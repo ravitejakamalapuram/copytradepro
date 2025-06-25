@@ -3,20 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
-
-// In-memory user storage (replace with database in production)
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  password: string;
-  createdAt: Date;
-}
-
-const users: User[] = [];
+import { userDatabase, User } from '../services/sqliteDatabase';
 
 // Helper function to generate JWT token
-const generateToken = (user: Omit<User, 'password'>): string => {
+const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('JWT_SECRET not configured');
@@ -24,7 +14,7 @@ const generateToken = (user: Omit<User, 'password'>): string => {
 
   return jwt.sign(
     {
-      id: user.id,
+      id: user.id.toString(),
       email: user.email,
       name: user.name,
     },
@@ -52,37 +42,22 @@ export const register = async (
 
     const { email, password, name } = req.body;
 
-    // Check if user already exists
-    const existingUser = users.find(user => user.email === email);
-    if (existingUser) {
-      res.status(409).json({
-        success: false,
-        message: 'User already exists with this email',
-      });
-      return;
-    }
-
     // Hash password
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new user
-    const newUser: User = {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+    // Create new user using SQLite database
+    const newUser = userDatabase.createUser({
       email,
       name,
       password: hashedPassword,
-      createdAt: new Date(),
-    };
-
-    users.push(newUser);
+    });
 
     // Generate token
     const token = generateToken({
       id: newUser.id,
       email: newUser.email,
       name: newUser.name,
-      createdAt: newUser.createdAt,
     });
 
     res.status(201).json({
@@ -93,7 +68,7 @@ export const register = async (
           id: newUser.id,
           email: newUser.email,
           name: newUser.name,
-          createdAt: newUser.createdAt,
+          createdAt: newUser.created_at,
         },
         token,
       },
@@ -122,8 +97,8 @@ export const login = async (
 
     const { email, password } = req.body;
 
-    // Find user
-    const user = users.find(u => u.email === email);
+    // Find user using SQLite database
+    const user = userDatabase.findUserByEmail(email);
     if (!user) {
       res.status(401).json({
         success: false,
@@ -147,7 +122,6 @@ export const login = async (
       id: user.id,
       email: user.email,
       name: user.name,
-      createdAt: user.createdAt,
     });
 
     res.status(200).json({
@@ -158,7 +132,7 @@ export const login = async (
           id: user.id,
           email: user.email,
           name: user.name,
-          createdAt: user.createdAt,
+          createdAt: user.created_at,
         },
         token,
       },
@@ -169,9 +143,9 @@ export const login = async (
 };
 
 export const logout = (
-  req: AuthenticatedRequest,
+  _req: AuthenticatedRequest,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void => {
   try {
     // In a real application, you might want to blacklist the token
@@ -180,7 +154,7 @@ export const logout = (
       message: 'Logout successful',
     });
   } catch (error) {
-    next(error);
+    _next(error);
   }
 };
 

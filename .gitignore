@@ -113,8 +113,10 @@ temp/
 # Trading specific sensitive files
 config/brokers.json
 config/api-keys.json
-data/trades.db
-data/accounts.db
+data/
+*.db
+*.db-shm
+*.db-wal
 logs/trading.log
 backups/
 
