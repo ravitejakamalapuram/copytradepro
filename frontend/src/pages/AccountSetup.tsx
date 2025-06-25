@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
-import type { ShoonyaCredentials } from '../services/brokerService';
+import type { ShoonyaCredentials, FyersCredentials } from '../services/brokerService';
 import './AccountSetup.css';
 
 interface BrokerAccount {
@@ -22,6 +22,7 @@ interface BrokerAccount {
 
 const SUPPORTED_BROKERS = [
   { id: 'shoonya', name: 'Shoonya', description: 'Reliable trading & investment platform by Finvasia' },
+  { id: 'fyers', name: 'Fyers', description: 'Advanced trading platform with powerful APIs' },
 ];
 
 const AccountSetup: React.FC = () => {
@@ -31,12 +32,18 @@ const AccountSetup: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     brokerName: '',
+    // Shoonya fields
     userId: '',
     password: '',
     twoFA: '',
     vendorCode: '',
     apiSecret: '',
     imei: '',
+    // Fyers fields
+    clientId: '',
+    secretKey: '',
+    redirectUri: '',
+    totpKey: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -58,28 +65,35 @@ const AccountSetup: React.FC = () => {
       newErrors.brokerName = 'Please select a broker';
     }
 
-    if (!formData.userId.trim()) {
-      newErrors.userId = 'User ID is required';
-    }
-
-    if (!formData.password.trim()) {
-      newErrors.password = 'Password is required';
-    }
-
-    if (!formData.twoFA.trim()) {
-      newErrors.twoFA = '2FA/OTP is required';
-    }
-
-    if (!formData.vendorCode.trim()) {
-      newErrors.vendorCode = 'Vendor Code is required';
-    }
-
-    if (!formData.apiSecret.trim()) {
-      newErrors.apiSecret = 'API Secret is required';
-    }
-
-    if (!formData.imei.trim()) {
-      newErrors.imei = 'IMEI is required';
+    if (formData.brokerName === 'shoonya') {
+      if (!formData.userId.trim()) {
+        newErrors.userId = 'User ID is required';
+      }
+      if (!formData.password.trim()) {
+        newErrors.password = 'Password is required';
+      }
+      if (!formData.twoFA.trim()) {
+        newErrors.twoFA = '2FA/OTP is required';
+      }
+      if (!formData.vendorCode.trim()) {
+        newErrors.vendorCode = 'Vendor Code is required';
+      }
+      if (!formData.apiSecret.trim()) {
+        newErrors.apiSecret = 'API Secret is required';
+      }
+      if (!formData.imei.trim()) {
+        newErrors.imei = 'IMEI is required';
+      }
+    } else if (formData.brokerName === 'fyers') {
+      if (!formData.clientId.trim()) {
+        newErrors.clientId = 'Client ID is required';
+      }
+      if (!formData.secretKey.trim()) {
+        newErrors.secretKey = 'Secret Key is required';
+      }
+      if (!formData.redirectUri.trim()) {
+        newErrors.redirectUri = 'Redirect URI is required';
+      }
     }
 
     setErrors(newErrors);
@@ -96,14 +110,27 @@ const AccountSetup: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const credentials: ShoonyaCredentials = {
-        userId: formData.userId.trim(),
-        password: formData.password.trim(),
-        twoFA: formData.twoFA.trim(),
-        vendorCode: formData.vendorCode.trim(),
-        apiSecret: formData.apiSecret.trim(),
-        imei: formData.imei.trim(),
-      };
+      let credentials: ShoonyaCredentials | FyersCredentials;
+
+      if (formData.brokerName === 'shoonya') {
+        credentials = {
+          userId: formData.userId.trim(),
+          password: formData.password.trim(),
+          twoFA: formData.twoFA.trim(),
+          vendorCode: formData.vendorCode.trim(),
+          apiSecret: formData.apiSecret.trim(),
+          imei: formData.imei.trim(),
+        } as ShoonyaCredentials;
+      } else if (formData.brokerName === 'fyers') {
+        credentials = {
+          clientId: formData.clientId.trim(),
+          secretKey: formData.secretKey.trim(),
+          redirectUri: formData.redirectUri.trim(),
+          totpKey: formData.totpKey?.trim() || undefined,
+        } as FyersCredentials;
+      } else {
+        throw new Error('Unsupported broker');
+      }
 
       const response = await brokerService.connectBroker(formData.brokerName, credentials);
 
@@ -123,7 +150,19 @@ const AccountSetup: React.FC = () => {
         };
 
         setAccounts(prev => [...prev, newAccount]);
-        setFormData({ brokerName: '', userId: '', password: '', twoFA: '', vendorCode: '', apiSecret: '', imei: '' });
+        setFormData({
+          brokerName: '',
+          userId: '',
+          password: '',
+          twoFA: '',
+          vendorCode: '',
+          apiSecret: '',
+          imei: '',
+          clientId: '',
+          secretKey: '',
+          redirectUri: '',
+          totpKey: '',
+        });
         setShowAddForm(false);
         setErrors({});
       } else {
@@ -267,107 +306,196 @@ const AccountSetup: React.FC = () => {
                   {errors.brokerName && <div className="form-error">{errors.brokerName}</div>}
                 </div>
 
-                <div className="form-group">
-                  <label htmlFor="userId" className="form-label">
-                    User ID
-                  </label>
-                  <input
-                    type="text"
-                    id="userId"
-                    name="userId"
-                    value={formData.userId}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.userId ? 'error' : ''}`}
-                    placeholder="Enter your Shoonya User ID"
-                    disabled={isSubmitting}
-                  />
-                  {errors.userId && <div className="form-error">{errors.userId}</div>}
-                </div>
+                {/* Conditional form fields based on selected broker */}
+                {formData.brokerName === 'shoonya' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="userId" className="form-label">
+                        User ID
+                      </label>
+                      <input
+                        type="text"
+                        id="userId"
+                        name="userId"
+                        value={formData.userId}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.userId ? 'error' : ''}`}
+                        placeholder="Enter your Shoonya User ID"
+                        disabled={isSubmitting}
+                      />
+                      {errors.userId && <div className="form-error">{errors.userId}</div>}
+                    </div>
+                  </>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="password" className="form-label">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.password ? 'error' : ''}`}
-                    placeholder="Enter your trading password"
-                    disabled={isSubmitting}
-                  />
-                  {errors.password && <div className="form-error">{errors.password}</div>}
-                </div>
+                {formData.brokerName === 'fyers' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="clientId" className="form-label">
+                        Client ID
+                      </label>
+                      <input
+                        type="text"
+                        id="clientId"
+                        name="clientId"
+                        value={formData.clientId}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.clientId ? 'error' : ''}`}
+                        placeholder="Enter your Fyers Client ID"
+                        disabled={isSubmitting}
+                      />
+                      {errors.clientId && <div className="form-error">{errors.clientId}</div>}
+                    </div>
+                  </>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="twoFA" className="form-label">
-                    2FA/OTP
-                  </label>
-                  <input
-                    type="text"
-                    id="twoFA"
-                    name="twoFA"
-                    value={formData.twoFA}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.twoFA ? 'error' : ''}`}
-                    placeholder="Enter OTP or TOTP"
-                    disabled={isSubmitting}
-                  />
-                  {errors.twoFA && <div className="form-error">{errors.twoFA}</div>}
-                </div>
+                {formData.brokerName === 'shoonya' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="password" className="form-label">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.password ? 'error' : ''}`}
+                        placeholder="Enter your trading password"
+                        disabled={isSubmitting}
+                      />
+                      {errors.password && <div className="form-error">{errors.password}</div>}
+                    </div>
 
-                <div className="form-group">
-                  <label htmlFor="vendorCode" className="form-label">
-                    Vendor Code
-                  </label>
-                  <input
-                    type="text"
-                    id="vendorCode"
-                    name="vendorCode"
-                    value={formData.vendorCode}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.vendorCode ? 'error' : ''}`}
-                    placeholder="Enter vendor code provided by Shoonya"
-                    disabled={isSubmitting}
-                  />
-                  {errors.vendorCode && <div className="form-error">{errors.vendorCode}</div>}
-                </div>
+                    <div className="form-group">
+                      <label htmlFor="twoFA" className="form-label">
+                        2FA/OTP
+                      </label>
+                      <input
+                        type="text"
+                        id="twoFA"
+                        name="twoFA"
+                        value={formData.twoFA}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.twoFA ? 'error' : ''}`}
+                        placeholder="Enter OTP or TOTP"
+                        disabled={isSubmitting}
+                      />
+                      {errors.twoFA && <div className="form-error">{errors.twoFA}</div>}
+                    </div>
 
-                <div className="form-group">
-                  <label htmlFor="apiSecret" className="form-label">
-                    API Secret
-                  </label>
-                  <input
-                    type="password"
-                    id="apiSecret"
-                    name="apiSecret"
-                    value={formData.apiSecret}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.apiSecret ? 'error' : ''}`}
-                    placeholder="Enter your API secret"
-                    disabled={isSubmitting}
-                  />
-                  {errors.apiSecret && <div className="form-error">{errors.apiSecret}</div>}
-                </div>
+                    <div className="form-group">
+                      <label htmlFor="vendorCode" className="form-label">
+                        Vendor Code
+                      </label>
+                      <input
+                        type="text"
+                        id="vendorCode"
+                        name="vendorCode"
+                        value={formData.vendorCode}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.vendorCode ? 'error' : ''}`}
+                        placeholder="Enter vendor code provided by Shoonya"
+                        disabled={isSubmitting}
+                      />
+                      {errors.vendorCode && <div className="form-error">{errors.vendorCode}</div>}
+                    </div>
+                  </>
+                )}
 
-                <div className="form-group">
-                  <label htmlFor="imei" className="form-label">
-                    IMEI
-                  </label>
-                  <input
-                    type="text"
-                    id="imei"
-                    name="imei"
-                    value={formData.imei}
-                    onChange={handleInputChange}
-                    className={`form-input ${errors.imei ? 'error' : ''}`}
-                    placeholder="Enter device IMEI for identification"
-                    disabled={isSubmitting}
-                  />
-                  {errors.imei && <div className="form-error">{errors.imei}</div>}
-                </div>
+                {formData.brokerName === 'fyers' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="secretKey" className="form-label">
+                        Secret Key
+                      </label>
+                      <input
+                        type="password"
+                        id="secretKey"
+                        name="secretKey"
+                        value={formData.secretKey}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.secretKey ? 'error' : ''}`}
+                        placeholder="Enter your Fyers Secret Key"
+                        disabled={isSubmitting}
+                      />
+                      {errors.secretKey && <div className="form-error">{errors.secretKey}</div>}
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="redirectUri" className="form-label">
+                        Redirect URI
+                      </label>
+                      <input
+                        type="url"
+                        id="redirectUri"
+                        name="redirectUri"
+                        value={formData.redirectUri}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.redirectUri ? 'error' : ''}`}
+                        placeholder="Enter your registered redirect URI"
+                        disabled={isSubmitting}
+                      />
+                      {errors.redirectUri && <div className="form-error">{errors.redirectUri}</div>}
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="totpKey" className="form-label">
+                        TOTP Key (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        id="totpKey"
+                        name="totpKey"
+                        value={formData.totpKey}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.totpKey ? 'error' : ''}`}
+                        placeholder="Enter TOTP key for automated authentication"
+                        disabled={isSubmitting}
+                      />
+                      {errors.totpKey && <div className="form-error">{errors.totpKey}</div>}
+                    </div>
+                  </>
+                )}
+
+                {formData.brokerName === 'shoonya' && (
+                  <>
+                    <div className="form-group">
+                      <label htmlFor="apiSecret" className="form-label">
+                        API Secret
+                      </label>
+                      <input
+                        type="password"
+                        id="apiSecret"
+                        name="apiSecret"
+                        value={formData.apiSecret}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.apiSecret ? 'error' : ''}`}
+                        placeholder="Enter your API secret"
+                        disabled={isSubmitting}
+                      />
+                      {errors.apiSecret && <div className="form-error">{errors.apiSecret}</div>}
+                    </div>
+
+                    <div className="form-group">
+                      <label htmlFor="imei" className="form-label">
+                        IMEI
+                      </label>
+                      <input
+                        type="text"
+                        id="imei"
+                        name="imei"
+                        value={formData.imei}
+                        onChange={handleInputChange}
+                        className={`form-input ${errors.imei ? 'error' : ''}`}
+                        placeholder="Enter device IMEI for identification"
+                        disabled={isSubmitting}
+                      />
+                      {errors.imei && <div className="form-error">{errors.imei}</div>}
+                    </div>
+                  </>
+                )}
 
                 <div className="modal-actions">
                   <button

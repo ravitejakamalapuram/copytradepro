@@ -9,6 +9,13 @@ export interface ShoonyaCredentials {
   imei: string;
 }
 
+export interface FyersCredentials {
+  clientId: string;
+  secretKey: string;
+  redirectUri: string;
+  totpKey?: string;
+}
+
 export interface BrokerConnectionResponse {
   success: boolean;
   message: string;
