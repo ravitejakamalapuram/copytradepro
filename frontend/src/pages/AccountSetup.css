@@ -72,6 +72,29 @@
   color: var(--text-primary);
 }
 
+.status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.status-indicator.active {
+  background-color: #28a745;
+  box-shadow: 0 0 4px rgba(40, 167, 69, 0.5);
+}
+
+.status-indicator.inactive {
+  background-color: #dc3545;
+  box-shadow: 0 0 4px rgba(220, 53, 69, 0.5);
+}
+
 .status-badge {
   padding: 0.25rem 0.75rem;
   border-radius: 20px;
@@ -220,4 +243,26 @@
   .modal-actions {
     flex-direction: column;
   }
+}
+
+/* Button Styles */
+.btn-info {
+  background: #17a2b8;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: background-color 0.2s ease;
+}
+
+.btn-info:hover {
+  background: #138496;
+}
+
+.btn-info:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+  opacity: 0.6;
 }

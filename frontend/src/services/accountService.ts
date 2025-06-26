@@ -92,6 +92,33 @@ export const accountService = {
     }
   },
 
+  // Check session status for an account
+  async checkAccountSessionStatus(accountId: string): Promise<{
+    success: boolean;
+    data?: {
+      accountId: number;
+      brokerName: string;
+      isActive: boolean;
+      sessionInfo: {
+        lastChecked: string;
+        status: 'active' | 'inactive' | 'expired' | 'error';
+        message: string;
+      };
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await api.get(`/broker/accounts/${accountId}/status`);
+      return response.data;
+    } catch (error) {
+      console.error('Failed to check account session status:', error);
+      return {
+        success: false,
+        message: 'Failed to check session status',
+      };
+    }
+  },
+
   // Local storage helpers for temporary storage during auth flow
   saveTemporaryAccount(account: Partial<ConnectedAccount>): void {
     localStorage.setItem('temp_account', JSON.stringify(account));
