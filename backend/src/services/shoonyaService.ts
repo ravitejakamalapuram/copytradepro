@@ -1,10 +1,11 @@
 import crypto from 'crypto';
 import axios from 'axios';
+import { authenticator } from 'otplib';
 
 export interface ShoonyaCredentials {
   userId: string;
   password: string;
-  twoFA: string;
+  totpKey: string;  // Changed from twoFA to totpKey
   vendorCode: string;
   apiSecret: string;
   imei: string;
@@ -48,9 +49,28 @@ export class ShoonyaService {
     return crypto.createHash('sha256').update(input).digest('hex');
   }
 
+  private generateTOTP(secret: string): string {
+    try {
+      // Generate TOTP using the secret key
+      const token = authenticator.generate(secret);
+      console.log('🔐 Generated TOTP:', token);
+      return token;
+    } catch (error) {
+      console.error('🚨 TOTP generation error:', error);
+      throw new Error('Failed to generate TOTP');
+    }
+  }
+
   private async makeRequest(endpoint: string, data: any): Promise<any> {
     try {
-      const response = await axios.post(`${this.baseUrl}/${endpoint}`, data, {
+      // Shoonya API expects data as jData parameter in form-encoded format (raw string)
+      const jsonData = JSON.stringify(data);
+      console.log('🔍 Sending jData:', jsonData);
+
+      const formBody = `jData=${jsonData}`;
+      console.log('🔍 Form body:', formBody);
+
+      const response = await axios.post(`${this.baseUrl}/${endpoint}`, formBody, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
@@ -59,6 +79,10 @@ export class ShoonyaService {
       return response.data;
     } catch (error: any) {
       console.error(`🚨 Shoonya API Error [${endpoint}]:`, error.message);
+      if (error.response) {
+        console.error('🚨 Response status:', error.response.status);
+        console.error('🚨 Response data:', error.response.data);
+      }
       throw new Error(`Shoonya API request failed: ${error.message}`);
     }
   }
@@ -68,18 +92,31 @@ export class ShoonyaService {
       // Hash the password with SHA256
       const hashedPassword = this.generateSHA256Hash(credentials.password);
 
+      // Generate TOTP from the secret key
+      const currentTOTP = this.generateTOTP(credentials.totpKey);
+
       const loginData = {
         uid: credentials.userId,
         pwd: hashedPassword,
-        factor2: credentials.twoFA,
+        factor2: currentTOTP,
         vc: credentials.vendorCode,
         appkey: this.generateSHA256Hash(`${credentials.userId}|${credentials.apiSecret}`),
         imei: credentials.imei,
         source: 'API',
+        apkversion: '1.0.0', // Required field that was missing
       };
 
       console.log('🔐 Attempting Shoonya login for user:', credentials.userId);
-      
+      console.log('🔍 Login data:', {
+        uid: loginData.uid,
+        vc: loginData.vc,
+        imei: loginData.imei,
+        source: loginData.source,
+        hasPassword: !!loginData.pwd,
+        hasAppkey: !!loginData.appkey,
+        hasFactor2: !!loginData.factor2
+      });
+
       const response = await this.makeRequest('QuickAuth', loginData);
       
       if (response.stat === 'Ok' && response.susertoken) {

@@ -33,11 +33,11 @@ const connectBrokerValidation = [
     .if(body('brokerName').equals('shoonya'))
     .isLength({ min: 1 })
     .withMessage('Password is required for Shoonya'),
-  body('credentials.twoFA')
+  body('credentials.totpKey')
     .if(body('brokerName').equals('shoonya'))
     .trim()
     .isLength({ min: 1 })
-    .withMessage('2FA/OTP is required for Shoonya'),
+    .withMessage('TOTP Key is required for Shoonya'),
   body('credentials.vendorCode')
     .if(body('brokerName').equals('shoonya'))
     .trim()

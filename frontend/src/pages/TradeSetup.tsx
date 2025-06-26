@@ -18,7 +18,7 @@ interface Trade {
 }
 
 const TradeSetup: React.FC = () => {
-  const { user } = useAuth();
+  const { } = useAuth();
   const [trades, setTrades] = useState<Trade[]>([]);
   const [showTradeForm, setShowTradeForm] = useState(false);
   const [formData, setFormData] = useState({
