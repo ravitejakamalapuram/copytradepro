@@ -70,6 +70,28 @@ export const accountService = {
     }
   },
 
+  // Activate account (re-authenticate)
+  async activateAccount(accountId: string): Promise<boolean> {
+    try {
+      const response = await api.post<AccountResponse>(`/broker/accounts/${accountId}/activate`);
+      return response.data.success;
+    } catch (error) {
+      console.error('Failed to activate account:', error);
+      return false;
+    }
+  },
+
+  // Deactivate account (logout)
+  async deactivateAccount(accountId: string): Promise<boolean> {
+    try {
+      const response = await api.post<AccountResponse>(`/broker/accounts/${accountId}/deactivate`);
+      return response.data.success;
+    } catch (error) {
+      console.error('Failed to deactivate account:', error);
+      return false;
+    }
+  },
+
   // Local storage helpers for temporary storage during auth flow
   saveTemporaryAccount(account: Partial<ConnectedAccount>): void {
     localStorage.setItem('temp_account', JSON.stringify(account));
