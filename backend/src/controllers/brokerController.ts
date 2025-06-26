@@ -97,7 +97,6 @@ export const connectBroker = async (
             exchanges: loginResponse.exarr || [],
             products: loginResponse.prarr || [],
             credentials: credentials, // Will be encrypted in database
-            is_active: true,
           });
 
           console.log('✅ Account saved to database:', dbAccount.id);
@@ -231,7 +230,7 @@ export const validateFyersAuthCode = async (
   }
 };
 
-// Get all connected accounts for a user
+// Get all connected accounts for a user with pure real-time session validation
 export const getConnectedAccounts = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -248,28 +247,69 @@ export const getConnectedAccounts = async (
       return;
     }
 
-    // Get connected accounts from database
+    // Get connected accounts from database (no is_active field - pure real-time validation)
     try {
       const dbAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
 
-      // Transform database accounts to frontend format
-      const accounts = dbAccounts.map(dbAccount => ({
-        id: dbAccount.id.toString(),
-        brokerName: dbAccount.broker_name,
-        accountId: dbAccount.account_id,
-        userId: dbAccount.account_id, // Use account_id as userId for display
-        userName: dbAccount.user_name,
-        email: dbAccount.email,
-        brokerDisplayName: dbAccount.broker_display_name,
-        exchanges: JSON.parse(dbAccount.exchanges),
-        products: JSON.parse(dbAccount.products),
-        isActive: Boolean(dbAccount.is_active),
-        createdAt: dbAccount.created_at,
-      }));
+      // Validate session status for each account in real-time
+      const accountsWithValidatedStatus = await Promise.all(
+        dbAccounts.map(async (dbAccount) => {
+          let isReallyActive = false;
+
+          // Check if broker service exists in memory and validate session
+          const userConnections = userBrokerConnections.get(userId);
+          const brokerService = userConnections?.get(dbAccount.broker_name);
+
+          if (brokerService) {
+            try {
+              let sessionValid = false;
+
+              if (dbAccount.broker_name === 'shoonya') {
+                sessionValid = await (brokerService as ShoonyaService).validateSession(dbAccount.account_id);
+              } else if (dbAccount.broker_name === 'fyers') {
+                sessionValid = await (brokerService as FyersService).validateSession();
+              }
+
+              if (sessionValid) {
+                isReallyActive = true;
+                console.log(`✅ Session valid for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
+              } else {
+                console.log(`⚠️ Session expired for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
+                // Remove from memory if session is invalid
+                userConnections?.delete(dbAccount.broker_name);
+                isReallyActive = false;
+              }
+            } catch (validationError: any) {
+              console.error(`🚨 Session validation error for ${dbAccount.broker_name}:`, validationError.message);
+              // On validation error, remove from memory and mark as inactive
+              userConnections?.delete(dbAccount.broker_name);
+              isReallyActive = false;
+            }
+          } else {
+            // No broker service in memory means not active
+            console.log(`⚠️ No active connection found for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
+            isReallyActive = false;
+          }
+
+          return {
+            id: dbAccount.id.toString(),
+            brokerName: dbAccount.broker_name,
+            accountId: dbAccount.account_id,
+            userId: dbAccount.account_id, // Use account_id as userId for display
+            userName: dbAccount.user_name,
+            email: dbAccount.email,
+            brokerDisplayName: dbAccount.broker_display_name,
+            exchanges: JSON.parse(dbAccount.exchanges),
+            products: JSON.parse(dbAccount.products),
+            isActive: isReallyActive, // Pure real-time validated status
+            createdAt: dbAccount.created_at,
+          };
+        })
+      );
 
       res.status(200).json({
         success: true,
-        accounts: accounts,
+        accounts: accountsWithValidatedStatus,
       });
     } catch (dbError: any) {
       console.error('🚨 Failed to fetch accounts from database:', dbError.message);
@@ -283,6 +323,103 @@ export const getConnectedAccounts = async (
     res.status(500).json({
       success: false,
       message: 'Internal server error',
+    });
+  }
+};
+
+// Check session status for a specific account (for UI refresh)
+export const checkAccountSessionStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { accountId } = req.params;
+
+    if (!userId || !accountId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated or account ID missing',
+      });
+      return;
+    }
+
+    const accountIdNum = parseInt(accountId);
+
+    // Get account from database
+    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    if (!account) {
+      res.status(404).json({
+        success: false,
+        message: 'Account not found',
+      });
+      return;
+    }
+
+    let isActive = false;
+    let sessionInfo = {
+      lastChecked: new Date().toISOString(),
+      status: 'inactive',
+      message: 'No active session found',
+    };
+
+    // Check if broker service exists in memory and validate session
+    const userConnections = userBrokerConnections.get(userId);
+    const brokerService = userConnections?.get(account.broker_name);
+
+    if (brokerService) {
+      try {
+        let sessionValid = false;
+
+        if (account.broker_name === 'shoonya') {
+          sessionValid = await (brokerService as ShoonyaService).validateSession(account.account_id);
+        } else if (account.broker_name === 'fyers') {
+          sessionValid = await (brokerService as FyersService).validateSession();
+        }
+
+        if (sessionValid) {
+          isActive = true;
+          sessionInfo = {
+            lastChecked: new Date().toISOString(),
+            status: 'active',
+            message: 'Session is valid and active',
+          };
+        } else {
+          // Remove from memory if session is invalid
+          userConnections?.delete(account.broker_name);
+          sessionInfo = {
+            lastChecked: new Date().toISOString(),
+            status: 'expired',
+            message: 'Session has expired',
+          };
+        }
+      } catch (validationError: any) {
+        console.error(`🚨 Session validation error for ${account.broker_name}:`, validationError.message);
+        // On validation error, remove from memory
+        userConnections?.delete(account.broker_name);
+        sessionInfo = {
+          lastChecked: new Date().toISOString(),
+          status: 'error',
+          message: `Validation error: ${validationError.message}`,
+        };
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        accountId: account.id,
+        brokerName: account.broker_name,
+        isActive,
+        sessionInfo,
+      },
+    });
+  } catch (error: any) {
+    console.error('🚨 Check session status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check session status',
     });
   }
 };
@@ -357,11 +494,24 @@ export const removeConnectedAccount = async (
         return;
       }
 
-      // Remove from in-memory connections (logout)
+      // Perform actual logout from broker and remove from in-memory connections
       const userConnections = userBrokerConnections.get(userId);
       if (userConnections && userConnections.has(account.broker_name)) {
+        const brokerService = userConnections.get(account.broker_name);
+
+        try {
+          if (account.broker_name === 'shoonya' && brokerService) {
+            await (brokerService as ShoonyaService).logout(account.account_id);
+          } else if (account.broker_name === 'fyers' && brokerService) {
+            await (brokerService as FyersService).logout();
+          }
+          console.log('✅ Successfully logged out from broker:', account.broker_name);
+        } catch (logoutError: any) {
+          console.error('⚠️ Logout error (continuing with removal):', logoutError.message);
+        }
+
         userConnections.delete(account.broker_name);
-        console.log('✅ Logged out from broker:', account.broker_name);
+        console.log('✅ Removed from in-memory connections:', account.broker_name);
       }
 
       // Delete from database
@@ -449,11 +599,8 @@ export const activateAccount = async (
       loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
 
       if (loginResponse.stat === 'Ok') {
-        // Store the connection
+        // Store the connection (status is determined by real-time validation)
         userConnections.set(account.broker_name, brokerService);
-
-        // Update account status in database
-        userDatabase.updateAccountStatus(accountIdNum, true);
 
         res.status(200).json({
           success: true,
@@ -515,15 +662,28 @@ export const deactivateAccount = async (
       return;
     }
 
-    // Remove from in-memory connections (logout)
+    // Perform actual logout from broker
     const userConnections = userBrokerConnections.get(userId);
     if (userConnections && userConnections.has(account.broker_name)) {
+      const brokerService = userConnections.get(account.broker_name);
+
+      try {
+        if (account.broker_name === 'shoonya' && brokerService) {
+          await (brokerService as ShoonyaService).logout(account.account_id);
+        } else if (account.broker_name === 'fyers' && brokerService) {
+          await (brokerService as FyersService).logout();
+        }
+        console.log('✅ Successfully logged out from broker:', account.broker_name);
+      } catch (logoutError: any) {
+        console.error('⚠️ Logout error (continuing anyway):', logoutError.message);
+      }
+
+      // Remove from in-memory connections
       userConnections.delete(account.broker_name);
-      console.log('✅ Logged out from broker:', account.broker_name);
+      console.log('✅ Removed from in-memory connections:', account.broker_name);
     }
 
-    // Update account status in database to inactive
-    userDatabase.updateAccountStatus(accountIdNum, false);
+    // Note: No database status update needed - status is determined by real-time validation
 
     res.status(200).json({
       success: true,

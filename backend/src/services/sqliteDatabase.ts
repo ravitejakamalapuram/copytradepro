@@ -35,9 +35,9 @@ export interface ConnectedAccount {
   exchanges: string; // JSON string
   products: string; // JSON string
   encrypted_credentials: string; // Encrypted JSON
-  is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Note: is_active removed - always validate in real-time
 }
 
 export interface CreateConnectedAccountData {
@@ -50,7 +50,7 @@ export interface CreateConnectedAccountData {
   exchanges: string[];
   products: any[];
   credentials: any; // Will be encrypted before storage
-  is_active: boolean;
+  // Note: is_active removed - always validate in real-time
 }
 
 export class SQLiteUserDatabase {
@@ -160,7 +160,6 @@ export class SQLiteUserDatabase {
         exchanges TEXT NOT NULL, -- JSON array as string
         products TEXT NOT NULL, -- JSON array as string
         encrypted_credentials TEXT NOT NULL, -- Encrypted credentials JSON
-        is_active BOOLEAN DEFAULT true,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
@@ -440,8 +439,8 @@ export class SQLiteUserDatabase {
     const insertAccount = this.db.prepare(`
       INSERT OR REPLACE INTO connected_accounts (
         user_id, broker_name, account_id, user_name, email,
-        broker_display_name, exchanges, products, encrypted_credentials, is_active
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        broker_display_name, exchanges, products, encrypted_credentials
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -457,8 +456,7 @@ export class SQLiteUserDatabase {
         accountData.broker_display_name,
         JSON.stringify(accountData.exchanges),
         JSON.stringify(accountData.products),
-        encryptedCredentials,
-        accountData.is_active ? 1 : 0
+        encryptedCredentials
       );
 
       const accountId = result.lastInsertRowid as number;
@@ -529,28 +527,8 @@ export class SQLiteUserDatabase {
     }
   }
 
-  // Update account active status
-  updateAccountStatus(accountId: number, isActive: boolean): boolean {
-    const updateAccount = this.db.prepare(`
-      UPDATE connected_accounts
-      SET is_active = ?
-      WHERE id = ?
-    `);
-
-    try {
-      const result = updateAccount.run(isActive ? 1 : 0, accountId);
-      const updated = result.changes > 0;
-
-      if (updated) {
-        console.log('✅ Account status updated successfully, ID:', accountId, 'Active:', isActive);
-      }
-
-      return updated;
-    } catch (error) {
-      console.error('🚨 Failed to update account status:', error);
-      throw error;
-    }
-  }
+  // Note: updateAccountStatus method removed - we no longer store active status in database
+  // Active status is always determined by real-time session validation
 
   // Delete connected account
   deleteConnectedAccount(accountId: number): boolean {

@@ -4,6 +4,7 @@ import {
   connectBroker,
   validateFyersAuthCode,
   getConnectedAccounts,
+  checkAccountSessionStatus,
   saveConnectedAccount,
   removeConnectedAccount,
   activateAccount,
@@ -104,6 +105,7 @@ router.post('/validate-fyers-auth', authenticateToken, validateFyersAuthCode);
 
 // Account management routes
 router.get('/accounts', authenticateToken, getConnectedAccounts);
+router.get('/accounts/:accountId/status', authenticateToken, checkAccountSessionStatus);
 router.post('/accounts', authenticateToken, saveConnectedAccount);
 router.delete('/accounts/:accountId', authenticateToken, removeConnectedAccount);
 router.post('/accounts/:accountId/activate', authenticateToken, activateAccount);
