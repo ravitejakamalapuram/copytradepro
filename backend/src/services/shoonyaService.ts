@@ -109,6 +109,12 @@ export class ShoonyaService {
       if (error.response) {
         console.error('🚨 Response status:', error.response.status);
         console.error('🚨 Response data:', error.response.data);
+        console.error('🚨 Response headers:', error.response.headers);
+
+        // If it's a 400 error, the response data usually contains the actual error
+        if (error.response.status === 400 && error.response.data) {
+          throw new Error(`Shoonya API Error: ${JSON.stringify(error.response.data)}`);
+        }
       }
       throw new Error(`Shoonya API request failed: ${error.message}`);
     }
@@ -228,6 +234,8 @@ export class ShoonyaService {
         quantity: orderData.quantity,
         type: orderData.priceType,
       });
+
+      console.log('🔍 Full Shoonya order request data:', requestData);
 
       const response = await this.makeAuthenticatedRequest('PlaceOrder', requestData);
       

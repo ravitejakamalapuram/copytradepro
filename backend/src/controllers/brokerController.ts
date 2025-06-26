@@ -901,7 +901,7 @@ export const placeOrder = async (
           shoonyaPriceType = 'MKT';
       }
 
-      const shoonyaOrderData = {
+      const shoonyaOrderData: import('../services/shoonyaService').PlaceOrderRequest = {
         userId: account.account_id, // Use the actual broker account ID (e.g., "FN135006")
         buyOrSell: action === 'BUY' ? 'B' as const : 'S' as const,
         productType: productType || 'C',
