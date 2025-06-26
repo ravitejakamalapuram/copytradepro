@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../hooks/useAuth';
 import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
@@ -20,7 +19,7 @@ interface Trade {
 }
 
 const TradeSetup: React.FC = () => {
-  const { } = useAuth();
+  // const { user } = useAuth(); // Not currently used
   const [trades, setTrades] = useState<Trade[]>([]);
   const [showTradeForm, setShowTradeForm] = useState(false);
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
