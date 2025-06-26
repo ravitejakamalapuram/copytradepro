@@ -324,7 +324,7 @@ const AccountSetup: React.FC = () => {
                     <p className="account-meta">User: {account.userName} ({account.email})</p>
                     <p className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</p>
                     <p className="account-date">
-                      Added: {account.createdAt.toLocaleDateString()}
+                      Added: {new Date(account.createdAt).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="account-actions">
