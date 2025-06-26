@@ -1,24 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
 import type { ShoonyaCredentials, FyersCredentials } from '../services/brokerService';
+import { accountService } from '../services/accountService';
+import type { ConnectedAccount } from '../services/accountService';
 import './AccountSetup.css';
 
-interface BrokerAccount {
-  id: string;
-  brokerName: string;
-  accountId: string;
-  userId: string;
-  userName: string;
-  email: string;
-  brokerDisplayName: string;
-  exchanges: string[];
-  products: string[];
-  isActive: boolean;
-  createdAt: Date;
-}
+// Using ConnectedAccount from accountService
 
 const SUPPORTED_BROKERS = [
   { id: 'shoonya', name: 'Shoonya', description: 'Reliable trading & investment platform by Finvasia' },
@@ -28,7 +18,7 @@ const SUPPORTED_BROKERS = [
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [accounts, setAccounts] = useState<BrokerAccount[]>([]);
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     brokerName: '',
@@ -47,6 +37,23 @@ const AccountSetup: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [fyersAuthUrl, setFyersAuthUrl] = useState<string>('');
+  const [fyersAuthCode, setFyersAuthCode] = useState<string>('');
+  const [showFyersAuthStep, setShowFyersAuthStep] = useState(false);
+
+  // Load connected accounts on component mount
+  useEffect(() => {
+    loadConnectedAccounts();
+  }, []);
+
+  const loadConnectedAccounts = async () => {
+    try {
+      const connectedAccounts = await accountService.getConnectedAccounts();
+      setAccounts(connectedAccounts);
+    } catch (error) {
+      console.error('Failed to load connected accounts:', error);
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -135,21 +142,26 @@ const AccountSetup: React.FC = () => {
       const response = await brokerService.connectBroker(formData.brokerName, credentials);
 
       if (response.success && response.data) {
-        const newAccount: BrokerAccount = {
-          id: Date.now().toString(),
-          brokerName: response.data.brokerName,
-          accountId: response.data.accountId,
-          userId: response.data.userId,
-          userName: response.data.userName,
-          email: response.data.email,
-          brokerDisplayName: response.data.brokerDisplayName,
-          exchanges: response.data.exchanges,
-          products: response.data.products,
-          isActive: true,
-          createdAt: new Date(),
-        };
+        // Handle Fyers two-step authentication
+        if (formData.brokerName === 'fyers' && response.data.requiresAuthCode && response.data.authUrl) {
+          setFyersAuthUrl(response.data.authUrl);
+          setShowFyersAuthStep(true);
+          setErrors({});
+          return; // Don't close the form yet
+        }
 
-        setAccounts(prev => [...prev, newAccount]);
+        // Handle successful connection (Shoonya or completed Fyers)
+        const newAccount = accountService.createAccountFromBrokerResponse(
+          formData.brokerName,
+          response.data,
+          credentials
+        );
+
+        // Save to backend and update local state
+        const savedAccount = await accountService.saveConnectedAccount(newAccount);
+        if (savedAccount) {
+          setAccounts(prev => [...prev, savedAccount]);
+        }
         setFormData({
           brokerName: '',
           userId: '',
@@ -176,9 +188,79 @@ const AccountSetup: React.FC = () => {
     }
   };
 
-  const handleRemoveAccount = (accountId: string) => {
+  const handleFyersAuthCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!fyersAuthCode.trim()) {
+      setErrors({ authCode: 'Auth code is required' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrors({});
+
+    try {
+      const credentials = {
+        clientId: formData.clientId,
+        secretKey: formData.secretKey,
+        redirectUri: formData.redirectUri,
+      } as FyersCredentials;
+
+      const data = await brokerService.validateFyersAuthCode(fyersAuthCode, credentials);
+
+      if (data.success && data.data) {
+        const newAccount = accountService.createAccountFromBrokerResponse(
+          'fyers',
+          data.data,
+          credentials
+        );
+
+        // Save to backend and update local state
+        const savedAccount = await accountService.saveConnectedAccount(newAccount);
+        if (savedAccount) {
+          setAccounts(prev => [...prev, savedAccount]);
+        }
+        setFormData({
+          brokerName: '',
+          userId: '',
+          password: '',
+          twoFA: '',
+          vendorCode: '',
+          apiSecret: '',
+          imei: '',
+          clientId: '',
+          secretKey: '',
+          redirectUri: '',
+          totpKey: '',
+        });
+        setShowAddForm(false);
+        setShowFyersAuthStep(false);
+        setFyersAuthUrl('');
+        setFyersAuthCode('');
+      } else {
+        setErrors({ general: data.message || 'Failed to validate auth code' });
+      }
+    } catch (error) {
+      console.error('Error validating Fyers auth code:', error);
+      setErrors({ general: 'Network error. Please try again.' });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveAccount = async (accountId: string) => {
     if (window.confirm('Are you sure you want to remove this account?')) {
-      setAccounts(prev => prev.filter(account => account.id !== accountId));
+      try {
+        const success = await accountService.removeConnectedAccount(accountId);
+        if (success) {
+          setAccounts(prev => prev.filter(account => account.id !== accountId));
+        } else {
+          setErrors({ general: 'Failed to remove account. Please try again.' });
+        }
+      } catch (error) {
+        console.error('Error removing account:', error);
+        setErrors({ general: 'Network error. Please try again.' });
+      }
     }
   };
 
@@ -298,7 +380,7 @@ const AccountSetup: React.FC = () => {
                   >
                     <option value="">Select a broker</option>
                     {SUPPORTED_BROKERS.map(broker => (
-                      <option key={broker.id} value={broker.name}>
+                      <option key={broker.id} value={broker.id}>
                         {broker.name} - {broker.description}
                       </option>
                     ))}
@@ -512,6 +594,89 @@ const AccountSetup: React.FC = () => {
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? 'Adding...' : 'Add Account'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Fyers Auth Code Step */}
+        {showFyersAuthStep && (
+          <div className="modal-overlay">
+            <div className="modal">
+              <div className="modal-header">
+                <h3>Complete Fyers Authentication</h3>
+                <button
+                  className="modal-close"
+                  onClick={() => {
+                    setShowFyersAuthStep(false);
+                    setFyersAuthUrl('');
+                    setFyersAuthCode('');
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+
+              <form onSubmit={handleFyersAuthCode} className="modal-body">
+                {errors.general && (
+                  <div className="form-error mb-3">{errors.general}</div>
+                )}
+
+                <div className="auth-step-info">
+                  <h4>Step 1: Visit Authorization URL</h4>
+                  <p>Click the link below to authorize the application:</p>
+                  <a
+                    href={fyersAuthUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="auth-url-link"
+                  >
+                    Open Fyers Authorization Page
+                  </a>
+                </div>
+
+                <div className="auth-step-info">
+                  <h4>Step 2: Enter Authorization Code</h4>
+                  <p>After authorizing, you'll receive an authorization code. Enter it below:</p>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="fyersAuthCode" className="form-label">
+                    Authorization Code
+                  </label>
+                  <input
+                    type="text"
+                    id="fyersAuthCode"
+                    value={fyersAuthCode}
+                    onChange={(e) => setFyersAuthCode(e.target.value)}
+                    className={`form-input ${errors.authCode ? 'error' : ''}`}
+                    placeholder="Enter the authorization code from Fyers"
+                    disabled={isSubmitting}
+                  />
+                  {errors.authCode && <div className="form-error">{errors.authCode}</div>}
+                </div>
+
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setShowFyersAuthStep(false);
+                      setFyersAuthUrl('');
+                      setFyersAuthCode('');
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={isSubmitting || !fyersAuthCode.trim()}
+                  >
+                    {isSubmitting ? 'Validating...' : 'Complete Authentication'}
                   </button>
                 </div>
               </form>

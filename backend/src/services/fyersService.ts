@@ -1,14 +1,6 @@
-import axios, { AxiosInstance } from 'axios';
-import crypto from 'crypto';
+const { fyersModel } = require('fyers-api-v3');
 
 export interface FyersCredentials {
-  clientId: string;
-  secretKey: string;
-  redirectUri: string;
-  totpKey?: string; // For TOTP-based authentication
-}
-
-export interface FyersLoginRequest {
   clientId: string;
   secretKey: string;
   redirectUri: string;
@@ -31,10 +23,10 @@ export interface PlaceOrderRequest {
 }
 
 export interface FyersOrderResponse {
-  s: string; // Status
+  s: string;
   code: number;
   message: string;
-  id?: string; // Order ID
+  id?: string;
 }
 
 export interface FyersPosition {
@@ -61,130 +53,69 @@ export interface FyersQuote {
 }
 
 export class FyersService {
-  private baseUrl: string;
-  private apiKey: string;
+  private fyers: any;
   private accessToken: string | null = null;
-  private httpClient: AxiosInstance;
+  private appId: string = '';
 
   constructor() {
-    this.baseUrl = 'https://api-t1.fyers.in/api/v3';
-    this.apiKey = '';
+    // Initialize the official Fyers API client
+    this.fyers = new fyersModel({
+      path: process.cwd() + '/logs',
+      enableLogging: true
+    });
+  }
+
+  // Generate auth URL for user to visit
+  generateAuthUrl(credentials: FyersCredentials): string {
+    this.appId = credentials.clientId;
+    this.fyers.setAppId(credentials.clientId);
+    this.fyers.setRedirectUrl(credentials.redirectUri);
     
-    this.httpClient = axios.create({
-      baseURL: this.baseUrl,
-      timeout: 30000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-    });
-
-    // Add request interceptor for authentication
-    this.httpClient.interceptors.request.use((config) => {
-      if (this.accessToken) {
-        config.headers['Authorization'] = `Bearer ${this.accessToken}`;
-      }
-      return config;
-    });
-
-    // Add response interceptor for error handling
-    this.httpClient.interceptors.response.use(
-      (response) => response,
-      (error) => {
-        console.error('🚨 Fyers API Error:', error.response?.data || error.message);
-        throw error;
-      }
-    );
+    const authUrl = this.fyers.generateAuthCode();
+    console.log('🔗 Auth URL generated:', authUrl);
+    return authUrl;
   }
 
-  // Generate TOTP code (simplified version - in production use a proper TOTP library)
-  private generateTOTP(secret: string): string {
-    const epoch = Math.round(new Date().getTime() / 1000.0);
-    const time = Math.floor(epoch / 30);
-    const timeHex = time.toString(16).padStart(16, '0');
-    const timeBytes = Buffer.from(timeHex, 'hex');
-
-    // Use the secret as-is for HMAC (in production, decode base32 properly)
-    const hmac = crypto.createHmac('sha1', Buffer.from(secret, 'utf8'));
-    hmac.update(timeBytes);
-    const hash = hmac.digest();
-
-    if (!hash || hash.length === 0) {
-      throw new Error('Failed to generate TOTP hash');
-    }
-
-    const offset = hash[hash.length - 1]! & 0xf;
-    const code = ((hash[offset]! & 0x7f) << 24) |
-                 ((hash[offset + 1]! & 0xff) << 16) |
-                 ((hash[offset + 2]! & 0xff) << 8) |
-                 (hash[offset + 3]! & 0xff);
-
-    return (code % 1000000).toString().padStart(6, '0');
-  }
-
-  // Step 1: Generate auth code
-  async generateAuthCode(credentials: FyersCredentials): Promise<string> {
+  // Generate access token from auth code
+  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; message: string }> {
     try {
-      const response = await this.httpClient.post('/generate-authcode', {
-        fyers_id: credentials.clientId,
-        app_id: credentials.clientId.split('-')[0],
-        redirect_uri: credentials.redirectUri,
-        response_type: 'code',
-        state: 'sample_state',
+      const response = await this.fyers.generate_access_token({
+        client_id: credentials.clientId,
+        secret_key: credentials.secretKey,
+        auth_code: authCode
       });
 
-      if (response.data.s === 'ok') {
-        return response.data.auth_code;
+      if (response.s === 'ok') {
+        this.accessToken = response.access_token;
+        this.fyers.setAccessToken(response.access_token);
+        
+        console.log('✅ Fyers access token generated successfully');
+        return {
+          success: true,
+          accessToken: response.access_token,
+          message: 'Access token generated successfully',
+        };
       } else {
-        throw new Error(response.data.message || 'Failed to generate auth code');
+        throw new Error(response.message || 'Failed to generate access token');
       }
     } catch (error: any) {
-      console.error('🚨 Failed to generate auth code:', error);
-      throw new Error(error.response?.data?.message || 'Auth code generation failed');
+      console.error('🚨 Failed to generate access token:', error);
+      return {
+        success: false,
+        message: error.message || 'Access token generation failed',
+      };
     }
   }
 
-  // Step 2: Validate auth code and get access token
-  async validateAuthCode(authCode: string, credentials: FyersCredentials): Promise<string> {
+  // Complete login flow - returns auth URL for user to visit
+  async login(credentials: FyersCredentials): Promise<{ success: boolean; authUrl?: string; message: string }> {
     try {
-      const appIdHash = crypto
-        .createHash('sha256')
-        .update(`${credentials.clientId}:${credentials.secretKey}`)
-        .digest('hex');
-
-      const response = await this.httpClient.post('/validate-authcode', {
-        grant_type: 'authorization_code',
-        appIdHash: appIdHash,
-        code: authCode,
-      });
-
-      if (response.data.s === 'ok') {
-        this.accessToken = response.data.access_token;
-        this.apiKey = credentials.clientId;
-        return response.data.access_token;
-      } else {
-        throw new Error(response.data.message || 'Failed to validate auth code');
-      }
-    } catch (error: any) {
-      console.error('🚨 Failed to validate auth code:', error);
-      throw new Error(error.response?.data?.message || 'Auth code validation failed');
-    }
-  }
-
-  // Complete login flow
-  async login(credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; message: string }> {
-    try {
-      // Step 1: Generate auth code
-      const authCode = await this.generateAuthCode(credentials);
+      const authUrl = this.generateAuthUrl(credentials);
       
-      // Step 2: Validate auth code and get access token
-      const accessToken = await this.validateAuthCode(authCode, credentials);
-
-      console.log('✅ Fyers login successful');
       return {
         success: true,
-        accessToken,
-        message: 'Login successful',
+        authUrl,
+        message: 'Please visit the auth URL to complete authentication',
       };
     } catch (error: any) {
       console.error('🚨 Fyers login failed:', error);
@@ -195,7 +126,7 @@ export class FyersService {
     }
   }
 
-  // Place order
+  // Place order using official API
   async placeOrder(orderData: PlaceOrderRequest): Promise<FyersOrderResponse> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
@@ -217,92 +148,85 @@ export class FyersService {
         takeProfit: orderData.takeProfit || 0,
       };
 
-      const response = await this.httpClient.post('/orders', payload);
-
-      console.log('✅ Order placed successfully:', response.data);
-      return response.data;
+      const response = await this.fyers.place_order(payload);
+      console.log('✅ Order placed successfully:', response);
+      return response;
     } catch (error: any) {
       console.error('🚨 Failed to place order:', error);
-      throw new Error(error.response?.data?.message || 'Order placement failed');
+      throw new Error(error.message || 'Order placement failed');
     }
   }
 
-  // Get order book
+  // Get order book using official API
   async getOrderBook(): Promise<any[]> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
     }
 
     try {
-      const response = await this.httpClient.get('/orders');
-      return response.data.orderBook || [];
+      const response = await this.fyers.orderbook();
+      return response.orderBook || [];
     } catch (error: any) {
       console.error('🚨 Failed to get order book:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get order book');
+      throw new Error(error.message || 'Failed to get order book');
     }
   }
 
-  // Get positions
+  // Get positions using official API
   async getPositions(): Promise<FyersPosition[]> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
     }
 
     try {
-      const response = await this.httpClient.get('/positions');
-      return response.data.netPositions || [];
+      const response = await this.fyers.get_positions();
+      return response.netPositions || [];
     } catch (error: any) {
       console.error('🚨 Failed to get positions:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get positions');
+      throw new Error(error.message || 'Failed to get positions');
     }
   }
 
-  // Search symbols
+  // Search symbols using official API
   async searchScrip(exchange: string, symbol: string): Promise<any[]> {
     try {
-      const response = await this.httpClient.get('/search', {
-        params: {
-          symbol: `${exchange}:${symbol}`,
-        },
+      const response = await this.fyers.search_scrips({
+        symbol: `${exchange}:${symbol}`
       });
-      return response.data.symbols || [];
+      return response.symbols || [];
     } catch (error: any) {
       console.error('🚨 Failed to search symbols:', error);
-      throw new Error(error.response?.data?.message || 'Symbol search failed');
+      throw new Error(error.message || 'Symbol search failed');
     }
   }
 
-  // Get quotes
+  // Get quotes using official API
   async getQuotes(symbols: string[]): Promise<FyersQuote[]> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
     }
 
     try {
-      const response = await this.httpClient.get('/quotes', {
-        params: {
-          symbols: symbols.join(','),
-        },
-      });
-      return response.data.d || [];
+      const response = await this.fyers.getQuotes(symbols);
+      return response.d || [];
     } catch (error: any) {
       console.error('🚨 Failed to get quotes:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get quotes');
+      throw new Error(error.message || 'Failed to get quotes');
     }
   }
 
-  // Get profile
+  // Get profile using official API
   async getProfile(): Promise<any> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
     }
 
     try {
-      const response = await this.httpClient.get('/profile');
-      return response.data.data;
+      const response = await this.fyers.get_profile();
+      return response;
     } catch (error: any) {
       console.error('🚨 Failed to get profile:', error);
-      throw new Error(error.response?.data?.message || 'Failed to get profile');
+      throw new Error(error.message || 'Failed to get profile');
     }
   }
 
@@ -331,12 +255,26 @@ export class FyersService {
   // Set access token (for existing sessions)
   setAccessToken(token: string): void {
     this.accessToken = token;
+    this.fyers.setAccessToken(token);
   }
 
   // Logout
-  logout(): void {
-    this.accessToken = null;
-    this.apiKey = '';
-    console.log('✅ Fyers logout successful');
+  async logout(): Promise<{ success: boolean; message: string }> {
+    try {
+      this.accessToken = null;
+      this.appId = '';
+      
+      console.log('✅ Fyers logout successful');
+      return {
+        success: true,
+        message: 'Logout successful',
+      };
+    } catch (error: any) {
+      console.error('🚨 Fyers logout failed:', error);
+      return {
+        success: false,
+        message: error.message || 'Logout failed',
+      };
+    }
   }
 }

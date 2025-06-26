@@ -28,6 +28,8 @@ export const connectBroker = async (
     const { brokerName, credentials } = req.body;
     const userId = req.user?.id;
 
+    console.log('🔍 Connect broker request:', { brokerName, userId, credentialsKeys: Object.keys(credentials || {}) });
+
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -89,17 +91,18 @@ export const connectBroker = async (
       brokerService = new FyersService();
       loginResponse = await brokerService.login(credentials);
 
-      if (loginResponse.success) {
-        // Store the connection
+      if (loginResponse.success && loginResponse.authUrl) {
+        // Store the service instance for later use
         userConnections.set(brokerName, brokerService);
 
         res.status(200).json({
           success: true,
-          message: `Successfully connected to ${brokerName}`,
+          message: 'Auth URL generated. Please complete authentication.',
           data: {
             brokerName,
-            accessToken: loginResponse.accessToken,
+            authUrl: loginResponse.authUrl,
             message: loginResponse.message,
+            requiresAuthCode: true,
           },
         });
       } else {
@@ -119,6 +122,172 @@ export const connectBroker = async (
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to connect to broker',
+    });
+  }
+};
+
+export const validateFyersAuthCode = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const { authCode, credentials } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!authCode) {
+      res.status(400).json({
+        success: false,
+        message: 'Auth code is required',
+      });
+      return;
+    }
+
+    // Get the existing Fyers service instance
+    const userConnections = userBrokerConnections.get(userId);
+    const fyersService = userConnections?.get('fyers') as FyersService;
+
+    if (!fyersService) {
+      res.status(400).json({
+        success: false,
+        message: 'No pending Fyers authentication found. Please start the connection process again.',
+      });
+      return;
+    }
+
+    // Generate access token using the auth code
+    const tokenResponse = await fyersService.generateAccessToken(authCode, credentials);
+
+    if (tokenResponse.success) {
+      res.status(200).json({
+        success: true,
+        message: 'Successfully connected to Fyers',
+        data: {
+          brokerName: 'fyers',
+          accessToken: tokenResponse.accessToken,
+          message: tokenResponse.message,
+        },
+      });
+    } else {
+      res.status(401).json({
+        success: false,
+        message: tokenResponse.message || 'Failed to validate auth code',
+      });
+    }
+  } catch (error: any) {
+    console.error('🚨 Validate Fyers auth code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Get all connected accounts for a user
+export const getConnectedAccounts = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // For now, return empty array - in production, fetch from database
+    res.status(200).json({
+      success: true,
+      accounts: [],
+    });
+  } catch (error: any) {
+    console.error('🚨 Get connected accounts error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Save a connected account
+export const saveConnectedAccount = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const accountData = req.body;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // For now, just return the account with an ID - in production, save to database
+    const savedAccount = {
+      ...accountData,
+      id: Date.now().toString(),
+      createdAt: new Date(),
+    };
+
+    res.status(200).json({
+      success: true,
+      data: savedAccount,
+    });
+  } catch (error: any) {
+    console.error('🚨 Save connected account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Remove a connected account
+export const removeConnectedAccount = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { accountId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // For now, just return success - in production, remove from database
+    res.status(200).json({
+      success: true,
+      message: 'Account removed successfully',
+    });
+  } catch (error: any) {
+    console.error('🚨 Remove connected account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
     });
   }
 };
