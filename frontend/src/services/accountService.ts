@@ -1,4 +1,4 @@
-import { api } from './api';
+import api from './api';
 
 export interface ConnectedAccount {
   id: string;
@@ -85,7 +85,7 @@ export const accountService = {
   },
 
   // Create account from broker response
-  createAccountFromBrokerResponse(brokerName: string, brokerResponse: any, credentials: any): ConnectedAccount {
+  createAccountFromBrokerResponse(brokerName: string, brokerResponse: any, _credentials: any): ConnectedAccount {
     const baseAccount = {
       id: Date.now().toString(),
       brokerName,

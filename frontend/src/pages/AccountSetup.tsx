@@ -17,7 +17,7 @@ const SUPPORTED_BROKERS = [
 
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { } = useAuth();
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -25,7 +25,7 @@ const AccountSetup: React.FC = () => {
     // Shoonya fields
     userId: '',
     password: '',
-    twoFA: '',
+    totpKey: '',  // Changed from twoFA to totpKey
     vendorCode: '',
     apiSecret: '',
     imei: '',
@@ -33,7 +33,6 @@ const AccountSetup: React.FC = () => {
     clientId: '',
     secretKey: '',
     redirectUri: '',
-    totpKey: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,8 +78,8 @@ const AccountSetup: React.FC = () => {
       if (!formData.password.trim()) {
         newErrors.password = 'Password is required';
       }
-      if (!formData.twoFA.trim()) {
-        newErrors.twoFA = '2FA/OTP is required';
+      if (!formData.totpKey.trim()) {
+        newErrors.totpKey = 'TOTP Key is required';
       }
       if (!formData.vendorCode.trim()) {
         newErrors.vendorCode = 'Vendor Code is required';
@@ -123,7 +122,7 @@ const AccountSetup: React.FC = () => {
         credentials = {
           userId: formData.userId.trim(),
           password: formData.password.trim(),
-          twoFA: formData.twoFA.trim(),
+          totpKey: formData.totpKey.trim(),
           vendorCode: formData.vendorCode.trim(),
           apiSecret: formData.apiSecret.trim(),
           imei: formData.imei.trim(),
@@ -166,23 +165,23 @@ const AccountSetup: React.FC = () => {
           brokerName: '',
           userId: '',
           password: '',
-          twoFA: '',
+          totpKey: '',
           vendorCode: '',
           apiSecret: '',
           imei: '',
           clientId: '',
           secretKey: '',
           redirectUri: '',
-          totpKey: '',
         });
         setShowAddForm(false);
         setErrors({});
       } else {
         setErrors({ general: response.message || 'Failed to connect to broker' });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('🚨 Add account error:', error);
-      setErrors({ general: error.message || 'Failed to add account. Please try again.' });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add account. Please try again.';
+      setErrors({ general: errorMessage });
     } finally {
       setIsSubmitting(false);
     }
@@ -224,14 +223,13 @@ const AccountSetup: React.FC = () => {
           brokerName: '',
           userId: '',
           password: '',
-          twoFA: '',
+          totpKey: '',
           vendorCode: '',
           apiSecret: '',
           imei: '',
           clientId: '',
           secretKey: '',
           redirectUri: '',
-          totpKey: '',
         });
         setShowAddForm(false);
         setShowFyersAuthStep(false);
@@ -451,20 +449,23 @@ const AccountSetup: React.FC = () => {
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="twoFA" className="form-label">
-                        2FA/OTP
+                      <label htmlFor="totpKey" className="form-label">
+                        TOTP Secret Key
                       </label>
                       <input
                         type="text"
-                        id="twoFA"
-                        name="twoFA"
-                        value={formData.twoFA}
+                        id="totpKey"
+                        name="totpKey"
+                        value={formData.totpKey}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.twoFA ? 'error' : ''}`}
-                        placeholder="Enter OTP or TOTP"
+                        className={`form-input ${errors.totpKey ? 'error' : ''}`}
+                        placeholder="Enter your TOTP secret key"
                         disabled={isSubmitting}
                       />
-                      {errors.twoFA && <div className="form-error">{errors.twoFA}</div>}
+                      {errors.totpKey && <div className="form-error">{errors.totpKey}</div>}
+                      <div className="form-help">
+                        Enter your TOTP secret key. The system will automatically generate the current OTP.
+                      </div>
                     </div>
 
                     <div className="form-group">
