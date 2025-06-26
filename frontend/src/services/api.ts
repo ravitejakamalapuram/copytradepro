@@ -35,11 +35,19 @@ api.interceptors.response.use(
       data: error.response?.data,
     });
 
-    // Handle 401 errors (unauthorized)
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
-      window.location.href = '/';
+    // Handle 401/403 errors (unauthorized/forbidden) - but only for auth endpoints
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      const url = error.config?.url || '';
+
+      // Only logout for authentication-related endpoints, not broker operations
+      if (url.includes('/auth/') || url.includes('/profile')) {
+        console.log('🚨 User authentication failed, logging out');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        window.location.href = '/';
+      } else {
+        console.log('🔍 Broker operation failed, keeping user logged in');
+      }
     }
 
     return Promise.reject(error);

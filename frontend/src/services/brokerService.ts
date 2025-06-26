@@ -9,19 +9,30 @@ export interface ShoonyaCredentials {
   imei: string;
 }
 
+export interface FyersCredentials {
+  clientId: string;
+  secretKey: string;
+  redirectUri: string;
+  totpKey?: string;
+}
+
 export interface BrokerConnectionResponse {
   success: boolean;
   message: string;
   data?: {
     brokerName: string;
-    userId: string;
-    accountId: string;
-    userName: string;
-    email: string;
-    brokerDisplayName: string;
-    lastAccessTime: string;
-    exchanges: string[];
-    products: string[];
+    userId?: string;
+    accountId?: string;
+    userName?: string;
+    email?: string;
+    brokerDisplayName?: string;
+    lastAccessTime?: string;
+    exchanges?: string[];
+    products?: string[];
+    // Fyers specific fields
+    authUrl?: string;
+    accessToken?: string;
+    requiresAuthCode?: boolean;
   };
   errors?: Array<{
     field: string;
@@ -61,7 +72,15 @@ export interface OrderResponse {
 }
 
 export const brokerService = {
-  async connectBroker(brokerName: string, credentials: ShoonyaCredentials): Promise<BrokerConnectionResponse> {
+  async validateFyersAuthCode(authCode: string, credentials: FyersCredentials): Promise<BrokerConnectionResponse> {
+    const response = await api.post<BrokerConnectionResponse>('/broker/validate-fyers-auth', {
+      authCode,
+      credentials,
+    });
+    return response.data;
+  },
+
+  async connectBroker(brokerName: string, credentials: ShoonyaCredentials | FyersCredentials): Promise<BrokerConnectionResponse> {
     try {
       const response = await api.post<BrokerConnectionResponse>('/broker/connect', {
         brokerName,

@@ -14,11 +14,12 @@ export const authenticateToken = (
   res: Response,
   next: NextFunction
 ): void => {
-  try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
+  try {
     if (!token) {
+      console.error('🚨 No token provided');
       res.status(401).json({
         success: false,
         message: 'Access token required',
@@ -39,8 +40,13 @@ export const authenticateToken = (
 
     req.user = decoded;
     next();
-  } catch (error) {
-    console.error('🚨 Authentication error:', error);
+  } catch (error: any) {
+    console.error('🚨 Authentication error:', error.message);
+    console.error('🔍 Token details:', {
+      hasAuthHeader: !!authHeader,
+      tokenLength: token?.length,
+      errorType: error.name
+    });
     res.status(403).json({
       success: false,
       message: 'Invalid or expired token',
