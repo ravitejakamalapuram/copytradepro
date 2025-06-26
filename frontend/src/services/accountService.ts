@@ -11,7 +11,7 @@ export interface ConnectedAccount {
   exchanges: string[];
   products: string[];
   isActive: boolean;
-  createdAt: Date;
+  createdAt: Date | string;
   accessToken?: string;
   // Fyers specific
   authUrl?: string;

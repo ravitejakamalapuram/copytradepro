@@ -8,6 +8,24 @@ import { FyersService } from '../services/fyersService';
 type BrokerService = ShoonyaService | FyersService;
 const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
 
+// Store connected account data per user
+interface ConnectedAccount {
+  id: string;
+  brokerName: string;
+  accountId: string;
+  userId: string;
+  userName: string;
+  email: string;
+  brokerDisplayName: string;
+  exchanges: string[];
+  products: any[];
+  isActive: boolean;
+  createdAt: Date;
+  accessToken?: string;
+}
+
+const userConnectedAccounts = new Map<string, ConnectedAccount[]>();
+
 export const connectBroker = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -65,6 +83,32 @@ export const connectBroker = async (
       if (loginResponse.stat === 'Ok') {
         // Store the connection
         userConnections.set(brokerName, brokerService);
+
+        // Create account data
+        const accountData: ConnectedAccount = {
+          id: Date.now().toString(),
+          brokerName,
+          accountId: loginResponse.actid,
+          userId: credentials.userId,
+          userName: loginResponse.uname,
+          email: loginResponse.email,
+          brokerDisplayName: loginResponse.brkname,
+          exchanges: loginResponse.exarr || [],
+          products: loginResponse.prarr || [],
+          isActive: true,
+          createdAt: new Date(),
+        };
+
+        // Store the account data
+        if (!userConnectedAccounts.has(userId)) {
+          userConnectedAccounts.set(userId, []);
+        }
+        const userAccounts = userConnectedAccounts.get(userId)!;
+
+        // Remove existing account for this broker if any
+        const filteredAccounts = userAccounts.filter(acc => acc.brokerName !== brokerName);
+        filteredAccounts.push(accountData);
+        userConnectedAccounts.set(userId, filteredAccounts);
 
         res.status(200).json({
           success: true,
@@ -208,10 +252,12 @@ export const getConnectedAccounts = async (
       return;
     }
 
-    // For now, return empty array - in production, fetch from database
+    // Get connected accounts for this user
+    const userAccounts = userConnectedAccounts.get(userId) || [];
+
     res.status(200).json({
       success: true,
-      accounts: [],
+      accounts: userAccounts,
     });
   } catch (error: any) {
     console.error('🚨 Get connected accounts error:', error);
@@ -278,7 +324,20 @@ export const removeConnectedAccount = async (
       return;
     }
 
-    // For now, just return success - in production, remove from database
+    // Remove account from storage
+    const userAccounts = userConnectedAccounts.get(userId) || [];
+    const filteredAccounts = userAccounts.filter(acc => acc.id !== accountId);
+    userConnectedAccounts.set(userId, filteredAccounts);
+
+    // Also remove broker connection if it exists
+    const userConnections = userBrokerConnections.get(userId);
+    if (userConnections) {
+      const accountToRemove = userAccounts.find(acc => acc.id === accountId);
+      if (accountToRemove) {
+        userConnections.delete(accountToRemove.brokerName);
+      }
+    }
+
     res.status(200).json({
       success: true,
       message: 'Account removed successfully',
