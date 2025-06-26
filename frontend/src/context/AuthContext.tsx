@@ -77,7 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userStr = localStorage.getItem('user');
 
         if (token && userStr) {
-          const user = JSON.parse(userStr);
+          JSON.parse(userStr);
           
           // Verify token is still valid
           const response = await authService.getProfile();

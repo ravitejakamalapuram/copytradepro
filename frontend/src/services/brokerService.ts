@@ -3,7 +3,7 @@ import api from './api';
 export interface ShoonyaCredentials {
   userId: string;
   password: string;
-  twoFA: string;
+  totpKey: string;  // Changed from twoFA to totpKey
   vendorCode: string;
   apiSecret: string;
   imei: string;
