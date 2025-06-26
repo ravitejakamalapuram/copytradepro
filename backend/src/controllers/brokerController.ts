@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
-import { FyersService } from '../services/fyersService';
+import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/sqliteDatabase';
 
 // Store broker connections per user (in production, use Redis or database)
@@ -750,6 +750,66 @@ export const disconnectBroker = async (
   }
 };
 
+// Helper function to ensure broker connection is active
+const ensureBrokerConnection = async (userId: string, brokerName: string): Promise<BrokerService | null> => {
+  // Check if connection already exists in memory
+  const userConnections = userBrokerConnections.get(userId);
+  if (userConnections && userConnections.has(brokerName)) {
+    return userConnections.get(brokerName)!;
+  }
+
+  // Connection not in memory, try to re-establish it
+  console.log(`🔄 Re-establishing connection for ${brokerName} user ${userId}`);
+
+  // Get all accounts for this user and broker
+  const userAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+  const brokerAccount = userAccounts.find(account => account.broker_name === brokerName);
+
+  if (!brokerAccount) {
+    console.log(`❌ No ${brokerName} account found for user ${userId}`);
+    return null;
+  }
+
+  // Get decrypted credentials
+  const credentials = userDatabase.getAccountCredentials(brokerAccount.id);
+  if (!credentials) {
+    console.log(`❌ Failed to retrieve credentials for ${brokerName} account ${brokerAccount.id}`);
+    return null;
+  }
+
+  try {
+    // Initialize user connections if not exists
+    if (!userBrokerConnections.has(userId)) {
+      userBrokerConnections.set(userId, new Map());
+    }
+    const userConnectionsMap = userBrokerConnections.get(userId)!;
+
+    // Try to authenticate with the broker
+    let brokerService: BrokerService;
+    let loginResponse: any;
+
+    if (brokerName === 'shoonya') {
+      brokerService = new ShoonyaService();
+      loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
+    } else if (brokerName === 'fyers') {
+      brokerService = new FyersService();
+      loginResponse = await brokerService.login(credentials as FyersCredentials);
+    } else {
+      console.log(`❌ Unsupported broker: ${brokerName}`);
+      return null;
+    }
+
+    // Store the connection
+    userConnectionsMap.set(brokerName, brokerService);
+    console.log(`✅ Successfully re-established ${brokerName} connection for user ${userId}`);
+
+    return brokerService;
+  } catch (error: any) {
+    console.error(`❌ Failed to re-establish ${brokerName} connection:`, error.message);
+    return null;
+  }
+};
+
 export const placeOrder = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -790,16 +850,15 @@ export const placeOrder = async (
       return;
     }
 
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections || !userConnections.has(brokerName)) {
+    // Ensure broker connection is active (re-establish if needed)
+    const brokerService = await ensureBrokerConnection(userId, brokerName);
+    if (!brokerService) {
       res.status(404).json({
         success: false,
-        message: `Not connected to ${brokerName}. Please connect first.`,
+        message: `Failed to establish connection to ${brokerName}. Please check your account and try again.`,
       });
       return;
     }
-
-    const brokerService = userConnections.get(brokerName)!;
     let orderResponse: any;
 
     if (brokerName === 'shoonya') {

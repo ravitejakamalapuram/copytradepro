@@ -215,7 +215,6 @@ export class ShoonyaService {
         prctyp: orderData.priceType,
         ret: orderData.retention || 'DAY',
         remarks: orderData.remarks || '',
-        token: this.sessionToken,
       };
 
       // Add trigger price for stop loss orders
@@ -230,7 +229,7 @@ export class ShoonyaService {
         type: orderData.priceType,
       });
 
-      const response = await this.makeRequest('PlaceOrder', requestData);
+      const response = await this.makeAuthenticatedRequest('PlaceOrder', requestData);
       
       if (response.stat === 'Ok') {
         console.log('✅ Shoonya order placed successfully:', response.norenordno);
