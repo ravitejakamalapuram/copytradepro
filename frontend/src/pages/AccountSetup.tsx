@@ -262,14 +262,41 @@ const AccountSetup: React.FC = () => {
     }
   };
 
-  const handleToggleAccount = (accountId: string) => {
-    setAccounts(prev =>
-      prev.map(account =>
-        account.id === accountId
-          ? { ...account, isActive: !account.isActive }
-          : account
-      )
-    );
+  const handleToggleAccount = async (accountId: string) => {
+    const account = accounts.find(acc => acc.id === accountId);
+    if (!account) return;
+
+    try {
+      let success = false;
+
+      if (account.isActive) {
+        // Deactivate (logout)
+        success = await accountService.deactivateAccount(accountId);
+      } else {
+        // Activate (re-authenticate)
+        success = await accountService.activateAccount(accountId);
+      }
+
+      if (success) {
+        // Update local state only if API call was successful
+        setAccounts(prev =>
+          prev.map(acc =>
+            acc.id === accountId
+              ? { ...acc, isActive: !acc.isActive }
+              : acc
+          )
+        );
+      } else {
+        setErrors({
+          general: `Failed to ${account.isActive ? 'deactivate' : 'activate'} account. Please try again.`
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling account:', error);
+      setErrors({
+        general: `Network error while ${account.isActive ? 'deactivating' : 'activating'} account. Please try again.`
+      });
+    }
   };
 
   return (
