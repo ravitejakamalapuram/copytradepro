@@ -3,6 +3,7 @@ import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService } from '../services/fyersService';
+import { userDatabase } from '../services/sqliteDatabase';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
@@ -84,31 +85,26 @@ export const connectBroker = async (
         // Store the connection
         userConnections.set(brokerName, brokerService);
 
-        // Create account data
-        const accountData: ConnectedAccount = {
-          id: Date.now().toString(),
-          brokerName,
-          accountId: loginResponse.actid,
-          userId: credentials.userId,
-          userName: loginResponse.uname,
-          email: loginResponse.email,
-          brokerDisplayName: loginResponse.brkname,
-          exchanges: loginResponse.exarr || [],
-          products: loginResponse.prarr || [],
-          isActive: true,
-          createdAt: new Date(),
-        };
+        // Save account to database
+        try {
+          const dbAccount = userDatabase.createConnectedAccount({
+            user_id: parseInt(userId),
+            broker_name: brokerName,
+            account_id: loginResponse.actid,
+            user_name: loginResponse.uname,
+            email: loginResponse.email,
+            broker_display_name: loginResponse.brkname,
+            exchanges: loginResponse.exarr || [],
+            products: loginResponse.prarr || [],
+            credentials: credentials, // Will be encrypted in database
+            is_active: true,
+          });
 
-        // Store the account data
-        if (!userConnectedAccounts.has(userId)) {
-          userConnectedAccounts.set(userId, []);
+          console.log('✅ Account saved to database:', dbAccount.id);
+        } catch (dbError: any) {
+          console.error('🚨 Failed to save account to database:', dbError.message);
+          // Continue with response even if DB save fails
         }
-        const userAccounts = userConnectedAccounts.get(userId)!;
-
-        // Remove existing account for this broker if any
-        const filteredAccounts = userAccounts.filter(acc => acc.brokerName !== brokerName);
-        filteredAccounts.push(accountData);
-        userConnectedAccounts.set(userId, filteredAccounts);
 
         res.status(200).json({
           success: true,
@@ -252,13 +248,36 @@ export const getConnectedAccounts = async (
       return;
     }
 
-    // Get connected accounts for this user
-    const userAccounts = userConnectedAccounts.get(userId) || [];
+    // Get connected accounts from database
+    try {
+      const dbAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
 
-    res.status(200).json({
-      success: true,
-      accounts: userAccounts,
-    });
+      // Transform database accounts to frontend format
+      const accounts = dbAccounts.map(dbAccount => ({
+        id: dbAccount.id.toString(),
+        brokerName: dbAccount.broker_name,
+        accountId: dbAccount.account_id,
+        userId: dbAccount.account_id, // Use account_id as userId for display
+        userName: dbAccount.user_name,
+        email: dbAccount.email,
+        brokerDisplayName: dbAccount.broker_display_name,
+        exchanges: JSON.parse(dbAccount.exchanges),
+        products: JSON.parse(dbAccount.products),
+        isActive: Boolean(dbAccount.is_active),
+        createdAt: dbAccount.created_at,
+      }));
+
+      res.status(200).json({
+        success: true,
+        accounts: accounts,
+      });
+    } catch (dbError: any) {
+      console.error('🚨 Failed to fetch accounts from database:', dbError.message);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch connected accounts',
+      });
+    }
   } catch (error: any) {
     console.error('🚨 Get connected accounts error:', error);
     res.status(500).json({
@@ -316,37 +335,210 @@ export const removeConnectedAccount = async (
     const userId = req.user?.id;
     const { accountId } = req.params;
 
-    if (!userId) {
+    if (!userId || !accountId) {
       res.status(401).json({
         success: false,
-        message: 'User not authenticated',
+        message: 'User not authenticated or account ID missing',
       });
       return;
     }
 
-    // Remove account from storage
-    const userAccounts = userConnectedAccounts.get(userId) || [];
-    const filteredAccounts = userAccounts.filter(acc => acc.id !== accountId);
-    userConnectedAccounts.set(userId, filteredAccounts);
+    // Remove account from database and logout
+    try {
+      const accountIdNum = parseInt(accountId);
 
-    // Also remove broker connection if it exists
-    const userConnections = userBrokerConnections.get(userId);
-    if (userConnections) {
-      const accountToRemove = userAccounts.find(acc => acc.id === accountId);
-      if (accountToRemove) {
-        userConnections.delete(accountToRemove.brokerName);
+      // Get account details before deletion for logout
+      const account = userDatabase.getConnectedAccountById(accountIdNum);
+      if (!account) {
+        res.status(404).json({
+          success: false,
+          message: 'Account not found',
+        });
+        return;
       }
-    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Account removed successfully',
-    });
+      // Remove from in-memory connections (logout)
+      const userConnections = userBrokerConnections.get(userId);
+      if (userConnections && userConnections.has(account.broker_name)) {
+        userConnections.delete(account.broker_name);
+        console.log('✅ Logged out from broker:', account.broker_name);
+      }
+
+      // Delete from database
+      const deleted = userDatabase.deleteConnectedAccount(accountIdNum);
+      if (!deleted) {
+        res.status(404).json({
+          success: false,
+          message: 'Account not found',
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        message: 'Account removed and logged out successfully',
+      });
+    } catch (dbError: any) {
+      console.error('🚨 Failed to remove account:', dbError.message);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to remove account',
+      });
+    }
   } catch (error: any) {
     console.error('🚨 Remove connected account error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
+    });
+  }
+};
+
+// Activate an account (re-authenticate)
+export const activateAccount = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { accountId } = req.params;
+
+    if (!userId || !accountId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated or account ID missing',
+      });
+      return;
+    }
+
+    const accountIdNum = parseInt(accountId);
+
+    // Get account from database
+    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    if (!account) {
+      res.status(404).json({
+        success: false,
+        message: 'Account not found',
+      });
+      return;
+    }
+
+    // Get decrypted credentials
+    const credentials = userDatabase.getAccountCredentials(accountIdNum);
+    if (!credentials) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve account credentials',
+      });
+      return;
+    }
+
+    // Initialize user connections if not exists
+    if (!userBrokerConnections.has(userId)) {
+      userBrokerConnections.set(userId, new Map());
+    }
+    const userConnections = userBrokerConnections.get(userId)!;
+
+    // Try to authenticate with the broker
+    let brokerService: BrokerService;
+    let loginResponse: any;
+
+    if (account.broker_name === 'shoonya') {
+      brokerService = new ShoonyaService();
+      loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
+
+      if (loginResponse.stat === 'Ok') {
+        // Store the connection
+        userConnections.set(account.broker_name, brokerService);
+
+        // Update account status in database
+        userDatabase.updateAccountStatus(accountIdNum, true);
+
+        res.status(200).json({
+          success: true,
+          message: `Successfully activated ${account.broker_name} account`,
+          data: {
+            accountId: account.id,
+            brokerName: account.broker_name,
+            isActive: true,
+          },
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: loginResponse.emsg || 'Failed to authenticate with broker',
+        });
+      }
+    } else {
+      res.status(400).json({
+        success: false,
+        message: `Broker ${account.broker_name} not supported for activation`,
+      });
+    }
+  } catch (error: any) {
+    console.error('🚨 Activate account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to activate account',
+    });
+  }
+};
+
+// Deactivate an account (logout only)
+export const deactivateAccount = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { accountId } = req.params;
+
+    if (!userId || !accountId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated or account ID missing',
+      });
+      return;
+    }
+
+    const accountIdNum = parseInt(accountId);
+
+    // Get account from database
+    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    if (!account) {
+      res.status(404).json({
+        success: false,
+        message: 'Account not found',
+      });
+      return;
+    }
+
+    // Remove from in-memory connections (logout)
+    const userConnections = userBrokerConnections.get(userId);
+    if (userConnections && userConnections.has(account.broker_name)) {
+      userConnections.delete(account.broker_name);
+      console.log('✅ Logged out from broker:', account.broker_name);
+    }
+
+    // Update account status in database to inactive
+    userDatabase.updateAccountStatus(accountIdNum, false);
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deactivated ${account.broker_name} account`,
+      data: {
+        accountId: account.id,
+        brokerName: account.broker_name,
+        isActive: false,
+      },
+    });
+  } catch (error: any) {
+    console.error('🚨 Deactivate account error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to deactivate account',
     });
   }
 };

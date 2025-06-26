@@ -6,6 +6,8 @@ import {
   getConnectedAccounts,
   saveConnectedAccount,
   removeConnectedAccount,
+  activateAccount,
+  deactivateAccount,
   disconnectBroker,
   placeOrder,
   getOrderBook,
@@ -104,6 +106,8 @@ router.post('/validate-fyers-auth', authenticateToken, validateFyersAuthCode);
 router.get('/accounts', authenticateToken, getConnectedAccounts);
 router.post('/accounts', authenticateToken, saveConnectedAccount);
 router.delete('/accounts/:accountId', authenticateToken, removeConnectedAccount);
+router.post('/accounts/:accountId/activate', authenticateToken, activateAccount);
+router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAccount);
 
 router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);

@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 export interface User {
   id: number;
@@ -23,9 +24,39 @@ export interface UpdateUserData {
   password?: string;
 }
 
+export interface ConnectedAccount {
+  id: number;
+  user_id: number;
+  broker_name: string;
+  account_id: string;
+  user_name: string;
+  email: string;
+  broker_display_name: string;
+  exchanges: string; // JSON string
+  products: string; // JSON string
+  encrypted_credentials: string; // Encrypted JSON
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateConnectedAccountData {
+  user_id: number;
+  broker_name: string;
+  account_id: string;
+  user_name: string;
+  email: string;
+  broker_display_name: string;
+  exchanges: string[];
+  products: any[];
+  credentials: any; // Will be encrypted before storage
+  is_active: boolean;
+}
+
 export class SQLiteUserDatabase {
   private db: Database.Database;
   private dbPath: string;
+  private encryptionKey: string;
 
   constructor() {
     // Ensure data directory exists
@@ -36,15 +67,51 @@ export class SQLiteUserDatabase {
 
     this.dbPath = path.join(dataDir, 'users.db');
     this.db = new Database(this.dbPath);
-    
+
+    // Initialize encryption key from environment or generate one
+    this.encryptionKey = process.env.JWT_SECRET || 'default-encryption-key-change-in-production';
+
     // Enable WAL mode for better concurrent access
     this.db.pragma('journal_mode = WAL');
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('cache_size = 1000');
     this.db.pragma('temp_store = memory');
-    
+
     this.initializeDatabase();
     console.log('✅ SQLite database initialized at:', this.dbPath);
+  }
+
+  // Encryption utilities for storing sensitive data
+  private encrypt(text: string): string {
+    const algorithm = 'aes-256-cbc';
+    const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+
+    let encrypted = cipher.update(text, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+
+    return iv.toString('hex') + ':' + encrypted;
+  }
+
+  private decrypt(encryptedText: string): string {
+    const algorithm = 'aes-256-cbc';
+    const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+    const parts = encryptedText.split(':');
+    if (parts.length !== 2) {
+      throw new Error('Invalid encrypted data format');
+    }
+    const [ivHex, encrypted] = parts;
+    if (!ivHex || !encrypted) {
+      throw new Error('Invalid encrypted data format');
+    }
+    const iv = Buffer.from(ivHex, 'hex');
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8') as string;
+    decrypted += decipher.final('utf8') as string;
+
+    return decrypted;
   }
 
   private initializeDatabase(): void {
@@ -73,10 +140,51 @@ export class SQLiteUserDatabase {
 
     // Create trigger to update updated_at timestamp
     const createUpdateTrigger = `
-      CREATE TRIGGER IF NOT EXISTS update_users_timestamp 
+      CREATE TRIGGER IF NOT EXISTS update_users_timestamp
       AFTER UPDATE ON users
       BEGIN
         UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END
+    `;
+
+    // Create connected_accounts table
+    const createConnectedAccountsTable = `
+      CREATE TABLE IF NOT EXISTS connected_accounts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        broker_name TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        user_name TEXT NOT NULL,
+        email TEXT NOT NULL,
+        broker_display_name TEXT NOT NULL,
+        exchanges TEXT NOT NULL, -- JSON array as string
+        products TEXT NOT NULL, -- JSON array as string
+        encrypted_credentials TEXT NOT NULL, -- Encrypted credentials JSON
+        is_active BOOLEAN DEFAULT true,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+        UNIQUE(user_id, broker_name) -- One account per broker per user
+      )
+    `;
+
+    // Create indexes for connected_accounts
+    const createAccountsUserIndex = `
+      CREATE INDEX IF NOT EXISTS idx_connected_accounts_user_id
+      ON connected_accounts(user_id)
+    `;
+
+    const createAccountsBrokerIndex = `
+      CREATE INDEX IF NOT EXISTS idx_connected_accounts_broker
+      ON connected_accounts(user_id, broker_name)
+    `;
+
+    // Create trigger to update connected_accounts updated_at timestamp
+    const createAccountsUpdateTrigger = `
+      CREATE TRIGGER IF NOT EXISTS update_connected_accounts_timestamp
+      AFTER UPDATE ON connected_accounts
+      BEGIN
+        UPDATE connected_accounts SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
       END
     `;
 
@@ -85,6 +193,10 @@ export class SQLiteUserDatabase {
       this.db.exec(createEmailIndex);
       this.db.exec(createNameIndex);
       this.db.exec(createUpdateTrigger);
+      this.db.exec(createConnectedAccountsTable);
+      this.db.exec(createAccountsUserIndex);
+      this.db.exec(createAccountsBrokerIndex);
+      this.db.exec(createAccountsUpdateTrigger);
       console.log('✅ Database tables and indexes created successfully');
     } catch (error) {
       console.error('🚨 Failed to initialize database:', error);
@@ -317,6 +429,161 @@ export class SQLiteUserDatabase {
       return stmt.all(...params);
     } catch (error) {
       console.error('🚨 Failed to execute raw SQL:', error);
+      throw error;
+    }
+  }
+
+  // ==================== CONNECTED ACCOUNTS METHODS ====================
+
+  // Create a connected account
+  createConnectedAccount(accountData: CreateConnectedAccountData): ConnectedAccount {
+    const insertAccount = this.db.prepare(`
+      INSERT OR REPLACE INTO connected_accounts (
+        user_id, broker_name, account_id, user_name, email,
+        broker_display_name, exchanges, products, encrypted_credentials, is_active
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    try {
+      // Encrypt credentials before storing
+      const encryptedCredentials = this.encrypt(JSON.stringify(accountData.credentials));
+
+      const result = insertAccount.run(
+        accountData.user_id,
+        accountData.broker_name,
+        accountData.account_id,
+        accountData.user_name,
+        accountData.email,
+        accountData.broker_display_name,
+        JSON.stringify(accountData.exchanges),
+        JSON.stringify(accountData.products),
+        encryptedCredentials,
+        accountData.is_active ? 1 : 0
+      );
+
+      const accountId = result.lastInsertRowid as number;
+      const account = this.getConnectedAccountById(accountId);
+
+      if (!account) {
+        throw new Error('Failed to retrieve created connected account');
+      }
+
+      console.log('✅ Connected account created successfully:', accountData.broker_name);
+      return account;
+    } catch (error: any) {
+      if (error.code === 'SQLITE_CONSTRAINT_UNIQUE') {
+        throw new Error(`Account already exists for ${accountData.broker_name}`);
+      }
+      console.error('🚨 Failed to create connected account:', error);
+      throw error;
+    }
+  }
+
+  // Get connected account by ID
+  getConnectedAccountById(id: number): ConnectedAccount | null {
+    const selectAccount = this.db.prepare(`
+      SELECT * FROM connected_accounts WHERE id = ?
+    `);
+
+    try {
+      return selectAccount.get(id) as ConnectedAccount || null;
+    } catch (error) {
+      console.error('🚨 Failed to get connected account by ID:', error);
+      throw error;
+    }
+  }
+
+  // Get all connected accounts for a user
+  getConnectedAccountsByUserId(userId: number): ConnectedAccount[] {
+    const selectAccounts = this.db.prepare(`
+      SELECT * FROM connected_accounts
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+    `);
+
+    try {
+      return selectAccounts.all(userId) as ConnectedAccount[];
+    } catch (error) {
+      console.error('🚨 Failed to get connected accounts by user ID:', error);
+      throw error;
+    }
+  }
+
+  // Get decrypted credentials for an account
+  getAccountCredentials(accountId: number): any | null {
+    const selectAccount = this.db.prepare(`
+      SELECT encrypted_credentials FROM connected_accounts WHERE id = ?
+    `);
+
+    try {
+      const result = selectAccount.get(accountId) as { encrypted_credentials: string } | undefined;
+      if (!result) {
+        return null;
+      }
+
+      const decryptedCredentials = this.decrypt(result.encrypted_credentials);
+      return JSON.parse(decryptedCredentials);
+    } catch (error) {
+      console.error('🚨 Failed to get account credentials:', error);
+      throw error;
+    }
+  }
+
+  // Update account active status
+  updateAccountStatus(accountId: number, isActive: boolean): boolean {
+    const updateAccount = this.db.prepare(`
+      UPDATE connected_accounts
+      SET is_active = ?
+      WHERE id = ?
+    `);
+
+    try {
+      const result = updateAccount.run(isActive ? 1 : 0, accountId);
+      const updated = result.changes > 0;
+
+      if (updated) {
+        console.log('✅ Account status updated successfully, ID:', accountId, 'Active:', isActive);
+      }
+
+      return updated;
+    } catch (error) {
+      console.error('🚨 Failed to update account status:', error);
+      throw error;
+    }
+  }
+
+  // Delete connected account
+  deleteConnectedAccount(accountId: number): boolean {
+    const deleteAccount = this.db.prepare(`
+      DELETE FROM connected_accounts WHERE id = ?
+    `);
+
+    try {
+      const result = deleteAccount.run(accountId);
+      const deleted = result.changes > 0;
+
+      if (deleted) {
+        console.log('✅ Connected account deleted successfully, ID:', accountId);
+      }
+
+      return deleted;
+    } catch (error) {
+      console.error('🚨 Failed to delete connected account:', error);
+      throw error;
+    }
+  }
+
+  // Get connected account by user and broker
+  getConnectedAccountByUserAndBroker(userId: number, brokerName: string): ConnectedAccount | null {
+    const selectAccount = this.db.prepare(`
+      SELECT * FROM connected_accounts
+      WHERE user_id = ? AND broker_name = ?
+    `);
+
+    try {
+      return selectAccount.get(userId, brokerName) as ConnectedAccount || null;
+    } catch (error) {
+      console.error('🚨 Failed to get connected account by user and broker:', error);
       throw error;
     }
   }
