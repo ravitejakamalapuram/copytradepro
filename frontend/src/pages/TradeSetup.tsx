@@ -115,6 +115,7 @@ const TradeSetup: React.FC = () => {
 
         const orderRequest: PlaceOrderRequest = {
           brokerName: account.brokerName,
+          accountId: account.id, // Include the specific account ID
           symbol: formData.symbol.toUpperCase().trim(),
           action: formData.action,
           quantity: Number(formData.quantity),

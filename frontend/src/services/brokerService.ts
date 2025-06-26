@@ -42,6 +42,7 @@ export interface BrokerConnectionResponse {
 
 export interface PlaceOrderRequest {
   brokerName: string;
+  accountId: string; // ID of the specific broker account to use
   symbol: string;
   action: 'BUY' | 'SELL';
   quantity: number;

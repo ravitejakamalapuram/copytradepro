@@ -827,17 +827,18 @@ export const placeOrder = async (
       return;
     }
 
-    const { 
-      brokerName, 
-      symbol, 
-      action, 
-      quantity, 
-      orderType, 
-      price, 
+    const {
+      brokerName,
+      accountId,
+      symbol,
+      action,
+      quantity,
+      orderType,
+      price,
       triggerPrice,
       exchange,
       productType,
-      remarks 
+      remarks
     } = req.body;
     
     const userId = req.user?.id;
@@ -846,6 +847,25 @@ export const placeOrder = async (
       res.status(401).json({
         success: false,
         message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // Validate that the user owns the specified account
+    const account = userDatabase.getConnectedAccountById(parseInt(accountId));
+    if (!account || account.user_id !== parseInt(userId)) {
+      res.status(404).json({
+        success: false,
+        message: 'Account not found or access denied',
+      });
+      return;
+    }
+
+    // Verify broker name matches the account
+    if (account.broker_name !== brokerName) {
+      res.status(400).json({
+        success: false,
+        message: `Broker name mismatch. Account belongs to ${account.broker_name}, not ${brokerName}`,
       });
       return;
     }
@@ -882,7 +902,7 @@ export const placeOrder = async (
       }
 
       const shoonyaOrderData = {
-        userId: userId,
+        userId: account.account_id, // Use the actual broker account ID (e.g., "FN135006")
         buyOrSell: action === 'BUY' ? 'B' as const : 'S' as const,
         productType: productType || 'C',
         exchange: exchange || 'NSE',
@@ -893,7 +913,7 @@ export const placeOrder = async (
         price: price ? parseFloat(price) : 0,
         triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
         retention: 'DAY' as const,
-        remarks: remarks || `Order placed via CopyTrade Pro`,
+        remarks: remarks || `Order placed via CopyTrade Pro for account ${account.account_id}`,
       };
 
       orderResponse = await (brokerService as ShoonyaService).placeOrder(shoonyaOrderData);
