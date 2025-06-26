@@ -20,6 +20,7 @@ const AccountSetup: React.FC = () => {
   const { } = useAuth();
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState({
     brokerName: '',
     // Shoonya fields
@@ -299,6 +300,39 @@ const AccountSetup: React.FC = () => {
     }
   };
 
+  const handleCheckSessionStatus = async (accountId: string) => {
+    setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
+
+    try {
+      const result = await accountService.checkAccountSessionStatus(accountId);
+
+      if (result.success && result.data) {
+        // Update the account status based on real-time check
+        setAccounts(prev =>
+          prev.map(acc =>
+            acc.id === accountId
+              ? { ...acc, isActive: result.data!.isActive }
+              : acc
+          )
+        );
+
+        // Show status message
+        const statusMessage = `Status: ${result.data.sessionInfo.status} - ${result.data.sessionInfo.message}`;
+        setErrors({ general: statusMessage });
+
+        // Clear message after 3 seconds
+        setTimeout(() => setErrors({}), 3000);
+      } else {
+        setErrors({ general: result.message || 'Failed to check session status' });
+      }
+    } catch (error) {
+      console.error('Error checking session status:', error);
+      setErrors({ general: 'Network error while checking session status' });
+    } finally {
+      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
+
   return (
     <div className="page-container">
       <Navigation />
@@ -340,9 +374,12 @@ const AccountSetup: React.FC = () => {
                   <div className="account-info">
                     <div className="account-header">
                       <h4>{account.brokerName}</h4>
-                      <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
-                        {account.isActive ? 'Active' : 'Inactive'}
-                      </span>
+                      <div className="status-container">
+                        <span className={`status-indicator ${account.isActive ? 'active' : 'inactive'}`}></span>
+                        <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
+                          {account.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
                     </div>
                     <p className="account-id">User ID: {account.userId}</p>
                     <p className="account-id">Account ID: {account.accountId}</p>
@@ -358,6 +395,13 @@ const AccountSetup: React.FC = () => {
                       onClick={() => handleToggleAccount(account.id)}
                     >
                       {account.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
+                    <button
+                      className="btn btn-info"
+                      onClick={() => handleCheckSessionStatus(account.id)}
+                      disabled={checkingStatus[account.id]}
+                    >
+                      {checkingStatus[account.id] ? 'Checking...' : 'Check Status'}
                     </button>
                     <button
                       className="btn btn-error"

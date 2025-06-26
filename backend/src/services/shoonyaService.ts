@@ -44,6 +44,7 @@ export interface PlaceOrderRequest {
 export class ShoonyaService {
   private baseUrl = 'https://api.shoonya.com/NorenWClientTP';
   private sessionToken: string | null = null;
+  private userId: string | null = null;
 
   private generateSHA256Hash(input: string): string {
     return crypto.createHash('sha256').update(input).digest('hex');
@@ -69,6 +70,32 @@ export class ShoonyaService {
 
       const formBody = `jData=${jsonData}`;
       console.log('🔍 Form body:', formBody);
+
+      const response = await axios.post(`${this.baseUrl}/${endpoint}`, formBody, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        timeout: 30000,
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error(`🚨 Shoonya API Error [${endpoint}]:`, error.message);
+      if (error.response) {
+        console.error('🚨 Response status:', error.response.status);
+        console.error('🚨 Response data:', error.response.data);
+      }
+      throw new Error(`Shoonya API request failed: ${error.message}`);
+    }
+  }
+
+  private async makeAuthenticatedRequest(endpoint: string, data: any): Promise<any> {
+    try {
+      // For authenticated requests, pass session token as jKey parameter
+      const jsonData = JSON.stringify(data);
+      console.log('🔍 Sending authenticated jData:', jsonData);
+
+      const formBody = `jData=${jsonData}&jKey=${this.sessionToken}`;
+      console.log('🔍 Authenticated form body:', formBody);
 
       const response = await axios.post(`${this.baseUrl}/${endpoint}`, formBody, {
         headers: {
@@ -121,6 +148,7 @@ export class ShoonyaService {
       
       if (response.stat === 'Ok' && response.susertoken) {
         this.sessionToken = response.susertoken;
+        this.userId = credentials.userId; // Store userId for logout
         console.log('✅ Shoonya login successful');
         return response;
       } else {
@@ -133,22 +161,38 @@ export class ShoonyaService {
     }
   }
 
-  async logout(): Promise<void> {
-    if (!this.sessionToken) {
-      return;
+  async logout(userId?: string): Promise<any> {
+    if (!this.sessionToken && !userId) {
+      console.log('⚠️ No active session to logout from');
+      return { stat: 'Ok', message: 'No active session' };
     }
 
     try {
-      await this.makeRequest('Logout', {
-        uid: '',
-        token: this.sessionToken,
-      });
-      
+      console.log('🔄 Logging out from Shoonya...');
+
+      const logoutData = {
+        uid: userId || this.userId || '', // Use provided userId or stored userId
+        jKey: this.sessionToken, // Include session token for logout
+      };
+
+      const response = await this.makeRequest('Logout', logoutData);
+
       this.sessionToken = null;
-      console.log('✅ Shoonya logout successful');
+      this.userId = null;
+
+      if (response.stat === 'Ok') {
+        console.log('✅ Shoonya logout successful');
+        return response;
+      } else {
+        console.log('⚠️ Shoonya logout response:', response.emsg || 'Unknown response');
+        return response;
+      }
     } catch (error: any) {
       console.error('🚨 Shoonya logout error:', error.message);
       this.sessionToken = null;
+      this.userId = null;
+      // Don't throw error for logout - just log it
+      return { stat: 'Ok', message: 'Logout completed with errors' };
     }
   }
 
@@ -284,5 +328,30 @@ export class ShoonyaService {
 
   getSessionToken(): string | null {
     return this.sessionToken;
+  }
+
+  // Validate if the current session is still active
+  async validateSession(userId: string): Promise<boolean> {
+    if (!this.sessionToken || !userId) {
+      return false;
+    }
+
+    try {
+      // Use a lightweight API call to check if session is still valid
+      // Limits is a simple endpoint that requires authentication
+      const response = await this.makeAuthenticatedRequest('Limits', {
+        uid: userId,
+        actid: userId, // Account ID is usually same as user ID
+      });
+
+      // If the call succeeds and returns 'Ok', session is valid
+      return response.stat === 'Ok';
+    } catch (error: any) {
+      console.log('⚠️ Session validation failed for Shoonya:', error.message);
+      // If API call fails, session is likely expired
+      this.sessionToken = null;
+      this.userId = null;
+      return false;
+    }
   }
 }

@@ -258,6 +258,27 @@ export class FyersService {
     this.fyers.setAccessToken(token);
   }
 
+  // Validate if the current session is still active
+  async validateSession(): Promise<boolean> {
+    if (!this.accessToken) {
+      return false;
+    }
+
+    try {
+      // Use a lightweight API call to check if session is still valid
+      // getProfile is a simple endpoint that requires authentication
+      const response = await this.fyers.get_profile();
+
+      // If the call succeeds, session is valid
+      return response.s === 'ok';
+    } catch (error: any) {
+      console.log('⚠️ Session validation failed for Fyers:', error.message);
+      // If API call fails, session is likely expired
+      this.accessToken = null;
+      return false;
+    }
+  }
+
   // Logout
   async logout(): Promise<{ success: boolean; message: string }> {
     try {
