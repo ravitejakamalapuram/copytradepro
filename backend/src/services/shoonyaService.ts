@@ -208,19 +208,27 @@ export class ShoonyaService {
     }
 
     try {
+      // Ensure trading symbol is in correct format for NSE
+      let tradingSymbol = orderData.tradingSymbol;
+      if (orderData.exchange === 'NSE' && !tradingSymbol.includes('-EQ')) {
+        tradingSymbol = `${tradingSymbol}-EQ`;
+      }
+
       const requestData = {
         uid: orderData.userId,
         actid: orderData.userId,
         exch: orderData.exchange,
-        tsym: orderData.tradingSymbol,
+        tsym: tradingSymbol,
         qty: orderData.quantity.toString(),
         dscqty: orderData.discloseQty.toString(),
-        prc: orderData.price?.toString() || '0',
+        prc: orderData.priceType === 'MKT' ? '0' : orderData.price.toString(),
         prd: orderData.productType,
         trantype: orderData.buyOrSell,
         prctyp: orderData.priceType,
         ret: orderData.retention || 'DAY',
         remarks: orderData.remarks || '',
+        // Add additional fields that might be required
+        ordersource: 'API',
       };
 
       // Add trigger price for stop loss orders

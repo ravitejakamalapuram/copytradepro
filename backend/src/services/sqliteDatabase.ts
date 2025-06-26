@@ -53,6 +53,42 @@ export interface CreateConnectedAccountData {
   // Note: is_active removed - always validate in real-time
 }
 
+export interface OrderHistory {
+  id: number;
+  user_id: number;
+  account_id: number;
+  broker_name: string;
+  broker_order_id: string;
+  symbol: string;
+  action: 'BUY' | 'SELL';
+  quantity: number;
+  price: number;
+  order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+  status: string;
+  exchange: string;
+  product_type: string;
+  remarks: string;
+  executed_at: string;
+  created_at: string;
+}
+
+export interface CreateOrderHistoryData {
+  user_id: number;
+  account_id: number;
+  broker_name: string;
+  broker_order_id: string;
+  symbol: string;
+  action: 'BUY' | 'SELL';
+  quantity: number;
+  price: number;
+  order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+  status?: string;
+  exchange?: string;
+  product_type?: string;
+  remarks?: string;
+  executed_at: string;
+}
+
 export class SQLiteUserDatabase {
   private db: Database.Database;
   private dbPath: string;
@@ -187,6 +223,46 @@ export class SQLiteUserDatabase {
       END
     `;
 
+    // Create order_history table
+    const createOrderHistoryTable = `
+      CREATE TABLE IF NOT EXISTS order_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        account_id INTEGER NOT NULL,
+        broker_name TEXT NOT NULL,
+        broker_order_id TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
+        quantity INTEGER NOT NULL,
+        price REAL,
+        order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET')),
+        status TEXT NOT NULL DEFAULT 'EXECUTED',
+        exchange TEXT NOT NULL DEFAULT 'NSE',
+        product_type TEXT NOT NULL DEFAULT 'C',
+        remarks TEXT,
+        executed_at DATETIME NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (account_id) REFERENCES connected_accounts(id) ON DELETE CASCADE
+      )
+    `;
+
+    // Create indexes for order_history
+    const createOrderHistoryUserIndex = `
+      CREATE INDEX IF NOT EXISTS idx_order_history_user_id
+      ON order_history(user_id)
+    `;
+
+    const createOrderHistoryAccountIndex = `
+      CREATE INDEX IF NOT EXISTS idx_order_history_account_id
+      ON order_history(account_id)
+    `;
+
+    const createOrderHistoryDateIndex = `
+      CREATE INDEX IF NOT EXISTS idx_order_history_executed_at
+      ON order_history(executed_at DESC)
+    `;
+
     try {
       this.db.exec(createUsersTable);
       this.db.exec(createEmailIndex);
@@ -196,6 +272,10 @@ export class SQLiteUserDatabase {
       this.db.exec(createAccountsUserIndex);
       this.db.exec(createAccountsBrokerIndex);
       this.db.exec(createAccountsUpdateTrigger);
+      this.db.exec(createOrderHistoryTable);
+      this.db.exec(createOrderHistoryUserIndex);
+      this.db.exec(createOrderHistoryAccountIndex);
+      this.db.exec(createOrderHistoryDateIndex);
       console.log('✅ Database tables and indexes created successfully');
     } catch (error) {
       console.error('🚨 Failed to initialize database:', error);
@@ -562,6 +642,113 @@ export class SQLiteUserDatabase {
       return selectAccount.get(userId, brokerName) as ConnectedAccount || null;
     } catch (error) {
       console.error('🚨 Failed to get connected account by user and broker:', error);
+      throw error;
+    }
+  }
+
+  // ==================== ORDER HISTORY METHODS ====================
+
+  // Create order history record
+  createOrderHistory(orderData: CreateOrderHistoryData): OrderHistory {
+    const insertOrder = this.db.prepare(`
+      INSERT INTO order_history (
+        user_id, account_id, broker_name, broker_order_id, symbol, action,
+        quantity, price, order_type, status, exchange, product_type, remarks, executed_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    try {
+      const result = insertOrder.run(
+        orderData.user_id,
+        orderData.account_id,
+        orderData.broker_name,
+        orderData.broker_order_id,
+        orderData.symbol,
+        orderData.action,
+        orderData.quantity,
+        orderData.price,
+        orderData.order_type,
+        orderData.status || 'EXECUTED',
+        orderData.exchange || 'NSE',
+        orderData.product_type || 'C',
+        orderData.remarks || '',
+        orderData.executed_at
+      );
+
+      const orderId = result.lastInsertRowid as number;
+      const order = this.getOrderHistoryById(orderId);
+
+      if (!order) {
+        throw new Error('Failed to retrieve created order history');
+      }
+
+      console.log('✅ Order history created successfully:', orderData.broker_order_id);
+      return order;
+    } catch (error: any) {
+      console.error('🚨 Failed to create order history:', error);
+      throw error;
+    }
+  }
+
+  // Get order history by ID
+  getOrderHistoryById(id: number): OrderHistory | null {
+    const selectOrder = this.db.prepare(`
+      SELECT * FROM order_history WHERE id = ?
+    `);
+
+    try {
+      return selectOrder.get(id) as OrderHistory || null;
+    } catch (error) {
+      console.error('🚨 Failed to get order history by ID:', error);
+      throw error;
+    }
+  }
+
+  // Get order history for a user
+  getOrderHistoryByUserId(userId: number, limit: number = 50, offset: number = 0): OrderHistory[] {
+    const selectOrders = this.db.prepare(`
+      SELECT * FROM order_history
+      WHERE user_id = ?
+      ORDER BY executed_at DESC, created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+
+    try {
+      return selectOrders.all(userId, limit, offset) as OrderHistory[];
+    } catch (error) {
+      console.error('🚨 Failed to get order history by user ID:', error);
+      throw error;
+    }
+  }
+
+  // Get order history for a specific account
+  getOrderHistoryByAccountId(accountId: number, limit: number = 50, offset: number = 0): OrderHistory[] {
+    const selectOrders = this.db.prepare(`
+      SELECT * FROM order_history
+      WHERE account_id = ?
+      ORDER BY executed_at DESC, created_at DESC
+      LIMIT ? OFFSET ?
+    `);
+
+    try {
+      return selectOrders.all(accountId, limit, offset) as OrderHistory[];
+    } catch (error) {
+      console.error('🚨 Failed to get order history by account ID:', error);
+      throw error;
+    }
+  }
+
+  // Get order count for a user
+  getOrderCountByUserId(userId: number): number {
+    const countOrders = this.db.prepare(`
+      SELECT COUNT(*) as count FROM order_history WHERE user_id = ?
+    `);
+
+    try {
+      const result = countOrders.get(userId) as { count: number };
+      return result.count;
+    } catch (error) {
+      console.error('🚨 Failed to get order count by user ID:', error);
       throw error;
     }
   }

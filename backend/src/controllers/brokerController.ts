@@ -954,6 +954,32 @@ export const placeOrder = async (
     // Handle response based on broker type
     if (brokerName === 'shoonya') {
       if (orderResponse.stat === 'Ok') {
+        // Save order to history
+        try {
+          const orderHistoryData = {
+            user_id: parseInt(userId),
+            account_id: account.id,
+            broker_name: brokerName,
+            broker_order_id: orderResponse.norenordno,
+            symbol: symbol,
+            action: action as 'BUY' | 'SELL',
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+            status: 'EXECUTED',
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || `Order placed via CopyTrade Pro`,
+            executed_at: new Date().toISOString(),
+          };
+
+          userDatabase.createOrderHistory(orderHistoryData);
+          console.log('✅ Order saved to history:', orderResponse.norenordno);
+        } catch (historyError: any) {
+          console.error('⚠️ Failed to save order history:', historyError.message);
+          // Don't fail the order response if history saving fails
+        }
+
         res.status(200).json({
           success: true,
           message: 'Order placed successfully',
@@ -979,6 +1005,32 @@ export const placeOrder = async (
       }
     } else if (brokerName === 'fyers') {
       if (orderResponse.s === 'ok') {
+        // Save order to history
+        try {
+          const orderHistoryData = {
+            user_id: parseInt(userId),
+            account_id: account.id,
+            broker_name: brokerName,
+            broker_order_id: orderResponse.id,
+            symbol: symbol,
+            action: action as 'BUY' | 'SELL',
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+            status: 'EXECUTED',
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || `Order placed via CopyTrade Pro`,
+            executed_at: new Date().toISOString(),
+          };
+
+          userDatabase.createOrderHistory(orderHistoryData);
+          console.log('✅ Order saved to history:', orderResponse.id);
+        } catch (historyError: any) {
+          console.error('⚠️ Failed to save order history:', historyError.message);
+          // Don't fail the order response if history saving fails
+        }
+
         res.status(200).json({
           success: true,
           message: 'Order placed successfully',
@@ -1008,6 +1060,50 @@ export const placeOrder = async (
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to place order',
+    });
+  }
+};
+
+// Get order history for a user
+export const getOrderHistory = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { limit = '50', offset = '0' } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    const orderHistory = userDatabase.getOrderHistoryByUserId(
+      parseInt(userId),
+      parseInt(limit as string),
+      parseInt(offset as string)
+    );
+
+    const totalCount = userDatabase.getOrderCountByUserId(parseInt(userId));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orders: orderHistory,
+        totalCount,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      },
+    });
+  } catch (error: any) {
+    console.error('🚨 Get order history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order history',
     });
   }
 };
