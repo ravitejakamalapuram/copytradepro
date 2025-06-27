@@ -61,9 +61,9 @@ class WebSocketService {
 
       // Verify JWT token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
-      socket.userId = decoded.userId;
+      socket.userId = decoded.id; // JWT contains 'id', not 'userId'
 
-      logger.info(`Socket.IO client authenticated: User ${decoded.userId}`);
+      logger.info(`Socket.IO client authenticated: User ${decoded.id}`);
       next();
     } catch (error: any) {
       logger.warn('Socket.IO connection rejected: Invalid token', error?.message);

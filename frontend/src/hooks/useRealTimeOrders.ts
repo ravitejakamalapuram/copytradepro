@@ -89,7 +89,14 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
 
     try {
       // Create Socket.IO connection
-      socketRef.current = io({
+      const serverUrl = import.meta.env.PROD
+        ? window.location.origin
+        : 'http://localhost:3001';
+
+      console.log('Connecting to Socket.IO server:', serverUrl);
+      console.log('Using token:', token ? 'Token present' : 'No token');
+
+      socketRef.current = io(serverUrl, {
         auth: {
           token: token
         },
@@ -97,7 +104,8 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
         reconnection: true,
         reconnectionAttempts: 5,
         reconnectionDelay: 3000,
-        timeout: 10000
+        timeout: 10000,
+        transports: ['websocket', 'polling']
       });
 
       // Set up event listeners
@@ -117,8 +125,14 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
         setConnectionStatus('disconnected');
       });
 
-      socketRef.current.on('connect_error', (error) => {
+      socketRef.current.on('connect_error', (error: any) => {
         console.error('Socket.IO connection error:', error);
+        console.error('Error details:', {
+          message: error.message,
+          description: error.description || 'No description',
+          context: error.context || 'No context',
+          type: error.type || 'Unknown type'
+        });
         setConnectionStatus('error');
       });
 
