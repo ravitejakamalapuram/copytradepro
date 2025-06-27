@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error Messages Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .error-demo {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-left: 4px solid #dc2626;
+            background: #fef2f2;
+            border-radius: 4px;
+        }
+        .warning-demo {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-left: 4px solid #f59e0b;
+            background: #fffbeb;
+            border-radius: 4px;
+        }
+        .info-demo {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-left: 4px solid #3b82f6;
+            background: #eff6ff;
+            border-radius: 4px;
+        }
+        .before-after {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .before {
+            background: #fee2e2;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        .after {
+            background: #dcfce7;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        h3 {
+            margin-top: 0;
+            color: #1f2937;
+        }
+        .icon {
+            font-size: 1.2em;
+            margin-right: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎯 Better Error Messages - Before & After</h1>
+    <p>This demonstrates the improvement from technical error messages to user-friendly ones.</p>
+
+    <div class="test-section">
+        <h3>🔐 Authentication Errors</h3>
+        <div class="before-after">
+            <div class="before">
+                <strong>❌ Before (Technical):</strong><br>
+                "401 Unauthorized: Invalid token"
+            </div>
+            <div class="after">
+                <strong>✅ After (User-Friendly):</strong><br>
+                <span class="icon">🔐</span><strong>Session Expired</strong><br>
+                Your session has expired for security reasons.<br>
+                <em>What you can do:</em> Please log in again to continue trading.
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>💰 Trading Errors</h3>
+        <div class="before-after">
+            <div class="before">
+                <strong>❌ Before (Technical):</strong><br>
+                "Error: Insufficient margin available"
+            </div>
+            <div class="after">
+                <strong>✅ After (User-Friendly):</strong><br>
+                <span class="icon">💰</span><strong>Insufficient Balance</strong><br>
+                You don't have enough funds in your account to place this order.<br>
+                <em>What you can do:</em> Please add funds to your account or reduce the order quantity.
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>🌐 Network Errors</h3>
+        <div class="before-after">
+            <div class="before">
+                <strong>❌ Before (Technical):</strong><br>
+                "NetworkError: Failed to fetch"
+            </div>
+            <div class="after">
+                <strong>✅ After (User-Friendly):</strong><br>
+                <span class="icon">🌐</span><strong>Connection Problem</strong><br>
+                Unable to connect to the trading server. Please check your internet connection.<br>
+                <em>What you can do:</em> Try refreshing the page or check your internet connection.
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>📈 Symbol Validation Errors</h3>
+        <div class="before-after">
+            <div class="before">
+                <strong>❌ Before (Technical):</strong><br>
+                "ValidationError: Symbol is required"
+            </div>
+            <div class="after">
+                <strong>✅ After (User-Friendly):</strong><br>
+                <span class="icon">📈</span><strong>Invalid Stock Symbol</strong><br>
+                Please enter a stock symbol (e.g., RELIANCE, TCS)<br>
+                <em>What you can do:</em> Please check the symbol spelling or search for the correct stock name.
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>🏦 Broker Connection Errors</h3>
+        <div class="before-after">
+            <div class="before">
+                <strong>❌ Before (Technical):</strong><br>
+                "Error: Connection timeout to broker API"
+            </div>
+            <div class="after">
+                <strong>✅ After (User-Friendly):</strong><br>
+                <span class="icon">🏦</span><strong>Broker Connection Failed</strong><br>
+                Unable to connect to your broker account. The broker's servers might be down.<br>
+                <em>What you can do:</em> Please try reconnecting your broker account or contact your broker.
+            </div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>⚠️ Partial Success Scenarios</h3>
+        <div class="warning-demo">
+            <span class="icon">⚠️</span><strong>Partial Success</strong><br>
+            2/3 orders placed successfully. Failed: Shoonya account inactive<br>
+            <em>What you can do:</em> Check the failed orders and try placing them again if needed.
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>🕐 Market Status Errors</h3>
+        <div class="info-demo">
+            <span class="icon">🕐</span><strong>Market is Closed</strong><br>
+            The stock market is currently closed. Orders cannot be placed right now.<br>
+            <em>What you can do:</em> You can place orders when the market opens (9:15 AM - 3:30 PM on weekdays).
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>🎯 Key Improvements</h3>
+        <ul>
+            <li><strong>🎨 Visual Icons:</strong> Each error type has a relevant emoji for quick recognition</li>
+            <li><strong>📝 Clear Titles:</strong> Human-readable error titles instead of technical codes</li>
+            <li><strong>💬 Plain Language:</strong> Explanations in simple, non-technical terms</li>
+            <li><strong>🔧 Actionable Suggestions:</strong> Clear next steps users can take</li>
+            <li><strong>🎨 Color Coding:</strong> Red for errors, yellow for warnings, blue for info</li>
+            <li><strong>🔄 Retry Options:</strong> Smart retry buttons for recoverable errors</li>
+            <li><strong>📱 Responsive Design:</strong> Works perfectly on mobile devices</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>🚀 Implementation Features</h3>
+        <ul>
+            <li><strong>Centralized Error Mapping:</strong> All error patterns in one utility file</li>
+            <li><strong>Context-Aware Messages:</strong> Different messages for login vs trading contexts</li>
+            <li><strong>HTTP Status Code Handling:</strong> Automatic mapping of 401, 403, 500, etc.</li>
+            <li><strong>Keyword Detection:</strong> Smart pattern matching for error types</li>
+            <li><strong>Reusable Components:</strong> ErrorDisplay, InlineErrorDisplay, ErrorToast</li>
+            <li><strong>TypeScript Safety:</strong> Fully typed error interfaces</li>
+        </ul>
+    </div>
+</body>
+</html>
