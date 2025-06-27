@@ -6,15 +6,17 @@ services:
     plan: starter
     buildCommand: |
       echo "🚀 Building CopyTrade Pro..."
+      node --version
+      npm --version
 
       # Build backend first
       cd backend
-      npm ci
+      npm install
       npm run build
 
       # Build frontend
       cd ../frontend
-      npm ci
+      npm install
       npm run build
 
       # Copy frontend build to backend public directory
@@ -23,7 +25,7 @@ services:
       cp -r ../frontend/dist/* public/
 
       # Clean up dev dependencies for production
-      npm prune --omit=dev
+      npm install --production
 
       echo "✅ Build completed successfully!"
     startCommand: cd backend && node dist/index.js
