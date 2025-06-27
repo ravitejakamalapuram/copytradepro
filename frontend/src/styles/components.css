@@ -355,6 +355,9 @@
 .text-secondary { color: var(--text-secondary); }
 .text-tertiary { color: var(--text-tertiary); }
 
+/* Additional Text Color Utilities */
+.text-inverse { color: var(--text-inverse); }
+
 /* Font Weight Utilities */
 .font-light { font-weight: var(--font-light); }
 .font-normal { font-weight: var(--font-normal); }
