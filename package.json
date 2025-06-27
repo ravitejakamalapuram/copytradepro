@@ -1,0 +1,42 @@
+{
+  "name": "copytrade-pro",
+  "version": "1.0.0",
+  "description": "Professional trading application with multi-broker support",
+  "private": true,
+  "scripts": {
+    "build": "./build.sh",
+    "start": "cd backend && npm start",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "clean": "rm -rf backend/dist frontend/dist backend/public",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "npm run install:all"
+  },
+  "keywords": [
+    "trading",
+    "broker",
+    "fintech",
+    "react",
+    "nodejs",
+    "typescript"
+  ],
+  "author": "Raviteja Kamalapuram",
+  "license": "ISC",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "backend",
+    "frontend"
+  ]
+}

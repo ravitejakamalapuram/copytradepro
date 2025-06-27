@@ -1,56 +1,58 @@
 services:
-  # Backend API Service
+  # Full-Stack Application (Backend serving Frontend)
   - type: web
-    name: copytrade-backend
-    env: node
+    name: copytrade-pro
+    runtime: node
     plan: starter
-    buildCommand: cd backend && npm install && npm run build
-    startCommand: cd backend && npm start
+    buildCommand: |
+      echo "🚀 Building CopyTrade Pro..."
+
+      # Build backend first
+      cd backend
+      npm ci
+      npm run build
+
+      # Build frontend
+      cd ../frontend
+      npm ci
+      npm run build
+
+      # Copy frontend build to backend public directory
+      cd ../backend
+      mkdir -p public
+      cp -r ../frontend/dist/* public/
+
+      # Clean up dev dependencies for production
+      npm prune --omit=dev
+
+      echo "✅ Build completed successfully!"
+    startCommand: cd backend && node dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 3001
+        value: 10000
       - key: JWT_SECRET
         generateValue: true
       - key: ENCRYPTION_KEY
         generateValue: true
       - key: FRONTEND_URL
-        fromService:
-          type: web
-          name: copytrade-frontend
-          property: url
+        value: https://copytrade-pro.onrender.com
       - key: ALLOWED_ORIGINS
-        fromService:
-          type: web
-          name: copytrade-frontend
-          property: url
+        value: https://copytrade-pro.onrender.com
       - key: DATABASE_PATH
-        value: /opt/render/project/src/data/trading.db
+        value: /opt/render/project/src/backend/data/trading.db
       - key: LOG_LEVEL
         value: info
       - key: ENABLE_REQUEST_LOGGING
-        value: true
+        value: "true"
       - key: RATE_LIMIT_WINDOW_MS
-        value: 900000
+        value: "900000"
       - key: RATE_LIMIT_MAX_REQUESTS
-        value: 100
-
-  # Frontend Static Site
-  - type: web
-    name: copytrade-frontend
-    env: static
-    plan: starter
-    buildCommand: cd frontend && npm install && npm run build
-    staticPublishPath: frontend/dist
-    envVars:
+        value: "100"
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: copytrade-backend
-          property: url
-          envVarKey: VITE_API_URL
+        value: https://copytrade-pro.onrender.com/api
       - key: VITE_APP_NAME
         value: CopyTrade Pro
       - key: VITE_APP_VERSION
@@ -58,19 +60,9 @@ services:
       - key: VITE_NODE_ENV
         value: production
       - key: VITE_ENABLE_DEBUG
-        value: false
+        value: "false"
       - key: VITE_ENABLE_ANALYTICS
-        value: true
+        value: "true"
 
 # Database (using disk storage for SQLite)
 databases: []
-
-# Additional configuration
-buildFilter:
-  paths:
-    - backend/**
-    - frontend/**
-  ignoredPaths:
-    - "*.md"
-    - ".git/**"
-    - "node_modules/**"

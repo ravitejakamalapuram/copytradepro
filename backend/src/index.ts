@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import path from 'path';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
@@ -134,13 +135,46 @@ app.post('/api/demo/update-order-status', (req: express.Request, res: express.Re
   });
 });
 
-// 404 handler
-app.use((_req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
+// Serve static files from frontend build (in production)
+if (process.env.NODE_ENV === 'production') {
+  const publicPath = path.join(__dirname, '../public');
+
+  // Serve static files
+  app.use(express.static(publicPath, {
+    maxAge: '1y', // Cache static assets for 1 year
+    etag: true,
+    lastModified: true,
+  }));
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction): void => {
+    // Skip API routes and static assets
+    if (req.path.startsWith('/api/') ||
+        req.path.startsWith('/health') ||
+        req.path.includes('.')) {
+      return next();
+    }
+
+    // Serve index.html for all other routes (SPA routing)
+    res.sendFile(path.join(publicPath, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(500).json({
+          success: false,
+          message: 'Error serving application',
+        });
+      }
+    });
   });
-});
+} else {
+  // 404 handler for development mode only
+  app.use((_req, res) => {
+    res.status(404).json({
+      success: false,
+      message: 'Route not found',
+    });
+  });
+}
 
 // Global error handler
 app.use(errorHandler);

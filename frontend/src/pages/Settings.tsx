@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardContent,
   Grid,
-  Stack,
+
   Badge
 } from '../components/ui';
 import './Settings.css';

@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useRealTimeOrders } from '../hooks/useRealTimeOrders';
-import { notificationService } from '../services/notificationService';
+// Removed unused notificationService import
 import { Button, StatusBadge, HStack } from './ui';
 import './RealTimeStatusIndicator.css';
 
 interface RealTimeStatusIndicatorProps {
   className?: string;
-  showDetails?: boolean;
   onOrderUpdate?: (orderId: string, newStatus: string) => void;
 }
 
 const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
   className = '',
-  showDetails = false,
   onOrderUpdate
 }) => {
   const {
@@ -27,52 +25,20 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
     refreshMonitoringStatus
   } = useRealTimeOrders();
 
-  const [recentUpdates, setRecentUpdates] = useState<Array<{
-    id: string;
-    type: 'status' | 'execution';
-    message: string;
-    timestamp: Date;
-    status?: string;
-  }>>([]);
+  // Removed unused recentUpdates state
 
   const [hasNewUpdates, setHasNewUpdates] = useState(false);
-  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(false);
-  const [, setNotificationPermission] = useState<NotificationPermission>('default');
+  // Removed unused pushNotificationsEnabled state
+  // Removed unused notification permission state
 
-  // Initialize push notifications
-  useEffect(() => {
-    const initializePushNotifications = async () => {
-      try {
-        if (notificationService.isNotificationSupported()) {
-          await notificationService.initialize();
-          const isSubscribed = await notificationService.isSubscribed();
-          setPushNotificationsEnabled(isSubscribed);
-          setNotificationPermission(notificationService.getPermission());
-        }
-      } catch (error) {
-        console.error('Failed to initialize push notifications:', error);
-      }
-    };
-
-    initializePushNotifications();
-  }, []);
+  // Removed push notification initialization
 
   // Set up order update listeners
   useEffect(() => {
     onOrderStatusChange((update) => {
       console.log('Order status changed:', update);
 
-      // Add to recent updates with better formatting
-      setRecentUpdates(prev => [
-        {
-          id: update.orderId,
-          type: 'status',
-          message: `${update.order.symbol} order ${update.oldStatus.toLowerCase()} → ${update.newStatus.toLowerCase()}`,
-          timestamp: new Date(),
-          status: update.newStatus
-        },
-        ...prev.slice(0, 9) // Keep last 10 updates
-      ]);
+      // Removed recent updates tracking
 
       // Show notification badge
       setHasNewUpdates(true);
@@ -87,39 +53,14 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
     onOrderExecutionUpdate((update) => {
       console.log('Order execution updated:', update);
 
-      setRecentUpdates(prev => [
-        {
-          id: update.orderId,
-          type: 'execution',
-          message: `${update.order.symbol} partially filled: ${update.executionData.executed_quantity || 0} shares`,
-          timestamp: new Date()
-        },
-        ...prev.slice(0, 9)
-      ]);
+      // Removed recent updates tracking
 
       setHasNewUpdates(true);
       setTimeout(() => setHasNewUpdates(false), 3000);
     });
   }, [onOrderStatusChange, onOrderExecutionUpdate, onOrderUpdate]);
 
-  const getStatusEmoji = (status: string) => {
-    switch (status.toUpperCase()) {
-      case 'EXECUTED':
-      case 'FILLED':
-        return '✅';
-      case 'REJECTED':
-      case 'CANCELLED':
-        return '❌';
-      case 'PLACED':
-      case 'PENDING':
-        return '⏳';
-      case 'PARTIAL':
-      case 'PARTIALLY_FILLED':
-        return '🔄';
-      default:
-        return '📋';
-    }
-  };
+  // Removed unused getStatusEmoji function
 
   const getStatusIcon = () => {
     switch (connectionStatus) {
@@ -151,19 +92,7 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
     }
   };
 
-  const getStatusColor = () => {
-    switch (connectionStatus) {
-      case 'connected':
-        return 'success';
-      case 'connecting':
-        return 'warning';
-      case 'disconnected':
-      case 'error':
-        return 'error';
-      default:
-        return 'neutral';
-    }
-  };
+  // Removed unused getStatusColor function
 
   const formatLastUpdate = () => {
     if (!lastUpdate) return 'Never';
@@ -190,11 +119,11 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
 
   const getStatusVariant = () => {
     switch (connectionStatus) {
-      case 'connected': return 'success';
-      case 'connecting': return 'warning';
-      case 'disconnected': return 'error';
+      case 'connected': return 'active';
+      case 'connecting': return 'pending';
+      case 'disconnected': return 'inactive';
       case 'error': return 'error';
-      default: return 'default';
+      default: return 'inactive';
     }
   };
 
@@ -204,8 +133,7 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
         {/* Connection Status */}
         <div className="status-section">
           <StatusBadge
-            variant={getStatusVariant()}
-            size="base"
+            status={getStatusVariant()}
           >
             <span className="status-icon">{getStatusIcon()}</span>
             {connectionStatus === 'connecting' && (

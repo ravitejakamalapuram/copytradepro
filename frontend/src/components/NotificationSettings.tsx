@@ -221,7 +221,7 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
                 <div className="status-info">
                   <Flex align="center" gap={3}>
                     <Badge
-                      variant={isSubscribed ? 'success' : 'secondary'}
+                      variant={isSubscribed ? 'success' : 'default'}
                       size="lg"
                     >
                       {isSubscribed ? 'Enabled' : 'Disabled'}

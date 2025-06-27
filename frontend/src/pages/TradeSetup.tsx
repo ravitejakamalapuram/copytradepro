@@ -6,7 +6,7 @@ import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
 import OrderSearchInput from '../components/OrderSearchInput';
 import ErrorDisplay, { InlineErrorDisplay } from '../components/ErrorDisplay';
 import RealTimeStatusIndicator from '../components/RealTimeStatusIndicator';
-import { ButtonSpinner } from '../components/LoadingSpinner';
+// Removed unused ButtonSpinner import
 import { SkeletonTradeHistory, SkeletonAccountList } from '../components/SkeletonLoader';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
@@ -388,7 +388,7 @@ const TradeSetup: React.FC = () => {
             <div className="card">
               <div className="card-body">
                 <RealTimeStatusIndicator
-                  showDetails={true}
+
                   onOrderUpdate={handleRealTimeOrderUpdate}
                 />
               </div>
@@ -534,7 +534,7 @@ const TradeSetup: React.FC = () => {
                       <Checkbox
                         key={account.id}
                         checked={formData.brokerAccounts.includes(account.id)}
-                        onChange={(checked) => handleAccountSelection(account.id)}
+                        onChange={() => handleAccountSelection(account.id)}
                         disabled={isSubmitting}
                         state={errors.brokerAccounts ? 'error' : 'default'}
                       >
