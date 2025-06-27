@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
+import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
 import './TradeSetup.css';
@@ -45,6 +46,10 @@ const TradeSetup: React.FC = () => {
     action: '' as '' | 'BUY' | 'SELL',
   });
   const [showFilters, setShowFilters] = useState(false);
+
+  // Order confirmation dialog state
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingOrderData, setPendingOrderData] = useState<any>(null);
 
   // Load connected accounts and order history on component mount
   useEffect(() => {
@@ -162,14 +167,45 @@ const TradeSetup: React.FC = () => {
 
   const handleSubmitTrade = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
 
+    // Prepare order details for confirmation dialog
+    const selectedAccounts = connectedAccounts.filter(account =>
+      formData.brokerAccounts.includes(account.id)
+    );
+
+    const orderDetails = {
+      symbol: formData.symbol.toUpperCase().trim(),
+      action: formData.action,
+      quantity: Number(formData.quantity),
+      orderType: formData.orderType,
+      price: formData.orderType === 'LIMIT' ? Number(formData.price) : undefined,
+      triggerPrice: undefined, // Add trigger price support later
+      exchange: 'NSE',
+      productType: 'C',
+      selectedAccounts: selectedAccounts.map(account => ({
+        id: account.id,
+        brokerDisplayName: account.brokerDisplayName,
+        brokerName: account.brokerName,
+      })),
+    };
+
+    setPendingOrderData(orderDetails);
+    setShowConfirmDialog(true);
+  };
+
+  const handleConfirmOrder = async () => {
+    if (!pendingOrderData) return;
+
     setIsSubmitting(true);
 
     try {
+      // Close confirmation dialog
+      setShowConfirmDialog(false);
+
       // Place orders for each selected broker account
       const orderPromises = formData.brokerAccounts.map(async (accountId) => {
         const account = connectedAccounts.find(acc => acc.id === accountId);
@@ -180,13 +216,13 @@ const TradeSetup: React.FC = () => {
         const orderRequest: PlaceOrderRequest = {
           brokerName: account.brokerName,
           accountId: account.id, // Include the specific account ID
-          symbol: formData.symbol.toUpperCase().trim(),
-          action: formData.action,
-          quantity: Number(formData.quantity),
-          orderType: formData.orderType === 'MARKET' ? 'MARKET' : 'LIMIT',
-          price: formData.orderType === 'LIMIT' ? Number(formData.price) : undefined,
-          exchange: 'NSE',
-          productType: 'C', // Cash product
+          symbol: pendingOrderData.symbol,
+          action: pendingOrderData.action,
+          quantity: pendingOrderData.quantity,
+          orderType: pendingOrderData.orderType === 'MARKET' ? 'MARKET' : 'LIMIT',
+          price: pendingOrderData.orderType === 'LIMIT' ? pendingOrderData.price : undefined,
+          exchange: pendingOrderData.exchange,
+          productType: pendingOrderData.productType,
           remarks: `Order placed via CopyTrade Pro at ${new Date().toISOString()}`,
         };
 
@@ -262,6 +298,14 @@ const TradeSetup: React.FC = () => {
       setErrors({ general: error instanceof Error ? error.message : 'Failed to submit trade. Please try again.' });
     } finally {
       setIsSubmitting(false);
+      setPendingOrderData(null);
+    }
+  };
+
+  const handleCloseConfirmDialog = () => {
+    if (!isSubmitting) {
+      setShowConfirmDialog(false);
+      setPendingOrderData(null);
     }
   };
 
@@ -276,10 +320,10 @@ const TradeSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container trade-setup-page">
       <Navigation />
-      
-      <div className="container">
+
+      <div className="container trade-setup-container">
         <div className="page-header">
           <h1>Trade Setup & History</h1>
           <p>Execute trades across multiple broker accounts</p>
@@ -572,8 +616,9 @@ const TradeSetup: React.FC = () => {
               <p>Place your first trade to see it here</p>
             </div>
           ) : (
-            <div className="trades-list">
-              {trades.map(trade => (
+            <div className="trade-history-container">
+              <div className="trades-list">
+                {trades.map(trade => (
                 <div key={trade.id} className="trade-item">
                   <div className="trade-info">
                     <div className="trade-header">
@@ -597,10 +642,22 @@ const TradeSetup: React.FC = () => {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Order Confirmation Dialog */}
+      {pendingOrderData && (
+        <OrderConfirmationDialog
+          isOpen={showConfirmDialog}
+          onClose={handleCloseConfirmDialog}
+          onConfirm={handleConfirmOrder}
+          orderDetails={pendingOrderData}
+          isSubmitting={isSubmitting}
+        />
+      )}
     </div>
   );
 };
