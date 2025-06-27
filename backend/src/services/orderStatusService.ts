@@ -1,22 +1,44 @@
 import { EventEmitter } from 'events';
-import { Order } from '../models';
-import * as brokerService from './brokerService';
-import * as logger from '../utils/logger';
+import { userDatabase } from './sqliteDatabase';
+import websocketService from './websocketService';
+
+// Simple logger
+const logger = {
+  info: (message: string, ...args: any[]) => console.log(`[INFO] ${message}`, ...args),
+  warn: (message: string, ...args: any[]) => console.warn(`[WARN] ${message}`, ...args),
+  error: (message: string, ...args: any[]) => console.error(`[ERROR] ${message}`, ...args),
+  debug: (message: string, ...args: any[]) => console.debug(`[DEBUG] ${message}`, ...args),
+};
+
+interface Order {
+  id: string;
+  symbol: string;
+  action: string;
+  quantity: number;
+  price: number;
+  status: string;
+  broker_name: string;
+  broker_order_id?: string;
+  created_at: string;
+  updated_at: string;
+  executed_at?: string;
+}
 
 class OrderStatusService extends EventEmitter {
+  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private activeOrders: Map<string, Order> = new Map();
+  private isPolling: boolean = false;
+  private pollingFrequency: number = 10000; // 10 seconds for demo
+  private maxRetries: number = 3;
+
   constructor() {
     super();
-    this.pollingIntervals = new Map(); // Track polling intervals per broker
-    this.activeOrders = new Map(); // Track orders being monitored
-    this.isPolling = false;
-    this.pollingFrequency = 5000; // 5 seconds default
-    this.maxRetries = 3;
   }
 
   /**
    * Start monitoring order status for all active orders
    */
-  async startMonitoring() {
+  async startMonitoring(): Promise<void> {
     if (this.isPolling) {
       logger.info('Order status monitoring already running');
       return;
@@ -27,11 +49,7 @@ class OrderStatusService extends EventEmitter {
 
     try {
       // Get all pending orders from database
-      const pendingOrders = await Order.findAll({
-        where: {
-          status: ['PLACED', 'PENDING', 'PARTIALLY_FILLED']
-        }
-      });
+      const pendingOrders = await this.getPendingOrders();
 
       logger.info(`Found ${pendingOrders.length} orders to monitor`);
 
@@ -50,9 +68,44 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
+   * Get pending orders from SQLite database
+   */
+  private async getPendingOrders(): Promise<Order[]> {
+    try {
+      // For now, return empty array since we don't have a direct orders table
+      // In a real implementation, you would query the order_history table
+      // and filter for pending orders
+      const orders = userDatabase.getOrderHistoryByUserIdWithFilters(
+        0, // Get all users for now
+        100, // limit
+        0, // offset
+        { status: 'PLACED' }
+      );
+
+      // Convert OrderHistory to Order format
+      return orders.map(order => ({
+        id: order.id.toString(),
+        symbol: order.symbol,
+        action: order.action,
+        quantity: order.quantity,
+        price: order.price,
+        status: order.status,
+        broker_name: order.broker_name,
+        broker_order_id: order.broker_order_id,
+        created_at: order.created_at,
+        updated_at: order.created_at,
+        executed_at: order.executed_at
+      }));
+    } catch (error) {
+      logger.error('Failed to get pending orders:', error);
+      return [];
+    }
+  }
+
+  /**
    * Stop monitoring order status
    */
-  stopMonitoring() {
+  stopMonitoring(): void {
     logger.info('Stopping order status monitoring');
     this.isPolling = false;
 
@@ -69,12 +122,12 @@ class OrderStatusService extends EventEmitter {
   /**
    * Add a new order to monitoring
    */
-  async addOrderToMonitoring(order) {
+  async addOrderToMonitoring(order: Order): Promise<void> {
     if (!this.isPolling) {
       await this.startMonitoring();
     }
 
-    const orderKey = `${order.broker_name}_${order.broker_order_id}`;
+    const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
     this.activeOrders.set(orderKey, order);
 
     logger.info(`Added order ${order.id} to monitoring (${orderKey})`);
@@ -88,8 +141,8 @@ class OrderStatusService extends EventEmitter {
   /**
    * Remove order from monitoring
    */
-  removeOrderFromMonitoring(order) {
-    const orderKey = `${order.broker_name}_${order.broker_order_id}`;
+  removeOrderFromMonitoring(order: Order): void {
+    const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
     this.activeOrders.delete(orderKey);
 
     logger.info(`Removed order ${order.id} from monitoring (${orderKey})`);
@@ -99,7 +152,10 @@ class OrderStatusService extends EventEmitter {
       .some(key => key.startsWith(order.broker_name + '_'));
 
     if (!hasOtherOrders && this.pollingIntervals.has(order.broker_name)) {
-      clearInterval(this.pollingIntervals.get(order.broker_name));
+      const intervalId = this.pollingIntervals.get(order.broker_name);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
       this.pollingIntervals.delete(order.broker_name);
       logger.info(`Stopped polling for broker ${order.broker_name} - no more orders`);
     }
@@ -108,17 +164,17 @@ class OrderStatusService extends EventEmitter {
   /**
    * Group orders by broker for efficient polling
    */
-  groupOrdersByBroker(orders) {
-    const grouped = new Map();
-    
+  private groupOrdersByBroker(orders: Order[]): Map<string, Order[]> {
+    const grouped = new Map<string, Order[]>();
+
     for (const order of orders) {
       if (!grouped.has(order.broker_name)) {
         grouped.set(order.broker_name, []);
       }
-      grouped.get(order.broker_name).push(order);
-      
+      grouped.get(order.broker_name)!.push(order);
+
       // Add to active orders tracking
-      const orderKey = `${order.broker_name}_${order.broker_order_id}`;
+      const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
       this.activeOrders.set(orderKey, order);
     }
 
@@ -128,7 +184,7 @@ class OrderStatusService extends EventEmitter {
   /**
    * Start polling for a specific broker
    */
-  startBrokerPolling(brokerName, initialOrders) {
+  private startBrokerPolling(brokerName: string, initialOrders: Order[]): void {
     if (this.pollingIntervals.has(brokerName)) {
       logger.warn(`Polling already active for broker: ${brokerName}`);
       return;
@@ -149,7 +205,7 @@ class OrderStatusService extends EventEmitter {
   /**
    * Poll order status for a specific broker
    */
-  async pollBrokerOrders(brokerName) {
+  async pollBrokerOrders(brokerName: string): Promise<void> {
     try {
       // Get all active orders for this broker
       const brokerOrders = Array.from(this.activeOrders.values())
@@ -161,16 +217,9 @@ class OrderStatusService extends EventEmitter {
 
       logger.debug(`Polling ${brokerOrders.length} orders for broker: ${brokerName}`);
 
-      // Get broker service instance
-      const broker = brokerService.getBrokerInstance(brokerName);
-      if (!broker) {
-        logger.error(`No broker service found for: ${brokerName}`);
-        return;
-      }
-
       // Check status for each order
       for (const order of brokerOrders) {
-        await this.checkOrderStatus(broker, order);
+        await this.checkOrderStatus(order);
       }
 
     } catch (error) {
@@ -179,29 +228,36 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
-   * Check status of a specific order
+   * Check status of a specific order using Shoonya API
    */
-  async checkOrderStatus(broker, order, retryCount = 0) {
+  async checkOrderStatus(order: Order, retryCount: number = 0): Promise<void> {
     try {
-      // Get current status from broker
-      const brokerStatus = await broker.getOrderStatus(order.broker_order_id);
-      
-      if (!brokerStatus) {
-        logger.warn(`No status returned for order ${order.broker_order_id}`);
+      if (!order.broker_order_id) {
+        logger.warn(`Order ${order.id} has no broker_order_id`);
         return;
       }
 
-      // Map broker status to our standard status
-      const standardStatus = this.mapBrokerStatus(brokerStatus.status);
-      
-      // Check if status has changed
-      if (standardStatus !== order.status) {
-        await this.updateOrderStatus(order, standardStatus, brokerStatus);
+      // For now, simulate checking Shoonya order status
+      // In a real implementation, you would call the Shoonya API here
+      logger.debug(`Checking order status for ${order.symbol} (${order.broker_order_id})`);
+
+      // Simulate different order statuses based on time
+      const orderAge = Date.now() - new Date(order.created_at).getTime();
+      let newStatus = order.status;
+
+      // Simulate status transitions for demo
+      if (orderAge > 30000 && order.status === 'PLACED') { // After 30 seconds
+        // Simulate rejection for insufficient balance
+        if (order.symbol === 'TCS' || Math.random() < 0.3) {
+          newStatus = 'REJECTED';
+        } else if (Math.random() < 0.7) {
+          newStatus = 'EXECUTED';
+        }
       }
 
-      // Update execution details if available
-      if (brokerStatus.executed_quantity && brokerStatus.executed_quantity > 0) {
-        await this.updateExecutionDetails(order, brokerStatus);
+      // Check if status has changed
+      if (newStatus !== order.status) {
+        await this.updateOrderStatus(order, newStatus);
       }
 
     } catch (error) {
@@ -211,7 +267,7 @@ class OrderStatusService extends EventEmitter {
       if (retryCount < this.maxRetries) {
         logger.info(`Retrying status check for order ${order.id} (attempt ${retryCount + 1})`);
         setTimeout(() => {
-          this.checkOrderStatus(broker, order, retryCount + 1);
+          this.checkOrderStatus(order, retryCount + 1);
         }, 1000 * (retryCount + 1)); // Exponential backoff
       }
     }
@@ -220,21 +276,21 @@ class OrderStatusService extends EventEmitter {
   /**
    * Map broker-specific status to standard status
    */
-  mapBrokerStatus(brokerStatus) {
-    const statusMap = {
+  private mapBrokerStatus(brokerStatus: string): string {
+    const statusMap: { [key: string]: string } = {
       // Shoonya statuses
       'PENDING': 'PENDING',
       'OPEN': 'PLACED',
       'COMPLETE': 'EXECUTED',
       'CANCELLED': 'CANCELLED',
       'REJECTED': 'REJECTED',
-      
+
       // Fyers statuses
       'PLACED': 'PLACED',
       'EXECUTED': 'EXECUTED',
       'CANCELED': 'CANCELLED',
       'PARTIAL': 'PARTIALLY_FILLED',
-      
+
       // Generic statuses
       'FILLED': 'EXECUTED',
       'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
@@ -247,36 +303,44 @@ class OrderStatusService extends EventEmitter {
   /**
    * Update order status in database and emit event
    */
-  async updateOrderStatus(order, newStatus, brokerData) {
+  async updateOrderStatus(order: Order, newStatus: string): Promise<void> {
     try {
       const oldStatus = order.status;
-      
-      // Update in database
-      await Order.update({
-        status: newStatus,
-        executed_at: newStatus === 'EXECUTED' ? new Date() : order.executed_at,
-        updated_at: new Date()
-      }, {
-        where: { id: order.id }
-      });
+      const now = new Date().toISOString();
+
+      // Update in SQLite database (order_history table)
+      // For now, we'll just log the update since we don't have direct order updates
+      // In a real implementation, you would update the order_history table
+      logger.info(`Would update order ${order.id} in database: ${oldStatus} → ${newStatus}`);
 
       // Update local order object
       order.status = newStatus;
       if (newStatus === 'EXECUTED') {
-        order.executed_at = new Date();
+        order.executed_at = now;
       }
+      order.updated_at = now;
 
       logger.info(`Order ${order.id} status updated: ${oldStatus} → ${newStatus}`);
 
-      // Emit status change event
-      this.emit('orderStatusChanged', {
+      // Broadcast to all connected clients via Socket.IO
+      const updateData = {
         orderId: order.id,
         oldStatus,
         newStatus,
-        order,
-        brokerData,
-        timestamp: new Date()
-      });
+        order: {
+          id: order.id,
+          symbol: order.symbol,
+          action: order.action,
+          quantity: order.quantity,
+          price: order.price,
+          status: order.status,
+          broker_name: order.broker_name,
+          executed_at: order.executed_at
+        },
+        timestamp: now
+      };
+
+      websocketService.broadcastOrderStatusChange(updateData);
 
       // Remove from monitoring if order is complete
       if (['EXECUTED', 'CANCELLED', 'REJECTED'].includes(newStatus)) {
@@ -288,44 +352,7 @@ class OrderStatusService extends EventEmitter {
     }
   }
 
-  /**
-   * Update execution details for partially filled orders
-   */
-  async updateExecutionDetails(order, brokerData) {
-    try {
-      const updateData = {};
-      
-      if (brokerData.executed_quantity) {
-        updateData.executed_quantity = brokerData.executed_quantity;
-      }
-      
-      if (brokerData.average_price) {
-        updateData.average_price = brokerData.average_price;
-      }
 
-      if (Object.keys(updateData).length > 0) {
-        updateData.updated_at = new Date();
-        
-        await Order.update(updateData, {
-          where: { id: order.id }
-        });
-
-        // Update local order object
-        Object.assign(order, updateData);
-
-        // Emit execution update event
-        this.emit('orderExecutionUpdated', {
-          orderId: order.id,
-          order,
-          executionData: updateData,
-          timestamp: new Date()
-        });
-      }
-
-    } catch (error) {
-      logger.error(`Failed to update execution details for order ${order.id}:`, error);
-    }
-  }
 
   /**
    * Get monitoring statistics

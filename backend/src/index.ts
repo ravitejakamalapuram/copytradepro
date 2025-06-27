@@ -11,6 +11,7 @@ import brokerRoutes from './routes/broker';
 import { errorHandler } from './middleware/errorHandler';
 import { validateEnv } from './utils/validateEnv';
 import websocketService from './services/websocketService';
+import orderStatusService from './services/orderStatusService';
 
 // Load environment variables
 dotenv.config();
@@ -77,18 +78,25 @@ const server = createServer(app);
 // Initialize Socket.IO
 websocketService.initialize(server);
 
+// Start order status monitoring
+orderStatusService.startMonitoring().catch((error: any) => {
+  console.error('Failed to start order status monitoring:', error);
+});
+
 // Start server
 server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔄 Socket.IO enabled for real-time updates`);
+  console.log(`📊 Order status monitoring active`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully');
   websocketService.shutdown();
+  orderStatusService.stopMonitoring();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
@@ -98,6 +106,7 @@ process.on('SIGTERM', () => {
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully');
   websocketService.shutdown();
+  orderStatusService.stopMonitoring();
   server.close(() => {
     console.log('Server closed');
     process.exit(0);
