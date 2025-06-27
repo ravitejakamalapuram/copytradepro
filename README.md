@@ -36,10 +36,46 @@ A professional multi-broker trading platform for copy trading and portfolio mana
 
 ### Installation
 
+#### Option 1: Automated Setup (Recommended)
+
+Run the setup script for your operating system:
+
+**Linux/macOS:**
+```bash
+git clone <repository-url>
+cd copytradepro
+chmod +x setup.sh
+./setup.sh
+```
+
+**Windows (Command Prompt):**
+```cmd
+git clone <repository-url>
+cd copytradepro
+setup.bat
+```
+
+**Windows (PowerShell):**
+```powershell
+git clone <repository-url>
+cd copytradepro
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\setup.ps1
+```
+
+The setup script will:
+- ✅ Check Node.js and npm versions
+- ✅ Create environment files with default configurations
+- ✅ Install all dependencies for both backend and frontend
+- ✅ Build the backend
+- ✅ Create startup scripts for development and production
+
+#### Option 2: Manual Setup
+
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd copyTradeV2
+   cd copytradepro
    ```
 
 2. **Install backend dependencies**
@@ -55,7 +91,7 @@ A professional multi-broker trading platform for copy trading and portfolio mana
    ```
 
 4. **Set up environment variables**
-   
+
    Backend (.env):
    ```bash
    cd ../backend
@@ -70,6 +106,14 @@ A professional multi-broker trading platform for copy trading and portfolio mana
    ```
 
 ### Development
+
+#### Quick Start (After Setup)
+
+**Using startup scripts:**
+- Linux/macOS: `./start-dev.sh`
+- Windows: `start-dev.bat` or `.\start-dev.ps1`
+
+**Manual start:**
 
 1. **Start the backend server**
    ```bash
@@ -159,12 +203,20 @@ copyTradeV2/
 
 ## Production Deployment
 
+#### Quick Production Start
+
+**Using startup scripts:**
+- Linux/macOS: `./start-prod.sh`
+- Windows: `start-prod.bat` or `.\start-prod.ps1`
+
+#### Manual Production Deployment
+
 1. **Build the applications**
    ```bash
    # Backend
    cd backend
    npm run build
-   
+
    # Frontend
    cd ../frontend
    npm run build
