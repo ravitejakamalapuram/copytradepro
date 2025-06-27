@@ -1,0 +1,402 @@
+/* Real-Time Status Indicator */
+
+.real-time-status {
+  position: relative;
+  display: inline-block;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  user-select: none;
+}
+
+.status-indicator:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.status-indicator--success {
+  border-color: #10b981;
+  background: #ecfdf5;
+}
+
+.status-indicator--success:hover {
+  background: #d1fae5;
+}
+
+.status-indicator--warning {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.status-indicator--warning:hover {
+  background: #fef3c7;
+}
+
+.status-indicator--error {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+
+.status-indicator--error:hover {
+  background: #fee2e2;
+}
+
+.status-indicator--neutral {
+  border-color: #6b7280;
+  background: #f9fafb;
+}
+
+.status-icon {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.status-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-left: -0.25rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.status-text {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.status-details {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+.dropdown-arrow {
+  font-size: 0.625rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  margin-left: auto;
+}
+
+.status-indicator:hover .dropdown-arrow {
+  transform: translateY(1px);
+}
+
+/* Status Dropdown */
+.status-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 1000;
+  min-width: 320px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  margin-top: 0.5rem;
+  overflow: hidden;
+  animation: dropdown-appear 0.2s ease-out;
+}
+
+@keyframes dropdown-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.dropdown-header h4 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background: #e5e7eb;
+  color: var(--text-primary);
+}
+
+/* Status Sections */
+.status-section,
+.monitoring-section,
+.updates-section {
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.status-section:last-child,
+.monitoring-section:last-child,
+.updates-section:last-child {
+  border-bottom: none;
+}
+
+.monitoring-section h5,
+.updates-section h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.status-row:last-child {
+  margin-bottom: 0;
+}
+
+.status-row .label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.status-row .value {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.value--success {
+  color: #10b981;
+}
+
+.value--warning {
+  color: #f59e0b;
+}
+
+.value--error {
+  color: #ef4444;
+}
+
+/* Updates List */
+.updates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.update-item {
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 4px;
+  border-left: 3px solid #3b82f6;
+}
+
+.update-message {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  font-weight: 500;
+  margin-bottom: 0.25rem;
+}
+
+.update-time {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Dropdown Actions */
+.dropdown-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #f9fafb;
+}
+
+.action-button {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.action-button:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.action-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-button.connect {
+  background: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+.action-button.connect:hover {
+  background: #059669;
+  border-color: #059669;
+}
+
+.action-button.disconnect {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.action-button.disconnect:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.action-button.refresh {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.action-button.refresh:hover:not(:disabled) {
+  background: #2563eb;
+  border-color: #2563eb;
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .status-dropdown {
+    right: auto;
+    left: 0;
+    min-width: 280px;
+    max-width: calc(100vw - 2rem);
+  }
+  
+  .status-details {
+    display: none;
+  }
+  
+  .dropdown-actions {
+    flex-direction: column;
+  }
+  
+  .action-button {
+    flex: none;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .status-indicator {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .status-indicator:hover {
+    background: #374151;
+    border-color: #4b5563;
+  }
+  
+  .status-dropdown {
+    background: #1f2937;
+    border-color: #374151;
+  }
+  
+  .dropdown-header {
+    background: #374151;
+    border-bottom-color: #4b5563;
+  }
+  
+  .status-section,
+  .monitoring-section,
+  .updates-section {
+    border-bottom-color: #4b5563;
+  }
+  
+  .update-item {
+    background: #374151;
+  }
+  
+  .dropdown-actions {
+    background: #374151;
+  }
+  
+  .action-button {
+    background: #1f2937;
+    border-color: #4b5563;
+  }
+  
+  .action-button:hover:not(:disabled) {
+    background: #4b5563;
+    border-color: #6b7280;
+  }
+  
+  .close-button:hover {
+    background: #4b5563;
+  }
+}
+
+/* Animation for status changes */
+.status-indicator {
+  animation: status-pulse 0.3s ease-out;
+}
+
+@keyframes status-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
