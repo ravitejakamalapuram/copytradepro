@@ -1088,7 +1088,8 @@ export const getOrderHistory = async (
       brokerName,
       startDate,
       endDate,
-      action
+      action,
+      search
     } = req.query;
 
     if (!userId) {
@@ -1107,6 +1108,7 @@ export const getOrderHistory = async (
       startDate: startDate as string,
       endDate: endDate as string,
       action: action as 'BUY' | 'SELL',
+      search: search as string,
     };
 
     const orderHistory = userDatabase.getOrderHistoryByUserIdWithFilters(
@@ -1136,6 +1138,54 @@ export const getOrderHistory = async (
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order history',
+    });
+  }
+};
+
+// Get search suggestions for order history
+export const getOrderSearchSuggestions = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { q: searchTerm, limit = '10' } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim().length < 1) {
+      res.status(400).json({
+        success: false,
+        message: 'Search term is required and must be at least 1 character',
+      });
+      return;
+    }
+
+    const suggestions = userDatabase.getOrderSearchSuggestions(
+      parseInt(userId),
+      searchTerm.trim(),
+      parseInt(limit as string)
+    );
+
+    res.status(200).json({
+      success: true,
+      data: {
+        suggestions,
+        searchTerm: searchTerm.trim(),
+      },
+    });
+  } catch (error: any) {
+    console.error('🚨 Get search suggestions error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch search suggestions',
     });
   }
 };

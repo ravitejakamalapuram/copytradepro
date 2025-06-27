@@ -3,6 +3,7 @@ import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
+import OrderSearchInput from '../components/OrderSearchInput';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
 import './TradeSetup.css';
@@ -47,6 +48,9 @@ const TradeSetup: React.FC = () => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState('');
+
   // Order confirmation dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOrderData, setPendingOrderData] = useState<any>(null);
@@ -72,13 +76,18 @@ const TradeSetup: React.FC = () => {
     }
   };
 
-  const loadOrderHistory = async (filters?: typeof orderFilters) => {
+  const loadOrderHistory = async (filters?: typeof orderFilters, search?: string) => {
     try {
       // Prepare filters for API call
       const apiFilters = filters || orderFilters;
       const cleanFilters = Object.fromEntries(
         Object.entries(apiFilters).filter(([_, value]) => value !== '')
       );
+
+      // Add search term if provided
+      if (search || searchTerm) {
+        cleanFilters.search = search || searchTerm;
+      }
 
       const response = await brokerService.getOrderHistory(50, 0, Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
       if (response.success && response.data) {
@@ -130,7 +139,17 @@ const TradeSetup: React.FC = () => {
       action: '' as '' | 'BUY' | 'SELL',
     };
     setOrderFilters(emptyFilters);
-    loadOrderHistory(emptyFilters);
+    setSearchTerm('');
+    loadOrderHistory(emptyFilters, '');
+  };
+
+  const handleSearch = (search: string) => {
+    setSearchTerm(search);
+    loadOrderHistory(orderFilters, search);
+  };
+
+  const handleSearchChange = (search: string) => {
+    setSearchTerm(search);
   };
 
   const handleAccountSelection = (accountId: string) => {
@@ -506,6 +525,16 @@ const TradeSetup: React.FC = () => {
             >
               {showFilters ? 'Hide Filters' : 'Show Filters'}
             </button>
+          </div>
+
+          {/* Search Input */}
+          <div className="search-section">
+            <OrderSearchInput
+              value={searchTerm}
+              onChange={handleSearchChange}
+              onSearch={handleSearch}
+              placeholder="Search by symbol (e.g., RELIANCE), order ID, or broker order ID..."
+            />
           </div>
 
           {/* Order History Filters */}

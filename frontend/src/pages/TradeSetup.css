@@ -251,6 +251,13 @@
   color: var(--text-secondary);
 }
 
+/* Search Section */
+.search-section {
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background-color: #fafbfc;
+}
+
 /* Order History Filters */
 .filters-section {
   padding: 1.5rem;

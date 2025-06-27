@@ -790,7 +790,7 @@ export class SQLiteUserDatabase {
     }
   }
 
-  // Get order history with filters
+  // Get order history with filters and search
   getOrderHistoryByUserIdWithFilters(
     userId: number,
     limit: number = 50,
@@ -802,6 +802,7 @@ export class SQLiteUserDatabase {
       startDate?: string;
       endDate?: string;
       action?: 'BUY' | 'SELL';
+      search?: string;
     }
   ): OrderHistory[] {
     let query = `
@@ -841,6 +842,17 @@ export class SQLiteUserDatabase {
       params.push(filters.endDate);
     }
 
+    // Add search functionality
+    if (filters.search) {
+      query += ` AND (
+        symbol LIKE ? OR
+        broker_order_id LIKE ? OR
+        CAST(id as TEXT) LIKE ?
+      )`;
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+
     query += ` ORDER BY executed_at DESC, created_at DESC LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
@@ -854,7 +866,7 @@ export class SQLiteUserDatabase {
     }
   }
 
-  // Get order count with filters
+  // Get order count with filters and search
   getOrderCountByUserIdWithFilters(
     userId: number,
     filters: {
@@ -864,6 +876,7 @@ export class SQLiteUserDatabase {
       startDate?: string;
       endDate?: string;
       action?: 'BUY' | 'SELL';
+      search?: string;
     }
   ): number {
     let query = `
@@ -903,6 +916,17 @@ export class SQLiteUserDatabase {
       params.push(filters.endDate);
     }
 
+    // Add search functionality (same as in main query)
+    if (filters.search) {
+      query += ` AND (
+        symbol LIKE ? OR
+        broker_order_id LIKE ? OR
+        CAST(id as TEXT) LIKE ?
+      )`;
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm);
+    }
+
     const countOrders = this.db.prepare(query);
 
     try {
@@ -911,6 +935,63 @@ export class SQLiteUserDatabase {
     } catch (error) {
       console.error('🚨 Failed to get filtered order count:', error);
       throw error;
+    }
+  }
+
+  // Get search suggestions for autocomplete
+  getOrderSearchSuggestions(
+    userId: number,
+    searchTerm: string,
+    limit: number = 10
+  ): Array<{ value: string; type: 'symbol' | 'order_id' | 'broker_order_id' }> {
+    const suggestions: Array<{ value: string; type: 'symbol' | 'order_id' | 'broker_order_id' }> = [];
+
+    try {
+      // Get unique symbols that match
+      const symbolQuery = this.db.prepare(`
+        SELECT DISTINCT symbol
+        FROM order_history
+        WHERE user_id = ? AND symbol LIKE ?
+        ORDER BY symbol
+        LIMIT ?
+      `);
+      const symbols = symbolQuery.all(userId, `%${searchTerm}%`, Math.ceil(limit / 3)) as Array<{ symbol: string }>;
+      symbols.forEach(row => {
+        suggestions.push({ value: row.symbol, type: 'symbol' });
+      });
+
+      // Get broker order IDs that match
+      const brokerOrderQuery = this.db.prepare(`
+        SELECT DISTINCT broker_order_id
+        FROM order_history
+        WHERE user_id = ? AND broker_order_id LIKE ?
+        ORDER BY created_at DESC
+        LIMIT ?
+      `);
+      const brokerOrders = brokerOrderQuery.all(userId, `%${searchTerm}%`, Math.ceil(limit / 3)) as Array<{ broker_order_id: string }>;
+      brokerOrders.forEach(row => {
+        suggestions.push({ value: row.broker_order_id, type: 'broker_order_id' });
+      });
+
+      // Get internal order IDs that match (if numeric search)
+      if (/^\d+$/.test(searchTerm)) {
+        const orderIdQuery = this.db.prepare(`
+          SELECT DISTINCT id
+          FROM order_history
+          WHERE user_id = ? AND CAST(id as TEXT) LIKE ?
+          ORDER BY created_at DESC
+          LIMIT ?
+        `);
+        const orderIds = orderIdQuery.all(userId, `%${searchTerm}%`, Math.ceil(limit / 3)) as Array<{ id: number }>;
+        orderIds.forEach(row => {
+          suggestions.push({ value: row.id.toString(), type: 'order_id' });
+        });
+      }
+
+      return suggestions.slice(0, limit);
+    } catch (error) {
+      console.error('🚨 Failed to get search suggestions:', error);
+      return [];
     }
   }
 }
