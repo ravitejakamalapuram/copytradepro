@@ -4,11 +4,15 @@
   "description": "Trading application backend with multi-broker support",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "start": "node dist/index.js",
+    "start:prod": "./start.sh",
     "dev": "nodemon src/index.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "postinstall": "npm run build",
+    "prod": "NODE_ENV=production npm start",
+    "health-check": "curl -f http://localhost:$PORT/health || exit 1"
   },
   "keywords": [
     "trading",
