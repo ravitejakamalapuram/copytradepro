@@ -1402,15 +1402,49 @@ export const getQuotes = async (
 
 // Broker Connection Manager for Order Status Service
 const brokerConnectionManagerImpl = {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
-    const userConnections = userBrokerConnections.get(userId);
-    if (userConnections && userConnections.has(brokerName)) {
+  getBrokerConnection(brokerAccountId: string, brokerName: string): ShoonyaService | null {
+    console.log(`🔍 Looking for broker connection: brokerAccountId=${brokerAccountId}, brokerName=${brokerName}`);
+    console.log(`🔍 Available user connections:`, Array.from(userBrokerConnections.keys()));
+
+    try {
+      // Find which web user has this broker account connected
+      const connectedAccount = userDatabase.getConnectedAccountByAccountId(brokerAccountId);
+
+      if (!connectedAccount) {
+        console.log(`❌ No connected account found for broker account ID: ${brokerAccountId}`);
+        return null;
+      }
+
+      console.log(`🔍 Found connected account for user ${connectedAccount.user_id}, broker: ${connectedAccount.broker_name}`);
+
+      // Check if the broker name matches
+      if (connectedAccount.broker_name !== brokerName) {
+        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${connectedAccount.broker_name}`);
+        return null;
+      }
+
+      // Get the broker connection for this web user
+      const userId = connectedAccount.user_id.toString();
+      const userConnections = userBrokerConnections.get(userId);
+
+      if (!userConnections) {
+        console.log(`❌ No active connections found for user ${userId}`);
+        return null;
+      }
+
       const service = userConnections.get(brokerName);
       if (service instanceof ShoonyaService) {
+        console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
         return service;
       }
+
+      console.log(`❌ Service not found or not a ShoonyaService for user ${userId}, broker ${brokerName}`);
+      return null;
+
+    } catch (error) {
+      console.error(`🚨 Error in getBrokerConnection:`, error);
+      return null;
     }
-    return null;
   }
 };
 

@@ -61,6 +61,47 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
 
+// Demo endpoint to test real-time order status updates
+app.post('/api/demo/update-order-status', (req: express.Request, res: express.Response): void => {
+  const { orderId, newStatus } = req.body;
+
+  if (!orderId || !newStatus) {
+    res.status(400).json({ error: 'orderId and newStatus are required' });
+    return;
+  }
+
+  // Note: Demo endpoint only broadcasts, real database updates happen in orderStatusService
+
+  // Simulate order status update
+  const updateData = {
+    orderId: orderId,
+    oldStatus: 'PLACED',
+    newStatus: newStatus,
+    order: {
+      id: orderId,
+      symbol: 'TCS',
+      action: 'BUY',
+      quantity: 1,
+      price: 0,
+      status: newStatus,
+      broker_name: 'shoonya',
+      executed_at: newStatus === 'EXECUTED' ? new Date().toISOString() : null
+    },
+    timestamp: new Date().toISOString()
+  };
+
+  // Broadcast to all connected clients
+  websocketService.broadcastOrderStatusChange(updateData);
+
+  console.log(`🎯 DEMO: Manually triggered order status update: ${orderId} → ${newStatus}`);
+
+  res.json({
+    success: true,
+    message: `Order ${orderId} status updated to ${newStatus}`,
+    data: updateData
+  });
+});
+
 // 404 handler
 app.use((_req, res) => {
   res.status(404).json({

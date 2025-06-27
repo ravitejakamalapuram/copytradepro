@@ -2,74 +2,93 @@ import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 const LoginForm: React.FC = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    if (error) setError('');
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value);
+    if (error) setError('');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
+  const performLogin = () => {
+    if (loading) return;
+
+    if (!email.trim()) {
+      setError('Email is required');
+      return;
+    }
+    if (!password) {
+      setError('Password is required');
+      return;
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      setError('Please enter a valid email address');
       return;
     }
 
-    setIsSubmitting(true);
-    setErrors({});
+    setLoading(true);
+    setError('');
 
-    try {
-      await login({
-        email: formData.email.trim().toLowerCase(),
-        password: formData.password,
-      });
-    } catch (error: any) {
-      console.error('🚨 Login error:', error);
-      setErrors({
-        general: error.message || 'Login failed. Please try again.',
-      });
-    } finally {
-      setIsSubmitting(false);
+    login({
+      email: email.trim().toLowerCase(),
+      password: password,
+    }).catch((err) => {
+      let errorMessage = 'Login failed. Please try again.';
+
+      if (err?.message) {
+        if (err.message.includes('Invalid email or password')) {
+          errorMessage = 'Invalid email or password. If you don\'t have an account, please register first.';
+        } else if (err.message.includes('Network error')) {
+          errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+
+      setError(errorMessage);
+    }).finally(() => {
+      setLoading(false);
+    });
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      performLogin();
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="auth-form">
-      {errors.general && (
-        <div className="form-error mb-3" style={{ textAlign: 'center' }}>
-          {errors.general}
+    <div className="auth-form">
+      {error && (
+        <div
+          className="form-error mb-3"
+          style={{
+            textAlign: 'center',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '6px',
+            padding: '12px',
+            marginBottom: '16px',
+            color: '#dc2626'
+          }}
+        >
+          {error}
+          {error.includes('Invalid email or password') && (
+            <div style={{ marginTop: '8px', fontSize: '14px', color: '#6b7280' }}>
+              Don't have an account?{' '}
+              <a href="/register" style={{ color: '#3b82f6', textDecoration: 'underline' }}>
+                Register here
+              </a>
+            </div>
+          )}
         </div>
       )}
 
@@ -80,15 +99,14 @@ const LoginForm: React.FC = () => {
         <input
           type="email"
           id="email"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
-          className={`form-input ${errors.email ? 'error' : ''}`}
-          placeholder="Enter your email"
-          disabled={isSubmitting}
+          value={email}
+          onChange={handleEmailChange}
+          onKeyPress={handleKeyPress}
+          className="form-input"
+          placeholder="Enter your email address"
+          disabled={loading}
           autoComplete="email"
         />
-        {errors.email && <div className="form-error">{errors.email}</div>}
       </div>
 
       <div className="form-group">
@@ -98,25 +116,28 @@ const LoginForm: React.FC = () => {
         <input
           type="password"
           id="password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
-          className={`form-input ${errors.password ? 'error' : ''}`}
+          value={password}
+          onChange={handlePasswordChange}
+          onKeyPress={handleKeyPress}
+          className="form-input"
           placeholder="Enter your password"
-          disabled={isSubmitting}
+          disabled={loading}
           autoComplete="current-password"
         />
-        {errors.password && <div className="form-error">{errors.password}</div>}
       </div>
 
-      <button
-        type="submit"
+      <div
         className="btn btn-primary w-full"
-        disabled={isSubmitting}
+        style={{
+          cursor: loading ? 'not-allowed' : 'pointer',
+          opacity: loading ? 0.7 : 1,
+          userSelect: 'none'
+        }}
+        onClick={performLogin}
       >
-        {isSubmitting ? 'Signing in...' : 'Sign In'}
-      </button>
-    </form>
+        {loading ? 'Signing in...' : 'Sign In'}
+      </div>
+    </div>
   );
 };
 

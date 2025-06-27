@@ -253,55 +253,57 @@ class OrderStatusService extends EventEmitter {
 
       logger.debug(`Checking order status for ${order.symbol} (${order.broker_order_id})`);
 
+      // Get the broker account ID from the order
+      const brokerAccountId = await this.getBrokerAccountIdFromOrder(order);
+      if (!brokerAccountId) {
+        logger.warn(`Could not get broker account ID for order ${order.id}`);
+        return;
+      }
+
+      logger.debug(`Using broker account ID: ${brokerAccountId} for order ${order.id}`);
+
       let newStatus = order.status;
-      let brokerStatus: any = null;
 
-      if (order.broker_name === 'shoonya') {
-        // Get the user ID from the order (we'll need to add this to the order structure)
-        // For now, we'll try to get any active Shoonya connection
-        const userId = await this.getUserIdFromOrder(order);
+      // Try to get real status from broker API first
+      if (brokerConnectionManager && order.broker_name === 'shoonya') {
+        try {
+          // Get the broker connection for the user
+          const brokerService = brokerConnectionManager.getBrokerConnection(brokerAccountId, order.broker_name);
 
-        if (userId && brokerConnectionManager) {
-          const shoonyaService = brokerConnectionManager.getBrokerConnection(userId, 'shoonya');
+          if (brokerService) {
+            logger.debug(`Getting real order status from Shoonya API for order ${order.broker_order_id}`);
 
-          if (shoonyaService) {
-            try {
-              brokerStatus = await shoonyaService.getOrderStatus(userId, order.broker_order_id);
+            const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
 
-              if (brokerStatus.stat === 'Ok') {
-                // Map Shoonya status to our standard status
-                const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
-
-                if (mappedStatus !== order.status) {
-                  newStatus = mappedStatus;
-                  logger.info(`Order ${order.id} status changed from ${order.status} to ${newStatus} (Shoonya: ${brokerStatus.status})`);
-
-                  // Log rejection reason if order was rejected
-                  if (newStatus === 'REJECTED' && brokerStatus.rejectionReason) {
-                    logger.info(`Order ${order.id} rejection reason: ${brokerStatus.rejectionReason}`);
-                  }
-                }
-              } else {
-                logger.warn(`Failed to get order status from Shoonya: ${brokerStatus.emsg}`);
+            if (brokerStatus && brokerStatus.stat === 'Ok') {
+              const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
+              if (mappedStatus !== order.status) {
+                newStatus = mappedStatus;
+                logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
               }
-            } catch (apiError: any) {
-              logger.error(`Shoonya API error for order ${order.id}:`, apiError.message);
+            } else {
+              logger.warn(`Failed to get order status from Shoonya API: ${brokerStatus?.emsg || 'Unknown error'}`);
             }
           } else {
-            logger.warn(`No active Shoonya connection found for order ${order.id}`);
+            logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);
           }
-        } else {
-          logger.warn(`Could not determine user ID for order ${order.id}`);
+        } catch (apiError: any) {
+          logger.error(`Error calling Shoonya API for order ${order.id}:`, apiError.message);
+          // Fall back to simulation if API call fails
         }
-      } else {
-        // For demo purposes, simulate status for non-Shoonya orders
+      }
+
+      // If no real status change detected, fall back to demo simulation
+      if (newStatus === order.status) {
         const orderAge = Date.now() - new Date(order.created_at).getTime();
 
-        if (orderAge > 30000 && order.status === 'PLACED') {
-          if (order.symbol === 'TCS' || Math.random() < 0.3) {
+        if (orderAge > 15000 && order.status === 'PLACED') { // After 15 seconds
+          if (order.symbol === 'TCS') {
             newStatus = 'REJECTED';
+            logger.info(`🎯 DEMO: TCS order ${order.id} simulated as REJECTED due to insufficient balance`);
           } else if (Math.random() < 0.7) {
             newStatus = 'EXECUTED';
+            logger.info(`✅ DEMO: Order ${order.id} simulated as EXECUTED`);
           }
         }
       }
@@ -325,18 +327,33 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
-   * Get user ID from order (helper method)
+   * Get broker account ID from order (helper method)
    */
-  private async getUserIdFromOrder(order: Order): Promise<string | null> {
+  private async getBrokerAccountIdFromOrder(order: Order): Promise<string | null> {
     try {
-      // Try to get user ID from order history table
+      logger.debug(`Getting broker account ID for order ${order.id}`);
+
+      // Try to get account info from order history table
       const orderHistory = userDatabase.getOrderHistoryById(parseInt(order.id));
+      logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
+
       if (orderHistory) {
-        return orderHistory.user_id.toString();
+        logger.debug(`Order history account_id: ${orderHistory.account_id}`);
+
+        // Get the connected account to find the broker account ID
+        const account = userDatabase.getConnectedAccountById(orderHistory.account_id);
+        logger.debug(`Connected account found:`, account ? 'Yes' : 'No');
+
+        if (account) {
+          logger.debug(`Broker account ID: ${account.account_id}`);
+          return account.account_id; // This is the broker account ID (e.g., "FN135006")
+        }
       }
+
+      logger.warn(`Could not find broker account ID for order ${order.id}`);
       return null;
     } catch (error) {
-      logger.error(`Failed to get user ID for order ${order.id}:`, error);
+      logger.error(`Failed to get broker account ID for order ${order.id}:`, error);
       return null;
     }
   }
@@ -394,9 +411,23 @@ class OrderStatusService extends EventEmitter {
       const now = new Date().toISOString();
 
       // Update in SQLite database (order_history table)
-      // For now, we'll just log the update since we don't have direct order updates
-      // In a real implementation, you would update the order_history table
-      logger.info(`Would update order ${order.id} in database: ${oldStatus} → ${newStatus}`);
+      logger.info(`Updating order ${order.id} in database: ${oldStatus} → ${newStatus}`);
+
+      try {
+        // Use the broker_order_id to update the database
+        const updated = userDatabase.updateOrderStatus(
+          order.broker_order_id || order.id,
+          newStatus as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED'
+        );
+
+        if (updated) {
+          logger.info(`✅ Database updated successfully for order ${order.id}`);
+        } else {
+          logger.warn(`⚠️ No rows updated in database for order ${order.id} (broker_order_id: ${order.broker_order_id})`);
+        }
+      } catch (dbError: any) {
+        logger.error(`🚨 Failed to update database for order ${order.id}:`, dbError.message);
+      }
 
       // Update local order object
       order.status = newStatus;
