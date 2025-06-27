@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRealTimeOrders } from '../hooks/useRealTimeOrders';
+import { notificationService } from '../services/notificationService';
 import './RealTimeStatusIndicator.css';
 
 interface RealTimeStatusIndicatorProps {
@@ -35,6 +36,26 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
 
   const [showDropdown, setShowDropdown] = useState(false);
   const [hasNewUpdates, setHasNewUpdates] = useState(false);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(false);
+  const [, setNotificationPermission] = useState<NotificationPermission>('default');
+
+  // Initialize push notifications
+  useEffect(() => {
+    const initializePushNotifications = async () => {
+      try {
+        if (notificationService.isNotificationSupported()) {
+          await notificationService.initialize();
+          const isSubscribed = await notificationService.isSubscribed();
+          setPushNotificationsEnabled(isSubscribed);
+          setNotificationPermission(notificationService.getPermission());
+        }
+      } catch (error) {
+        console.error('Failed to initialize push notifications:', error);
+      }
+    };
+
+    initializePushNotifications();
+  }, []);
 
   // Set up order update listeners
   useEffect(() => {
@@ -42,7 +63,6 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
       console.log('Order status changed:', update);
 
       // Add to recent updates with better formatting
-      const statusEmoji = getStatusEmoji(update.newStatus);
       setRecentUpdates(prev => [
         {
           id: update.orderId,
@@ -269,6 +289,14 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
                 <div className="monitoring-card">
                   <div className="metric-value">{monitoringStatus.pollingFrequency / 1000}s</div>
                   <div className="metric-label">Update Frequency</div>
+                </div>
+                <div className="monitoring-card">
+                  <div className="metric-value">
+                    {pushNotificationsEnabled ? '🔔' : '🔕'}
+                  </div>
+                  <div className="metric-label">
+                    {pushNotificationsEnabled ? 'Push Enabled' : 'Push Disabled'}
+                  </div>
                 </div>
               </div>
               {monitoringStatus.brokers.length > 0 && (

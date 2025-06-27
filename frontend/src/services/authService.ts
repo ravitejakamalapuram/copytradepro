@@ -56,15 +56,19 @@ export const authService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Get profile error:', error);
-      
+
       if (error.response?.data) {
         return error.response.data;
       }
-      
+
       return {
         success: false,
         message: 'Failed to fetch user profile.',
       };
     }
+  },
+
+  getToken(): string | null {
+    return localStorage.getItem('token');
   },
 };
