@@ -789,6 +789,130 @@ export class SQLiteUserDatabase {
       throw error;
     }
   }
+
+  // Get order history with filters
+  getOrderHistoryByUserIdWithFilters(
+    userId: number,
+    limit: number = 50,
+    offset: number = 0,
+    filters: {
+      status?: string;
+      symbol?: string;
+      brokerName?: string;
+      startDate?: string;
+      endDate?: string;
+      action?: 'BUY' | 'SELL';
+    }
+  ): OrderHistory[] {
+    let query = `
+      SELECT * FROM order_history
+      WHERE user_id = ?
+    `;
+    const params: any[] = [userId];
+
+    // Add filters
+    if (filters.status) {
+      query += ` AND status = ?`;
+      params.push(filters.status);
+    }
+
+    if (filters.symbol) {
+      query += ` AND symbol LIKE ?`;
+      params.push(`%${filters.symbol}%`);
+    }
+
+    if (filters.brokerName) {
+      query += ` AND broker_name = ?`;
+      params.push(filters.brokerName);
+    }
+
+    if (filters.action) {
+      query += ` AND action = ?`;
+      params.push(filters.action);
+    }
+
+    if (filters.startDate) {
+      query += ` AND executed_at >= ?`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND executed_at <= ?`;
+      params.push(filters.endDate);
+    }
+
+    query += ` ORDER BY executed_at DESC, created_at DESC LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
+
+    const selectOrders = this.db.prepare(query);
+
+    try {
+      return selectOrders.all(...params) as OrderHistory[];
+    } catch (error) {
+      console.error('🚨 Failed to get filtered order history:', error);
+      throw error;
+    }
+  }
+
+  // Get order count with filters
+  getOrderCountByUserIdWithFilters(
+    userId: number,
+    filters: {
+      status?: string;
+      symbol?: string;
+      brokerName?: string;
+      startDate?: string;
+      endDate?: string;
+      action?: 'BUY' | 'SELL';
+    }
+  ): number {
+    let query = `
+      SELECT COUNT(*) as count FROM order_history
+      WHERE user_id = ?
+    `;
+    const params: any[] = [userId];
+
+    // Add same filters as above
+    if (filters.status) {
+      query += ` AND status = ?`;
+      params.push(filters.status);
+    }
+
+    if (filters.symbol) {
+      query += ` AND symbol LIKE ?`;
+      params.push(`%${filters.symbol}%`);
+    }
+
+    if (filters.brokerName) {
+      query += ` AND broker_name = ?`;
+      params.push(filters.brokerName);
+    }
+
+    if (filters.action) {
+      query += ` AND action = ?`;
+      params.push(filters.action);
+    }
+
+    if (filters.startDate) {
+      query += ` AND executed_at >= ?`;
+      params.push(filters.startDate);
+    }
+
+    if (filters.endDate) {
+      query += ` AND executed_at <= ?`;
+      params.push(filters.endDate);
+    }
+
+    const countOrders = this.db.prepare(query);
+
+    try {
+      const result = countOrders.get(...params) as { count: number };
+      return result.count;
+    } catch (error) {
+      console.error('🚨 Failed to get filtered order count:', error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance

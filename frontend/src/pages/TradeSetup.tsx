@@ -35,6 +35,17 @@ const TradeSetup: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Order history filtering state
+  const [orderFilters, setOrderFilters] = useState({
+    status: '',
+    symbol: '',
+    brokerName: '',
+    startDate: '',
+    endDate: '',
+    action: '' as '' | 'BUY' | 'SELL',
+  });
+  const [showFilters, setShowFilters] = useState(false);
+
   // Load connected accounts and order history on component mount
   useEffect(() => {
     loadConnectedAccounts();
@@ -56,9 +67,15 @@ const TradeSetup: React.FC = () => {
     }
   };
 
-  const loadOrderHistory = async () => {
+  const loadOrderHistory = async (filters?: typeof orderFilters) => {
     try {
-      const response = await brokerService.getOrderHistory(50, 0);
+      // Prepare filters for API call
+      const apiFilters = filters || orderFilters;
+      const cleanFilters = Object.fromEntries(
+        Object.entries(apiFilters).filter(([_, value]) => value !== '')
+      );
+
+      const response = await brokerService.getOrderHistory(50, 0, Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
       if (response.success && response.data) {
         // Convert order history to Trade format for display
         const historyTrades: Trade[] = response.data.orders.map(order => ({
@@ -83,10 +100,32 @@ const TradeSetup: React.FC = () => {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-    
+
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
+  };
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setOrderFilters(prev => ({ ...prev, [name]: value }));
+  };
+
+  const applyFilters = () => {
+    loadOrderHistory(orderFilters);
+  };
+
+  const clearFilters = () => {
+    const emptyFilters = {
+      status: '',
+      symbol: '',
+      brokerName: '',
+      startDate: '',
+      endDate: '',
+      action: '' as '' | 'BUY' | 'SELL',
+    };
+    setOrderFilters(emptyFilters);
+    loadOrderHistory(emptyFilters);
   };
 
   const handleAccountSelection = (accountId: string) => {
@@ -416,7 +455,115 @@ const TradeSetup: React.FC = () => {
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Trade History</h3>
+            <button
+              type="button"
+              onClick={() => setShowFilters(!showFilters)}
+              className="btn btn-secondary"
+            >
+              {showFilters ? 'Hide Filters' : 'Show Filters'}
+            </button>
           </div>
+
+          {/* Order History Filters */}
+          {showFilters && (
+            <div className="filters-section">
+              <div className="filters-grid">
+                <div className="form-group">
+                  <label htmlFor="filterStatus" className="form-label">Status</label>
+                  <select
+                    id="filterStatus"
+                    name="status"
+                    value={orderFilters.status}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="PLACED">PLACED</option>
+                    <option value="PENDING">PENDING</option>
+                    <option value="EXECUTED">EXECUTED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                    <option value="REJECTED">REJECTED</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="filterSymbol" className="form-label">Symbol</label>
+                  <input
+                    type="text"
+                    id="filterSymbol"
+                    name="symbol"
+                    value={orderFilters.symbol}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                    placeholder="e.g., RELIANCE"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="filterAction" className="form-label">Action</label>
+                  <select
+                    id="filterAction"
+                    name="action"
+                    value={orderFilters.action}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                  >
+                    <option value="">All Actions</option>
+                    <option value="BUY">BUY</option>
+                    <option value="SELL">SELL</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="filterBroker" className="form-label">Broker</label>
+                  <select
+                    id="filterBroker"
+                    name="brokerName"
+                    value={orderFilters.brokerName}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                  >
+                    <option value="">All Brokers</option>
+                    <option value="shoonya">Shoonya</option>
+                    <option value="fyers">Fyers</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="filterStartDate" className="form-label">From Date</label>
+                  <input
+                    type="date"
+                    id="filterStartDate"
+                    name="startDate"
+                    value={orderFilters.startDate}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="filterEndDate" className="form-label">To Date</label>
+                  <input
+                    type="date"
+                    id="filterEndDate"
+                    name="endDate"
+                    value={orderFilters.endDate}
+                    onChange={handleFilterChange}
+                    className="form-input"
+                  />
+                </div>
+              </div>
+
+              <div className="filters-actions">
+                <button type="button" onClick={applyFilters} className="btn btn-primary">
+                  Apply Filters
+                </button>
+                <button type="button" onClick={clearFilters} className="btn btn-secondary">
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          )}
 
           {trades.length === 0 ? (
             <div className="empty-state">

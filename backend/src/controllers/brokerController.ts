@@ -1072,7 +1072,7 @@ export const placeOrder = async (
   }
 };
 
-// Get order history for a user
+// Get order history for a user with filtering
 export const getOrderHistory = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -1080,7 +1080,16 @@ export const getOrderHistory = async (
 ): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { limit = '50', offset = '0' } = req.query;
+    const {
+      limit = '50',
+      offset = '0',
+      status,
+      symbol,
+      brokerName,
+      startDate,
+      endDate,
+      action
+    } = req.query;
 
     if (!userId) {
       res.status(401).json({
@@ -1090,13 +1099,27 @@ export const getOrderHistory = async (
       return;
     }
 
-    const orderHistory = userDatabase.getOrderHistoryByUserId(
+    // Build filter options
+    const filterOptions = {
+      status: status as string,
+      symbol: symbol as string,
+      brokerName: brokerName as string,
+      startDate: startDate as string,
+      endDate: endDate as string,
+      action: action as 'BUY' | 'SELL',
+    };
+
+    const orderHistory = userDatabase.getOrderHistoryByUserIdWithFilters(
       parseInt(userId),
       parseInt(limit as string),
-      parseInt(offset as string)
+      parseInt(offset as string),
+      filterOptions
     );
 
-    const totalCount = userDatabase.getOrderCountByUserId(parseInt(userId));
+    const totalCount = userDatabase.getOrderCountByUserIdWithFilters(
+      parseInt(userId),
+      filterOptions
+    );
 
     res.status(200).json({
       success: true,
@@ -1105,6 +1128,7 @@ export const getOrderHistory = async (
         totalCount,
         limit: parseInt(limit as string),
         offset: parseInt(offset as string),
+        filters: filterOptions,
       },
     });
   } catch (error: any) {

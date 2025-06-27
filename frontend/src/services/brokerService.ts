@@ -212,7 +212,18 @@ export const brokerService = {
     }
   },
 
-  async getOrderHistory(limit: number = 50, offset: number = 0): Promise<{
+  async getOrderHistory(
+    limit: number = 50,
+    offset: number = 0,
+    filters?: {
+      status?: string;
+      symbol?: string;
+      brokerName?: string;
+      startDate?: string;
+      endDate?: string;
+      action?: 'BUY' | 'SELL';
+    }
+  ): Promise<{
     success: boolean;
     data?: {
       orders: Array<{
@@ -232,11 +243,28 @@ export const brokerService = {
       totalCount: number;
       limit: number;
       offset: number;
+      filters?: any;
     };
     message?: string;
   }> {
     try {
-      const response = await api.get(`/broker/order-history?limit=${limit}&offset=${offset}`);
+      // Build query parameters
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: offset.toString(),
+      });
+
+      // Add filters if provided
+      if (filters) {
+        if (filters.status) params.append('status', filters.status);
+        if (filters.symbol) params.append('symbol', filters.symbol);
+        if (filters.brokerName) params.append('brokerName', filters.brokerName);
+        if (filters.startDate) params.append('startDate', filters.startDate);
+        if (filters.endDate) params.append('endDate', filters.endDate);
+        if (filters.action) params.append('action', filters.action);
+      }
+
+      const response = await api.get(`/broker/order-history?${params.toString()}`);
       return response.data;
     } catch (error: any) {
       console.error('🚨 Get order history error:', error);
