@@ -20,6 +20,9 @@ export type { InputProps, SelectProps } from './Input';
 export { default as Badge, StatusBadge } from './Badge';
 export type { BadgeProps, StatusBadgeProps } from './Badge';
 
+export { default as Checkbox } from './Checkbox';
+export type { CheckboxProps } from './Checkbox';
+
 export { 
   default as Table, 
   TableHeader, 

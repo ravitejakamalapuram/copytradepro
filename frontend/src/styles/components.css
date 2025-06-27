@@ -4,6 +4,38 @@
    ========================================================================== */
 
 /* ==========================================================================
+   ALERT COMPONENTS
+   ========================================================================== */
+
+.login-error-alert,
+.register-error-alert {
+  background-color: var(--surface-error);
+  border: 1px solid var(--border-error);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  color: var(--text-error);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.error-help-text {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+.error-link {
+  color: var(--interactive-primary);
+  text-decoration: underline;
+  font-weight: var(--font-medium);
+}
+
+.error-link:hover {
+  color: var(--interactive-primary-hover);
+}
+
+/* ==========================================================================
    BUTTON COMPONENTS
    ========================================================================== */
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import './OrderConfirmationDialog.css';
+import { Button, HStack } from './ui';
 
 interface OrderConfirmationDialogProps {
   isOpen: boolean;
@@ -196,22 +197,23 @@ const OrderConfirmationDialog: React.FC<OrderConfirmationDialogProps> = ({
         </div>
 
         <div className="dialog-footer">
-          <button 
-            type="button" 
-            className="btn btn-secondary" 
-            onClick={onClose}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button 
-            type="button" 
-            className="btn btn-primary" 
-            onClick={onConfirm}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Placing Order...' : 'Confirm & Place Order'}
-          </button>
+          <HStack gap={3}>
+            <Button
+              variant="secondary"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              onClick={onConfirm}
+              disabled={isSubmitting}
+              loading={isSubmitting}
+            >
+              {isSubmitting ? 'Placing Order...' : 'Confirm & Place Order'}
+            </Button>
+          </HStack>
         </div>
       </div>
     </div>
