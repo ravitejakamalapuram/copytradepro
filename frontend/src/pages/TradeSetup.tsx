@@ -320,10 +320,10 @@ const TradeSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="page-container trade-setup-page">
       <Navigation />
-      
-      <div className="container">
+
+      <div className="container trade-setup-container">
         <div className="page-header">
           <h1>Trade Setup & History</h1>
           <p>Execute trades across multiple broker accounts</p>
@@ -616,8 +616,9 @@ const TradeSetup: React.FC = () => {
               <p>Place your first trade to see it here</p>
             </div>
           ) : (
-            <div className="trades-list">
-              {trades.map(trade => (
+            <div className="trade-history-container">
+              <div className="trades-list">
+                {trades.map(trade => (
                 <div key={trade.id} className="trade-item">
                   <div className="trade-info">
                     <div className="trade-header">
@@ -641,6 +642,7 @@ const TradeSetup: React.FC = () => {
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           )}
         </div>
