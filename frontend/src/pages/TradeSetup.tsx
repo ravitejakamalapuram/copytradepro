@@ -12,8 +12,8 @@ interface Trade {
   action: 'BUY' | 'SELL';
   quantity: number;
   price: number;
-  orderType: 'MARKET' | 'LIMIT';
-  status: 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'FAILED';
+  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   timestamp: Date;
   brokerAccounts: string[];
 }
@@ -35,9 +35,10 @@ const TradeSetup: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load connected accounts on component mount
+  // Load connected accounts and order history on component mount
   useEffect(() => {
     loadConnectedAccounts();
+    loadOrderHistory();
   }, []);
 
   const loadConnectedAccounts = async () => {
@@ -52,6 +53,30 @@ const TradeSetup: React.FC = () => {
       setErrors({ general: 'Failed to load connected accounts. Please refresh the page.' });
     } finally {
       setLoadingAccounts(false);
+    }
+  };
+
+  const loadOrderHistory = async () => {
+    try {
+      const response = await brokerService.getOrderHistory(50, 0);
+      if (response.success && response.data) {
+        // Convert order history to Trade format for display
+        const historyTrades: Trade[] = response.data.orders.map(order => ({
+          id: order.broker_order_id,
+          symbol: order.symbol,
+          action: order.action,
+          quantity: order.quantity,
+          price: order.price,
+          orderType: order.order_type,
+          status: order.status as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED',
+          timestamp: new Date(order.executed_at),
+          brokerAccounts: [order.broker_name], // Use broker name as identifier
+        }));
+        setTrades(historyTrades);
+      }
+    } catch (error) {
+      console.error('Failed to load order history:', error);
+      // Don't show error for order history loading failure
     }
   };
 
@@ -149,7 +174,7 @@ const TradeSetup: React.FC = () => {
             quantity: orderData.quantity,
             price: orderData.price || 0,
             orderType: orderData.orderType as 'MARKET' | 'LIMIT',
-            status: 'EXECUTED',
+            status: 'PLACED',
             timestamp: new Date(orderData.timestamp),
             brokerAccounts: [accountId],
           };
@@ -162,9 +187,11 @@ const TradeSetup: React.FC = () => {
         }
       });
 
-      // Update trades with successful orders
+      // Update trades with successful orders and reload history
       if (successfulOrders.length > 0) {
         setTrades(prev => [...successfulOrders, ...prev]);
+        // Reload order history to get the latest data from database
+        loadOrderHistory();
       }
 
       // Handle results

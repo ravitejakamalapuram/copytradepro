@@ -200,14 +200,49 @@ export const brokerService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Get quotes error:', error);
-      
+
       if (error.response?.data) {
         return error.response.data;
       }
-      
+
       return {
         success: false,
         message: 'Network error. Please check your connection and try again.',
+      };
+    }
+  },
+
+  async getOrderHistory(limit: number = 50, offset: number = 0): Promise<{
+    success: boolean;
+    data?: {
+      orders: Array<{
+        id: number;
+        broker_name: string;
+        broker_order_id: string;
+        symbol: string;
+        action: 'BUY' | 'SELL';
+        quantity: number;
+        price: number;
+        order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+        status: string;
+        exchange: string;
+        executed_at: string;
+        created_at: string;
+      }>;
+      totalCount: number;
+      limit: number;
+      offset: number;
+    };
+    message?: string;
+  }> {
+    try {
+      const response = await api.get(`/broker/order-history?limit=${limit}&offset=${offset}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('🚨 Get order history error:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch order history. Please try again.',
       };
     }
   },
