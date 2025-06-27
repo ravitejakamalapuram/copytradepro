@@ -222,6 +222,7 @@ export const brokerService = {
       startDate?: string;
       endDate?: string;
       action?: 'BUY' | 'SELL';
+      search?: string;
     }
   ): Promise<{
     success: boolean;
@@ -262,6 +263,7 @@ export const brokerService = {
         if (filters.startDate) params.append('startDate', filters.startDate);
         if (filters.endDate) params.append('endDate', filters.endDate);
         if (filters.action) params.append('action', filters.action);
+        if (filters.search) params.append('search', filters.search);
       }
 
       const response = await api.get(`/broker/order-history?${params.toString()}`);
@@ -271,6 +273,34 @@ export const brokerService = {
       return {
         success: false,
         message: 'Failed to fetch order history. Please try again.',
+      };
+    }
+  },
+
+  async getOrderSearchSuggestions(searchTerm: string, limit: number = 10): Promise<{
+    success: boolean;
+    data?: {
+      suggestions: Array<{
+        value: string;
+        type: 'symbol' | 'order_id' | 'broker_order_id';
+      }>;
+      searchTerm: string;
+    };
+    message?: string;
+  }> {
+    try {
+      const params = new URLSearchParams({
+        q: searchTerm,
+        limit: limit.toString(),
+      });
+
+      const response = await api.get(`/broker/order-search-suggestions?${params.toString()}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('🚨 Get search suggestions error:', error);
+      return {
+        success: false,
+        message: 'Failed to fetch search suggestions. Please try again.',
       };
     }
   },
