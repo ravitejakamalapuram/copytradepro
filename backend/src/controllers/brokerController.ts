@@ -4,6 +4,8 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/sqliteDatabase';
+import { setBrokerConnectionManager } from '../services/orderStatusService';
+import orderStatusService from '../services/orderStatusService';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
@@ -975,9 +977,26 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+
+          // Add order to real-time monitoring
+          const orderForMonitoring = {
+            id: savedOrder.id.toString(),
+            symbol: symbol,
+            action: action,
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            status: 'PLACED',
+            broker_name: brokerName,
+            broker_order_id: orderResponse.norenordno,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+          console.log('📊 Order added to real-time monitoring:', orderResponse.norenordno);
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1030,9 +1049,26 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.id);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+
+          // Add order to real-time monitoring
+          const orderForMonitoring = {
+            id: savedOrder.id.toString(),
+            symbol: symbol,
+            action: action,
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            status: 'PLACED',
+            broker_name: brokerName,
+            broker_order_id: orderResponse.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+          console.log('📊 Order added to real-time monitoring:', orderResponse.id);
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1363,3 +1399,20 @@ export const getQuotes = async (
     });
   }
 };
+
+// Broker Connection Manager for Order Status Service
+const brokerConnectionManagerImpl = {
+  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
+    const userConnections = userBrokerConnections.get(userId);
+    if (userConnections && userConnections.has(brokerName)) {
+      const service = userConnections.get(brokerName);
+      if (service instanceof ShoonyaService) {
+        return service;
+      }
+    }
+    return null;
+  }
+};
+
+// Set the broker connection manager for the order status service
+setBrokerConnectionManager(brokerConnectionManagerImpl);

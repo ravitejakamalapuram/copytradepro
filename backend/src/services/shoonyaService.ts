@@ -266,14 +266,63 @@ export class ShoonyaService {
     }
 
     try {
-      const response = await this.makeRequest('OrderBook', {
+      const response = await this.makeAuthenticatedRequest('OrderBook', {
         uid: userId,
-        token: this.sessionToken,
+        actid: userId,
       });
 
       return response;
     } catch (error: any) {
       console.error('🚨 Shoonya get order book error:', error.message);
+      throw error;
+    }
+  }
+
+  async getOrderStatus(userId: string, orderNumber: string): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      // Get the full order book and find the specific order
+      const orderBook = await this.getOrderBook(userId);
+
+      if (orderBook.stat === 'Ok' && Array.isArray(orderBook)) {
+        // Find the order by order number
+        const order = orderBook.find((order: any) => order.norenordno === orderNumber);
+
+        if (order) {
+          console.log(`📊 Found order ${orderNumber} status: ${order.status}`);
+          return {
+            stat: 'Ok',
+            orderNumber: order.norenordno,
+            status: order.status,
+            symbol: order.tsym,
+            quantity: order.qty,
+            price: order.prc,
+            executedQuantity: order.fillshares || '0',
+            averagePrice: order.avgprc || '0',
+            rejectionReason: order.rejreason || '',
+            orderTime: order.norentm,
+            updateTime: order.exch_tm,
+            rawOrder: order
+          };
+        } else {
+          console.log(`⚠️ Order ${orderNumber} not found in order book`);
+          return {
+            stat: 'Not_Ok',
+            emsg: 'Order not found'
+          };
+        }
+      } else {
+        console.log('⚠️ Failed to get order book or empty response');
+        return {
+          stat: 'Not_Ok',
+          emsg: orderBook.emsg || 'Failed to get order book'
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya get order status error:', error.message);
       throw error;
     }
   }

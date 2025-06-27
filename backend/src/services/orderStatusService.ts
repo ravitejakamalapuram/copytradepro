@@ -1,6 +1,20 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
 import websocketService from './websocketService';
+import { ShoonyaService } from './shoonyaService';
+
+// Import broker connections from controller (we'll need to export this)
+// For now, we'll create a simple interface to access broker connections
+interface BrokerConnectionManager {
+  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
+}
+
+// Global broker connection manager - will be set by the broker controller
+let brokerConnectionManager: BrokerConnectionManager | null = null;
+
+export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
+  brokerConnectionManager = manager;
+};
 
 // Simple logger
 const logger = {
@@ -228,7 +242,7 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
-   * Check status of a specific order using Shoonya API
+   * Check status of a specific order using real Shoonya API
    */
   async checkOrderStatus(order: Order, retryCount: number = 0): Promise<void> {
     try {
@@ -237,25 +251,62 @@ class OrderStatusService extends EventEmitter {
         return;
       }
 
-      // For now, simulate checking Shoonya order status
-      // In a real implementation, you would call the Shoonya API here
       logger.debug(`Checking order status for ${order.symbol} (${order.broker_order_id})`);
 
-      // Simulate different order statuses based on time
-      const orderAge = Date.now() - new Date(order.created_at).getTime();
       let newStatus = order.status;
+      let brokerStatus: any = null;
 
-      // Simulate status transitions for demo
-      if (orderAge > 30000 && order.status === 'PLACED') { // After 30 seconds
-        // Simulate rejection for insufficient balance
-        if (order.symbol === 'TCS' || Math.random() < 0.3) {
-          newStatus = 'REJECTED';
-        } else if (Math.random() < 0.7) {
-          newStatus = 'EXECUTED';
+      if (order.broker_name === 'shoonya') {
+        // Get the user ID from the order (we'll need to add this to the order structure)
+        // For now, we'll try to get any active Shoonya connection
+        const userId = await this.getUserIdFromOrder(order);
+
+        if (userId && brokerConnectionManager) {
+          const shoonyaService = brokerConnectionManager.getBrokerConnection(userId, 'shoonya');
+
+          if (shoonyaService) {
+            try {
+              brokerStatus = await shoonyaService.getOrderStatus(userId, order.broker_order_id);
+
+              if (brokerStatus.stat === 'Ok') {
+                // Map Shoonya status to our standard status
+                const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
+
+                if (mappedStatus !== order.status) {
+                  newStatus = mappedStatus;
+                  logger.info(`Order ${order.id} status changed from ${order.status} to ${newStatus} (Shoonya: ${brokerStatus.status})`);
+
+                  // Log rejection reason if order was rejected
+                  if (newStatus === 'REJECTED' && brokerStatus.rejectionReason) {
+                    logger.info(`Order ${order.id} rejection reason: ${brokerStatus.rejectionReason}`);
+                  }
+                }
+              } else {
+                logger.warn(`Failed to get order status from Shoonya: ${brokerStatus.emsg}`);
+              }
+            } catch (apiError: any) {
+              logger.error(`Shoonya API error for order ${order.id}:`, apiError.message);
+            }
+          } else {
+            logger.warn(`No active Shoonya connection found for order ${order.id}`);
+          }
+        } else {
+          logger.warn(`Could not determine user ID for order ${order.id}`);
+        }
+      } else {
+        // For demo purposes, simulate status for non-Shoonya orders
+        const orderAge = Date.now() - new Date(order.created_at).getTime();
+
+        if (orderAge > 30000 && order.status === 'PLACED') {
+          if (order.symbol === 'TCS' || Math.random() < 0.3) {
+            newStatus = 'REJECTED';
+          } else if (Math.random() < 0.7) {
+            newStatus = 'EXECUTED';
+          }
         }
       }
 
-      // Check if status has changed
+      // Update status if changed
       if (newStatus !== order.status) {
         await this.updateOrderStatus(order, newStatus);
       }
@@ -271,6 +322,40 @@ class OrderStatusService extends EventEmitter {
         }, 1000 * (retryCount + 1)); // Exponential backoff
       }
     }
+  }
+
+  /**
+   * Get user ID from order (helper method)
+   */
+  private async getUserIdFromOrder(order: Order): Promise<string | null> {
+    try {
+      // Try to get user ID from order history table
+      const orderHistory = userDatabase.getOrderHistoryById(parseInt(order.id));
+      if (orderHistory) {
+        return orderHistory.user_id.toString();
+      }
+      return null;
+    } catch (error) {
+      logger.error(`Failed to get user ID for order ${order.id}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Map Shoonya status to our standard status
+   */
+  private mapShoonyaStatus(shoonyaStatus: string): string {
+    const statusMap: { [key: string]: string } = {
+      'PENDING': 'PENDING',
+      'OPEN': 'PLACED',
+      'COMPLETE': 'EXECUTED',
+      'CANCELLED': 'CANCELLED',
+      'REJECTED': 'REJECTED',
+      'TRIGGER_PENDING': 'PENDING',
+      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+    };
+
+    return statusMap[shoonyaStatus] || shoonyaStatus;
   }
 
   /**
