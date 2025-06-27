@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useAuth } from './useAuth';
 
 interface OrderStatusUpdate {
   orderId: string;
@@ -62,6 +63,7 @@ interface UseRealTimeOrdersReturn {
 }
 
 export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
+  const { token, isAuthenticated } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('disconnected');
   const [monitoringStatus, setMonitoringStatus] = useState<MonitoringStatus | null>(null);
@@ -71,19 +73,13 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
   const orderStatusCallbackRef = useRef<((update: OrderStatusUpdate) => void) | null>(null);
   const orderExecutionCallbackRef = useRef<((update: OrderExecutionUpdate) => void) | null>(null);
 
-  const getAuthToken = useCallback(() => {
-    // Get token from localStorage or your auth context
-    return localStorage.getItem('authToken');
-  }, []);
-
   const connect = useCallback(() => {
     if (socketRef.current?.connected) {
       console.log('Socket.IO already connected');
       return;
     }
 
-    const token = getAuthToken();
-    if (!token) {
+    if (!token || !isAuthenticated) {
       console.error('No auth token available for Socket.IO connection');
       setConnectionStatus('error');
       return;
@@ -136,7 +132,7 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
       console.error('Error creating Socket.IO connection:', error);
       setConnectionStatus('error');
     }
-  }, [getAuthToken]);
+  }, [token, isAuthenticated]);
 
   const disconnect = useCallback(() => {
     if (socketRef.current) {
@@ -213,14 +209,18 @@ export const useRealTimeOrders = (): UseRealTimeOrdersReturn => {
     orderExecutionCallbackRef.current = callback;
   }, []);
 
-  // Auto-connect on mount
+  // Auto-connect when authenticated
   useEffect(() => {
-    connect();
+    if (isAuthenticated && token) {
+      connect();
+    } else {
+      disconnect();
+    }
 
     return () => {
       disconnect();
     };
-  }, [connect, disconnect]);
+  }, [isAuthenticated, token, connect, disconnect]);
 
   return {
     isConnected,
