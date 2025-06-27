@@ -1,7 +1,7 @@
-const EventEmitter = require('events');
-const { Order } = require('../models');
-const brokerService = require('./brokerService');
-const logger = require('../utils/logger');
+import { EventEmitter } from 'events';
+import { Order } from '../models';
+import * as brokerService from './brokerService';
+import * as logger from '../utils/logger';
 
 class OrderStatusService extends EventEmitter {
   constructor() {
@@ -344,4 +344,4 @@ class OrderStatusService extends EventEmitter {
 // Create singleton instance
 const orderStatusService = new OrderStatusService();
 
-module.exports = orderStatusService;
+export default orderStatusService;

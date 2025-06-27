@@ -1,10 +1,11 @@
-const express = require('express');
+import express from 'express';
+import { Order } from '../models';
+import orderStatusService from '../services/orderStatusService';
+import websocketService from '../services/websocketService';
+import { auth } from '../middleware/auth';
+import * as logger from '../utils/logger';
+
 const router = express.Router();
-const { Order } = require('../models');
-const orderStatusService = require('../services/orderStatusService');
-const websocketService = require('../services/websocketService');
-const auth = require('../middleware/auth');
-const logger = require('../utils/logger');
 
 /**
  * Get real-time monitoring status
@@ -343,4 +344,4 @@ router.put('/monitoring/config', auth, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
