@@ -16,7 +16,7 @@ echo "Current directory: $(pwd)"
 # Install backend dependencies (including dev dependencies for build)
 echo "📦 Installing backend dependencies..."
 cd backend
-npm install --silent
+npm install 
 echo "✅ Backend dependencies installed"
 
 # Build backend first (requires dev dependencies)
@@ -27,7 +27,7 @@ echo "✅ Backend build completed"
 # Install frontend dependencies
 echo "📦 Installing frontend dependencies..."
 cd ../frontend
-npm install --silent
+npm install 
 echo "✅ Frontend dependencies installed"
 
 # Build frontend
@@ -48,7 +48,7 @@ ls -la public/
 
 # Clean up backend dev dependencies for production
 echo "🧹 Cleaning up dev dependencies..."
-npm prune --omit=dev --silent
+npm prune --omit=dev 
 echo "✅ Dev dependencies removed"
 
 # Verify backend build

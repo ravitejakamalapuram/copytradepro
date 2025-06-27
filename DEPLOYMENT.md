@@ -1,23 +1,60 @@
 # CopyTrade Pro - Production Deployment Guide
 
-## Overview
-This guide covers deploying CopyTrade Pro to Render.com with a Node.js backend and React frontend.
+## 🏗️ Architecture Overview
 
-## Architecture
-- **Backend**: Node.js + Express + TypeScript + SQLite
-- **Frontend**: React + TypeScript + Vite
+CopyTrade Pro uses a **unified deployment architecture** where:
+- **Frontend**: React + TypeScript + Vite (builds to static files)
+- **Backend**: Node.js + Express + TypeScript (serves API + static files)
 - **Database**: SQLite (file-based, persistent storage)
-- **Real-time**: Socket.IO for order status updates
-- **Deployment**: Render.com (Web Services + Static Site)
+- **Real-time**: Socket.IO for live order updates
+- **Deployment**: Single Render.com web service (full-stack)
 
-## Prerequisites
-1. GitHub repository with your code
+## 🚀 Render.com Deployment
+
+### Prerequisites
+
+1. GitHub repository with the code
 2. Render.com account
 3. Environment variables configured
 
-## Deployment Steps
+### Deployment Configuration
 
-### 1. Prepare Environment Variables
+The application uses a **single web service** that:
+
+1. Builds both frontend and backend
+2. Serves frontend static files through Node.js
+3. Provides API endpoints
+4. Handles client-side routing (SPA)
+
+### Build Process
+
+The deployment follows this build sequence:
+
+```bash
+# 1. Install backend dependencies (production only)
+cd backend && npm ci --only=production
+
+# 2. Install frontend dependencies and build
+cd ../frontend && npm ci && npm run build
+
+# 3. Copy frontend build to backend public directory
+cd ../backend && mkdir -p public && cp -r ../frontend/dist/* public/
+
+# 4. Build backend TypeScript
+npm run build
+```
+
+### File Structure After Build
+
+```
+backend/
+├── dist/           # Compiled TypeScript backend
+├── public/         # Frontend static files (from frontend/dist)
+├── data/           # SQLite database directory
+└── node_modules/   # Backend dependencies only
+```
+
+## 🔧 Environment Variables
 
 #### Backend Environment Variables (Required)
 ```bash
