@@ -5,6 +5,8 @@ import { accountService } from '../services/accountService';
 import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
 import OrderSearchInput from '../components/OrderSearchInput';
 import ErrorDisplay, { InlineErrorDisplay } from '../components/ErrorDisplay';
+import { ButtonSpinner } from '../components/LoadingSpinner';
+import { SkeletonTradeHistory, SkeletonAccountList } from '../components/SkeletonLoader';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
 import './TradeSetup.css';
@@ -53,6 +55,9 @@ const TradeSetup: React.FC = () => {
   // Search state
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Loading states
+  const [loadingOrderHistory, setLoadingOrderHistory] = useState(false);
+
   // Order confirmation dialog state
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [pendingOrderData, setPendingOrderData] = useState<any>(null);
@@ -80,6 +85,8 @@ const TradeSetup: React.FC = () => {
 
   const loadOrderHistory = async (filters?: typeof orderFilters, search?: string) => {
     try {
+      setLoadingOrderHistory(true);
+
       // Prepare filters for API call
       const apiFilters = filters || orderFilters;
       const cleanFilters = Object.fromEntries(
@@ -110,6 +117,8 @@ const TradeSetup: React.FC = () => {
     } catch (error) {
       console.error('Failed to load order history:', error);
       // Don't show error for order history loading failure
+    } finally {
+      setLoadingOrderHistory(false);
     }
   };
 
@@ -506,7 +515,7 @@ const TradeSetup: React.FC = () => {
                   Broker Accounts (Active Only)
                 </label>
                 {loadingAccounts ? (
-                  <div className="loading-accounts">Loading connected accounts...</div>
+                  <SkeletonAccountList accounts={3} />
                 ) : connectedAccounts.length === 0 ? (
                   <div className="no-accounts">
                     <p>No active broker accounts found.</p>
@@ -553,7 +562,14 @@ const TradeSetup: React.FC = () => {
                   className="btn btn-primary"
                   disabled={isSubmitting}
                 >
-                  {isSubmitting ? 'Placing Trade...' : 'Place Trade'}
+                  {isSubmitting ? (
+                    <>
+                      <ButtonSpinner size="small" color="white" />
+                      Placing Trade...
+                    </>
+                  ) : (
+                    'Place Trade'
+                  )}
                 </button>
               </div>
             </form>
@@ -684,7 +700,9 @@ const TradeSetup: React.FC = () => {
             </div>
           )}
 
-          {trades.length === 0 ? (
+          {loadingOrderHistory ? (
+            <SkeletonTradeHistory items={5} />
+          ) : trades.length === 0 ? (
             <div className="empty-state">
               <div className="empty-icon">📊</div>
               <h4>No trades yet</h4>
