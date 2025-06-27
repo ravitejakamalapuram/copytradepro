@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import './Navigation.css';
+import { Button, Flex } from '../components/ui';
 
 const Navigation: React.FC = () => {
   const navigate = useNavigate();
@@ -19,40 +19,59 @@ const Navigation: React.FC = () => {
     { path: '/account-setup', label: 'Account Setup', icon: '🔗' },
     { path: '/trade-setup', label: 'Trade Setup', icon: '📊' },
     { path: '/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/demo', label: 'Components', icon: '🎨' },
   ];
 
   return (
-    <nav className="navigation">
-      <div className="nav-container">
-        {/* Logo/Brand */}
-        <div className="nav-brand">
-          <h2>CopyTrade Pro</h2>
-        </div>
+    <nav className="enterprise-nav">
+      <div className="enterprise-nav-content">
+        {/* Brand */}
+        <a href="/" className="enterprise-logo">
+          <span style={{ fontSize: '1.5rem' }}>📈</span>
+          CopyTrade Pro
+        </a>
 
         {/* Navigation Links */}
-        <div className="nav-links">
+        <div className="enterprise-nav-links">
           {navItems.map(item => (
             <button
               key={item.path}
-              className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+              className={`enterprise-nav-link ${location.pathname === item.path ? 'active' : ''}`}
               onClick={() => navigate(item.path)}
             >
-              <span className="nav-icon">{item.icon}</span>
-              <span className="nav-label">{item.label}</span>
+              <span>{item.icon}</span>
+              <span>{item.label}</span>
             </button>
           ))}
         </div>
 
         {/* User Menu */}
-        <div className="nav-user">
-          <div className="user-info">
-            <span className="user-name">{user?.name}</span>
-            <span className="user-email">{user?.email}</span>
+        <Flex align="center" gap={4}>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{
+              fontWeight: '600',
+              color: '#0f172a',
+              fontSize: '0.875rem',
+              lineHeight: '1.25'
+            }}>
+              {user?.name}
+            </div>
+            <div style={{
+              fontSize: '0.75rem',
+              color: '#64748b',
+              lineHeight: '1.25'
+            }}>
+              {user?.email}
+            </div>
           </div>
-          <button className="logout-btn" onClick={handleLogout}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLogout}
+          >
             Logout
-          </button>
-        </div>
+          </Button>
+        </Flex>
       </div>
     </nav>
   );

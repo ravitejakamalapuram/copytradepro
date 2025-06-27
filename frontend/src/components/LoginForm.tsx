@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { Input, Button, Stack } from './ui';
 
 const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -68,23 +69,12 @@ const LoginForm: React.FC = () => {
   return (
     <div className="auth-form">
       {error && (
-        <div
-          className="form-error mb-3"
-          style={{
-            textAlign: 'center',
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: '6px',
-            padding: '12px',
-            marginBottom: '16px',
-            color: '#dc2626'
-          }}
-        >
+        <div className="login-error-alert">
           {error}
           {error.includes('Invalid email or password') && (
-            <div style={{ marginTop: '8px', fontSize: '14px', color: '#6b7280' }}>
+            <div className="error-help-text">
               Don't have an account?{' '}
-              <a href="/register" style={{ color: '#3b82f6', textDecoration: 'underline' }}>
+              <a href="/register" className="error-link">
                 Register here
               </a>
             </div>
@@ -92,51 +82,44 @@ const LoginForm: React.FC = () => {
         </div>
       )}
 
-      <div className="form-group">
-        <label htmlFor="email" className="form-label">
-          Email Address
-        </label>
-        <input
+      <Stack gap={4}>
+        <Input
           type="email"
-          id="email"
+          label="Email Address"
           value={email}
           onChange={handleEmailChange}
           onKeyPress={handleKeyPress}
-          className="form-input"
           placeholder="Enter your email address"
           disabled={loading}
           autoComplete="email"
+          state={error && error.includes('email') ? 'error' : 'default'}
+          fullWidth
         />
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="password" className="form-label">
-          Password
-        </label>
-        <input
+        <Input
           type="password"
-          id="password"
+          label="Password"
           value={password}
           onChange={handlePasswordChange}
           onKeyPress={handleKeyPress}
-          className="form-input"
           placeholder="Enter your password"
           disabled={loading}
           autoComplete="current-password"
+          state={error && error.includes('password') ? 'error' : 'default'}
+          fullWidth
         />
-      </div>
 
-      <div
-        className="btn btn-primary w-full"
-        style={{
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.7 : 1,
-          userSelect: 'none'
-        }}
-        onClick={performLogin}
-      >
-        {loading ? 'Signing in...' : 'Sign In'}
-      </div>
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={performLogin}
+          disabled={loading}
+          loading={loading}
+          fullWidth
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </Button>
+      </Stack>
     </div>
   );
 };

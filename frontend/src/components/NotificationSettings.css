@@ -1,50 +1,88 @@
-.notification-settings {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+/* ===================================
+   NOTIFICATION SETTINGS - CLEAN STYLES
+   =================================== */
+
+/* Notification Alerts */
+.notification-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
-.settings-header {
-  text-align: center;
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #f0f0f0;
+.notification-alert.error {
+  background-color: var(--color-error-50);
+  color: var(--color-error-700);
+  border: 1px solid var(--color-error-200);
 }
 
-.settings-header h2 {
-  color: #2c3e50;
-  margin: 0 0 10px 0;
-  font-size: 28px;
-  font-weight: 600;
+.notification-alert.success {
+  background-color: var(--color-success-50);
+  color: var(--color-success-700);
+  border: 1px solid var(--color-success-200);
 }
 
-.settings-header p {
-  color: #7f8c8d;
-  margin: 0;
+.alert-icon {
   font-size: 16px;
 }
 
-/* Loading State */
-.loading-container {
+/* Notification Sections */
+.notification-section {
+  margin-bottom: 32px;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+  color: var(--color-text-primary);
+}
+
+.push-notification-card {
+  padding: 24px;
+  background-color: var(--color-background-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.status-info {
+  flex: 1;
+}
+
+.status-description {
+  margin: 8px 0 0 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.notification-actions {
+  flex-shrink: 0;
+}
+
+/* Loading and Error States */
+.loading-container,
+.error-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 20px;
-  color: #7f8c8d;
+  padding: 80px 40px;
+  text-align: center;
+  color: var(--color-text-secondary);
 }
 
 .loading-spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3498db;
+  border: 3px solid var(--color-border);
+  border-top: 3px solid var(--color-primary-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
 }
 
 @keyframes spin {
@@ -52,325 +90,48 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Error and Success Messages */
-.error-message,
-.success-message {
-  padding: 15px 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 500;
-}
-
-.error-message {
-  background: #fee;
-  color: #c0392b;
-  border: 1px solid #f5b7b1;
-}
-
-.success-message {
-  background: #eef;
-  color: #27ae60;
-  border: 1px solid #a9dfbf;
-}
-
-.error-icon,
-.success-icon {
-  font-size: 18px;
-}
-
-/* Error Container */
-.error-container {
-  text-align: center;
-  padding: 40px 20px;
-  color: #7f8c8d;
-}
-
 .error-container .error-icon {
   font-size: 48px;
-  margin-bottom: 15px;
-  display: block;
+  margin-bottom: 20px;
+  opacity: 0.7;
 }
 
 .error-container h3 {
-  color: #2c3e50;
-  margin: 0 0 10px 0;
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+  color: var(--color-text-primary);
 }
 
 .error-container p {
   margin: 0;
-  line-height: 1.6;
-}
-
-/* Settings Sections */
-.settings-section {
-  margin-bottom: 30px;
-  padding: 25px;
-  background: #f8f9fa;
-  border-radius: 10px;
-  border: 1px solid #e9ecef;
-}
-
-.settings-section h3 {
-  color: #2c3e50;
-  margin: 0 0 20px 0;
-  font-size: 20px;
-  font-weight: 600;
-}
-
-/* Subscription Status */
-.subscription-status {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-
-.status-info {
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  flex: 1;
-}
-
-.status-indicator {
-  font-size: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.status-text strong {
-  color: #2c3e50;
-  font-size: 18px;
-  display: block;
-  margin-bottom: 5px;
-}
-
-.status-text p {
-  color: #7f8c8d;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-.subscription-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-/* Buttons */
-.subscribe-button,
-.unsubscribe-button,
-.test-button {
-  padding: 12px 24px;
-  border: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 120px;
-}
-
-.subscribe-button {
-  background: #27ae60;
-  color: white;
-}
-
-.subscribe-button:hover:not(:disabled) {
-  background: #229954;
-  transform: translateY(-2px);
-}
-
-.unsubscribe-button {
-  background: #e74c3c;
-  color: white;
-}
-
-.unsubscribe-button:hover:not(:disabled) {
-  background: #c0392b;
-  transform: translateY(-2px);
-}
-
-.test-button {
-  background: #3498db;
-  color: white;
-}
-
-.test-button:hover:not(:disabled) {
-  background: #2980b9;
-  transform: translateY(-2px);
-}
-
-.subscribe-button:disabled,
-.unsubscribe-button:disabled,
-.test-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
-
-/* Preference Grid */
-.preference-grid {
-  display: grid;
-  gap: 20px;
-}
-
-.preference-item {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-  transition: all 0.3s ease;
-}
-
-.preference-item:hover {
-  border-color: #3498db;
-  box-shadow: 0 2px 8px rgba(52, 152, 219, 0.1);
-}
-
-.preference-item label {
-  display: flex;
-  align-items: flex-start;
-  gap: 15px;
-  cursor: pointer;
-}
-
-.preference-item input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: #3498db;
-}
-
-.preference-label {
-  flex: 1;
-}
-
-.preference-label strong {
-  color: #2c3e50;
-  font-size: 16px;
-  display: block;
-  margin-bottom: 5px;
-}
-
-.preference-label p {
-  color: #7f8c8d;
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.4;
-}
-
-/* Quiet Hours */
-.quiet-hours-container {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  border: 1px solid #e9ecef;
-}
-
-.quiet-hours-toggle {
-  margin-bottom: 20px;
-}
-
-.quiet-hours-toggle label {
-  display: flex;
-  align-items: flex-start;
-  gap: 15px;
-  cursor: pointer;
-}
-
-.quiet-hours-toggle input[type="checkbox"] {
-  width: 20px;
-  height: 20px;
-  margin: 0;
-  cursor: pointer;
-  accent-color: #3498db;
-}
-
-.quiet-hours-times {
-  display: flex;
-  gap: 20px;
-  flex-wrap: wrap;
-  padding-top: 15px;
-  border-top: 1px solid #e9ecef;
-}
-
-.time-input {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  min-width: 150px;
-}
-
-.time-input label {
-  color: #2c3e50;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.time-input input[type="time"] {
-  padding: 10px 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 14px;
-  background: white;
-  cursor: pointer;
-}
-
-.time-input input[type="time"]:focus {
-  outline: none;
-  border-color: #3498db;
-  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+  max-width: 400px;
+  line-height: 1.5;
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
-  .notification-settings {
-    margin: 10px;
-    padding: 15px;
+  .push-notification-card {
+    padding: 20px;
   }
 
-  .subscription-status {
+  .push-notification-card .enterprise-flex {
     flex-direction: column;
     align-items: stretch;
+    gap: 20px;
   }
 
-  .subscription-actions {
-    justify-content: center;
+  .notification-actions {
+    align-self: stretch;
   }
 
-  .quiet-hours-times {
-    flex-direction: column;
+  .notification-actions .enterprise-flex {
+    justify-content: stretch;
   }
 
-  .time-input {
-    min-width: auto;
-  }
-
-  .settings-section {
-    padding: 20px 15px;
+  .notification-actions .enterprise-button {
+    flex: 1;
   }
 }
 
-@media (max-width: 480px) {
-  .settings-header h2 {
-    font-size: 24px;
-  }
-
-  .subscription-actions {
-    flex-direction: column;
-  }
-
-  .subscribe-button,
-  .unsubscribe-button,
-  .test-button {
-    width: 100%;
-  }
-}
+/* Clean, minimal styles for notification settings - using UI components */

@@ -6,6 +6,19 @@ import { brokerService } from '../services/brokerService';
 import type { ShoonyaCredentials, FyersCredentials } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import type { ConnectedAccount } from '../services/accountService';
+import {
+  Container,
+  PageHeader,
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Input,
+  Select,
+  StatusBadge,
+  Flex,
+  Stack
+} from '../components/ui';
 import './AccountSetup.css';
 
 // Using ConnectedAccount from accountService
@@ -334,90 +347,111 @@ const AccountSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="enterprise-app">
       <Navigation />
-      
-      <div className="container">
-        <div className="page-header">
-          <h1>Broker Account Setup</h1>
-          <p>Connect your broker accounts to start copy trading</p>
-        </div>
 
-        {/* Account List */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Connected Accounts</h3>
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowAddForm(true)}
-            >
-              Add Account
-            </button>
-          </div>
-
-          {accounts.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🔗</div>
-              <h4>No accounts connected</h4>
-              <p>Add your first broker account to get started with copy trading</p>
-              <button
-                className="btn btn-primary"
+      <main className="enterprise-main">
+        <Container>
+          <PageHeader
+            title="Broker Account Setup"
+            subtitle="Connect your broker accounts to start copy trading"
+            actions={
+              <Button
+                variant="primary"
                 onClick={() => setShowAddForm(true)}
+                leftIcon="+"
               >
-                Add Your First Account
-              </button>
-            </div>
-          ) : (
-            <div className="accounts-list">
-              {accounts.map(account => (
-                <div key={account.id} className="account-item">
-                  <div className="account-info">
-                    <div className="account-header">
-                      <h4>{account.brokerName}</h4>
-                      <div className="status-container">
-                        <span className={`status-indicator ${account.isActive ? 'active' : 'inactive'}`}></span>
-                        <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
-                          {account.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="account-id">User ID: {account.userId}</p>
-                    <p className="account-id">Account ID: {account.accountId}</p>
-                    <p className="account-meta">User: {account.userName} ({account.email})</p>
-                    <p className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</p>
-                    <p className="account-date">
-                      Added: {new Date(account.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="account-actions">
-                    <button
-                      className={`btn ${account.isActive ? 'btn-secondary' : 'btn-success'}`}
-                      onClick={() => handleToggleAccount(account.id)}
-                    >
-                      {account.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      className="btn btn-info"
-                      onClick={() => handleCheckSessionStatus(account.id)}
-                      disabled={checkingStatus[account.id]}
-                    >
-                      {checkingStatus[account.id] ? 'Checking...' : 'Check Status'}
-                    </button>
-                    <button
-                      className="btn btn-error"
-                      onClick={() => handleRemoveAccount(account.id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                Add Account
+              </Button>
+            }
+          />
 
-        {/* Add Account Form */}
-        {showAddForm && (
+          {/* Account List */}
+          <Card>
+            <CardHeader
+              title="Connected Accounts"
+              subtitle={`${accounts.length} account${accounts.length !== 1 ? 's' : ''} connected`}
+            />
+            <CardContent>
+              {accounts.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🔗</div>
+                  <h4>No accounts connected</h4>
+                  <p>Add your first broker account to get started with copy trading</p>
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowAddForm(true)}
+                    leftIcon="+"
+                  >
+                    Add Your First Account
+                  </Button>
+                </div>
+              ) : (
+                <Stack gap={4}>
+                  {accounts.map(account => (
+                    <Card key={account.id} variant="outlined" hoverable>
+                      <CardContent>
+                        <Flex justify="between" align="start">
+                          <Stack gap={3}>
+                            <Flex align="center" gap={3}>
+                              <h4 style={{
+                                margin: 0,
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                color: '#0f172a'
+                              }}>
+                                {account.brokerName}
+                              </h4>
+                              <StatusBadge status={account.isActive ? 'active' : 'inactive'} />
+                            </Flex>
+
+                            <Stack gap={1}>
+                              <div className="account-id">User ID: {account.userId}</div>
+                              <div className="account-id">Account ID: {account.accountId}</div>
+                              <div className="account-meta">User: {account.userName} ({account.email})</div>
+                              <div className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</div>
+                              <div className="account-date">
+                                Added: {new Date(account.createdAt).toLocaleDateString()}
+                              </div>
+                            </Stack>
+                          </Stack>
+
+                          <Flex gap={2}>
+                            <Button
+                              variant={account.isActive ? 'secondary' : 'primary'}
+                              size="sm"
+                              onClick={() => handleToggleAccount(account.id)}
+                            >
+                              {account.isActive ? 'Deactivate' : 'Activate'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCheckSessionStatus(account.id)}
+                              disabled={checkingStatus[account.id]}
+                              loading={checkingStatus[account.id]}
+                            >
+                              Check Status
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveAccount(account.id)}
+                            >
+                              Remove
+                            </Button>
+                          </Flex>
+                        </Flex>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Add Account Form */}
+          {showAddForm && (
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
@@ -436,45 +470,41 @@ const AccountSetup: React.FC = () => {
                 )}
 
                 <div className="form-group">
-                  <label htmlFor="brokerName" className="form-label">
-                    Broker
-                  </label>
-                  <select
-                    id="brokerName"
+                  <Select
+                    label="Broker"
                     name="brokerName"
                     value={formData.brokerName}
                     onChange={handleInputChange}
-                    className={`form-input ${errors.brokerName ? 'error' : ''}`}
+                    state={errors.brokerName ? 'error' : 'default'}
+                    error={errors.brokerName}
                     disabled={isSubmitting}
-                  >
-                    <option value="">Select a broker</option>
-                    {SUPPORTED_BROKERS.map(broker => (
-                      <option key={broker.id} value={broker.id}>
-                        {broker.name} - {broker.description}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.brokerName && <div className="form-error">{errors.brokerName}</div>}
+                    fullWidth
+                    options={[
+                      { value: '', label: 'Select a broker' },
+                      ...SUPPORTED_BROKERS.map(broker => ({
+                        value: broker.id,
+                        label: `${broker.name} - ${broker.description}`
+                      }))
+                    ]}
+                  />
                 </div>
 
                 {/* Conditional form fields based on selected broker */}
                 {formData.brokerName === 'shoonya' && (
                   <>
                     <div className="form-group">
-                      <label htmlFor="userId" className="form-label">
-                        User ID
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="userId"
+                        label="User ID"
                         name="userId"
                         value={formData.userId}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.userId ? 'error' : ''}`}
+                        state={errors.userId ? 'error' : 'default'}
+                        error={errors.userId}
                         placeholder="Enter your Shoonya User ID"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.userId && <div className="form-error">{errors.userId}</div>}
                     </div>
                   </>
                 )}
@@ -482,20 +512,18 @@ const AccountSetup: React.FC = () => {
                 {formData.brokerName === 'fyers' && (
                   <>
                     <div className="form-group">
-                      <label htmlFor="clientId" className="form-label">
-                        Client ID
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="clientId"
+                        label="Client ID"
                         name="clientId"
                         value={formData.clientId}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.clientId ? 'error' : ''}`}
+                        state={errors.clientId ? 'error' : 'default'}
+                        error={errors.clientId}
                         placeholder="Enter your Fyers Client ID"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.clientId && <div className="form-error">{errors.clientId}</div>}
                     </div>
                   </>
                 )}
@@ -503,57 +531,49 @@ const AccountSetup: React.FC = () => {
                 {formData.brokerName === 'shoonya' && (
                   <>
                     <div className="form-group">
-                      <label htmlFor="password" className="form-label">
-                        Password
-                      </label>
-                      <input
+                      <Input
                         type="password"
-                        id="password"
+                        label="Password"
                         name="password"
                         value={formData.password}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.password ? 'error' : ''}`}
+                        state={errors.password ? 'error' : 'default'}
+                        error={errors.password}
                         placeholder="Enter your trading password"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.password && <div className="form-error">{errors.password}</div>}
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="totpKey" className="form-label">
-                        TOTP Secret Key
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="totpKey"
+                        label="TOTP Secret Key"
                         name="totpKey"
                         value={formData.totpKey}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.totpKey ? 'error' : ''}`}
+                        state={errors.totpKey ? 'error' : 'default'}
+                        error={errors.totpKey}
                         placeholder="Enter your TOTP secret key"
                         disabled={isSubmitting}
+                        helperText="Enter your TOTP secret key. The system will automatically generate the current OTP."
+                        fullWidth
                       />
-                      {errors.totpKey && <div className="form-error">{errors.totpKey}</div>}
-                      <div className="form-help">
-                        Enter your TOTP secret key. The system will automatically generate the current OTP.
-                      </div>
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="vendorCode" className="form-label">
-                        Vendor Code
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="vendorCode"
+                        label="Vendor Code"
                         name="vendorCode"
                         value={formData.vendorCode}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.vendorCode ? 'error' : ''}`}
+                        state={errors.vendorCode ? 'error' : 'default'}
+                        error={errors.vendorCode}
                         placeholder="Enter vendor code provided by Shoonya"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.vendorCode && <div className="form-error">{errors.vendorCode}</div>}
                     </div>
                   </>
                 )}
@@ -561,54 +581,48 @@ const AccountSetup: React.FC = () => {
                 {formData.brokerName === 'fyers' && (
                   <>
                     <div className="form-group">
-                      <label htmlFor="secretKey" className="form-label">
-                        Secret Key
-                      </label>
-                      <input
+                      <Input
                         type="password"
-                        id="secretKey"
+                        label="Secret Key"
                         name="secretKey"
                         value={formData.secretKey}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.secretKey ? 'error' : ''}`}
+                        state={errors.secretKey ? 'error' : 'default'}
+                        error={errors.secretKey}
                         placeholder="Enter your Fyers Secret Key"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.secretKey && <div className="form-error">{errors.secretKey}</div>}
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="redirectUri" className="form-label">
-                        Redirect URI
-                      </label>
-                      <input
+                      <Input
                         type="url"
-                        id="redirectUri"
+                        label="Redirect URI"
                         name="redirectUri"
                         value={formData.redirectUri}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.redirectUri ? 'error' : ''}`}
+                        state={errors.redirectUri ? 'error' : 'default'}
+                        error={errors.redirectUri}
                         placeholder="Enter your registered redirect URI"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.redirectUri && <div className="form-error">{errors.redirectUri}</div>}
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="totpKey" className="form-label">
-                        TOTP Key (Optional)
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="totpKey"
+                        label="TOTP Key (Optional)"
                         name="totpKey"
                         value={formData.totpKey}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.totpKey ? 'error' : ''}`}
+                        state={errors.totpKey ? 'error' : 'default'}
+                        error={errors.totpKey}
                         placeholder="Enter TOTP key for automated authentication"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.totpKey && <div className="form-error">{errors.totpKey}</div>}
                     </div>
                   </>
                 )}
@@ -616,57 +630,53 @@ const AccountSetup: React.FC = () => {
                 {formData.brokerName === 'shoonya' && (
                   <>
                     <div className="form-group">
-                      <label htmlFor="apiSecret" className="form-label">
-                        API Secret
-                      </label>
-                      <input
+                      <Input
                         type="password"
-                        id="apiSecret"
+                        label="API Secret"
                         name="apiSecret"
                         value={formData.apiSecret}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.apiSecret ? 'error' : ''}`}
+                        state={errors.apiSecret ? 'error' : 'default'}
+                        error={errors.apiSecret}
                         placeholder="Enter your API secret"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.apiSecret && <div className="form-error">{errors.apiSecret}</div>}
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="imei" className="form-label">
-                        IMEI
-                      </label>
-                      <input
+                      <Input
                         type="text"
-                        id="imei"
+                        label="IMEI"
                         name="imei"
                         value={formData.imei}
                         onChange={handleInputChange}
-                        className={`form-input ${errors.imei ? 'error' : ''}`}
+                        state={errors.imei ? 'error' : 'default'}
+                        error={errors.imei}
                         placeholder="Enter device IMEI for identification"
                         disabled={isSubmitting}
+                        fullWidth
                       />
-                      {errors.imei && <div className="form-error">{errors.imei}</div>}
                     </div>
                   </>
                 )}
 
                 <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
+                  <Button
+                    variant="secondary"
                     onClick={() => setShowAddForm(false)}
                     disabled={isSubmitting}
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    className="btn btn-primary"
+                    variant="primary"
                     disabled={isSubmitting}
+                    loading={isSubmitting}
                   >
                     {isSubmitting ? 'Adding...' : 'Add Account'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -715,25 +725,22 @@ const AccountSetup: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="fyersAuthCode" className="form-label">
-                    Authorization Code
-                  </label>
-                  <input
+                  <Input
                     type="text"
-                    id="fyersAuthCode"
+                    label="Authorization Code"
                     value={fyersAuthCode}
                     onChange={(e) => setFyersAuthCode(e.target.value)}
-                    className={`form-input ${errors.authCode ? 'error' : ''}`}
+                    state={errors.authCode ? 'error' : 'default'}
+                    error={errors.authCode}
                     placeholder="Enter the authorization code from Fyers"
                     disabled={isSubmitting}
+                    fullWidth
                   />
-                  {errors.authCode && <div className="form-error">{errors.authCode}</div>}
                 </div>
 
                 <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
+                  <Button
+                    variant="secondary"
                     onClick={() => {
                       setShowFyersAuthStep(false);
                       setFyersAuthUrl('');
@@ -742,14 +749,15 @@ const AccountSetup: React.FC = () => {
                     disabled={isSubmitting}
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    className="btn btn-primary"
+                    variant="primary"
                     disabled={isSubmitting || !fyersAuthCode.trim()}
+                    loading={isSubmitting}
                   >
                     {isSubmitting ? 'Validating...' : 'Complete Authentication'}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
@@ -759,15 +767,16 @@ const AccountSetup: React.FC = () => {
         {/* Navigation Actions */}
         {accounts.length > 0 && (
           <div className="page-actions">
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => navigate('/trade-setup')}
             >
               Continue to Trade Setup
-            </button>
+            </Button>
           </div>
         )}
-      </div>
+        </Container>
+      </main>
     </div>
   );
 };

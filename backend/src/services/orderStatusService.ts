@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
 import websocketService from './websocketService';
 import { ShoonyaService } from './shoonyaService';
+import { notificationService, OrderNotificationData } from './notificationService';
 
 // Import broker connections from controller (we'll need to export this)
 // For now, we'll create a simple interface to access broker connections
@@ -26,6 +27,7 @@ const logger = {
 
 interface Order {
   id: string;
+  user_id: number;
   symbol: string;
   action: string;
   quantity: number;
@@ -99,6 +101,7 @@ class OrderStatusService extends EventEmitter {
       // Convert OrderHistory to Order format
       return orders.map(order => ({
         id: order.id.toString(),
+        user_id: order.user_id,
         symbol: order.symbol,
         action: order.action,
         quantity: order.quantity,
@@ -457,6 +460,27 @@ class OrderStatusService extends EventEmitter {
       };
 
       websocketService.broadcastOrderStatusChange(updateData);
+
+      // Send push notification for order status change
+      try {
+        const orderNotificationData: OrderNotificationData = {
+          orderId: order.id,
+          symbol: order.symbol,
+          action: order.action as 'BUY' | 'SELL',
+          quantity: order.quantity,
+          price: order.price,
+          oldStatus,
+          newStatus,
+          brokerName: order.broker_name,
+          timestamp: now
+        };
+
+        await notificationService.sendOrderStatusNotification(order.user_id.toString(), orderNotificationData);
+        logger.info(`📱 Push notification sent for order ${order.id} status change`);
+      } catch (notificationError) {
+        logger.error(`Failed to send push notification for order ${order.id}:`, notificationError);
+        // Don't fail the entire operation if notification fails
+      }
 
       // Remove from monitoring if order is complete
       if (['EXECUTED', 'CANCELLED', 'REJECTED'].includes(newStatus)) {

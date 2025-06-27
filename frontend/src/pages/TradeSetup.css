@@ -1,39 +1,38 @@
-/* Trade Setup Page Styles */
-
-/* Page Layout */
-.trade-setup-page {
-  min-height: 100vh;
-  overflow-y: auto;
-}
-
-.trade-setup-container {
-  max-height: calc(100vh - 80px); /* Account for navigation height */
-  overflow-y: auto;
-  padding-bottom: 2rem;
-}
+/* Professional Trade Setup Page Styles */
 
 /* Trade Form */
 .trade-form {
-  padding: 1.5rem 0;
-  border-top: 1px solid var(--border-color);
-  max-height: 500px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-label {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
 }
 
 .form-actions {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-  margin-top: 2rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color);
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-primary);
+  margin-top: 1rem;
 }
 
 /* Account Selection */
@@ -41,13 +40,38 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
 }
 
 .loading-accounts {
-  padding: 1rem;
+  padding: 2rem;
   text-align: center;
   color: var(--text-secondary);
   font-style: italic;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+.no-accounts {
+  padding: 1.5rem;
+  text-align: center;
+  background: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  border-radius: var(--radius-md);
+  color: var(--color-warning-800);
+}
+
+.no-accounts p {
+  margin: 0.5rem 0;
+  font-size: var(--text-sm);
+}
+
+.no-accounts p:first-child {
+  font-weight: var(--font-semibold);
+}
 }
 
 .no-accounts {
@@ -67,68 +91,29 @@
   font-weight: 500;
 }
 
-.account-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.75rem;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-}
+/* Old checkbox styles removed - now using enterprise Checkbox component */
 
-.account-checkbox:hover {
-  border-color: var(--primary-color);
-  background: rgba(102, 126, 234, 0.05);
-}
-
-.account-checkbox input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.checkmark {
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--border-color);
-  border-radius: 4px;
-  position: relative;
-  transition: all 0.2s ease;
-}
-
-.account-checkbox input[type="checkbox"]:checked + .checkmark {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
-}
-
-.account-checkbox input[type="checkbox"]:checked + .checkmark::after {
-  content: '✓';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.account-name {
-  font-weight: 500;
-  color: var(--text-primary);
+.account-info {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
 }
 
+.account-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
 .account-status {
   font-size: 0.75rem;
-  color: var(--success-color);
-  font-weight: 400;
-  margin-left: 0.5rem;
+  color: var(--color-success-600);
+  font-weight: 500;
+  background: var(--color-success-50);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-success-200);
 }
 
 /* Trade History */

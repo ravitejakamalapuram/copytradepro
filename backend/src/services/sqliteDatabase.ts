@@ -263,6 +263,70 @@ export class SQLiteUserDatabase {
       ON order_history(executed_at DESC)
     `;
 
+    // Create push_subscriptions table
+    const createPushSubscriptionsTable = `
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        endpoint TEXT NOT NULL,
+        p256dh_key TEXT NOT NULL,
+        auth_key TEXT NOT NULL,
+        user_agent TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, endpoint)
+      )
+    `;
+
+    // Create indexes for push_subscriptions
+    const createPushSubscriptionsUserIndex = `
+      CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user_id
+      ON push_subscriptions(user_id)
+    `;
+
+    const createPushSubscriptionsEndpointIndex = `
+      CREATE INDEX IF NOT EXISTS idx_push_subscriptions_endpoint
+      ON push_subscriptions(endpoint)
+    `;
+
+    // Create notification_preferences table
+    const createNotificationPreferencesTable = `
+      CREATE TABLE IF NOT EXISTS notification_preferences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        push_enabled BOOLEAN DEFAULT 1,
+        email_enabled BOOLEAN DEFAULT 0,
+        sms_enabled BOOLEAN DEFAULT 0,
+        order_status_changes BOOLEAN DEFAULT 1,
+        order_executions BOOLEAN DEFAULT 1,
+        order_rejections BOOLEAN DEFAULT 1,
+        portfolio_alerts BOOLEAN DEFAULT 1,
+        market_alerts BOOLEAN DEFAULT 0,
+        quiet_hours_enabled BOOLEAN DEFAULT 0,
+        quiet_hours_start TEXT DEFAULT '22:00',
+        quiet_hours_end TEXT DEFAULT '08:00',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id)
+      )
+    `;
+
+    // Create index for notification_preferences
+    const createNotificationPreferencesUserIndex = `
+      CREATE INDEX IF NOT EXISTS idx_notification_preferences_user_id
+      ON notification_preferences(user_id)
+    `;
+
+    // Create trigger to update notification_preferences updated_at timestamp
+    const createNotificationPreferencesUpdateTrigger = `
+      CREATE TRIGGER IF NOT EXISTS update_notification_preferences_timestamp
+      AFTER UPDATE ON notification_preferences
+      BEGIN
+        UPDATE notification_preferences SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+      END
+    `;
+
     try {
       this.db.exec(createUsersTable);
       this.db.exec(createEmailIndex);
@@ -276,6 +340,12 @@ export class SQLiteUserDatabase {
       this.db.exec(createOrderHistoryUserIndex);
       this.db.exec(createOrderHistoryAccountIndex);
       this.db.exec(createOrderHistoryDateIndex);
+      this.db.exec(createPushSubscriptionsTable);
+      this.db.exec(createPushSubscriptionsUserIndex);
+      this.db.exec(createPushSubscriptionsEndpointIndex);
+      this.db.exec(createNotificationPreferencesTable);
+      this.db.exec(createNotificationPreferencesUserIndex);
+      this.db.exec(createNotificationPreferencesUpdateTrigger);
       console.log('✅ Database tables and indexes created successfully');
     } catch (error) {
       console.error('🚨 Failed to initialize database:', error);
@@ -1006,6 +1076,146 @@ export class SQLiteUserDatabase {
     } catch (error) {
       console.error('🚨 Failed to get search suggestions:', error);
       return [];
+    }
+  }
+
+  // Push Subscription Methods
+  savePushSubscription(subscription: any): boolean {
+    const insertSubscription = this.db.prepare(`
+      INSERT OR REPLACE INTO push_subscriptions (user_id, endpoint, p256dh_key, auth_key, user_agent)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    try {
+      const result = insertSubscription.run(
+        subscription.userId,
+        subscription.endpoint,
+        subscription.keys.p256dh,
+        subscription.keys.auth,
+        subscription.userAgent || null
+      );
+
+      console.log('✅ Push subscription saved successfully for user:', subscription.userId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('🚨 Failed to save push subscription:', error);
+      return false;
+    }
+  }
+
+  getUserPushSubscriptions(userId: string): any[] {
+    const selectSubscriptions = this.db.prepare(`
+      SELECT endpoint, p256dh_key, auth_key, user_agent, created_at
+      FROM push_subscriptions
+      WHERE user_id = ?
+    `);
+
+    try {
+      const subscriptions = selectSubscriptions.all(userId) as any[];
+      return subscriptions.map(sub => ({
+        endpoint: sub.endpoint,
+        keys: {
+          p256dh: sub.p256dh_key,
+          auth: sub.auth_key
+        },
+        userAgent: sub.user_agent,
+        createdAt: sub.created_at
+      }));
+    } catch (error) {
+      console.error('🚨 Failed to get push subscriptions:', error);
+      return [];
+    }
+  }
+
+  removePushSubscription(userId: string, endpoint?: string): boolean {
+    let query = 'DELETE FROM push_subscriptions WHERE user_id = ?';
+    let params = [userId];
+
+    if (endpoint) {
+      query += ' AND endpoint = ?';
+      params.push(endpoint);
+    }
+
+    const deleteSubscription = this.db.prepare(query);
+
+    try {
+      const result = deleteSubscription.run(...params);
+      console.log('✅ Push subscription removed for user:', userId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('🚨 Failed to remove push subscription:', error);
+      return false;
+    }
+  }
+
+  // Notification Preferences Methods
+  saveUserNotificationPreferences(preferences: any): boolean {
+    const insertPreferences = this.db.prepare(`
+      INSERT OR REPLACE INTO notification_preferences (
+        user_id, push_enabled, email_enabled, sms_enabled,
+        order_status_changes, order_executions, order_rejections,
+        portfolio_alerts, market_alerts, quiet_hours_enabled,
+        quiet_hours_start, quiet_hours_end
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+
+    try {
+      const result = insertPreferences.run(
+        preferences.userId,
+        preferences.pushEnabled ? 1 : 0,
+        preferences.emailEnabled ? 1 : 0,
+        preferences.smsEnabled ? 1 : 0,
+        preferences.orderStatusChanges ? 1 : 0,
+        preferences.orderExecutions ? 1 : 0,
+        preferences.orderRejections ? 1 : 0,
+        preferences.portfolioAlerts ? 1 : 0,
+        preferences.marketAlerts ? 1 : 0,
+        preferences.quietHours?.enabled ? 1 : 0,
+        preferences.quietHours?.startTime || '22:00',
+        preferences.quietHours?.endTime || '08:00'
+      );
+
+      console.log('✅ Notification preferences saved for user:', preferences.userId);
+      return result.changes > 0;
+    } catch (error) {
+      console.error('🚨 Failed to save notification preferences:', error);
+      return false;
+    }
+  }
+
+  getUserNotificationPreferences(userId: string): any | null {
+    const selectPreferences = this.db.prepare(`
+      SELECT * FROM notification_preferences WHERE user_id = ?
+    `);
+
+    try {
+      const prefs = selectPreferences.get(userId) as any;
+
+      if (!prefs) {
+        return null;
+      }
+
+      return {
+        userId: prefs.user_id,
+        pushEnabled: Boolean(prefs.push_enabled),
+        emailEnabled: Boolean(prefs.email_enabled),
+        smsEnabled: Boolean(prefs.sms_enabled),
+        orderStatusChanges: Boolean(prefs.order_status_changes),
+        orderExecutions: Boolean(prefs.order_executions),
+        orderRejections: Boolean(prefs.order_rejections),
+        portfolioAlerts: Boolean(prefs.portfolio_alerts),
+        marketAlerts: Boolean(prefs.market_alerts),
+        quietHours: {
+          enabled: Boolean(prefs.quiet_hours_enabled),
+          startTime: prefs.quiet_hours_start,
+          endTime: prefs.quiet_hours_end
+        },
+        createdAt: prefs.created_at,
+        updatedAt: prefs.updated_at
+      };
+    } catch (error) {
+      console.error('🚨 Failed to get notification preferences:', error);
+      return null;
     }
   }
 }

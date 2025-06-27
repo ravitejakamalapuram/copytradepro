@@ -10,6 +10,7 @@ import { ButtonSpinner } from '../components/LoadingSpinner';
 import { SkeletonTradeHistory, SkeletonAccountList } from '../components/SkeletonLoader';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
+import { Button, Input, Select, HStack, Checkbox, Card, CardHeader, CardContent } from '../components/ui';
 import './TradeSetup.css';
 
 interface Trade {
@@ -370,24 +371,29 @@ const TradeSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container trade-setup-page">
+    <div className="app">
       <Navigation />
 
-      <div className="container trade-setup-container">
-        <div className="page-header">
-          <div className="header-content">
-            <div className="header-text">
-              <h1>Trade Setup & History</h1>
-              <p>Execute trades across multiple broker accounts</p>
+      <main className="app-main">
+        <div className="main-container">
+          <div className="page-header">
+            <h1 className="page-title">Trade Setup & History</h1>
+            <p className="page-subtitle">Execute trades across multiple broker accounts</p>
+          </div>
+
+          <div className="section">
+            <div className="section-header">
+              <h2 className="section-title">Real-time Status</h2>
             </div>
-            <div className="header-actions">
-              <RealTimeStatusIndicator
-                showDetails={true}
-                onOrderUpdate={handleRealTimeOrderUpdate}
-              />
+            <div className="card">
+              <div className="card-body">
+                <RealTimeStatusIndicator
+                  showDetails={true}
+                  onOrderUpdate={handleRealTimeOrderUpdate}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
         {/* General Error Display */}
         {generalError && (
@@ -409,129 +415,105 @@ const TradeSetup: React.FC = () => {
         )}
 
         {/* Trade Form */}
-        <div className="card">
-          <div className="card-header">
+        <Card>
+          <CardHeader>
             <h3 className="card-title">New Trade</h3>
-            <button
-              className="btn btn-primary"
+            <Button
+              variant="primary"
               onClick={() => setShowTradeForm(!showTradeForm)}
             >
               {showTradeForm ? 'Cancel' : 'Place Trade'}
-            </button>
-          </div>
+            </Button>
+          </CardHeader>
 
           {showTradeForm && (
-            <form onSubmit={handleSubmitTrade} className="trade-form">
+            <CardContent>
+              <form onSubmit={handleSubmitTrade} className="trade-form">
               {errors.general && (
                 <div className="form-error mb-3">{errors.general}</div>
               )}
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="symbol" className="form-label">
-                    Symbol
-                  </label>
-                  <input
+                  <Input
                     type="text"
-                    id="symbol"
+                    label="Symbol"
                     name="symbol"
                     value={formData.symbol}
                     onChange={handleInputChange}
-                    className={`form-input ${errors.symbol ? 'error' : ''}`}
+                    state={errors.symbol ? 'error' : 'default'}
+                    error={errors.symbol}
                     placeholder="e.g., RELIANCE, TCS"
                     disabled={isSubmitting}
+                    fullWidth
                   />
-                  {errors.symbol && (
-                    <InlineErrorDisplay
-                      error={{ message: errors.symbol, type: 'validation' }}
-                      context="form"
-                    />
-                  )}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="action" className="form-label">
-                    Action
-                  </label>
-                  <select
-                    id="action"
+                  <Select
+                    label="Action"
                     name="action"
                     value={formData.action}
                     onChange={handleInputChange}
-                    className="form-input"
                     disabled={isSubmitting}
-                  >
-                    <option value="BUY">BUY</option>
-                    <option value="SELL">SELL</option>
-                  </select>
+                    fullWidth
+                    options={[
+                      { value: 'BUY', label: 'BUY' },
+                      { value: 'SELL', label: 'SELL' }
+                    ]}
+                  />
                 </div>
               </div>
 
               <div className="form-row">
                 <div className="form-group">
-                  <label htmlFor="quantity" className="form-label">
-                    Quantity
-                  </label>
-                  <input
+                  <Input
                     type="number"
-                    id="quantity"
+                    label="Quantity"
                     name="quantity"
                     value={formData.quantity}
                     onChange={handleInputChange}
-                    className={`form-input ${errors.quantity ? 'error' : ''}`}
+                    state={errors.quantity ? 'error' : 'default'}
+                    error={errors.quantity}
                     placeholder="Enter quantity"
                     min="1"
                     disabled={isSubmitting}
+                    fullWidth
                   />
-                  {errors.quantity && (
-                    <InlineErrorDisplay
-                      error={{ message: errors.quantity, type: 'validation' }}
-                      context="form"
-                    />
-                  )}
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="orderType" className="form-label">
-                    Order Type
-                  </label>
-                  <select
-                    id="orderType"
+                  <Select
+                    label="Order Type"
                     name="orderType"
                     value={formData.orderType}
                     onChange={handleInputChange}
-                    className="form-input"
                     disabled={isSubmitting}
-                  >
-                    <option value="MARKET">MARKET</option>
-                    <option value="LIMIT">LIMIT</option>
-                  </select>
+                    fullWidth
+                    options={[
+                      { value: 'MARKET', label: 'MARKET' },
+                      { value: 'LIMIT', label: 'LIMIT' }
+                    ]}
+                  />
                 </div>
               </div>
 
               {formData.orderType === 'LIMIT' && (
                 <div className="form-group">
-                  <label htmlFor="price" className="form-label">
-                    Limit Price
-                  </label>
-                  <input
+                  <Input
                     type="number"
-                    id="price"
+                    label="Limit Price"
                     name="price"
                     value={formData.price}
                     onChange={handleInputChange}
-                    className={`form-input ${errors.price ? 'error' : ''}`}
+                    state={errors.price ? 'error' : 'default'}
+                    error={errors.price}
                     placeholder="Enter limit price"
                     step="0.01"
                     min="0.01"
                     disabled={isSubmitting}
+                    fullWidth
                   />
-                  {errors.price && (
-                    <InlineErrorDisplay
-                      error={{ message: errors.price, type: 'validation' }}
-                      context="form"
-                    />
-                  )}
                 </div>
               )}
 
@@ -549,19 +531,20 @@ const TradeSetup: React.FC = () => {
                 ) : (
                   <div className="account-selection">
                     {connectedAccounts.map(account => (
-                      <label key={account.id} className="account-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={formData.brokerAccounts.includes(account.id)}
-                          onChange={() => handleAccountSelection(account.id)}
-                          disabled={isSubmitting}
-                        />
-                        <span className="checkmark"></span>
-                        <span className="account-name">
-                          {account.brokerDisplayName} - {account.accountId}
+                      <Checkbox
+                        key={account.id}
+                        checked={formData.brokerAccounts.includes(account.id)}
+                        onChange={(checked) => handleAccountSelection(account.id)}
+                        disabled={isSubmitting}
+                        state={errors.brokerAccounts ? 'error' : 'default'}
+                      >
+                        <div className="account-info">
+                          <span className="account-name">
+                            {account.brokerDisplayName} - {account.accountId}
+                          </span>
                           <span className="account-status">✓ Active</span>
-                        </span>
-                      </label>
+                        </div>
+                      </Checkbox>
                     ))}
                   </div>
                 )}
@@ -574,44 +557,39 @@ const TradeSetup: React.FC = () => {
               </div>
 
               <div className="form-actions">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setShowTradeForm(false)}
-                  disabled={isSubmitting}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <ButtonSpinner size="small" color="white" />
-                      Placing Trade...
-                    </>
-                  ) : (
-                    'Place Trade'
-                  )}
-                </button>
+                <HStack gap={3}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setShowTradeForm(false)}
+                    disabled={isSubmitting}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    variant="primary"
+                    disabled={isSubmitting}
+                    loading={isSubmitting}
+                  >
+                    {isSubmitting ? 'Placing Trade...' : 'Place Trade'}
+                  </Button>
+                </HStack>
               </div>
             </form>
+            </CardContent>
           )}
-        </div>
+        </Card>
 
         {/* Trade History */}
         <div className="card">
           <div className="card-header">
             <h3 className="card-title">Trade History</h3>
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setShowFilters(!showFilters)}
-              className="btn btn-secondary"
             >
               {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
+            </Button>
           </div>
 
           {/* Search Input */}
@@ -629,98 +607,97 @@ const TradeSetup: React.FC = () => {
             <div className="filters-section">
               <div className="filters-grid">
                 <div className="form-group">
-                  <label htmlFor="filterStatus" className="form-label">Status</label>
-                  <select
-                    id="filterStatus"
+                  <Select
+                    label="Status"
                     name="status"
                     value={orderFilters.status}
                     onChange={handleFilterChange}
-                    className="form-input"
-                  >
-                    <option value="">All Statuses</option>
-                    <option value="PLACED">PLACED</option>
-                    <option value="PENDING">PENDING</option>
-                    <option value="EXECUTED">EXECUTED</option>
-                    <option value="CANCELLED">CANCELLED</option>
-                    <option value="REJECTED">REJECTED</option>
-                  </select>
+                    fullWidth
+                    options={[
+                      { value: '', label: 'All Statuses' },
+                      { value: 'PLACED', label: 'PLACED' },
+                      { value: 'PENDING', label: 'PENDING' },
+                      { value: 'EXECUTED', label: 'EXECUTED' },
+                      { value: 'CANCELLED', label: 'CANCELLED' },
+                      { value: 'REJECTED', label: 'REJECTED' }
+                    ]}
+                  />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="filterSymbol" className="form-label">Symbol</label>
-                  <input
+                  <Input
                     type="text"
-                    id="filterSymbol"
+                    label="Symbol"
                     name="symbol"
                     value={orderFilters.symbol}
                     onChange={handleFilterChange}
-                    className="form-input"
                     placeholder="e.g., RELIANCE"
+                    fullWidth
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="filterAction" className="form-label">Action</label>
-                  <select
-                    id="filterAction"
+                  <Select
+                    label="Action"
                     name="action"
                     value={orderFilters.action}
                     onChange={handleFilterChange}
-                    className="form-input"
-                  >
-                    <option value="">All Actions</option>
-                    <option value="BUY">BUY</option>
-                    <option value="SELL">SELL</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="filterBroker" className="form-label">Broker</label>
-                  <select
-                    id="filterBroker"
-                    name="brokerName"
-                    value={orderFilters.brokerName}
-                    onChange={handleFilterChange}
-                    className="form-input"
-                  >
-                    <option value="">All Brokers</option>
-                    <option value="shoonya">Shoonya</option>
-                    <option value="fyers">Fyers</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="filterStartDate" className="form-label">From Date</label>
-                  <input
-                    type="date"
-                    id="filterStartDate"
-                    name="startDate"
-                    value={orderFilters.startDate}
-                    onChange={handleFilterChange}
-                    className="form-input"
+                    fullWidth
+                    options={[
+                      { value: '', label: 'All Actions' },
+                      { value: 'BUY', label: 'BUY' },
+                      { value: 'SELL', label: 'SELL' }
+                    ]}
                   />
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="filterEndDate" className="form-label">To Date</label>
-                  <input
+                  <Select
+                    label="Broker"
+                    name="brokerName"
+                    value={orderFilters.brokerName}
+                    onChange={handleFilterChange}
+                    fullWidth
+                    options={[
+                      { value: '', label: 'All Brokers' },
+                      { value: 'shoonya', label: 'Shoonya' },
+                      { value: 'fyers', label: 'Fyers' }
+                    ]}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <Input
                     type="date"
-                    id="filterEndDate"
+                    label="From Date"
+                    name="startDate"
+                    value={orderFilters.startDate}
+                    onChange={handleFilterChange}
+                    fullWidth
+                  />
+                </div>
+
+                <div className="form-group">
+                  <Input
+                    type="date"
+                    label="To Date"
                     name="endDate"
                     value={orderFilters.endDate}
                     onChange={handleFilterChange}
-                    className="form-input"
+                    fullWidth
                   />
                 </div>
               </div>
 
               <div className="filters-actions">
-                <button type="button" onClick={applyFilters} className="btn btn-primary">
-                  Apply Filters
-                </button>
-                <button type="button" onClick={clearFilters} className="btn btn-secondary">
-                  Clear Filters
-                </button>
+                <HStack gap={3}>
+                  <Button variant="primary" onClick={applyFilters}>
+                    Apply Filters
+                  </Button>
+                  <Button variant="secondary" onClick={clearFilters}>
+                    Clear Filters
+                  </Button>
+                </HStack>
               </div>
             </div>
           )}
@@ -764,18 +741,19 @@ const TradeSetup: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Order Confirmation Dialog */}
-      {pendingOrderData && (
-        <OrderConfirmationDialog
-          isOpen={showConfirmDialog}
-          onClose={handleCloseConfirmDialog}
-          onConfirm={handleConfirmOrder}
-          orderDetails={pendingOrderData}
-          isSubmitting={isSubmitting}
-        />
-      )}
+        {/* Order Confirmation Dialog */}
+        {pendingOrderData && (
+          <OrderConfirmationDialog
+            isOpen={showConfirmDialog}
+            onClose={handleCloseConfirmDialog}
+            onConfirm={handleConfirmOrder}
+            orderDetails={pendingOrderData}
+            isSubmitting={isSubmitting}
+          />
+        )}
+        </div>
+      </main>
     </div>
   );
 };

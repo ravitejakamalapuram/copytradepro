@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { Input, Button, Stack } from './ui';
 
 const RegisterForm: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -87,90 +88,79 @@ const RegisterForm: React.FC = () => {
   return (
     <form onSubmit={handleSubmit} className="auth-form">
       {errors.general && (
-        <div className="form-error mb-3" style={{ textAlign: 'center' }}>
+        <div className="register-error-alert">
           {errors.general}
         </div>
       )}
 
-      <div className="form-group">
-        <label htmlFor="name" className="form-label">
-          Full Name
-        </label>
-        <input
+      <Stack gap={4}>
+        <Input
           type="text"
-          id="name"
+          label="Full Name"
           name="name"
           value={formData.name}
           onChange={handleChange}
-          className={`form-input ${errors.name ? 'error' : ''}`}
           placeholder="Enter your full name"
           disabled={isSubmitting}
           autoComplete="name"
+          state={errors.name ? 'error' : 'default'}
+          error={errors.name}
+          fullWidth
         />
-        {errors.name && <div className="form-error">{errors.name}</div>}
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="email" className="form-label">
-          Email Address
-        </label>
-        <input
+        <Input
           type="email"
-          id="email"
+          label="Email Address"
           name="email"
           value={formData.email}
           onChange={handleChange}
-          className={`form-input ${errors.email ? 'error' : ''}`}
           placeholder="Enter your email"
           disabled={isSubmitting}
           autoComplete="email"
+          state={errors.email ? 'error' : 'default'}
+          error={errors.email}
+          fullWidth
         />
-        {errors.email && <div className="form-error">{errors.email}</div>}
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="password" className="form-label">
-          Password
-        </label>
-        <input
+        <Input
           type="password"
-          id="password"
+          label="Password"
           name="password"
           value={formData.password}
           onChange={handleChange}
-          className={`form-input ${errors.password ? 'error' : ''}`}
           placeholder="Create a password"
           disabled={isSubmitting}
           autoComplete="new-password"
+          state={errors.password ? 'error' : 'default'}
+          error={errors.password}
+          fullWidth
         />
-        {errors.password && <div className="form-error">{errors.password}</div>}
-      </div>
 
-      <div className="form-group">
-        <label htmlFor="confirmPassword" className="form-label">
-          Confirm Password
-        </label>
-        <input
+        <Input
           type="password"
-          id="confirmPassword"
+          label="Confirm Password"
           name="confirmPassword"
           value={formData.confirmPassword}
           onChange={handleChange}
-          className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
           placeholder="Confirm your password"
           disabled={isSubmitting}
           autoComplete="new-password"
+          state={errors.confirmPassword ? 'error' : 'default'}
+          error={errors.confirmPassword}
+          fullWidth
         />
-        {errors.confirmPassword && <div className="form-error">{errors.confirmPassword}</div>}
-      </div>
 
-      <button
-        type="submit"
-        className="btn btn-primary w-full"
-        disabled={isSubmitting}
-      >
-        {isSubmitting ? 'Creating Account...' : 'Create Account'}
-      </button>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          disabled={isSubmitting}
+          loading={isSubmitting}
+          fullWidth
+        >
+          {isSubmitting ? 'Creating Account...' : 'Create Account'}
+        </Button>
+      </Stack>
     </form>
   );
 };

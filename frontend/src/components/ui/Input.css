@@ -1,0 +1,159 @@
+/**
+ * ENTERPRISE INPUT COMPONENT STYLES
+ * CSS-only implementation to avoid CSSStyleDeclaration issues
+ */
+
+/* Base Input Container */
+.enterprise-input-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.enterprise-input-container--full-width {
+  width: 100%;
+}
+
+/* Input Label */
+.enterprise-input-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #334155;
+  margin-bottom: 0.25rem;
+}
+
+.enterprise-input-label--required::after {
+  content: ' *';
+  color: #ef4444;
+}
+
+/* Base Input Styles */
+.enterprise-input {
+  width: 100%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: 0.5rem;
+  border: 1px solid #cbd5e1;
+  background-color: white;
+  color: #0f172a;
+  transition: all 0.2s ease-in-out;
+  outline: none;
+  position: relative;
+}
+
+/* Input Sizes */
+.enterprise-input--sm {
+  height: 2rem;
+  font-size: 0.75rem;
+  padding: 0 0.75rem;
+}
+
+.enterprise-input--base {
+  height: 2.5rem;
+  font-size: 0.875rem;
+  padding: 0 0.75rem;
+}
+
+.enterprise-input--lg {
+  height: 3rem;
+  font-size: 1rem;
+  padding: 0 1rem;
+}
+
+/* Input with Icons */
+.enterprise-input--with-left-icon {
+  padding-left: 2.5rem;
+}
+
+.enterprise-input--with-right-icon {
+  padding-right: 2.5rem;
+}
+
+/* Input States */
+.enterprise-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+}
+
+.enterprise-input--error {
+  border-color: #ef4444;
+}
+
+.enterprise-input--error:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgb(239 68 68 / 0.1);
+}
+
+.enterprise-input--success {
+  border-color: #10b981;
+}
+
+.enterprise-input--success:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
+}
+
+.enterprise-input:disabled {
+  background-color: #f1f5f9;
+  color: #64748b;
+  cursor: not-allowed;
+  border-color: #e2e8f0;
+}
+
+.enterprise-input:hover:not(:disabled):not(:focus) {
+  border-color: #94a3b8;
+}
+
+/* Input Icon Container */
+.enterprise-input-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #64748b;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.enterprise-input-icon--left {
+  left: 0.75rem;
+}
+
+.enterprise-input-icon--right {
+  right: 0.75rem;
+}
+
+/* Helper Text */
+.enterprise-input-helper {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: #64748b;
+}
+
+.enterprise-input-helper--error {
+  color: #dc2626;
+}
+
+/* Select Specific Styles */
+.enterprise-select {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  padding-right: 2.5rem;
+}
+
+.enterprise-select:disabled {
+  cursor: not-allowed;
+}
+
+/* Input Wrapper for Icon Positioning */
+.enterprise-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}

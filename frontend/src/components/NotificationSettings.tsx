@@ -1,5 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { notificationService, type NotificationPreferences } from '../services/notificationService';
+import {
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Stack,
+  Flex,
+  Badge
+} from './ui';
 import './NotificationSettings.css';
 
 interface NotificationSettingsProps {
@@ -182,76 +191,87 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
   }
 
   return (
-    <div className={`notification-settings ${className}`}>
-      <div className="settings-header">
-        <h2>🔔 Notification Settings</h2>
-        <p>Manage your push notification preferences for real-time trade updates.</p>
-      </div>
+    <Card className={className}>
+      <CardHeader
+        title="🔔 Notification Settings"
+        subtitle="Manage your push notification preferences for real-time trade updates"
+      />
+      <CardContent>
+        <Stack gap={6}>
 
-      {error && (
-        <div className="error-message">
-          <span className="error-icon">❌</span>
-          {error}
-        </div>
-      )}
+          {error && (
+            <div className="notification-alert error">
+              <span className="alert-icon">❌</span>
+              <span>{error}</span>
+            </div>
+          )}
 
-      {success && (
-        <div className="success-message">
-          <span className="success-icon">✅</span>
-          {success}
-        </div>
-      )}
+          {success && (
+            <div className="notification-alert success">
+              <span className="alert-icon">✅</span>
+              <span>{success}</span>
+            </div>
+          )}
 
-      {/* Push Notification Status */}
-      <div className="settings-section">
-        <h3>📱 Push Notifications</h3>
-        <div className="subscription-status">
-          <div className="status-info">
-            <span className={`status-indicator ${isSubscribed ? 'active' : 'inactive'}`}>
-              {isSubscribed ? '🟢' : '🔴'}
-            </span>
-            <div className="status-text">
-              <strong>{isSubscribed ? 'Enabled' : 'Disabled'}</strong>
-              <p>
-                {permission === 'granted' 
-                  ? 'You will receive push notifications for trade updates'
-                  : permission === 'denied'
-                  ? 'Push notifications are blocked. Please enable them in your browser settings.'
-                  : 'Click subscribe to enable push notifications'
-                }
-              </p>
+          {/* Push Notification Status */}
+          <div className="notification-section">
+            <h3 className="section-title">📱 Push Notifications</h3>
+            <div className="push-notification-card">
+              <Flex justify="between" align="center">
+                <div className="status-info">
+                  <Flex align="center" gap={3}>
+                    <Badge
+                      variant={isSubscribed ? 'success' : 'secondary'}
+                      size="lg"
+                    >
+                      {isSubscribed ? 'Enabled' : 'Disabled'}
+                    </Badge>
+                    <div>
+                      <p className="status-description">
+                        {permission === 'granted'
+                          ? 'You will receive push notifications for trade updates'
+                          : permission === 'denied'
+                          ? 'Push notifications are blocked. Please enable them in your browser settings.'
+                          : 'Click subscribe to enable push notifications'
+                        }
+                      </p>
+                    </div>
+                  </Flex>
+                </div>
+                <div className="notification-actions">
+                  {!isSubscribed ? (
+                    <Button
+                      variant="primary"
+                      onClick={handleSubscribe}
+                      disabled={isSaving || permission === 'denied'}
+                      loading={isSaving}
+                    >
+                      Subscribe
+                    </Button>
+                  ) : (
+                    <Flex gap={2}>
+                      <Button
+                        variant="outline"
+                        onClick={handleTestNotification}
+                        disabled={isSaving}
+                        loading={isSaving}
+                      >
+                        Test Notification
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={handleUnsubscribe}
+                        disabled={isSaving}
+                        loading={isSaving}
+                      >
+                        Unsubscribe
+                      </Button>
+                    </Flex>
+                  )}
+                </div>
+              </Flex>
             </div>
           </div>
-          <div className="subscription-actions">
-            {!isSubscribed ? (
-              <button
-                className="subscribe-button"
-                onClick={handleSubscribe}
-                disabled={isSaving || permission === 'denied'}
-              >
-                {isSaving ? 'Subscribing...' : 'Subscribe'}
-              </button>
-            ) : (
-              <>
-                <button
-                  className="test-button"
-                  onClick={handleTestNotification}
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Sending...' : 'Test Notification'}
-                </button>
-                <button
-                  className="unsubscribe-button"
-                  onClick={handleUnsubscribe}
-                  disabled={isSaving}
-                >
-                  {isSaving ? 'Unsubscribing...' : 'Unsubscribe'}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Notification Preferences */}
       {preferences && isSubscribed && (
@@ -373,7 +393,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
           </div>
         </>
       )}
-    </div>
+        </Stack>
+      </CardContent>
+    </Card>
   );
 };
 

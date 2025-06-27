@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRealTimeOrders } from '../hooks/useRealTimeOrders';
 import { notificationService } from '../services/notificationService';
+import { Button, StatusBadge, HStack } from './ui';
 import './RealTimeStatusIndicator.css';
 
 interface RealTimeStatusIndicatorProps {
@@ -34,7 +35,6 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
     status?: string;
   }>>([]);
 
-  const [showDropdown, setShowDropdown] = useState(false);
   const [hasNewUpdates, setHasNewUpdates] = useState(false);
   const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState(false);
   const [, setNotificationPermission] = useState<NotificationPermission>('default');
@@ -188,183 +188,87 @@ const RealTimeStatusIndicator: React.FC<RealTimeStatusIndicatorProps> = ({
     }
   };
 
+  const getStatusVariant = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'success';
+      case 'connecting': return 'warning';
+      case 'disconnected': return 'error';
+      case 'error': return 'error';
+      default: return 'default';
+    }
+  };
+
   return (
-    <div className={`real-time-status ${className}`}>
-      <div
-        className={`status-indicator status-indicator--${getStatusColor()} ${hasNewUpdates ? 'has-updates' : ''}`}
-        onClick={() => {
-          setShowDropdown(!showDropdown);
-          if (showDropdown) setHasNewUpdates(false);
-        }}
-        title={`${getStatusText()} - Click for details`}
-      >
-        <div className="status-main">
-          <span className="status-icon">{getStatusIcon()}</span>
-          {connectionStatus === 'connecting' && (
-            <div className="status-spinner"></div>
-          )}
-          <span className="status-text">{getStatusText()}</span>
-          {hasNewUpdates && (
-            <span className="update-badge">!</span>
-          )}
+    <div className={`real-time-status-bar ${className}`}>
+      <HStack gap={4} className="status-content">
+        {/* Connection Status */}
+        <div className="status-section">
+          <StatusBadge
+            variant={getStatusVariant()}
+            size="base"
+          >
+            <span className="status-icon">{getStatusIcon()}</span>
+            {connectionStatus === 'connecting' && (
+              <div className="status-spinner"></div>
+            )}
+            <span className="status-text">{getStatusText()}</span>
+            {hasNewUpdates && (
+              <span className="update-badge">!</span>
+            )}
+          </StatusBadge>
         </div>
 
-        {showDetails && monitoringStatus && (
-          <div className="status-details">
-            <span className="detail-item">
-              📊 {monitoringStatus.activeOrders} orders
-            </span>
-            <span className="detail-item">
-              🔗 {monitoringStatus.activeBrokers} brokers
-            </span>
+        {/* Monitoring Stats */}
+        {monitoringStatus && isConnected && (
+          <div className="monitoring-stats">
+            <HStack gap={3}>
+              <div className="stat-item">
+                <span className="stat-icon">📊</span>
+                <span className="stat-value">{monitoringStatus.activeOrders}</span>
+                <span className="stat-label">Orders</span>
+              </div>
+              <div className="stat-item">
+                <span className="stat-icon">🔗</span>
+                <span className="stat-value">{monitoringStatus.activeBrokers}</span>
+                <span className="stat-label">Brokers</span>
+              </div>
+            </HStack>
           </div>
         )}
 
-        <span className={`dropdown-arrow ${showDropdown ? 'open' : ''}`}>
-          {showDropdown ? '▲' : '▼'}
-        </span>
-      </div>
-
-      {showDropdown && (
-        <div className="status-dropdown">
-          <div className="dropdown-header">
-            <div className="header-content">
-              <h4>📡 Real-Time Order Status</h4>
-              <div className="connection-badge">
-                <span className={`connection-dot connection-dot--${getStatusColor()}`}></span>
-                <span className="connection-text">{getStatusText()}</span>
-              </div>
-            </div>
-            <button
-              className="close-button"
-              onClick={() => setShowDropdown(false)}
-              title="Close"
-            >
-              ✕
-            </button>
+        {/* Last Update */}
+        {lastUpdate && (
+          <div className="last-update">
+            <span className="update-icon">🕒</span>
+            <span className="update-text">{formatLastUpdate()}</span>
           </div>
+        )}
 
-          <div className="status-section">
-            <div className="section-title">📊 Connection Status</div>
-            <div className="status-grid">
-              <div className="status-card">
-                <div className="card-icon">{getStatusIcon()}</div>
-                <div className="card-content">
-                  <div className="card-label">Status</div>
-                  <div className={`card-value card-value--${getStatusColor()}`}>
-                    {getStatusText()}
-                  </div>
-                </div>
-              </div>
-              <div className="status-card">
-                <div className="card-icon">🕒</div>
-                <div className="card-content">
-                  <div className="card-label">Last Update</div>
-                  <div className="card-value">{formatLastUpdate()}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {monitoringStatus && (
-            <div className="monitoring-section">
-              <div className="section-title">🎯 Order Monitoring</div>
-              <div className="monitoring-grid">
-                <div className="monitoring-card">
-                  <div className="metric-value">{monitoringStatus.activeOrders}</div>
-                  <div className="metric-label">Active Orders</div>
-                </div>
-                <div className="monitoring-card">
-                  <div className="metric-value">{monitoringStatus.activeBrokers}</div>
-                  <div className="metric-label">Connected Brokers</div>
-                </div>
-                <div className="monitoring-card">
-                  <div className="metric-value">
-                    {monitoringStatus.isPolling ? '✅' : '❌'}
-                  </div>
-                  <div className="metric-label">
-                    {monitoringStatus.isPolling ? 'Polling Active' : 'Polling Inactive'}
-                  </div>
-                </div>
-                <div className="monitoring-card">
-                  <div className="metric-value">{monitoringStatus.pollingFrequency / 1000}s</div>
-                  <div className="metric-label">Update Frequency</div>
-                </div>
-                <div className="monitoring-card">
-                  <div className="metric-value">
-                    {pushNotificationsEnabled ? '🔔' : '🔕'}
-                  </div>
-                  <div className="metric-label">
-                    {pushNotificationsEnabled ? 'Push Enabled' : 'Push Disabled'}
-                  </div>
-                </div>
-              </div>
-              {monitoringStatus.brokers.length > 0 && (
-                <div className="brokers-list">
-                  <div className="brokers-title">📈 Active Brokers:</div>
-                  <div className="brokers-tags">
-                    {monitoringStatus.brokers.map(broker => (
-                      <span key={broker} className="broker-tag">
-                        {broker.charAt(0).toUpperCase() + broker.slice(1)}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {recentUpdates.length > 0 && (
-            <div className="updates-section">
-              <div className="section-title">
-                📋 Recent Updates
-                {hasNewUpdates && <span className="new-badge">NEW</span>}
-              </div>
-              <div className="updates-list">
-                {recentUpdates.slice(0, 5).map((update, index) => (
-                  <div key={`${update.id}-${index}`} className={`update-item update-item--${update.type}`}>
-                    <div className="update-header">
-                      <span className="update-icon">
-                        {update.type === 'status' && update.status ? getStatusEmoji(update.status) : '📊'}
-                      </span>
-                      <span className="update-message">{update.message}</span>
-                    </div>
-                    <div className="update-time">
-                      {update.timestamp.toLocaleTimeString()}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              {recentUpdates.length === 0 && (
-                <div className="no-updates">
-                  <span className="no-updates-icon">📭</span>
-                  <span className="no-updates-text">No recent updates</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="dropdown-actions">
-            <button
-              className={`action-button ${isConnected ? 'disconnect' : 'connect'}`}
+        {/* Action Buttons */}
+        <div className="status-actions">
+          <HStack gap={2}>
+            <Button
+              variant={isConnected ? 'danger' : 'primary'}
+              size="sm"
               onClick={handleToggleConnection}
-              title={isConnected ? 'Disconnect from real-time updates' : 'Connect to real-time updates'}
+              loading={connectionStatus === 'connecting'}
             >
-              <span className="button-icon">{isConnected ? '🔌' : '🔗'}</span>
               {isConnected ? 'Disconnect' : 'Connect'}
-            </button>
-            <button
-              className="action-button refresh"
-              onClick={refreshMonitoringStatus}
-              disabled={!isConnected}
-              title="Refresh monitoring status"
-            >
-              <span className="button-icon">🔄</span>
-              Refresh
-            </button>
-          </div>
+            </Button>
+
+            {isConnected && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={refreshMonitoringStatus}
+                title="Refresh monitoring status"
+              >
+                🔄
+              </Button>
+            )}
+          </HStack>
         </div>
-      )}
+      </HStack>
     </div>
   );
 };

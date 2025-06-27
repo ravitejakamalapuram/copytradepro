@@ -1,0 +1,340 @@
+/**
+ * ENTERPRISE LAYOUT COMPONENT STYLES
+ * CSS-only implementation to avoid CSSStyleDeclaration issues
+ */
+
+/* Container Component */
+.enterprise-container {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.enterprise-container--sm {
+  max-width: 640px;
+}
+
+.enterprise-container--md {
+  max-width: 768px;
+}
+
+.enterprise-container--lg {
+  max-width: 1024px;
+}
+
+.enterprise-container--xl {
+  max-width: 1280px;
+}
+
+.enterprise-container--full {
+  max-width: none;
+}
+
+.enterprise-container--centered {
+  text-align: center;
+}
+
+/* Page Header Component */
+.enterprise-page-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.enterprise-page-header-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.enterprise-page-header-subtitle {
+  font-size: 1.125rem;
+  color: #64748b;
+  margin: 0.5rem 0 0 0;
+  line-height: 1.5;
+}
+
+.enterprise-page-header-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.enterprise-page-header-breadcrumb {
+  margin-bottom: 1rem;
+}
+
+.enterprise-page-header-breadcrumb-item {
+  display: flex;
+  gap: 0.75rem;
+}
+
+/* Stack Component */
+.enterprise-stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.enterprise-stack--gap-1 {
+  gap: 0.25rem;
+}
+
+.enterprise-stack--gap-2 {
+  gap: 0.5rem;
+}
+
+.enterprise-stack--gap-3 {
+  gap: 0.75rem;
+}
+
+.enterprise-stack--gap-4 {
+  gap: 1rem;
+}
+
+.enterprise-stack--gap-5 {
+  gap: 1.25rem;
+}
+
+.enterprise-stack--gap-6 {
+  gap: 1.5rem;
+}
+
+.enterprise-stack--gap-8 {
+  gap: 2rem;
+}
+
+/* HStack Component */
+.enterprise-hstack {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.enterprise-hstack--gap-1 {
+  gap: 0.25rem;
+}
+
+.enterprise-hstack--gap-2 {
+  gap: 0.5rem;
+}
+
+.enterprise-hstack--gap-3 {
+  gap: 0.75rem;
+}
+
+.enterprise-hstack--gap-4 {
+  gap: 1rem;
+}
+
+.enterprise-hstack--gap-5 {
+  gap: 1.25rem;
+}
+
+.enterprise-hstack--gap-6 {
+  gap: 1.5rem;
+}
+
+.enterprise-hstack--gap-8 {
+  gap: 2rem;
+}
+
+/* Spacer Component */
+.enterprise-spacer {
+  flex: 1;
+}
+
+.enterprise-spacer--size-1 {
+  height: 0.25rem;
+}
+
+.enterprise-spacer--size-2 {
+  height: 0.5rem;
+}
+
+.enterprise-spacer--size-3 {
+  height: 0.75rem;
+}
+
+.enterprise-spacer--size-4 {
+  height: 1rem;
+}
+
+.enterprise-spacer--size-5 {
+  height: 1.25rem;
+}
+
+.enterprise-spacer--size-6 {
+  height: 1.5rem;
+}
+
+.enterprise-spacer--size-8 {
+  height: 2rem;
+}
+
+.enterprise-spacer--size-12 {
+  height: 3rem;
+}
+
+.enterprise-spacer--size-16 {
+  height: 4rem;
+}
+
+.enterprise-spacer--size-20 {
+  height: 5rem;
+}
+
+.enterprise-spacer--size-24 {
+  height: 6rem;
+}
+
+.enterprise-spacer--size-32 {
+  height: 8rem;
+}
+
+/* Grid Component */
+.enterprise-grid {
+  display: grid;
+}
+
+.enterprise-grid--cols-1 {
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-6 {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.enterprise-grid--cols-12 {
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+}
+
+.enterprise-grid--gap-1 {
+  gap: 0.25rem;
+}
+
+.enterprise-grid--gap-2 {
+  gap: 0.5rem;
+}
+
+.enterprise-grid--gap-3 {
+  gap: 0.75rem;
+}
+
+.enterprise-grid--gap-4 {
+  gap: 1rem;
+}
+
+.enterprise-grid--gap-5 {
+  gap: 1.25rem;
+}
+
+.enterprise-grid--gap-6 {
+  gap: 1.5rem;
+}
+
+.enterprise-grid--gap-8 {
+  gap: 2rem;
+}
+
+/* Flex Component */
+.enterprise-flex {
+  display: flex;
+}
+
+.enterprise-flex--direction-row {
+  flex-direction: row;
+}
+
+.enterprise-flex--direction-column {
+  flex-direction: column;
+}
+
+.enterprise-flex--justify-start {
+  justify-content: flex-start;
+}
+
+.enterprise-flex--justify-center {
+  justify-content: center;
+}
+
+.enterprise-flex--justify-end {
+  justify-content: flex-end;
+}
+
+.enterprise-flex--justify-between {
+  justify-content: space-between;
+}
+
+.enterprise-flex--justify-around {
+  justify-content: space-around;
+}
+
+.enterprise-flex--justify-evenly {
+  justify-content: space-evenly;
+}
+
+.enterprise-flex--align-start {
+  align-items: flex-start;
+}
+
+.enterprise-flex--align-center {
+  align-items: center;
+}
+
+.enterprise-flex--align-end {
+  align-items: flex-end;
+}
+
+.enterprise-flex--align-stretch {
+  align-items: stretch;
+}
+
+.enterprise-flex--gap-1 {
+  gap: 0.25rem;
+}
+
+.enterprise-flex--gap-2 {
+  gap: 0.5rem;
+}
+
+.enterprise-flex--gap-3 {
+  gap: 0.75rem;
+}
+
+.enterprise-flex--gap-4 {
+  gap: 1rem;
+}
+
+.enterprise-flex--gap-5 {
+  gap: 1.25rem;
+}
+
+.enterprise-flex--gap-6 {
+  gap: 1.5rem;
+}
+
+.enterprise-flex--gap-8 {
+  gap: 2rem;
+}
+
+.enterprise-flex--wrap {
+  flex-wrap: wrap;
+}
