@@ -52,22 +52,22 @@ async function testDatabaseDirect() {
       });
     }
     
-    // Create a test order history record
-    console.log('➕ Creating test order history record...');
+    // Create a test order history record with PLACED status (correct behavior)
+    console.log('➕ Creating test order history record with PLACED status...');
     const testOrderData = {
       user_id: userWithAccounts.id,
       account_id: account.id,
       broker_name: account.broker_name,
-      broker_order_id: 'TEST_ORDER_' + Date.now(),
-      symbol: 'TESTSTOCK',
+      broker_order_id: 'TEST_PLACED_ORDER_' + Date.now(),
+      symbol: 'NEWSTOCK',
       action: 'BUY',
-      quantity: 10,
-      price: 100.50,
+      quantity: 5,
+      price: 50.25,
       order_type: 'MARKET',
-      status: 'EXECUTED',
+      status: 'PLACED', // Correct status for newly placed orders
       exchange: 'NSE',
       product_type: 'C',
-      remarks: 'Test order from direct database test',
+      remarks: 'Test order with correct PLACED status',
       executed_at: new Date().toISOString(),
     };
     
