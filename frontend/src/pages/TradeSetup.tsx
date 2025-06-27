@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
+import React, { useState, useEffect } from 'react';
 import Navigation from '../components/Navigation';
 import { brokerService } from '../services/brokerService';
+import { accountService } from '../services/accountService';
 import type { PlaceOrderRequest } from '../services/brokerService';
+import type { ConnectedAccount } from '../services/accountService';
 import './TradeSetup.css';
 
 interface Trade {
@@ -11,16 +12,18 @@ interface Trade {
   action: 'BUY' | 'SELL';
   quantity: number;
   price: number;
-  orderType: 'MARKET' | 'LIMIT';
-  status: 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'FAILED';
+  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   timestamp: Date;
   brokerAccounts: string[];
 }
 
 const TradeSetup: React.FC = () => {
-  const { } = useAuth();
+  // const { user } = useAuth(); // Not currently used
   const [trades, setTrades] = useState<Trade[]>([]);
   const [showTradeForm, setShowTradeForm] = useState(false);
+  const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [formData, setFormData] = useState({
     symbol: '',
     action: 'BUY' as 'BUY' | 'SELL',
@@ -32,10 +35,50 @@ const TradeSetup: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Mock broker accounts (in real app, this would come from API)
-  const mockBrokerAccounts = [
-    { id: '1', name: 'Shoonya - Connected', broker: 'Shoonya' },
-  ];
+  // Load connected accounts and order history on component mount
+  useEffect(() => {
+    loadConnectedAccounts();
+    loadOrderHistory();
+  }, []);
+
+  const loadConnectedAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const accounts = await accountService.getConnectedAccounts();
+      // Filter to show only active accounts for trading
+      const activeAccounts = accounts.filter(account => account.isActive);
+      setConnectedAccounts(activeAccounts);
+    } catch (error) {
+      console.error('Failed to load connected accounts:', error);
+      setErrors({ general: 'Failed to load connected accounts. Please refresh the page.' });
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
+
+  const loadOrderHistory = async () => {
+    try {
+      const response = await brokerService.getOrderHistory(50, 0);
+      if (response.success && response.data) {
+        // Convert order history to Trade format for display
+        const historyTrades: Trade[] = response.data.orders.map(order => ({
+          id: order.broker_order_id,
+          symbol: order.symbol,
+          action: order.action,
+          quantity: order.quantity,
+          price: order.price,
+          orderType: order.order_type,
+          status: order.status as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED',
+          timestamp: new Date(order.executed_at),
+          brokerAccounts: [order.broker_name], // Use broker name as identifier
+        }));
+        setTrades(historyTrades);
+      }
+    } catch (error) {
+      console.error('Failed to load order history:', error);
+      // Don't show error for order history loading failure
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -88,34 +131,72 @@ const TradeSetup: React.FC = () => {
     setIsSubmitting(true);
 
     try {
-      const orderRequest: PlaceOrderRequest = {
-        brokerName: 'shoonya',
-        symbol: formData.symbol.toUpperCase().trim(),
-        action: formData.action,
-        quantity: Number(formData.quantity),
-        orderType: formData.orderType === 'MARKET' ? 'MARKET' : 'LIMIT',
-        price: formData.orderType === 'LIMIT' ? Number(formData.price) : undefined,
-        exchange: 'NSE',
-        productType: 'C', // Cash product
-        remarks: `Order placed via CopyTrade Pro at ${new Date().toISOString()}`,
-      };
+      // Place orders for each selected broker account
+      const orderPromises = formData.brokerAccounts.map(async (accountId) => {
+        const account = connectedAccounts.find(acc => acc.id === accountId);
+        if (!account) {
+          throw new Error(`Account ${accountId} not found`);
+        }
 
-      const response = await brokerService.placeOrder(orderRequest);
-
-      if (response.success && response.data) {
-        const newTrade: Trade = {
-          id: response.data.orderId,
-          symbol: response.data.symbol,
-          action: response.data.action as 'BUY' | 'SELL',
-          quantity: response.data.quantity,
-          price: response.data.price || 0,
-          orderType: response.data.orderType as 'MARKET' | 'LIMIT',
-          status: 'EXECUTED',
-          timestamp: new Date(response.data.timestamp),
-          brokerAccounts: formData.brokerAccounts,
+        const orderRequest: PlaceOrderRequest = {
+          brokerName: account.brokerName,
+          accountId: account.id, // Include the specific account ID
+          symbol: formData.symbol.toUpperCase().trim(),
+          action: formData.action,
+          quantity: Number(formData.quantity),
+          orderType: formData.orderType === 'MARKET' ? 'MARKET' : 'LIMIT',
+          price: formData.orderType === 'LIMIT' ? Number(formData.price) : undefined,
+          exchange: 'NSE',
+          productType: 'C', // Cash product
+          remarks: `Order placed via CopyTrade Pro at ${new Date().toISOString()}`,
         };
 
-        setTrades(prev => [newTrade, ...prev]);
+        return brokerService.placeOrder(orderRequest);
+      });
+
+      const responses = await Promise.allSettled(orderPromises);
+
+      // Process results
+      const successfulOrders: Trade[] = [];
+      const failedOrders: string[] = [];
+
+      responses.forEach((result, index) => {
+        const accountId = formData.brokerAccounts[index];
+        const account = connectedAccounts.find(acc => acc.id === accountId);
+
+        if (result.status === 'fulfilled' && result.value.success && result.value.data) {
+          const response = result.value;
+          const orderData = response.data!; // We know it exists from the condition above
+          const newTrade: Trade = {
+            id: `${orderData.orderId}-${accountId}`,
+            symbol: orderData.symbol,
+            action: orderData.action as 'BUY' | 'SELL',
+            quantity: orderData.quantity,
+            price: orderData.price || 0,
+            orderType: orderData.orderType as 'MARKET' | 'LIMIT',
+            status: 'PLACED',
+            timestamp: new Date(orderData.timestamp),
+            brokerAccounts: [accountId],
+          };
+          successfulOrders.push(newTrade);
+        } else {
+          const errorMsg = result.status === 'rejected'
+            ? result.reason?.message || 'Unknown error'
+            : result.value.message || 'Order failed';
+          failedOrders.push(`${account?.brokerDisplayName || accountId}: ${errorMsg}`);
+        }
+      });
+
+      // Update trades with successful orders and reload history
+      if (successfulOrders.length > 0) {
+        setTrades(prev => [...successfulOrders, ...prev]);
+        // Reload order history to get the latest data from database
+        loadOrderHistory();
+      }
+
+      // Handle results
+      if (successfulOrders.length === formData.brokerAccounts.length) {
+        // All orders successful
         setFormData({
           symbol: '',
           action: 'BUY',
@@ -126,12 +207,20 @@ const TradeSetup: React.FC = () => {
         });
         setShowTradeForm(false);
         setErrors({});
+      } else if (successfulOrders.length > 0) {
+        // Partial success
+        setErrors({
+          general: `${successfulOrders.length}/${formData.brokerAccounts.length} orders placed successfully. Failed: ${failedOrders.join(', ')}`
+        });
       } else {
-        setErrors({ general: response.message || 'Failed to place order' });
+        // All failed
+        setErrors({
+          general: `All orders failed: ${failedOrders.join(', ')}`
+        });
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('🚨 Trade submission error:', error);
-      setErrors({ general: error.message || 'Failed to submit trade. Please try again.' });
+      setErrors({ general: error instanceof Error ? error.message : 'Failed to submit trade. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
@@ -271,22 +360,34 @@ const TradeSetup: React.FC = () => {
 
               <div className="form-group">
                 <label className="form-label">
-                  Broker Accounts
+                  Broker Accounts (Active Only)
                 </label>
-                <div className="account-selection">
-                  {mockBrokerAccounts.map(account => (
-                    <label key={account.id} className="account-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={formData.brokerAccounts.includes(account.id)}
-                        onChange={() => handleAccountSelection(account.id)}
-                        disabled={isSubmitting}
-                      />
-                      <span className="checkmark"></span>
-                      <span className="account-name">{account.name}</span>
-                    </label>
-                  ))}
-                </div>
+                {loadingAccounts ? (
+                  <div className="loading-accounts">Loading connected accounts...</div>
+                ) : connectedAccounts.length === 0 ? (
+                  <div className="no-accounts">
+                    <p>No active broker accounts found.</p>
+                    <p>Please connect and activate a broker account first.</p>
+                  </div>
+                ) : (
+                  <div className="account-selection">
+                    {connectedAccounts.map(account => (
+                      <label key={account.id} className="account-checkbox">
+                        <input
+                          type="checkbox"
+                          checked={formData.brokerAccounts.includes(account.id)}
+                          onChange={() => handleAccountSelection(account.id)}
+                          disabled={isSubmitting}
+                        />
+                        <span className="checkmark"></span>
+                        <span className="account-name">
+                          {account.brokerDisplayName} - {account.accountId}
+                          <span className="account-status">✓ Active</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                )}
                 {errors.brokerAccounts && <div className="form-error">{errors.brokerAccounts}</div>}
               </div>
 

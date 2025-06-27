@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
-import { FyersService } from '../services/fyersService';
+import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/sqliteDatabase';
 
 // Store broker connections per user (in production, use Redis or database)
@@ -750,6 +750,66 @@ export const disconnectBroker = async (
   }
 };
 
+// Helper function to ensure broker connection is active
+const ensureBrokerConnection = async (userId: string, brokerName: string): Promise<BrokerService | null> => {
+  // Check if connection already exists in memory
+  const userConnections = userBrokerConnections.get(userId);
+  if (userConnections && userConnections.has(brokerName)) {
+    return userConnections.get(brokerName)!;
+  }
+
+  // Connection not in memory, try to re-establish it
+  console.log(`🔄 Re-establishing connection for ${brokerName} user ${userId}`);
+
+  // Get all accounts for this user and broker
+  const userAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+  const brokerAccount = userAccounts.find(account => account.broker_name === brokerName);
+
+  if (!brokerAccount) {
+    console.log(`❌ No ${brokerName} account found for user ${userId}`);
+    return null;
+  }
+
+  // Get decrypted credentials
+  const credentials = userDatabase.getAccountCredentials(brokerAccount.id);
+  if (!credentials) {
+    console.log(`❌ Failed to retrieve credentials for ${brokerName} account ${brokerAccount.id}`);
+    return null;
+  }
+
+  try {
+    // Initialize user connections if not exists
+    if (!userBrokerConnections.has(userId)) {
+      userBrokerConnections.set(userId, new Map());
+    }
+    const userConnectionsMap = userBrokerConnections.get(userId)!;
+
+    // Try to authenticate with the broker
+    let brokerService: BrokerService;
+    let loginResponse: any;
+
+    if (brokerName === 'shoonya') {
+      brokerService = new ShoonyaService();
+      loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
+    } else if (brokerName === 'fyers') {
+      brokerService = new FyersService();
+      loginResponse = await brokerService.login(credentials as FyersCredentials);
+    } else {
+      console.log(`❌ Unsupported broker: ${brokerName}`);
+      return null;
+    }
+
+    // Store the connection
+    userConnectionsMap.set(brokerName, brokerService);
+    console.log(`✅ Successfully re-established ${brokerName} connection for user ${userId}`);
+
+    return brokerService;
+  } catch (error: any) {
+    console.error(`❌ Failed to re-establish ${brokerName} connection:`, error.message);
+    return null;
+  }
+};
+
 export const placeOrder = async (
   req: AuthenticatedRequest,
   res: Response,
@@ -767,17 +827,18 @@ export const placeOrder = async (
       return;
     }
 
-    const { 
-      brokerName, 
-      symbol, 
-      action, 
-      quantity, 
-      orderType, 
-      price, 
+    const {
+      brokerName,
+      accountId,
+      symbol,
+      action,
+      quantity,
+      orderType,
+      price,
       triggerPrice,
       exchange,
       productType,
-      remarks 
+      remarks
     } = req.body;
     
     const userId = req.user?.id;
@@ -790,16 +851,34 @@ export const placeOrder = async (
       return;
     }
 
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections || !userConnections.has(brokerName)) {
+    // Validate that the user owns the specified account
+    const account = userDatabase.getConnectedAccountById(parseInt(accountId));
+    if (!account || account.user_id !== parseInt(userId)) {
       res.status(404).json({
         success: false,
-        message: `Not connected to ${brokerName}. Please connect first.`,
+        message: 'Account not found or access denied',
       });
       return;
     }
 
-    const brokerService = userConnections.get(brokerName)!;
+    // Verify broker name matches the account
+    if (account.broker_name !== brokerName) {
+      res.status(400).json({
+        success: false,
+        message: `Broker name mismatch. Account belongs to ${account.broker_name}, not ${brokerName}`,
+      });
+      return;
+    }
+
+    // Ensure broker connection is active (re-establish if needed)
+    const brokerService = await ensureBrokerConnection(userId, brokerName);
+    if (!brokerService) {
+      res.status(404).json({
+        success: false,
+        message: `Failed to establish connection to ${brokerName}. Please check your account and try again.`,
+      });
+      return;
+    }
     let orderResponse: any;
 
     if (brokerName === 'shoonya') {
@@ -822,8 +901,8 @@ export const placeOrder = async (
           shoonyaPriceType = 'MKT';
       }
 
-      const shoonyaOrderData = {
-        userId: userId,
+      const shoonyaOrderData: import('../services/shoonyaService').PlaceOrderRequest = {
+        userId: account.account_id, // Use the actual broker account ID (e.g., "FN135006")
         buyOrSell: action === 'BUY' ? 'B' as const : 'S' as const,
         productType: productType || 'C',
         exchange: exchange || 'NSE',
@@ -834,7 +913,7 @@ export const placeOrder = async (
         price: price ? parseFloat(price) : 0,
         triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
         retention: 'DAY' as const,
-        remarks: remarks || `Order placed via CopyTrade Pro`,
+        remarks: remarks || `Order placed via CopyTrade Pro for account ${account.account_id}`,
       };
 
       orderResponse = await (brokerService as ShoonyaService).placeOrder(shoonyaOrderData);
@@ -875,9 +954,38 @@ export const placeOrder = async (
     // Handle response based on broker type
     if (brokerName === 'shoonya') {
       if (orderResponse.stat === 'Ok') {
+        // Save order to history with PLACED status
+        // Note: Status is 'PLACED' because broker API success only means order was submitted,
+        // not that it was executed. Actual execution depends on market conditions.
+        try {
+          const orderHistoryData = {
+            user_id: parseInt(userId),
+            account_id: account.id,
+            broker_name: brokerName,
+            broker_order_id: orderResponse.norenordno,
+            symbol: symbol,
+            action: action as 'BUY' | 'SELL',
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || `Order placed via CopyTrade Pro`,
+            executed_at: new Date().toISOString(), // This is placement time, not execution time
+          };
+
+          userDatabase.createOrderHistory(orderHistoryData);
+          console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
+          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+        } catch (historyError: any) {
+          console.error('⚠️ Failed to save order history:', historyError.message);
+          // Don't fail the order response if history saving fails
+        }
+
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully',
+          message: 'Order placed successfully (awaiting execution)',
           data: {
             orderId: orderResponse.norenordno,
             brokerName,
@@ -890,6 +998,7 @@ export const placeOrder = async (
             exchange,
             status: 'PLACED',
             timestamp: new Date().toISOString(),
+            note: 'Order has been submitted to the exchange and is awaiting execution',
           },
         });
       } else {
@@ -900,9 +1009,38 @@ export const placeOrder = async (
       }
     } else if (brokerName === 'fyers') {
       if (orderResponse.s === 'ok') {
+        // Save order to history with PLACED status
+        // Note: Status is 'PLACED' because broker API success only means order was submitted,
+        // not that it was executed. Actual execution depends on market conditions.
+        try {
+          const orderHistoryData = {
+            user_id: parseInt(userId),
+            account_id: account.id,
+            broker_name: brokerName,
+            broker_order_id: orderResponse.id,
+            symbol: symbol,
+            action: action as 'BUY' | 'SELL',
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || `Order placed via CopyTrade Pro`,
+            executed_at: new Date().toISOString(), // This is placement time, not execution time
+          };
+
+          userDatabase.createOrderHistory(orderHistoryData);
+          console.log('✅ Order placed and saved to history:', orderResponse.id);
+          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+        } catch (historyError: any) {
+          console.error('⚠️ Failed to save order history:', historyError.message);
+          // Don't fail the order response if history saving fails
+        }
+
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully',
+          message: 'Order placed successfully (awaiting execution)',
           data: {
             orderId: orderResponse.id,
             brokerName,
@@ -915,6 +1053,7 @@ export const placeOrder = async (
             exchange,
             status: 'PLACED',
             timestamp: new Date().toISOString(),
+            note: 'Order has been submitted to the exchange and is awaiting execution',
           },
         });
       } else {
@@ -929,6 +1068,50 @@ export const placeOrder = async (
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to place order',
+    });
+  }
+};
+
+// Get order history for a user
+export const getOrderHistory = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { limit = '50', offset = '0' } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    const orderHistory = userDatabase.getOrderHistoryByUserId(
+      parseInt(userId),
+      parseInt(limit as string),
+      parseInt(offset as string)
+    );
+
+    const totalCount = userDatabase.getOrderCountByUserId(parseInt(userId));
+
+    res.status(200).json({
+      success: true,
+      data: {
+        orders: orderHistory,
+        totalCount,
+        limit: parseInt(limit as string),
+        offset: parseInt(offset as string),
+      },
+    });
+  } catch (error: any) {
+    console.error('🚨 Get order history error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch order history',
     });
   }
 };

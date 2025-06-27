@@ -11,6 +11,7 @@ import {
   deactivateAccount,
   disconnectBroker,
   placeOrder,
+  getOrderHistory,
   getOrderBook,
   getPositions,
   searchSymbol,
@@ -113,6 +114,7 @@ router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAcco
 
 router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
+router.get('/order-history', authenticateToken, getOrderHistory);
 router.get('/orders/:brokerName', authenticateToken, getOrderBook);
 router.get('/positions/:brokerName', authenticateToken, getPositions);
 router.get('/search/:brokerName/:exchange/:symbol', authenticateToken, searchSymbol);

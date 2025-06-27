@@ -109,6 +109,12 @@ export class ShoonyaService {
       if (error.response) {
         console.error('🚨 Response status:', error.response.status);
         console.error('🚨 Response data:', error.response.data);
+        console.error('🚨 Response headers:', error.response.headers);
+
+        // If it's a 400 error, the response data usually contains the actual error
+        if (error.response.status === 400 && error.response.data) {
+          throw new Error(`Shoonya API Error: ${JSON.stringify(error.response.data)}`);
+        }
       }
       throw new Error(`Shoonya API request failed: ${error.message}`);
     }
@@ -202,20 +208,27 @@ export class ShoonyaService {
     }
 
     try {
+      // Ensure trading symbol is in correct format for NSE
+      let tradingSymbol = orderData.tradingSymbol;
+      if (orderData.exchange === 'NSE' && !tradingSymbol.includes('-EQ')) {
+        tradingSymbol = `${tradingSymbol}-EQ`;
+      }
+
       const requestData = {
         uid: orderData.userId,
         actid: orderData.userId,
         exch: orderData.exchange,
-        tsym: orderData.tradingSymbol,
+        tsym: tradingSymbol,
         qty: orderData.quantity.toString(),
         dscqty: orderData.discloseQty.toString(),
-        prc: orderData.price?.toString() || '0',
+        prc: orderData.priceType === 'MKT' ? '0' : orderData.price.toString(),
         prd: orderData.productType,
         trantype: orderData.buyOrSell,
         prctyp: orderData.priceType,
         ret: orderData.retention || 'DAY',
         remarks: orderData.remarks || '',
-        token: this.sessionToken,
+        // Add additional fields that might be required
+        ordersource: 'API',
       };
 
       // Add trigger price for stop loss orders
@@ -230,7 +243,9 @@ export class ShoonyaService {
         type: orderData.priceType,
       });
 
-      const response = await this.makeRequest('PlaceOrder', requestData);
+      console.log('🔍 Full Shoonya order request data:', requestData);
+
+      const response = await this.makeAuthenticatedRequest('PlaceOrder', requestData);
       
       if (response.stat === 'Ok') {
         console.log('✅ Shoonya order placed successfully:', response.norenordno);
