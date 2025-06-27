@@ -64,7 +64,7 @@ export interface OrderHistory {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: string;
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
   exchange: string;
   product_type: string;
   remarks: string;
@@ -82,7 +82,7 @@ export interface CreateOrderHistoryData {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status?: string;
+  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
   exchange?: string;
   product_type?: string;
   remarks?: string;
@@ -236,7 +236,7 @@ export class SQLiteUserDatabase {
         quantity INTEGER NOT NULL,
         price REAL,
         order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET')),
-        status TEXT NOT NULL DEFAULT 'EXECUTED',
+        status TEXT NOT NULL DEFAULT 'PLACED' CHECK (status IN ('PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED')),
         exchange TEXT NOT NULL DEFAULT 'NSE',
         product_type TEXT NOT NULL DEFAULT 'C',
         remarks TEXT,
@@ -749,6 +749,43 @@ export class SQLiteUserDatabase {
       return result.count;
     } catch (error) {
       console.error('🚨 Failed to get order count by user ID:', error);
+      throw error;
+    }
+  }
+
+  // Update order status (for when we get actual execution updates)
+  updateOrderStatus(brokerOrderId: string, status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED', executedPrice?: number): boolean {
+    const updateOrder = this.db.prepare(`
+      UPDATE order_history
+      SET status = ?, price = COALESCE(?, price), updated_at = CURRENT_TIMESTAMP
+      WHERE broker_order_id = ?
+    `);
+
+    try {
+      const result = updateOrder.run(status, executedPrice, brokerOrderId);
+      const updated = result.changes > 0;
+
+      if (updated) {
+        console.log(`✅ Order status updated: ${brokerOrderId} -> ${status}`);
+      }
+
+      return updated;
+    } catch (error) {
+      console.error('🚨 Failed to update order status:', error);
+      throw error;
+    }
+  }
+
+  // Get order by broker order ID
+  getOrderByBrokerOrderId(brokerOrderId: string): OrderHistory | null {
+    const selectOrder = this.db.prepare(`
+      SELECT * FROM order_history WHERE broker_order_id = ?
+    `);
+
+    try {
+      return selectOrder.get(brokerOrderId) as OrderHistory || null;
+    } catch (error) {
+      console.error('🚨 Failed to get order by broker order ID:', error);
       throw error;
     }
   }

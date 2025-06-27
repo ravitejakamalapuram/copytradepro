@@ -954,7 +954,9 @@ export const placeOrder = async (
     // Handle response based on broker type
     if (brokerName === 'shoonya') {
       if (orderResponse.stat === 'Ok') {
-        // Save order to history
+        // Save order to history with PLACED status
+        // Note: Status is 'PLACED' because broker API success only means order was submitted,
+        // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
             user_id: parseInt(userId),
@@ -966,15 +968,16 @@ export const placeOrder = async (
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
             order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-            status: 'EXECUTED',
+            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
             exchange: exchange || 'NSE',
             product_type: productType || 'C',
             remarks: remarks || `Order placed via CopyTrade Pro`,
-            executed_at: new Date().toISOString(),
+            executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
           userDatabase.createOrderHistory(orderHistoryData);
-          console.log('✅ Order saved to history:', orderResponse.norenordno);
+          console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
+          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -982,7 +985,7 @@ export const placeOrder = async (
 
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully',
+          message: 'Order placed successfully (awaiting execution)',
           data: {
             orderId: orderResponse.norenordno,
             brokerName,
@@ -995,6 +998,7 @@ export const placeOrder = async (
             exchange,
             status: 'PLACED',
             timestamp: new Date().toISOString(),
+            note: 'Order has been submitted to the exchange and is awaiting execution',
           },
         });
       } else {
@@ -1005,7 +1009,9 @@ export const placeOrder = async (
       }
     } else if (brokerName === 'fyers') {
       if (orderResponse.s === 'ok') {
-        // Save order to history
+        // Save order to history with PLACED status
+        // Note: Status is 'PLACED' because broker API success only means order was submitted,
+        // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
             user_id: parseInt(userId),
@@ -1017,15 +1023,16 @@ export const placeOrder = async (
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
             order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-            status: 'EXECUTED',
+            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
             exchange: exchange || 'NSE',
             product_type: productType || 'C',
             remarks: remarks || `Order placed via CopyTrade Pro`,
-            executed_at: new Date().toISOString(),
+            executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
           userDatabase.createOrderHistory(orderHistoryData);
-          console.log('✅ Order saved to history:', orderResponse.id);
+          console.log('✅ Order placed and saved to history:', orderResponse.id);
+          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1033,7 +1040,7 @@ export const placeOrder = async (
 
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully',
+          message: 'Order placed successfully (awaiting execution)',
           data: {
             orderId: orderResponse.id,
             brokerName,
@@ -1046,6 +1053,7 @@ export const placeOrder = async (
             exchange,
             status: 'PLACED',
             timestamp: new Date().toISOString(),
+            note: 'Order has been submitted to the exchange and is awaiting execution',
           },
         });
       } else {
