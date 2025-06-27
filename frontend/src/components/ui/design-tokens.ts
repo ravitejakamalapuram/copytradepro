@@ -201,7 +201,7 @@ export const getColor = (color: string, scale?: ColorScale) => {
   if (!colorFamily) return color;
   
   if (scale && typeof colorFamily === 'object') {
-    return colorFamily[scale] || color;
+    return (colorFamily as any)[scale] || color;
   }
   
   return typeof colorFamily === 'string' ? colorFamily : colorFamily[500];

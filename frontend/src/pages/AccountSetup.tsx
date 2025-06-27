@@ -13,12 +13,9 @@ import {
   CardHeader,
   CardContent,
   Button,
-  Input,
-  Select,
   StatusBadge,
   Flex,
-  Stack,
-  Grid
+  Stack
 } from '../components/ui';
 import './AccountSetup.css';
 
@@ -388,13 +385,13 @@ const AccountSetup: React.FC = () => {
                   </Button>
                 </div>
               ) : (
-                <Stack gap="4">
+                <Stack gap={4}>
                   {accounts.map(account => (
                     <Card key={account.id} variant="outlined" hoverable>
                       <CardContent>
                         <Flex justify="between" align="start">
-                          <Stack gap="3">
-                            <Flex align="center" gap="3">
+                          <Stack gap={3}>
+                            <Flex align="center" gap={3}>
                               <h4 style={{
                                 margin: 0,
                                 fontSize: '1.125rem',
@@ -406,7 +403,7 @@ const AccountSetup: React.FC = () => {
                               <StatusBadge status={account.isActive ? 'active' : 'inactive'} />
                             </Flex>
 
-                            <Stack gap="1">
+                            <Stack gap={1}>
                               <div className="account-id">User ID: {account.userId}</div>
                               <div className="account-id">Account ID: {account.accountId}</div>
                               <div className="account-meta">User: {account.userName} ({account.email})</div>
@@ -417,7 +414,7 @@ const AccountSetup: React.FC = () => {
                             </Stack>
                           </Stack>
 
-                          <Flex gap="2">
+                          <Flex gap={2}>
                             <Button
                               variant={account.isActive ? 'secondary' : 'primary'}
                               size="sm"

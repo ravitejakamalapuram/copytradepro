@@ -46,7 +46,7 @@ const Navigation: React.FC = () => {
         </div>
 
         {/* User Menu */}
-        <Flex align="center" gap="4">
+        <Flex align="center" gap={4}>
           <div style={{ textAlign: 'right' }}>
             <div style={{
               fontWeight: '600',

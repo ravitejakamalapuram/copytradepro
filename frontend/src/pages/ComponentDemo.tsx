@@ -50,15 +50,15 @@ const ComponentDemo: React.FC = () => {
           }
         />
 
-        <Stack gap="8">
+        <Stack gap={8}>
           {/* Buttons Section */}
           <Card>
             <CardHeader title="Buttons" subtitle="Various button styles and states" />
             <CardContent>
-              <Stack gap="4">
+              <Stack gap={4}>
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Variants</h4>
-                  <Flex gap="3" wrap>
+                  <Flex gap={3} wrap>
                     <Button variant="primary">Primary</Button>
                     <Button variant="secondary">Secondary</Button>
                     <Button variant="outline">Outline</Button>
@@ -69,7 +69,7 @@ const ComponentDemo: React.FC = () => {
 
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Sizes</h4>
-                  <Flex gap="3" align="center">
+                  <Flex gap={3} align="center">
                     <Button size="sm">Small</Button>
                     <Button size="base">Base</Button>
                     <Button size="lg">Large</Button>
@@ -78,7 +78,7 @@ const ComponentDemo: React.FC = () => {
 
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button States</h4>
-                  <Flex gap="3">
+                  <Flex gap={3}>
                     <Button loading>Loading</Button>
                     <Button disabled>Disabled</Button>
                     <Button leftIcon="📊">With Icon</Button>
@@ -92,8 +92,8 @@ const ComponentDemo: React.FC = () => {
           <Card>
             <CardHeader title="Form Components" subtitle="Input fields and form controls" />
             <CardContent>
-              <Grid cols={2} gap="6">
-                <Stack gap="4">
+              <Grid cols={2} gap={6}>
+                <Stack gap={4}>
                   <Input
                     label="Text Input"
                     placeholder="Enter some text..."
@@ -117,7 +117,7 @@ const ComponentDemo: React.FC = () => {
                   />
                 </Stack>
 
-                <Stack gap="4">
+                <Stack gap={4}>
                   <Select
                     label="Select Option"
                     value={selectValue}
@@ -152,10 +152,10 @@ const ComponentDemo: React.FC = () => {
           <Card>
             <CardHeader title="Badges & Status" subtitle="Status indicators and labels" />
             <CardContent>
-              <Stack gap="4">
+              <Stack gap={4}>
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Variants</h4>
-                  <Flex gap="3" wrap>
+                  <Flex gap={3} wrap>
                     <Badge variant="default">Default</Badge>
                     <Badge variant="primary">Primary</Badge>
                     <Badge variant="success">Success</Badge>
@@ -167,7 +167,7 @@ const ComponentDemo: React.FC = () => {
 
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Sizes</h4>
-                  <Flex gap="3" wrap>
+                  <Flex gap={3} wrap>
                     <Badge variant="primary" size="sm">Small</Badge>
                     <Badge variant="primary" size="base">Base</Badge>
                     <Badge variant="primary" size="lg">Large</Badge>
@@ -176,13 +176,13 @@ const ComponentDemo: React.FC = () => {
 
                 <div>
                   <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Status Badges</h4>
-                  <Flex gap="3" wrap>
+                  <Flex gap={3} wrap>
                     <StatusBadge status="active" />
                     <StatusBadge status="inactive" />
                     <StatusBadge status="pending" />
-                    <StatusBadge status="success" />
+                    <StatusBadge status="executed" />
                     <StatusBadge status="error" />
-                    <StatusBadge status="warning" />
+                    <StatusBadge status="rejected" />
                   </Flex>
                 </div>
               </Stack>
@@ -217,7 +217,7 @@ const ComponentDemo: React.FC = () => {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Flex gap="2">
+                        <Flex gap={2}>
                           <Button size="sm" variant="ghost">Edit</Button>
                           <Button size="sm" variant="ghost">Delete</Button>
                         </Flex>
@@ -230,12 +230,12 @@ const ComponentDemo: React.FC = () => {
           </Card>
 
           {/* Cards Section */}
-          <Grid cols={3} gap="6">
+          <Grid cols={3} gap={6}>
             <Card variant="default" hoverable>
               <CardHeader title="Default Card" />
               <CardContent>
                 <p>This is a default card with hover effects.</p>
-                <Spacer size="4" />
+                <Spacer size={4} />
                 <Button variant="outline" fullWidth>Action</Button>
               </CardContent>
             </Card>
@@ -244,7 +244,7 @@ const ComponentDemo: React.FC = () => {
               <CardHeader title="Outlined Card" />
               <CardContent>
                 <p>This is an outlined card that's clickable.</p>
-                <Spacer size="4" />
+                <Spacer size={4} />
                 <Button variant="primary" fullWidth>Primary Action</Button>
               </CardContent>
             </Card>
@@ -253,13 +253,13 @@ const ComponentDemo: React.FC = () => {
               <CardHeader title="Elevated Card" />
               <CardContent>
                 <p>This is an elevated card with shadow.</p>
-                <Spacer size="4" />
+                <Spacer size={4} />
                 <Button variant="secondary" fullWidth>Secondary Action</Button>
               </CardContent>
             </Card>
           </Grid>
 
-          <Spacer size="8" />
+          <Spacer size={8} />
         </Stack>
       </Container>
     </div>

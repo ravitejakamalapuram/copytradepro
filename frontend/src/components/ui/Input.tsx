@@ -6,7 +6,7 @@
 import React from 'react';
 import './Input.css';
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   /** Input size */
   size?: 'sm' | 'base' | 'lg';
   /** Input state */
@@ -113,9 +113,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 Input.displayName = 'Input';
 
 // Select Component
-export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, 'size'> {
   /** Select size */
   size?: 'sm' | 'base' | 'lg';
+  /** Options for the select */
+  options?: Array<{ value: string; label: string; }>;
   /** Select state */
   state?: 'default' | 'error' | 'success';
   /** Label text */
@@ -142,6 +144,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       required = false,
       className = '',
       disabled,
+      options,
       children,
       ...props
     },
@@ -186,7 +189,15 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           disabled={disabled}
           {...props}
         >
-          {children}
+          {options ? (
+            options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))
+          ) : (
+            children
+          )}
         </select>
         
         {(helperText || error) && (
