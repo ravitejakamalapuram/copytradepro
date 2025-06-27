@@ -32,7 +32,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 10000
+        value: "10000"
       - key: JWT_SECRET
         generateValue: true
       - key: ENCRYPTION_KEY
