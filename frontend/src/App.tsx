@@ -16,7 +16,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return (
       <div className="loading-container">
         <div className="loading-spinner"></div>
-        <p>Loading...</p>
+        <p className="loading-text">Loading...</p>
       </div>
     );
   }

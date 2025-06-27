@@ -334,14 +334,15 @@ const AccountSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container">
+    <div className="app">
       <Navigation />
-      
-      <div className="container">
-        <div className="page-header">
-          <h1>Broker Account Setup</h1>
-          <p>Connect your broker accounts to start copy trading</p>
-        </div>
+
+      <main className="app-main">
+        <div className="main-container">
+          <div className="page-header">
+            <h1 className="page-title">Broker Account Setup</h1>
+            <p className="page-subtitle">Connect your broker accounts to start copy trading</p>
+          </div>
 
         {/* Account List */}
         <div className="card">
@@ -767,7 +768,8 @@ const AccountSetup: React.FC = () => {
             </button>
           </div>
         )}
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

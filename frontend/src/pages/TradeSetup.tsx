@@ -370,24 +370,29 @@ const TradeSetup: React.FC = () => {
   };
 
   return (
-    <div className="page-container trade-setup-page">
+    <div className="app">
       <Navigation />
 
-      <div className="container trade-setup-container">
-        <div className="page-header">
-          <div className="header-content">
-            <div className="header-text">
-              <h1>Trade Setup & History</h1>
-              <p>Execute trades across multiple broker accounts</p>
+      <main className="app-main">
+        <div className="main-container">
+          <div className="page-header">
+            <h1 className="page-title">Trade Setup & History</h1>
+            <p className="page-subtitle">Execute trades across multiple broker accounts</p>
+          </div>
+
+          <div className="section">
+            <div className="section-header">
+              <h2 className="section-title">Real-time Status</h2>
             </div>
-            <div className="header-actions">
-              <RealTimeStatusIndicator
-                showDetails={true}
-                onOrderUpdate={handleRealTimeOrderUpdate}
-              />
+            <div className="card">
+              <div className="card-body">
+                <RealTimeStatusIndicator
+                  showDetails={true}
+                  onOrderUpdate={handleRealTimeOrderUpdate}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
         {/* General Error Display */}
         {generalError && (
@@ -776,6 +781,8 @@ const TradeSetup: React.FC = () => {
           isSubmitting={isSubmitting}
         />
       )}
+        </div>
+      </main>
     </div>
   );
 };

@@ -1,27 +1,26 @@
-/* Global App Styles */
-.app {
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
+/* ==========================================================================
+   COPYTRADE PRO - APPLICATION STYLES
+   ========================================================================== */
 
-/* Loading Styles */
+/* Application loading states */
 .loading-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   min-height: 100vh;
-  color: white;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  gap: var(--space-4);
 }
 
 .loading-spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(255, 255, 255, 0.3);
-  border-top: 4px solid white;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 3px solid var(--color-neutral-200);
+  border-top: 3px solid var(--color-primary-600);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
 }
 
 @keyframes spin {
@@ -29,40 +28,22 @@
   100% { transform: rotate(360deg); }
 }
 
-/* Container Styles */
+.loading-text {
+  font-size: var(--text-lg);
+  font-weight: var(--font-medium);
+  color: var(--text-secondary);
+}
+
+/* Legacy container support */
 .container {
-  max-width: 1200px;
+  max-width: var(--container-max-width);
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--space-6);
 }
 
 .page-container {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-}
-
-/* Card Styles */
-.card {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  margin-bottom: 2rem;
-}
-
-.card-header {
-  margin-bottom: 1.5rem;
-}
-
-.card-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #2d3748;
-  margin-bottom: 0.5rem;
-}
-
-.card-subtitle {
-  color: #718096;
-  font-size: 0.9rem;
+  background-color: var(--bg-primary);
 }

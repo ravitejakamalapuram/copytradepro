@@ -13,30 +13,34 @@ const Settings: React.FC = () => {
       
       case 'account':
         return (
-          <div className="settings-content">
-            <div className="settings-header">
-              <h2>👤 Account Settings</h2>
-              <p>Manage your account information and preferences.</p>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">👤 Account Settings</h2>
+              <p className="card-subtitle">Manage your account information and preferences</p>
             </div>
-            <div className="coming-soon">
-              <span className="coming-soon-icon">🚧</span>
-              <h3>Coming Soon</h3>
-              <p>Account settings will be available in a future update.</p>
+            <div className="card-body">
+              <div className="flex flex-col items-center justify-center p-8 text-center">
+                <span className="text-4xl mb-4">🚧</span>
+                <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
+                <p className="text-secondary">Account settings will be available in a future update.</p>
+              </div>
             </div>
           </div>
         );
       
       case 'trading':
         return (
-          <div className="settings-content">
-            <div className="settings-header">
-              <h2>📈 Trading Settings</h2>
-              <p>Configure your trading preferences and risk management.</p>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">📈 Trading Settings</h2>
+              <p className="card-subtitle">Configure your trading preferences and risk management</p>
             </div>
-            <div className="coming-soon">
-              <span className="coming-soon-icon">🚧</span>
-              <h3>Coming Soon</h3>
-              <p>Trading settings will be available in a future update.</p>
+            <div className="card-body">
+              <div className="flex flex-col items-center justify-center p-8 text-center">
+                <span className="text-4xl mb-4">🚧</span>
+                <h3 className="text-lg font-semibold mb-2">Coming Soon</h3>
+                <p className="text-secondary">Trading settings will be available in a future update.</p>
+              </div>
             </div>
           </div>
         );
@@ -47,45 +51,59 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className="settings-page">
+    <div className="app">
       <Navigation />
-      
-      <div className="settings-container">
-        <div className="settings-sidebar">
-          <h1>⚙️ Settings</h1>
-          
-          <nav className="settings-nav">
-            <button
-              className={`nav-item ${activeTab === 'notifications' ? 'active' : ''}`}
-              onClick={() => setActiveTab('notifications')}
-            >
-              <span className="nav-icon">🔔</span>
-              <span className="nav-label">Notifications</span>
-              <span className="nav-badge">New</span>
-            </button>
-            
-            <button
-              className={`nav-item ${activeTab === 'account' ? 'active' : ''}`}
-              onClick={() => setActiveTab('account')}
-            >
-              <span className="nav-icon">👤</span>
-              <span className="nav-label">Account</span>
-            </button>
-            
-            <button
-              className={`nav-item ${activeTab === 'trading' ? 'active' : ''}`}
-              onClick={() => setActiveTab('trading')}
-            >
-              <span className="nav-icon">📈</span>
-              <span className="nav-label">Trading</span>
-            </button>
-          </nav>
+
+      <main className="app-main">
+        <div className="main-container">
+          <div className="page-header">
+            <h1 className="page-title">Settings</h1>
+            <p className="page-subtitle">Manage your application preferences and configurations</p>
+          </div>
+
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-3">
+              <div className="card">
+                <div className="card-header">
+                  <h3 className="card-title">Categories</h3>
+                </div>
+                <div className="card-body p-0">
+                  <nav className="nav-tabs flex-col">
+                    <button
+                      className={`nav-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('notifications')}
+                    >
+                      <span className="nav-tab-icon">🔔</span>
+                      <span>Notifications</span>
+                      <span className="badge badge-info ml-auto">New</span>
+                    </button>
+
+                    <button
+                      className={`nav-tab ${activeTab === 'account' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('account')}
+                    >
+                      <span className="nav-tab-icon">👤</span>
+                      <span>Account</span>
+                    </button>
+
+                    <button
+                      className={`nav-tab ${activeTab === 'trading' ? 'active' : ''}`}
+                      onClick={() => setActiveTab('trading')}
+                    >
+                      <span className="nav-tab-icon">📈</span>
+                      <span>Trading</span>
+                    </button>
+                  </nav>
+                </div>
+              </div>
+            </div>
+
+            <div className="col-span-9">
+              {renderTabContent()}
+            </div>
+          </div>
         </div>
-        
-        <div className="settings-main">
-          {renderTabContent()}
-        </div>
-      </div>
+      </main>
     </div>
   );
 };
