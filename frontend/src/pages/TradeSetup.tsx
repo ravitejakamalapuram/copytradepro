@@ -4,6 +4,7 @@ import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
 import OrderSearchInput from '../components/OrderSearchInput';
+import ErrorDisplay, { InlineErrorDisplay } from '../components/ErrorDisplay';
 import type { PlaceOrderRequest } from '../services/brokerService';
 import type { ConnectedAccount } from '../services/accountService';
 import './TradeSetup.css';
@@ -36,6 +37,7 @@ const TradeSetup: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [generalError, setGeneralError] = useState<any>(null);
 
   // Order history filtering state
   const [orderFilters, setOrderFilters] = useState({
@@ -70,7 +72,7 @@ const TradeSetup: React.FC = () => {
       setConnectedAccounts(activeAccounts);
     } catch (error) {
       console.error('Failed to load connected accounts:', error);
-      setErrors({ general: 'Failed to load connected accounts. Please refresh the page.' });
+      setGeneralError(error);
     } finally {
       setLoadingAccounts(false);
     }
@@ -165,19 +167,19 @@ const TradeSetup: React.FC = () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.symbol.trim()) {
-      newErrors.symbol = 'Symbol is required';
+      newErrors.symbol = 'Please enter a stock symbol (e.g., RELIANCE, TCS)';
     }
 
     if (!formData.quantity || Number(formData.quantity) <= 0) {
-      newErrors.quantity = 'Valid quantity is required';
+      newErrors.quantity = 'Please enter a valid quantity (minimum 1 share)';
     }
 
     if (formData.orderType === 'LIMIT' && (!formData.price || Number(formData.price) <= 0)) {
-      newErrors.price = 'Valid price is required for limit orders';
+      newErrors.price = 'Please enter a valid price for limit orders';
     }
 
     if (formData.brokerAccounts.length === 0) {
-      newErrors.brokerAccounts = 'Select at least one broker account';
+      newErrors.brokerAccounts = 'Please select at least one active broker account to place the order';
     }
 
     setErrors(newErrors);
@@ -303,18 +305,23 @@ const TradeSetup: React.FC = () => {
         setErrors({});
       } else if (successfulOrders.length > 0) {
         // Partial success
-        setErrors({
-          general: `${successfulOrders.length}/${formData.brokerAccounts.length} orders placed successfully. Failed: ${failedOrders.join(', ')}`
+        setGeneralError({
+          message: `${successfulOrders.length}/${formData.brokerAccounts.length} orders placed successfully`,
+          type: 'partial_success',
+          failedOrders,
+          successfulOrders
         });
       } else {
         // All failed
-        setErrors({
-          general: `All orders failed: ${failedOrders.join(', ')}`
+        setGeneralError({
+          message: `All orders failed: ${failedOrders.join(', ')}`,
+          type: 'all_failed',
+          failedOrders
         });
       }
     } catch (error) {
       console.error('🚨 Trade submission error:', error);
-      setErrors({ general: error instanceof Error ? error.message : 'Failed to submit trade. Please try again.' });
+      setGeneralError(error);
     } finally {
       setIsSubmitting(false);
       setPendingOrderData(null);
@@ -347,6 +354,25 @@ const TradeSetup: React.FC = () => {
           <h1>Trade Setup & History</h1>
           <p>Execute trades across multiple broker accounts</p>
         </div>
+
+        {/* General Error Display */}
+        {generalError && (
+          <ErrorDisplay
+            error={generalError}
+            context="trading"
+            onRetry={() => {
+              setGeneralError(null);
+              loadConnectedAccounts();
+            }}
+            onAction={() => {
+              setGeneralError(null);
+              // Navigate to account setup if needed
+            }}
+            actionLabel="🔧 Fix Account Setup"
+            dismissible
+            onDismiss={() => setGeneralError(null)}
+          />
+        )}
 
         {/* Trade Form */}
         <div className="card">
@@ -381,7 +407,12 @@ const TradeSetup: React.FC = () => {
                     placeholder="e.g., RELIANCE, TCS"
                     disabled={isSubmitting}
                   />
-                  {errors.symbol && <div className="form-error">{errors.symbol}</div>}
+                  {errors.symbol && (
+                    <InlineErrorDisplay
+                      error={{ message: errors.symbol, type: 'validation' }}
+                      context="form"
+                    />
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -418,7 +449,12 @@ const TradeSetup: React.FC = () => {
                     min="1"
                     disabled={isSubmitting}
                   />
-                  {errors.quantity && <div className="form-error">{errors.quantity}</div>}
+                  {errors.quantity && (
+                    <InlineErrorDisplay
+                      error={{ message: errors.quantity, type: 'validation' }}
+                      context="form"
+                    />
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -456,7 +492,12 @@ const TradeSetup: React.FC = () => {
                     min="0.01"
                     disabled={isSubmitting}
                   />
-                  {errors.price && <div className="form-error">{errors.price}</div>}
+                  {errors.price && (
+                    <InlineErrorDisplay
+                      error={{ message: errors.price, type: 'validation' }}
+                      context="form"
+                    />
+                  )}
                 </div>
               )}
 
@@ -490,7 +531,12 @@ const TradeSetup: React.FC = () => {
                     ))}
                   </div>
                 )}
-                {errors.brokerAccounts && <div className="form-error">{errors.brokerAccounts}</div>}
+                {errors.brokerAccounts && (
+                  <InlineErrorDisplay
+                    error={{ message: errors.brokerAccounts, type: 'validation' }}
+                    context="form"
+                  />
+                )}
               </div>
 
               <div className="form-actions">
