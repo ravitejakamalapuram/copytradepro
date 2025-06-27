@@ -5,6 +5,7 @@ import { useAuth } from './hooks/useAuth';
 import LandingPage from './pages/LandingPage';
 import AccountSetup from './pages/AccountSetup';
 import TradeSetup from './pages/TradeSetup';
+import Settings from './pages/Settings';
 import './App.css';
 
 // Protected Route Component
@@ -49,6 +50,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <TradeSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }
         />

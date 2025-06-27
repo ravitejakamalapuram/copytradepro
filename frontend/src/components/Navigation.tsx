@@ -18,6 +18,7 @@ const Navigation: React.FC = () => {
   const navItems = [
     { path: '/account-setup', label: 'Account Setup', icon: '🔗' },
     { path: '/trade-setup', label: 'Trade Setup', icon: '📊' },
+    { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 
   return (
