@@ -8,15 +8,15 @@ export const authService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Login error:', error);
-      
+
+      // If we have a response with error data, throw it so the UI can handle it
       if (error.response?.data) {
-        return error.response.data;
+        const errorResponse = error.response.data;
+        throw new Error(errorResponse.message || 'Login failed');
       }
-      
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
+
+      // For network errors, throw a generic error
+      throw new Error('Network error. Please check your connection and try again.');
     }
   },
 
@@ -26,15 +26,15 @@ export const authService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Register error:', error);
-      
+
+      // If we have a response with error data, throw it so the UI can handle it
       if (error.response?.data) {
-        return error.response.data;
+        const errorResponse = error.response.data;
+        throw new Error(errorResponse.message || 'Registration failed');
       }
-      
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
+
+      // For network errors, throw a generic error
+      throw new Error('Network error. Please check your connection and try again.');
     }
   },
 

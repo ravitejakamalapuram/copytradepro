@@ -5,6 +5,7 @@ import { accountService } from '../services/accountService';
 import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
 import OrderSearchInput from '../components/OrderSearchInput';
 import ErrorDisplay, { InlineErrorDisplay } from '../components/ErrorDisplay';
+import RealTimeStatusIndicator from '../components/RealTimeStatusIndicator';
 import { ButtonSpinner } from '../components/LoadingSpinner';
 import { SkeletonTradeHistory, SkeletonAccountList } from '../components/SkeletonLoader';
 import type { PlaceOrderRequest } from '../services/brokerService';
@@ -157,6 +158,20 @@ const TradeSetup: React.FC = () => {
   const handleSearch = (search: string) => {
     setSearchTerm(search);
     loadOrderHistory(orderFilters, search);
+  };
+
+  const handleRealTimeOrderUpdate = (orderId: string, newStatus: string) => {
+    // Update the order in the trades list
+    setTrades(prevTrades =>
+      prevTrades.map(trade =>
+        trade.id === orderId
+          ? { ...trade, status: newStatus as Trade['status'] }
+          : trade
+      )
+    );
+
+    // Reload order history to get the latest data
+    loadOrderHistory(orderFilters, searchTerm);
   };
 
   const handleSearchChange = (search: string) => {
@@ -360,8 +375,18 @@ const TradeSetup: React.FC = () => {
 
       <div className="container trade-setup-container">
         <div className="page-header">
-          <h1>Trade Setup & History</h1>
-          <p>Execute trades across multiple broker accounts</p>
+          <div className="header-content">
+            <div className="header-text">
+              <h1>Trade Setup & History</h1>
+              <p>Execute trades across multiple broker accounts</p>
+            </div>
+            <div className="header-actions">
+              <RealTimeStatusIndicator
+                showDetails={true}
+                onOrderUpdate={handleRealTimeOrderUpdate}
+              />
+            </div>
+          </div>
         </div>
 
         {/* General Error Display */}

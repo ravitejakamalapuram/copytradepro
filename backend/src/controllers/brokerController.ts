@@ -4,6 +4,8 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/sqliteDatabase';
+import { setBrokerConnectionManager } from '../services/orderStatusService';
+import orderStatusService from '../services/orderStatusService';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
@@ -975,9 +977,26 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+
+          // Add order to real-time monitoring
+          const orderForMonitoring = {
+            id: savedOrder.id.toString(),
+            symbol: symbol,
+            action: action,
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            status: 'PLACED',
+            broker_name: brokerName,
+            broker_order_id: orderResponse.norenordno,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+          console.log('📊 Order added to real-time monitoring:', orderResponse.norenordno);
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1030,9 +1049,26 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.id);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+
+          // Add order to real-time monitoring
+          const orderForMonitoring = {
+            id: savedOrder.id.toString(),
+            symbol: symbol,
+            action: action,
+            quantity: parseInt(quantity),
+            price: price ? parseFloat(price) : 0,
+            status: 'PLACED',
+            broker_name: brokerName,
+            broker_order_id: orderResponse.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+          console.log('📊 Order added to real-time monitoring:', orderResponse.id);
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1363,3 +1399,54 @@ export const getQuotes = async (
     });
   }
 };
+
+// Broker Connection Manager for Order Status Service
+const brokerConnectionManagerImpl = {
+  getBrokerConnection(brokerAccountId: string, brokerName: string): ShoonyaService | null {
+    console.log(`🔍 Looking for broker connection: brokerAccountId=${brokerAccountId}, brokerName=${brokerName}`);
+    console.log(`🔍 Available user connections:`, Array.from(userBrokerConnections.keys()));
+
+    try {
+      // Find which web user has this broker account connected
+      const connectedAccount = userDatabase.getConnectedAccountByAccountId(brokerAccountId);
+
+      if (!connectedAccount) {
+        console.log(`❌ No connected account found for broker account ID: ${brokerAccountId}`);
+        return null;
+      }
+
+      console.log(`🔍 Found connected account for user ${connectedAccount.user_id}, broker: ${connectedAccount.broker_name}`);
+
+      // Check if the broker name matches
+      if (connectedAccount.broker_name !== brokerName) {
+        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${connectedAccount.broker_name}`);
+        return null;
+      }
+
+      // Get the broker connection for this web user
+      const userId = connectedAccount.user_id.toString();
+      const userConnections = userBrokerConnections.get(userId);
+
+      if (!userConnections) {
+        console.log(`❌ No active connections found for user ${userId}`);
+        return null;
+      }
+
+      const service = userConnections.get(brokerName);
+      if (service instanceof ShoonyaService) {
+        console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
+        return service;
+      }
+
+      console.log(`❌ Service not found or not a ShoonyaService for user ${userId}, broker ${brokerName}`);
+      return null;
+
+    } catch (error) {
+      console.error(`🚨 Error in getBrokerConnection:`, error);
+      return null;
+    }
+  }
+};
+
+// Set the broker connection manager for the order status service
+setBrokerConnectionManager(brokerConnectionManagerImpl);

@@ -571,6 +571,20 @@ export class SQLiteUserDatabase {
     }
   }
 
+  // Get connected account by broker account ID
+  getConnectedAccountByAccountId(accountId: string): ConnectedAccount | null {
+    const selectAccount = this.db.prepare(`
+      SELECT * FROM connected_accounts WHERE account_id = ?
+    `);
+
+    try {
+      return selectAccount.get(accountId) as ConnectedAccount || null;
+    } catch (error) {
+      console.error('🚨 Failed to get connected account by account ID:', error);
+      throw error;
+    }
+  }
+
   // Get all connected accounts for a user
   getConnectedAccountsByUserId(userId: number): ConnectedAccount[] {
     const selectAccounts = this.db.prepare(`
@@ -757,7 +771,7 @@ export class SQLiteUserDatabase {
   updateOrderStatus(brokerOrderId: string, status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED', executedPrice?: number): boolean {
     const updateOrder = this.db.prepare(`
       UPDATE order_history
-      SET status = ?, price = COALESCE(?, price), updated_at = CURRENT_TIMESTAMP
+      SET status = ?, price = COALESCE(?, price)
       WHERE broker_order_id = ?
     `);
 
