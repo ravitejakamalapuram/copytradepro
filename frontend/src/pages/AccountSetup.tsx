@@ -6,6 +6,20 @@ import { brokerService } from '../services/brokerService';
 import type { ShoonyaCredentials, FyersCredentials } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import type { ConnectedAccount } from '../services/accountService';
+import {
+  Container,
+  PageHeader,
+  Card,
+  CardHeader,
+  CardContent,
+  Button,
+  Input,
+  Select,
+  StatusBadge,
+  Flex,
+  Stack,
+  Grid
+} from '../components/ui';
 import './AccountSetup.css';
 
 // Using ConnectedAccount from accountService
@@ -334,91 +348,111 @@ const AccountSetup: React.FC = () => {
   };
 
   return (
-    <div className="app">
+    <div className="enterprise-app">
       <Navigation />
 
-      <main className="app-main">
-        <div className="main-container">
-          <div className="page-header">
-            <h1 className="page-title">Broker Account Setup</h1>
-            <p className="page-subtitle">Connect your broker accounts to start copy trading</p>
-          </div>
-
-        {/* Account List */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Connected Accounts</h3>
-            <button
-              className="btn btn-primary"
-              onClick={() => setShowAddForm(true)}
-            >
-              Add Account
-            </button>
-          </div>
-
-          {accounts.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">🔗</div>
-              <h4>No accounts connected</h4>
-              <p>Add your first broker account to get started with copy trading</p>
-              <button
-                className="btn btn-primary"
+      <main className="enterprise-main">
+        <Container>
+          <PageHeader
+            title="Broker Account Setup"
+            subtitle="Connect your broker accounts to start copy trading"
+            actions={
+              <Button
+                variant="primary"
                 onClick={() => setShowAddForm(true)}
+                leftIcon="+"
               >
-                Add Your First Account
-              </button>
-            </div>
-          ) : (
-            <div className="accounts-list">
-              {accounts.map(account => (
-                <div key={account.id} className="account-item">
-                  <div className="account-info">
-                    <div className="account-header">
-                      <h4>{account.brokerName}</h4>
-                      <div className="status-container">
-                        <span className={`status-indicator ${account.isActive ? 'active' : 'inactive'}`}></span>
-                        <span className={`status-badge ${account.isActive ? 'active' : 'inactive'}`}>
-                          {account.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="account-id">User ID: {account.userId}</p>
-                    <p className="account-id">Account ID: {account.accountId}</p>
-                    <p className="account-meta">User: {account.userName} ({account.email})</p>
-                    <p className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</p>
-                    <p className="account-date">
-                      Added: {new Date(account.createdAt).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <div className="account-actions">
-                    <button
-                      className={`btn ${account.isActive ? 'btn-secondary' : 'btn-success'}`}
-                      onClick={() => handleToggleAccount(account.id)}
-                    >
-                      {account.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
-                    <button
-                      className="btn btn-info"
-                      onClick={() => handleCheckSessionStatus(account.id)}
-                      disabled={checkingStatus[account.id]}
-                    >
-                      {checkingStatus[account.id] ? 'Checking...' : 'Check Status'}
-                    </button>
-                    <button
-                      className="btn btn-error"
-                      onClick={() => handleRemoveAccount(account.id)}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                Add Account
+              </Button>
+            }
+          />
 
-        {/* Add Account Form */}
-        {showAddForm && (
+          {/* Account List */}
+          <Card>
+            <CardHeader
+              title="Connected Accounts"
+              subtitle={`${accounts.length} account${accounts.length !== 1 ? 's' : ''} connected`}
+            />
+            <CardContent>
+              {accounts.length === 0 ? (
+                <div className="empty-state">
+                  <div className="empty-icon">🔗</div>
+                  <h4>No accounts connected</h4>
+                  <p>Add your first broker account to get started with copy trading</p>
+                  <Button
+                    variant="primary"
+                    onClick={() => setShowAddForm(true)}
+                    leftIcon="+"
+                  >
+                    Add Your First Account
+                  </Button>
+                </div>
+              ) : (
+                <Stack gap="4">
+                  {accounts.map(account => (
+                    <Card key={account.id} variant="outlined" hoverable>
+                      <CardContent>
+                        <Flex justify="between" align="start">
+                          <Stack gap="3">
+                            <Flex align="center" gap="3">
+                              <h4 style={{
+                                margin: 0,
+                                fontSize: '1.125rem',
+                                fontWeight: '600',
+                                color: '#0f172a'
+                              }}>
+                                {account.brokerName}
+                              </h4>
+                              <StatusBadge status={account.isActive ? 'active' : 'inactive'} />
+                            </Flex>
+
+                            <Stack gap="1">
+                              <div className="account-id">User ID: {account.userId}</div>
+                              <div className="account-id">Account ID: {account.accountId}</div>
+                              <div className="account-meta">User: {account.userName} ({account.email})</div>
+                              <div className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</div>
+                              <div className="account-date">
+                                Added: {new Date(account.createdAt).toLocaleDateString()}
+                              </div>
+                            </Stack>
+                          </Stack>
+
+                          <Flex gap="2">
+                            <Button
+                              variant={account.isActive ? 'secondary' : 'primary'}
+                              size="sm"
+                              onClick={() => handleToggleAccount(account.id)}
+                            >
+                              {account.isActive ? 'Deactivate' : 'Activate'}
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCheckSessionStatus(account.id)}
+                              disabled={checkingStatus[account.id]}
+                              loading={checkingStatus[account.id]}
+                            >
+                              Check Status
+                            </Button>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleRemoveAccount(account.id)}
+                            >
+                              Remove
+                            </Button>
+                          </Flex>
+                        </Flex>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Add Account Form */}
+          {showAddForm && (
           <div className="modal-overlay">
             <div className="modal">
               <div className="modal-header">
@@ -768,7 +802,7 @@ const AccountSetup: React.FC = () => {
             </button>
           </div>
         )}
-        </div>
+        </Container>
       </main>
     </div>
   );

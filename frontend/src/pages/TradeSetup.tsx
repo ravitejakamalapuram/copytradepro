@@ -769,18 +769,17 @@ const TradeSetup: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Order Confirmation Dialog */}
-      {pendingOrderData && (
-        <OrderConfirmationDialog
-          isOpen={showConfirmDialog}
-          onClose={handleCloseConfirmDialog}
-          onConfirm={handleConfirmOrder}
-          orderDetails={pendingOrderData}
-          isSubmitting={isSubmitting}
-        />
-      )}
+        {/* Order Confirmation Dialog */}
+        {pendingOrderData && (
+          <OrderConfirmationDialog
+            isOpen={showConfirmDialog}
+            onClose={handleCloseConfirmDialog}
+            onConfirm={handleConfirmOrder}
+            orderDetails={pendingOrderData}
+            isSubmitting={isSubmitting}
+          />
+        )}
         </div>
       </main>
     </div>

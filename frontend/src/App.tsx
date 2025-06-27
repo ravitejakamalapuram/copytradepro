@@ -6,7 +6,8 @@ import LandingPage from './pages/LandingPage';
 import AccountSetup from './pages/AccountSetup';
 import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
-import './App.css';
+import ComponentDemo from './pages/ComponentDemo';
+import './styles/enterprise-base.css';
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -60,6 +61,10 @@ const AppContent: React.FC = () => {
               <Settings />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/demo"
+          element={<ComponentDemo />}
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

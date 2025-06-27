@@ -984,6 +984,7 @@ export const placeOrder = async (
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
+            user_id: parseInt(userId),
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1056,6 +1057,7 @@ export const placeOrder = async (
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
+            user_id: parseInt(userId),
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),

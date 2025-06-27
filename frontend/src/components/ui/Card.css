@@ -1,0 +1,135 @@
+/**
+ * ENTERPRISE CARD COMPONENT STYLES
+ * CSS-only implementation to avoid CSSStyleDeclaration issues
+ */
+
+/* Base Card Styles */
+.enterprise-card {
+  background-color: white;
+  border-radius: 0.75rem;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+
+/* Card Variants */
+.enterprise-card--default {
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.enterprise-card--outlined {
+  border: 1px solid #e2e8f0;
+  box-shadow: none;
+}
+
+.enterprise-card--elevated {
+  border: none;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+.enterprise-card--flat {
+  border: none;
+  box-shadow: none;
+  background-color: #f8fafc;
+}
+
+/* Card Padding */
+.enterprise-card--padding-none {
+  padding: 0;
+}
+
+.enterprise-card--padding-sm {
+  padding: 1rem;
+}
+
+.enterprise-card--padding-base {
+  padding: 1.5rem;
+}
+
+.enterprise-card--padding-lg {
+  padding: 2rem;
+}
+
+/* Hoverable and Clickable Cards */
+.enterprise-card--hoverable:hover,
+.enterprise-card--clickable:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  transform: translateY(-2px);
+  border-color: #cbd5e1;
+}
+
+.enterprise-card--clickable {
+  cursor: pointer;
+}
+
+/* Card Header */
+.enterprise-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.enterprise-card-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.enterprise-card-header p {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+/* Card Content */
+.enterprise-card-content {
+  /* No specific styles needed, just a container */
+}
+
+/* Card Footer */
+.enterprise-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.enterprise-card-footer--justify-start {
+  justify-content: flex-start;
+}
+
+.enterprise-card-footer--justify-center {
+  justify-content: center;
+}
+
+.enterprise-card-footer--justify-end {
+  justify-content: flex-end;
+}
+
+.enterprise-card-footer--justify-between {
+  justify-content: space-between;
+}
+
+/* Card Title and Subtitle Classes */
+.enterprise-card-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.25;
+}
+
+.enterprise-card-subtitle {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.5;
+}

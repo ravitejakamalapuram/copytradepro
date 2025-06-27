@@ -91,6 +91,7 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
+app.use('/api/notifications', require('./routes/notifications').default);
 
 // Demo endpoint to test real-time order status updates
 app.post('/api/demo/update-order-status', (req: express.Request, res: express.Response): void => {
