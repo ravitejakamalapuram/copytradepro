@@ -1,61 +1,50 @@
 import React, { useState, useEffect } from 'react';
+// import { useNavigate } from 'react-router-dom';
 import KiteNavigation from '../components/KiteNavigation';
+import { fundsService, type FundTransaction, type FundsBalance } from '../services/fundsService';
 import '../styles/kite-theme.css';
 
-interface FundTransaction {
-  id: string;
-  type: 'CREDIT' | 'DEBIT';
-  amount: number;
-  description: string;
-  date: string;
-  status: 'SUCCESS' | 'PENDING' | 'FAILED';
-}
-
 const KiteFunds: React.FC = () => {
-  const [availableFunds] = useState(125000);
-  const [usedMargin] = useState(75000);
+  // const navigate = useNavigate(); // Will be used for navigation features
+  const [fundsBalance, setFundsBalance] = useState<FundsBalance>({
+    availableFunds: 0,
+    usedMargin: 0,
+    totalBalance: 0,
+    withdrawableBalance: 0,
+    marginUtilized: 0,
+    marginAvailable: 0
+  });
   const [transactions, setTransactions] = useState<FundTransaction[]>([]);
   const [addFundsAmount, setAddFundsAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [selectedMethod, setSelectedMethod] = useState<'UPI' | 'NETBANKING' | 'BANK_TRANSFER'>('UPI');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
-    // Mock transaction data
-    const mockTransactions: FundTransaction[] = [
-      {
-        id: 'TXN001',
-        type: 'CREDIT',
-        amount: 50000,
-        description: 'Bank Transfer - HDFC Bank',
-        date: '2024-01-15 09:30:00',
-        status: 'SUCCESS'
-      },
-      {
-        id: 'TXN002',
-        type: 'DEBIT',
-        amount: 25000,
-        description: 'Withdrawal to Bank',
-        date: '2024-01-14 14:20:00',
-        status: 'SUCCESS'
-      },
-      {
-        id: 'TXN003',
-        type: 'CREDIT',
-        amount: 100000,
-        description: 'Initial Deposit - UPI',
-        date: '2024-01-10 10:15:00',
-        status: 'SUCCESS'
-      },
-      {
-        id: 'TXN004',
-        type: 'DEBIT',
-        amount: 5000,
-        description: 'Trading Charges',
-        date: '2024-01-09 16:45:00',
-        status: 'SUCCESS'
-      }
-    ];
+    const fetchFundsData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    setTransactions(mockTransactions);
+        // Fetch funds balance
+        const balance = await fundsService.getFundsBalance();
+        setFundsBalance(balance);
+
+        // Fetch transactions
+        const transactionHistory = await fundsService.getTransactions(20);
+        setTransactions(transactionHistory);
+
+      } catch (error: any) {
+        console.error('Failed to fetch funds data:', error);
+        setError('Failed to load funds data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFundsData();
   }, []);
 
   const formatCurrency = (amount: number): string => {
@@ -78,26 +67,125 @@ const KiteFunds: React.FC = () => {
     return type === 'CREDIT' ? 'var(--kite-profit)' : 'var(--kite-loss)';
   };
 
-  const handleAddFunds = () => {
-    if (addFundsAmount && parseFloat(addFundsAmount) > 0) {
-      // Mock add funds logic
-      console.log('Adding funds:', addFundsAmount);
-      setAddFundsAmount('');
+  const handleAddFunds = async () => {
+    if (!addFundsAmount || parseFloat(addFundsAmount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const result = await fundsService.addFunds({
+        amount: parseFloat(addFundsAmount),
+        method: selectedMethod
+      });
+
+      if (result.success) {
+        alert(result.message);
+        setAddFundsAmount('');
+        // Refresh data
+        const balance = await fundsService.getFundsBalance();
+        setFundsBalance(balance);
+        const transactionHistory = await fundsService.getTransactions(20);
+        setTransactions(transactionHistory);
+      }
+    } catch (error: any) {
+      alert('Failed to add funds: ' + error.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const handleWithdraw = () => {
-    if (withdrawAmount && parseFloat(withdrawAmount) > 0) {
-      // Mock withdraw logic
-      console.log('Withdrawing funds:', withdrawAmount);
-      setWithdrawAmount('');
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+
+    if (parseFloat(withdrawAmount) > fundsBalance.withdrawableBalance) {
+      alert('Insufficient withdrawable balance');
+      return;
+    }
+
+    try {
+      setActionLoading(true);
+      const result = await fundsService.withdrawFunds({
+        amount: parseFloat(withdrawAmount),
+        bankAccount: 'Primary Bank Account'
+      });
+
+      if (result.success) {
+        alert(result.message);
+        setWithdrawAmount('');
+        // Refresh data
+        const balance = await fundsService.getFundsBalance();
+        setFundsBalance(balance);
+        const transactionHistory = await fundsService.getTransactions(20);
+        setTransactions(transactionHistory);
+      }
+    } catch (error: any) {
+      alert('Failed to withdraw funds: ' + error.message);
+    } finally {
+      setActionLoading(false);
     }
   };
+
+  const formatDate = (dateString: string): string => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>💰</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading funds...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
+            <button
+              className="kite-btn kite-btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="kite-theme">
       <KiteNavigation />
-      
+
       <div className="kite-main">
         {/* Funds Overview */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
@@ -106,7 +194,7 @@ const KiteFunds: React.FC = () => {
               Available Funds
             </div>
             <div style={{ fontSize: '2rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(availableFunds)}
+              ₹{formatCurrency(fundsBalance.availableFunds)}
             </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
               Ready for trading
@@ -118,10 +206,10 @@ const KiteFunds: React.FC = () => {
               Used Margin
             </div>
             <div style={{ fontSize: '2rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-neutral)' }}>
-              ₹{formatCurrency(usedMargin)}
+              ₹{formatCurrency(fundsBalance.usedMargin)}
             </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
-              {((usedMargin / (availableFunds + usedMargin)) * 100).toFixed(1)}% utilized
+              {((fundsBalance.usedMargin / fundsBalance.totalBalance) * 100).toFixed(1)}% utilized
             </div>
           </div>
 
@@ -130,7 +218,7 @@ const KiteFunds: React.FC = () => {
               Total Balance
             </div>
             <div style={{ fontSize: '2rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(availableFunds + usedMargin)}
+              ₹{formatCurrency(fundsBalance.totalBalance)}
             </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
               Available + Used
@@ -158,6 +246,21 @@ const KiteFunds: React.FC = () => {
                   className="kite-input"
                   style={{ fontSize: '1rem' }}
                 />
+
+                {/* Payment Method Selection */}
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {(['UPI', 'NETBANKING', 'BANK_TRANSFER'] as const).map(method => (
+                    <button
+                      key={method}
+                      className={`kite-btn ${selectedMethod === method ? 'kite-btn-primary' : ''}`}
+                      onClick={() => setSelectedMethod(method)}
+                      style={{ fontSize: '0.875rem' }}
+                    >
+                      {method.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   {[5000, 10000, 25000, 50000].map(amount => (
                     <button
@@ -170,13 +273,13 @@ const KiteFunds: React.FC = () => {
                     </button>
                   ))}
                 </div>
-                <button 
+                <button
                   className="kite-btn kite-btn-primary"
                   onClick={handleAddFunds}
-                  disabled={!addFundsAmount || parseFloat(addFundsAmount) <= 0}
+                  disabled={!addFundsAmount || parseFloat(addFundsAmount) <= 0 || actionLoading}
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
-                  Add Funds via UPI/Bank Transfer
+                  {actionLoading ? 'Processing...' : `Add Funds via ${selectedMethod.replace('_', ' ')}`}
                 </button>
               </div>
             </div>
@@ -194,18 +297,18 @@ const KiteFunds: React.FC = () => {
                   onChange={(e) => setWithdrawAmount(e.target.value)}
                   className="kite-input"
                   style={{ fontSize: '1rem' }}
-                  max={availableFunds}
+                  max={fundsBalance.withdrawableBalance}
                 />
                 <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
-                  Maximum withdrawable: ₹{formatCurrency(availableFunds)}
+                  Maximum withdrawable: ₹{formatCurrency(fundsBalance.withdrawableBalance)}
                 </div>
-                <button 
+                <button
                   className="kite-btn kite-btn-danger"
                   onClick={handleWithdraw}
-                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > availableFunds}
+                  disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0 || parseFloat(withdrawAmount) > fundsBalance.withdrawableBalance || actionLoading}
                   style={{ width: '100%', justifyContent: 'center' }}
                 >
-                  Withdraw to Bank Account
+                  {actionLoading ? 'Processing...' : 'Withdraw to Bank Account'}
                 </button>
               </div>
             </div>
@@ -235,13 +338,7 @@ const KiteFunds: React.FC = () => {
                   {transactions.map((transaction) => (
                     <tr key={transaction.id}>
                       <td style={{ fontFamily: 'var(--kite-font-mono)', fontSize: '0.875rem' }}>
-                        {new Date(transaction.date).toLocaleDateString('en-IN')}
-                        <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
-                          {new Date(transaction.date).toLocaleTimeString('en-IN', { 
-                            hour: '2-digit', 
-                            minute: '2-digit' 
-                          })}
-                        </div>
+                        {formatDate(transaction.date)}
                       </td>
                       <td>
                         <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>

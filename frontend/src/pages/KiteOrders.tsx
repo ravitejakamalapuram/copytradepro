@@ -33,10 +33,10 @@ const KiteOrders: React.FC = () => {
         setError(null);
 
         // Fetch orders from the backend
-        const response = await advancedOrderService.getOrders();
+        const response = await advancedOrderService.getAdvancedOrders();
 
         // Convert backend order format to our interface
-        const ordersData = response.map((order: any) => ({
+        const ordersData = response.orders.map((order: any) => ({
           id: order.id,
           symbol: order.symbol,
           type: order.side.toUpperCase() as 'BUY' | 'SELL',
@@ -97,7 +97,7 @@ const KiteOrders: React.FC = () => {
 
   const handleCancelOrder = async (orderId: string) => {
     try {
-      await advancedOrderService.cancelOrder(orderId);
+      await advancedOrderService.cancelAdvancedOrder(parseInt(orderId));
       // Refresh orders after cancellation
       setOrders(orders.map(order =>
         order.id === orderId ? { ...order, status: 'CANCELLED' as const } : order
