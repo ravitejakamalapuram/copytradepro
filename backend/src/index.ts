@@ -9,6 +9,7 @@ import path from 'path';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
+import portfolioRoutes from './routes/portfolio';
 import { errorHandler } from './middleware/errorHandler';
 import { validateEnv } from './utils/validateEnv';
 import websocketService from './services/websocketService';
@@ -92,6 +93,7 @@ app.get('/health', (_req, res) => {
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
+app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/notifications', require('./routes/notifications').default);
 
 // Demo endpoint to test real-time order status updates
