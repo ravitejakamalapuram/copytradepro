@@ -7,19 +7,20 @@ export interface UseNotificationsReturn {
   isSupported: boolean;
   isSubscribed: boolean;
   permission: NotificationPermission;
-  
+
   // Actions
   subscribe: () => Promise<boolean>;
   unsubscribe: () => Promise<boolean>;
   sendTestNotification: () => Promise<boolean>;
-  
+  refreshStatus: () => Promise<void>;
+
   // In-app notifications
   showNotification: (notification: Omit<NotificationItem, 'id' | 'timestamp'>) => void;
-  
+
   // Loading states
   isLoading: boolean;
   isSubscribing: boolean;
-  
+
   // Error handling
   error: string | null;
   clearError: () => void;
@@ -66,6 +67,17 @@ export const useNotifications = (): UseNotificationsReturn => {
     initializeNotifications();
   }, []);
 
+  // Show in-app notification
+  const showNotification = useCallback((notification: Omit<NotificationItem, 'id' | 'timestamp'>) => {
+    // Use the global addNotification function if available
+    if ((window as any).addNotification) {
+      (window as any).addNotification(notification);
+    } else {
+      console.warn('NotificationDisplay component not found. Make sure it is rendered in your app.');
+      console.log('Notification:', notification);
+    }
+  }, []);
+
   // Subscribe to push notifications
   const subscribe = useCallback(async (): Promise<boolean> => {
     try {
@@ -105,17 +117,18 @@ export const useNotifications = (): UseNotificationsReturn => {
       setError(null);
 
       const success = await notificationService.unsubscribe();
-      
+
       if (success) {
         setIsSubscribed(false);
-        
+        setPermission(notificationService.getPermission());
+
         // Show success notification
         showNotification({
           title: 'Notifications Disabled',
           message: 'You will no longer receive push notifications.',
           type: 'info'
         });
-        
+
         return true;
       } else {
         throw new Error('Failed to unsubscribe from notifications');
@@ -127,7 +140,7 @@ export const useNotifications = (): UseNotificationsReturn => {
     } finally {
       setIsSubscribing(false);
     }
-  }, []);
+  }, [showNotification]);
 
   // Send test notification
   const sendTestNotification = useCallback(async (): Promise<boolean> => {
@@ -155,21 +168,25 @@ export const useNotifications = (): UseNotificationsReturn => {
     }
   }, []);
 
-  // Show in-app notification
-  const showNotification = useCallback((notification: Omit<NotificationItem, 'id' | 'timestamp'>) => {
-    // Use the global addNotification function if available
-    if ((window as any).addNotification) {
-      (window as any).addNotification(notification);
-    } else {
-      console.warn('NotificationDisplay component not found. Make sure it is rendered in your app.');
-      console.log('Notification:', notification);
-    }
-  }, []);
-
   // Clear error
   const clearError = useCallback(() => {
     setError(null);
   }, []);
+
+  // Refresh subscription status
+  const refreshStatus = useCallback(async () => {
+    try {
+      if (isSupported) {
+        const subscribed = await notificationService.isSubscribed();
+        const currentPermission = notificationService.getPermission();
+
+        setIsSubscribed(subscribed);
+        setPermission(currentPermission);
+      }
+    } catch (err: any) {
+      console.error('Failed to refresh subscription status:', err);
+    }
+  }, [isSupported]);
 
   // Listen for order updates and show notifications
   useEffect(() => {
@@ -222,17 +239,18 @@ export const useNotifications = (): UseNotificationsReturn => {
     isSupported,
     isSubscribed,
     permission,
-    
+
     // Actions
     subscribe,
     unsubscribe,
     sendTestNotification,
     showNotification,
-    
+    refreshStatus,
+
     // Loading states
     isLoading,
     isSubscribing,
-    
+
     // Error handling
     error,
     clearError

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNotifications } from '../hooks/useNotifications';
 import { Button, StatusBadge } from './ui';
 
@@ -20,10 +20,37 @@ const NotificationIcon: React.FC<NotificationIconProps> = ({
     subscribe,
     isSubscribing,
     error,
-    showNotification
+    showNotification,
+    refreshStatus
   } = useNotifications();
 
   const [showTooltip, setShowTooltip] = useState(false);
+
+  // Refresh status periodically and when component mounts
+  useEffect(() => {
+    // Initial refresh
+    refreshStatus();
+
+    // Set up periodic refresh every 30 seconds
+    const interval = setInterval(() => {
+      refreshStatus();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [refreshStatus]);
+
+  // Listen for notification status changes from other components
+  useEffect(() => {
+    const handleStatusChange = () => {
+      refreshStatus();
+    };
+
+    window.addEventListener('notificationStatusChanged', handleStatusChange);
+
+    return () => {
+      window.removeEventListener('notificationStatusChanged', handleStatusChange);
+    };
+  }, [refreshStatus]);
 
   const getNotificationIcon = () => {
     if (!isSupported) {
@@ -79,7 +106,10 @@ const NotificationIcon: React.FC<NotificationIconProps> = ({
     if (isSupported && !isSubscribed && permission !== 'denied') {
       try {
         const success = await subscribe();
-        if (!success && error) {
+        if (success) {
+          // Refresh status after successful subscription
+          setTimeout(() => refreshStatus(), 500);
+        } else if (error) {
           showNotification({
             title: 'Notification Error',
             message: error,
