@@ -168,10 +168,10 @@ const NotificationIcon: React.FC<NotificationIconProps> = ({
       {showTooltip && (
         <div style={{
           position: 'absolute',
-          bottom: '100%',
+          top: '100%',
           left: '50%',
           transform: 'translateX(-50%)',
-          marginBottom: '0.5rem',
+          marginTop: '0.5rem',
           padding: '0.5rem 0.75rem',
           backgroundColor: '#1f2937',
           color: 'white',
@@ -184,18 +184,18 @@ const NotificationIcon: React.FC<NotificationIconProps> = ({
           textAlign: 'center'
         }}>
           {getTooltipText()}
-          
+
           {/* Tooltip arrow */}
           <div style={{
             position: 'absolute',
-            top: '100%',
+            bottom: '100%',
             left: '50%',
             transform: 'translateX(-50%)',
             width: 0,
             height: 0,
             borderLeft: '4px solid transparent',
             borderRight: '4px solid transparent',
-            borderTop: '4px solid #1f2937'
+            borderBottom: '4px solid #1f2937'
           }} />
         </div>
       )}
