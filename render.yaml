@@ -10,7 +10,7 @@ services:
       # Install and build backend with all dependencies
       cd backend
       npm install
-      npx tsc
+      npm run build
 
       # Install and build frontend
       cd ../frontend
