@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import KiteNavigation from '../components/KiteNavigation';
+import { advancedOrderService } from '../services/advancedOrderService';
 import '../styles/kite-theme.css';
 
 interface Order {
@@ -14,74 +16,56 @@ interface Order {
   time: string;
   filledQty: number;
   avgPrice?: number;
+  createdAt?: string;
 }
 
 const KiteOrders: React.FC = () => {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Mock orders data
-    const mockOrders: Order[] = [
-      {
-        id: 'ORD001',
-        symbol: 'RELIANCE',
-        type: 'BUY',
-        orderType: 'LIMIT',
-        qty: 10,
-        price: 2850.00,
-        status: 'PENDING',
-        time: '09:15:23',
-        filledQty: 0
-      },
-      {
-        id: 'ORD002',
-        symbol: 'TCS',
-        type: 'SELL',
-        orderType: 'MARKET',
-        qty: 5,
-        status: 'COMPLETE',
-        time: '09:12:45',
-        filledQty: 5,
-        avgPrice: 4156.30
-      },
-      {
-        id: 'ORD003',
-        symbol: 'INFY',
-        type: 'BUY',
-        orderType: 'SL',
-        qty: 15,
-        price: 1800.00,
-        triggerPrice: 1795.00,
-        status: 'PENDING',
-        time: '09:10:12',
-        filledQty: 0
-      },
-      {
-        id: 'ORD004',
-        symbol: 'HDFC',
-        type: 'SELL',
-        orderType: 'LIMIT',
-        qty: 8,
-        price: 1650.00,
-        status: 'CANCELLED',
-        time: '09:08:30',
-        filledQty: 0
-      },
-      {
-        id: 'ORD005',
-        symbol: 'ICICIBANK',
-        type: 'BUY',
-        orderType: 'MARKET',
-        qty: 12,
-        status: 'COMPLETE',
-        time: '09:05:15',
-        filledQty: 12,
-        avgPrice: 1234.50
-      }
-    ];
+    const fetchOrders = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-    setOrders(mockOrders);
+        // Fetch orders from the backend
+        const response = await advancedOrderService.getOrders();
+
+        // Convert backend order format to our interface
+        const ordersData = response.map((order: any) => ({
+          id: order.id,
+          symbol: order.symbol,
+          type: order.side.toUpperCase() as 'BUY' | 'SELL',
+          orderType: order.orderType.toUpperCase() as 'MARKET' | 'LIMIT' | 'SL' | 'SL-M',
+          qty: order.quantity,
+          price: order.price,
+          triggerPrice: order.triggerPrice,
+          status: order.status.toUpperCase() as 'PENDING' | 'COMPLETE' | 'CANCELLED' | 'REJECTED',
+          time: new Date(order.createdAt).toLocaleTimeString('en-IN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }),
+          filledQty: order.filledQuantity || 0,
+          avgPrice: order.averagePrice,
+          createdAt: order.createdAt
+        }));
+
+        setOrders(ordersData);
+
+      } catch (error: any) {
+        console.error('Failed to fetch orders:', error);
+        setError('Failed to load orders');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchOrders();
   }, []);
 
   const filteredOrders = orders.filter(order => {
@@ -111,6 +95,59 @@ const KiteOrders: React.FC = () => {
     return type === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)';
   };
 
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      await advancedOrderService.cancelOrder(orderId);
+      // Refresh orders after cancellation
+      setOrders(orders.map(order =>
+        order.id === orderId ? { ...order, status: 'CANCELLED' as const } : order
+      ));
+    } catch (error) {
+      console.error('Failed to cancel order:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>📋</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading orders...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
+            <button
+              className="kite-btn kite-btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="kite-theme">
       <KiteNavigation />
@@ -120,7 +157,10 @@ const KiteOrders: React.FC = () => {
           <div className="kite-card-header">
             <h2 className="kite-card-title">Orders</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button className="kite-btn kite-btn-primary">
+              <button
+                className="kite-btn kite-btn-primary"
+                onClick={() => navigate('/trade-setup')}
+              >
                 + Place Order
               </button>
               <button className="kite-btn">
@@ -245,12 +285,13 @@ const KiteOrders: React.FC = () => {
                               >
                                 Modify
                               </button>
-                              <button 
+                              <button
                                 className="kite-btn kite-btn-danger"
-                                style={{ 
+                                style={{
                                   padding: '0.25rem 0.5rem',
                                   fontSize: '0.75rem'
                                 }}
+                                onClick={() => handleCancelOrder(order.id)}
                               >
                                 Cancel
                               </button>

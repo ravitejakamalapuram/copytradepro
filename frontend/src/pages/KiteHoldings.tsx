@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import KiteNavigation from '../components/KiteNavigation';
+import { portfolioService } from '../services/portfolioService';
 import '../styles/kite-theme.css';
 
 interface Holding {
@@ -13,104 +14,77 @@ interface Holding {
   pnlPercent: number;
   dayChange: number;
   dayChangePercent: number;
+  exchange?: string;
+  product?: string;
+}
+
+interface HoldingsSummary {
+  totalValue: number;
+  totalInvested: number;
+  totalPnL: number;
+  dayPnL: number;
+  totalPnLPercent: number;
+  dayPnLPercent: number;
 }
 
 const KiteHoldings: React.FC = () => {
   const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [totalInvested, setTotalInvested] = useState(0);
-  const [currentValue, setCurrentValue] = useState(0);
-  const [totalPnL, setTotalPnL] = useState(0);
-  const [dayPnL, setDayPnL] = useState(0);
+  const [portfolioSummary, setPortfolioSummary] = useState<HoldingsSummary>({
+    totalValue: 0,
+    totalInvested: 0,
+    totalPnL: 0,
+    dayPnL: 0,
+    totalPnLPercent: 0,
+    dayPnLPercent: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock data similar to Kite interface
   useEffect(() => {
-    const mockHoldings: Holding[] = [
-      {
-        symbol: 'ADANIENT',
-        qty: 22,
-        avgCost: 399.68,
-        ltp: 444.00,
-        invested: 8793.00,
-        currentValue: 9768.00,
-        pnl: 975.00,
-        pnlPercent: 11.09,
-        dayChange: -11.20,
-        dayChangePercent: -2.46
-      },
-      {
-        symbol: 'ANGELONE',
-        qty: 3,
-        avgCost: 2325.48,
-        ltp: 2920.00,
-        invested: 6976.45,
-        currentValue: 8760.00,
-        pnl: 1783.55,
-        pnlPercent: 25.57,
-        dayChange: -35.30,
-        dayChangePercent: -1.19
-      },
-      {
-        symbol: 'AONETOTAL',
-        qty: 204,
-        avgCost: 11.69,
-        ltp: 11.91,
-        invested: 2384.76,
-        currentValue: 2429.64,
-        pnl: 44.88,
-        pnlPercent: 1.88,
-        dayChange: 0.18,
-        dayChangePercent: 1.54
-      },
-      {
-        symbol: 'APLAPOLLO',
-        qty: 5,
-        avgCost: 1455.83,
-        ltp: 1747.80,
-        invested: 7279.15,
-        currentValue: 8739.00,
-        pnl: 1459.85,
-        pnlPercent: 20.05,
-        dayChange: -30.20,
-        dayChangePercent: -1.67
-      },
-      {
-        symbol: 'BEL',
-        qty: 50,
-        avgCost: 297.27,
-        ltp: 414.95,
-        invested: 14863.53,
-        currentValue: 20747.50,
-        pnl: 5883.97,
-        pnlPercent: 39.59,
-        dayChange: -39.85,
-        dayChangePercent: -8.75
-      },
-      {
-        symbol: 'BHEL',
-        qty: 35,
-        avgCost: 205.08,
-        ltp: 253.45,
-        invested: 7792.99,
-        currentValue: 8870.75,
-        pnl: 1077.76,
-        pnlPercent: 13.83,
-        dayChange: -28.40,
-        dayChangePercent: -10.08
+    const fetchHoldingsData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch portfolio summary
+        const summaryResponse = await portfolioService.getSummary();
+        setPortfolioSummary({
+          totalValue: summaryResponse.summary.portfolioValue,
+          totalInvested: summaryResponse.metrics.totalInvested,
+          totalPnL: summaryResponse.summary.totalPnL,
+          dayPnL: summaryResponse.summary.dayPnL,
+          totalPnLPercent: summaryResponse.metrics.totalPnLPercentage,
+          dayPnLPercent: (summaryResponse.summary.dayPnL / summaryResponse.summary.portfolioValue) * 100
+        });
+
+        // Fetch positions (treating them as holdings for now)
+        const positionsResponse = await portfolioService.getPositions();
+        // Convert PortfolioPosition to holdings format
+        const holdingsData = positionsResponse.positions.map((position: any) => ({
+            symbol: position.symbol,
+            qty: position.totalQuantity,
+            avgCost: position.averagePrice,
+            ltp: position.currentValue / position.totalQuantity, // Calculate LTP
+            invested: position.investedValue,
+            currentValue: position.currentValue,
+            pnl: position.pnl,
+            pnlPercent: position.pnlPercentage,
+            dayChange: 0, // Not available in current API
+            dayChangePercent: 0, // Not available in current API
+            exchange: 'NSE', // Default exchange
+            product: 'CNC' // Default product
+          }));
+          setHoldings(holdingsData);
+
+      } catch (error: any) {
+        console.error('Failed to fetch holdings data:', error);
+        setError('Failed to load holdings data');
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    setHoldings(mockHoldings);
-
-    // Calculate totals
-    const invested = mockHoldings.reduce((sum, holding) => sum + holding.invested, 0);
-    const current = mockHoldings.reduce((sum, holding) => sum + holding.currentValue, 0);
-    const pnl = current - invested;
-    const dayPnL = mockHoldings.reduce((sum, holding) => sum + (holding.dayChange * holding.qty), 0);
-
-    setTotalInvested(invested);
-    setCurrentValue(current);
-    setTotalPnL(pnl);
-    setDayPnL(dayPnL);
+    fetchHoldingsData();
   }, []);
 
   const formatCurrency = (amount: number): string => {
@@ -126,6 +100,47 @@ const KiteHoldings: React.FC = () => {
       maximumFractionDigits: 2
     }).format(num);
   };
+
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>📊</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading holdings...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
+            <button
+              className="kite-btn kite-btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="kite-theme">
@@ -170,7 +185,7 @@ const KiteHoldings: React.FC = () => {
                 fontFamily: 'var(--kite-font-mono)',
                 color: 'var(--kite-text-primary)'
               }}>
-                ₹{formatCurrency(totalInvested)}
+                ₹{formatCurrency(portfolioSummary.totalInvested)}
               </div>
             </div>
             <div>
@@ -187,24 +202,24 @@ const KiteHoldings: React.FC = () => {
                 fontFamily: 'var(--kite-font-mono)',
                 color: 'var(--kite-text-primary)'
               }}>
-                ₹{formatCurrency(currentValue)}
+                ₹{formatCurrency(portfolioSummary.totalValue)}
               </div>
             </div>
             <div>
-              <div style={{ 
-                fontSize: '0.75rem', 
+              <div style={{
+                fontSize: '0.75rem',
                 color: 'var(--kite-text-secondary)',
                 marginBottom: '0.25rem'
               }}>
                 Day's P&L
               </div>
-              <div style={{ 
-                fontSize: '1.25rem', 
+              <div style={{
+                fontSize: '1.25rem',
                 fontWeight: '600',
                 fontFamily: 'var(--kite-font-mono)',
-                color: dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(dayPnL))}
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
               </div>
             </div>
             <div>
@@ -215,13 +230,13 @@ const KiteHoldings: React.FC = () => {
               }}>
                 Total P&L
               </div>
-              <div style={{ 
-                fontSize: '1.25rem', 
+              <div style={{
+                fontSize: '1.25rem',
                 fontWeight: '600',
                 fontFamily: 'var(--kite-font-mono)',
-                color: totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(totalPnL))} ({((totalPnL / totalInvested) * 100).toFixed(2)}%)
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
               </div>
             </div>
           </div>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import KiteNavigation from '../components/KiteNavigation';
+import { portfolioService } from '../services/portfolioService';
 import '../styles/kite-theme.css';
 
 interface Position {
@@ -15,84 +17,72 @@ interface Position {
   exchange: 'NSE' | 'BSE';
 }
 
+interface PositionsSummary {
+  totalValue: number;
+  totalInvested: number;
+  totalPnL: number;
+  dayPnL: number;
+  totalPnLPercent: number;
+  dayPnLPercent: number;
+}
+
 const KitePositions: React.FC = () => {
+  const navigate = useNavigate();
   const [positions, setPositions] = useState<Position[]>([]);
-  const [totalPnL, setTotalPnL] = useState(0);
-  const [totalInvested, setTotalInvested] = useState(0);
+  const [positionsSummary, setPositionsSummary] = useState<PositionsSummary>({
+    totalValue: 0,
+    totalInvested: 0,
+    totalPnL: 0,
+    dayPnL: 0,
+    totalPnLPercent: 0,
+    dayPnLPercent: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Mock positions data
-    const mockPositions: Position[] = [
-      {
-        symbol: 'RELIANCE',
-        qty: 10,
-        avgPrice: 2847.65,
-        ltp: 2860.00,
-        pnl: 123.50,
-        pnlPercent: 0.43,
-        dayChange: 12.35,
-        dayChangePercent: 0.43,
-        product: 'CNC',
-        exchange: 'NSE'
-      },
-      {
-        symbol: 'TCS',
-        qty: -5,
-        avgPrice: 4156.30,
-        ltp: 4140.00,
-        pnl: 81.50,
-        pnlPercent: 0.39,
-        dayChange: -16.30,
-        dayChangePercent: -0.39,
-        product: 'MIS',
-        exchange: 'NSE'
-      },
-      {
-        symbol: 'INFY',
-        qty: 15,
-        avgPrice: 1789.25,
-        ltp: 1795.00,
-        pnl: 86.25,
-        pnlPercent: 0.32,
-        dayChange: 5.75,
-        dayChangePercent: 0.32,
-        product: 'CNC',
-        exchange: 'NSE'
-      },
-      {
-        symbol: 'HDFC',
-        qty: -8,
-        avgPrice: 1654.80,
-        ltp: 1642.50,
-        pnl: 98.40,
-        pnlPercent: 0.74,
-        dayChange: -12.30,
-        dayChangePercent: -0.74,
-        product: 'MIS',
-        exchange: 'NSE'
-      },
-      {
-        symbol: 'ICICIBANK',
-        qty: 12,
-        avgPrice: 1234.50,
-        ltp: 1245.75,
-        pnl: 135.00,
-        pnlPercent: 0.91,
-        dayChange: 11.25,
-        dayChangePercent: 0.91,
-        product: 'CNC',
-        exchange: 'NSE'
+    const fetchPositionsData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch portfolio summary
+        const summaryResponse = await portfolioService.getSummary();
+        setPositionsSummary({
+          totalValue: summaryResponse.summary.portfolioValue,
+          totalInvested: summaryResponse.metrics.totalInvested,
+          totalPnL: summaryResponse.summary.totalPnL,
+          dayPnL: summaryResponse.summary.dayPnL,
+          totalPnLPercent: summaryResponse.metrics.totalPnLPercentage,
+          dayPnLPercent: (summaryResponse.summary.dayPnL / summaryResponse.summary.portfolioValue) * 100
+        });
+
+        // Fetch positions
+        const positionsResponse = await portfolioService.getPositions();
+        // Convert PortfolioPosition to Position format
+        const positionsData = positionsResponse.positions.map((position: any) => ({
+          symbol: position.symbol,
+          qty: position.totalQuantity,
+          avgPrice: position.averagePrice,
+          ltp: position.currentValue / position.totalQuantity, // Calculate LTP
+          pnl: position.pnl,
+          pnlPercent: position.pnlPercentage,
+          dayChange: 0, // Not available in current API
+          dayChangePercent: 0, // Not available in current API
+          product: 'CNC' as const, // Default product
+          exchange: 'NSE' as const // Default exchange
+        }));
+        setPositions(positionsData);
+
+      } catch (error: any) {
+        console.error('Failed to fetch positions data:', error);
+        setError('Failed to load positions data');
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    setPositions(mockPositions);
-
-    // Calculate totals
-    const totalPnL = mockPositions.reduce((sum, pos) => sum + pos.pnl, 0);
-    const totalInvested = mockPositions.reduce((sum, pos) => sum + (Math.abs(pos.qty) * pos.avgPrice), 0);
-    
-    setTotalPnL(totalPnL);
-    setTotalInvested(totalInvested);
+    fetchPositionsData();
   }, []);
 
   const formatCurrency = (amount: number): string => {
@@ -110,6 +100,47 @@ const KitePositions: React.FC = () => {
       default: return 'var(--kite-text-secondary)';
     }
   };
+
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>🎯</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading positions...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="kite-theme">
+        <KiteNavigation />
+        <div className="kite-main">
+          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
+            <button
+              className="kite-btn kite-btn-primary"
+              onClick={() => window.location.reload()}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="kite-theme">
@@ -147,20 +178,20 @@ const KitePositions: React.FC = () => {
               <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginBottom: '0.25rem' }}>
                 Total P&L
               </div>
-              <div style={{ 
-                fontSize: '1.25rem', 
-                fontWeight: '600', 
-                fontFamily: 'var(--kite-font-mono)', 
-                color: totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+              <div style={{
+                fontSize: '1.25rem',
+                fontWeight: '600',
+                fontFamily: 'var(--kite-font-mono)',
+                color: positionsSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(totalPnL))}
+                {positionsSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(positionsSummary.totalPnL))}
               </div>
-              <div style={{ 
-                fontSize: '0.875rem', 
-                color: totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
+              <div style={{
+                fontSize: '0.875rem',
+                color: positionsSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
                 marginTop: '0.25rem'
               }}>
-                {totalPnL >= 0 ? '+' : ''}{((totalPnL / totalInvested) * 100).toFixed(2)}%
+                {positionsSummary.totalPnLPercent >= 0 ? '+' : ''}{positionsSummary.totalPnLPercent.toFixed(2)}%
               </div>
             </div>
             <div>
@@ -168,7 +199,7 @@ const KitePositions: React.FC = () => {
                 Total Value
               </div>
               <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-                ₹{formatCurrency(totalInvested + totalPnL)}
+                ₹{formatCurrency(positionsSummary.totalValue)}
               </div>
             </div>
             <div>
@@ -289,9 +320,10 @@ const KitePositions: React.FC = () => {
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
               <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No positions today</div>
               <div style={{ fontSize: '0.875rem' }}>Start trading to see your positions here</div>
-              <button 
+              <button
                 className="kite-btn kite-btn-primary"
                 style={{ marginTop: '1rem' }}
+                onClick={() => navigate('/trade-setup')}
               >
                 Place Order
               </button>
