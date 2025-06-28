@@ -10,6 +10,7 @@ const router = express.Router();
 router.get('/positions', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -17,11 +18,14 @@ router.get('/positions', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const positions = await portfolioAnalyticsService.getPortfolioPositions(userId);
+    const positions = portfolioAnalyticsService.calculatePortfolioPositions(userId);
 
     return res.json({
       success: true,
-      data: positions
+      data: {
+        positions,
+        count: positions.length
+      }
     });
   } catch (error: any) {
     console.error('Failed to get portfolio positions:', error);
@@ -39,6 +43,7 @@ router.get('/positions', authenticateToken, async (req: any, res: any) => {
 router.get('/metrics', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -46,7 +51,7 @@ router.get('/metrics', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const metrics = await portfolioAnalyticsService.getPortfolioMetrics(userId);
+    const metrics = portfolioAnalyticsService.calculatePortfolioMetrics(userId);
 
     return res.json({
       success: true,
@@ -68,6 +73,7 @@ router.get('/metrics', authenticateToken, async (req: any, res: any) => {
 router.get('/trading-stats', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -75,7 +81,7 @@ router.get('/trading-stats', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const stats = await portfolioAnalyticsService.getTradingStatistics(userId);
+    const stats = portfolioAnalyticsService.calculateTradingStats(userId);
 
     return res.json({
       success: true,
@@ -92,11 +98,13 @@ router.get('/trading-stats', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get performance data
+ * Get performance data for charts
  */
 router.get('/performance', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+    const days = parseInt(req.query.days as string) || 30;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -104,12 +112,21 @@ router.get('/performance', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const days = parseInt(req.query.days as string) || 30;
-    const performance = await portfolioAnalyticsService.getPerformanceData(userId, days);
+    if (days < 1 || days > 365) {
+      return res.status(400).json({
+        success: false,
+        error: 'Days parameter must be between 1 and 365'
+      });
+    }
+
+    const performanceData = portfolioAnalyticsService.getPerformanceData(userId, days);
 
     return res.json({
       success: true,
-      data: performance
+      data: {
+        performance: performanceData,
+        period: `${days} days`
+      }
     });
   } catch (error: any) {
     console.error('Failed to get performance data:', error);
@@ -122,11 +139,12 @@ router.get('/performance', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get symbol performance
+ * Get symbol-wise performance
  */
 router.get('/symbols', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -134,11 +152,14 @@ router.get('/symbols', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const symbolPerformance = await portfolioAnalyticsService.getSymbolPerformance(userId);
+    const symbolPerformance = portfolioAnalyticsService.getSymbolPerformance(userId);
 
     return res.json({
       success: true,
-      data: symbolPerformance
+      data: {
+        symbols: symbolPerformance,
+        count: symbolPerformance.length
+      }
     });
   } catch (error: any) {
     console.error('Failed to get symbol performance:', error);
@@ -151,11 +172,12 @@ router.get('/symbols', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get portfolio summary for dashboard
+ * Get portfolio summary (combined overview)
  */
 router.get('/summary', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -163,11 +185,30 @@ router.get('/summary', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const summary = await portfolioAnalyticsService.getPortfolioSummary(userId);
+    // Get all portfolio data in one call for dashboard
+    const [metrics, positions, tradingStats, performanceData] = await Promise.all([
+      portfolioAnalyticsService.calculatePortfolioMetrics(userId),
+      portfolioAnalyticsService.calculatePortfolioPositions(userId),
+      portfolioAnalyticsService.calculateTradingStats(userId),
+      portfolioAnalyticsService.getPerformanceData(userId, 7) // Last 7 days for quick overview
+    ]);
 
     return res.json({
       success: true,
-      data: summary
+      data: {
+        metrics,
+        positions: positions.slice(0, 5), // Top 5 positions
+        tradingStats,
+        recentPerformance: performanceData,
+        summary: {
+          totalPositions: positions.length,
+          portfolioValue: metrics.currentValue,
+          totalPnL: metrics.totalPnL,
+          dayPnL: metrics.dayPnL,
+          successRate: metrics.successRate,
+          winRate: tradingStats.winRate
+        }
+      }
     });
   } catch (error: any) {
     console.error('Failed to get portfolio summary:', error);
@@ -180,11 +221,13 @@ router.get('/summary', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get detailed analytics
+ * Get portfolio analytics for a specific date range
  */
 router.get('/analytics', authenticateToken, async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
+    const { startDate, endDate } = req.query;
+
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -192,17 +235,41 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const analytics = await portfolioAnalyticsService.getDetailedAnalytics(userId);
+    // For now, return basic analytics
+    // In a full implementation, you'd filter by date range
+    const metrics = portfolioAnalyticsService.calculatePortfolioMetrics(userId);
+    const tradingStats = portfolioAnalyticsService.calculateTradingStats(userId);
+    const symbolPerformance = portfolioAnalyticsService.getSymbolPerformance(userId);
 
     return res.json({
       success: true,
-      data: analytics
+      data: {
+        period: {
+          startDate: startDate || 'All time',
+          endDate: endDate || new Date().toISOString().split('T')[0]
+        },
+        metrics,
+        tradingStats,
+        topPerformers: symbolPerformance.slice(0, 10),
+        analytics: {
+          riskMetrics: {
+            maxDrawdown: tradingStats.maxDrawdown,
+            sharpeRatio: tradingStats.sharpeRatio,
+            volatility: tradingStats.sharpeRatio > 0 ? 1 / tradingStats.sharpeRatio : 0
+          },
+          diversification: {
+            totalSymbols: symbolPerformance.length,
+            concentrationRisk: symbolPerformance.length > 0 ?
+              (symbolPerformance[0]?.volume || 0) / symbolPerformance.reduce((sum, s) => sum + s.volume, 0) * 100 : 0
+          }
+        }
+      }
     });
   } catch (error: any) {
-    console.error('Failed to get detailed analytics:', error);
+    console.error('Failed to get portfolio analytics:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to get detailed analytics',
+      error: 'Failed to get portfolio analytics',
       details: error.message
     });
   }

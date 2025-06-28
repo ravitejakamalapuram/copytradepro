@@ -7,6 +7,7 @@ import AccountSetup from './pages/AccountSetup';
 import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
 import ComponentDemo from './pages/ComponentDemo';
+import PortfolioAnalytics from './pages/PortfolioAnalytics';
 import NotificationDisplay from './components/NotificationDisplay';
 import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
 import './styles/enterprise-base.css';
@@ -53,6 +54,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <TradeSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/portfolio"
+          element={
+            <ProtectedRoute>
+              <PortfolioAnalytics />
             </ProtectedRoute>
           }
         />
