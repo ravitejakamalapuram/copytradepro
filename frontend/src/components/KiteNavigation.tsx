@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import '../styles/kite-theme.css';
 
 const KiteNavigation: React.FC = () => {
@@ -8,6 +9,29 @@ const KiteNavigation: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // Fetch live market indices
+  useEffect(() => {
+    const fetchMarketData = async () => {
+      try {
+        const indices = await marketDataService.getMarketIndices();
+        setMarketIndices(indices);
+        setLastUpdated(new Date());
+      } catch (error) {
+        console.error('Failed to fetch market indices:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchMarketData();
+
+    // Update every 30 seconds
+    const interval = setInterval(fetchMarketData, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -26,7 +50,13 @@ const KiteNavigation: React.FC = () => {
     { path: '/funds', label: 'Funds', icon: '💰' },
   ];
 
-  const watchlistItems = [
+  // Use live market indices for watchlist, fallback to mock data
+  const watchlistItems = marketIndices.length > 0 ? marketIndices.map(index => ({
+    symbol: index.name,
+    ltp: index.value,
+    change: index.change,
+    changePercent: index.changePercent
+  })) : [
     { symbol: 'NIFTY 50', ltp: 25637.80, change: -1.26, changePercent: -0.05 },
     { symbol: 'SENSEX', ltp: 84058.90, change: 181.87, changePercent: 0.22 },
     { symbol: 'RELIANCE', ltp: 2847.65, change: 12.45, changePercent: 0.44 },
@@ -179,6 +209,32 @@ const KiteNavigation: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Live Data Indicator */}
+          {lastUpdated && (
+            <div style={{
+              fontSize: '0.7rem',
+              color: 'var(--kite-text-secondary)',
+              textAlign: 'center',
+              marginTop: '0.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.25rem'
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                backgroundColor: 'var(--kite-profit)',
+                borderRadius: '50%',
+                animation: 'pulse 2s infinite'
+              }}></span>
+              Live • {lastUpdated.toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
+          )}
         </div>
 
         {/* Portfolio Summary */}

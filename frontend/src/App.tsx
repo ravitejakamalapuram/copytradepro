@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import LandingPage from './pages/LandingPage';
+import CopyTradeLogin from './pages/CopyTradeLogin';
 import AccountSetup from './pages/AccountSetup';
 import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
@@ -46,9 +47,10 @@ const AppContent: React.FC = () => {
         <Route
           path="/"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <CopyTradeLogin />
           }
         />
+        <Route path="/landing" element={<LandingPage />} />
 
         {/* Kite-themed routes */}
         <Route
