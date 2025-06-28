@@ -6,28 +6,24 @@ services:
     plan: starter
     buildCommand: |
       echo "🚀 Building CopyTrade Pro..."
-      node --version
-      npm --version
 
-      # Build backend first
+      # Install and build backend
       cd backend
-      npm install
-      npm run build
+      npm install --only=production
+      npm install typescript @types/node --save-dev
+      npx tsc
 
-      # Build frontend
+      # Install and build frontend
       cd ../frontend
       npm install
       npm run build
 
-      # Copy frontend build to backend public directory
+      # Copy frontend to backend public
       cd ../backend
       mkdir -p public
       cp -r ../frontend/dist/* public/
 
-      # Clean up dev dependencies for production
-      npm install --production
-
-      echo "✅ Build completed successfully!"
+      echo "✅ Build completed!"
     startCommand: cd backend && node dist/index.js
     healthCheckPath: /health
     envVars:

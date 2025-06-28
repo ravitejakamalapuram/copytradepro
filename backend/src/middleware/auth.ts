@@ -7,6 +7,8 @@ export interface AuthenticatedRequest extends Request {
     email: string;
     name: string;
   };
+  body: any;
+  params: any;
 }
 
 export const authenticateToken = (
