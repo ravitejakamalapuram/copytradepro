@@ -15,8 +15,7 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "clean": "rm -rf backend/dist frontend/dist backend/public",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "npm run install:all"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
     "trading",
