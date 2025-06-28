@@ -7,10 +7,9 @@ services:
     buildCommand: |
       echo "🚀 Building CopyTrade Pro..."
 
-      # Install and build backend
+      # Install and build backend with all dependencies
       cd backend
-      npm install --only=production
-      npm install typescript @types/node --save-dev
+      npm install
       npx tsc
 
       # Install and build frontend
