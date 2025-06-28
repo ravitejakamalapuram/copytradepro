@@ -1,5 +1,33 @@
 services:
   # Full-Stack Application (Backend serving Frontend)
+  #
+  # ✅ WORKING MANUAL DEPLOYMENT CONFIGURATION FOR RENDER.COM:
+  #
+  # Build Command (TESTED & WORKING):
+  # echo "Installing root dependencies..." && npm install --include=dev && echo "Building backend..." && cd backend && npm run build && echo "Building frontend..." && cd ../frontend && npm run build && echo "Copying frontend to backend..." && cd ../backend && mkdir -p public && cp -r ../frontend/dist/* public/ && echo "Build complete!"
+  #
+  # Start Command:
+  # cd backend && npm start
+  #
+  # Environment Variables (copy to Render.com dashboard):
+  # NODE_ENV=production
+  # PORT=10000
+  # JWT_SECRET=a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6
+  # ENCRYPTION_KEY=9f8e7d6c5b4a39281746352819047362518394756281947362851
+  # FRONTEND_URL=https://copytradepro.onrender.com
+  # ALLOWED_ORIGINS=https://copytradepro.onrender.com
+  # DATABASE_PATH=/opt/render/project/src/backend/data/trading.db
+  # LOG_LEVEL=info
+  # ENABLE_REQUEST_LOGGING=true
+  # RATE_LIMIT_WINDOW_MS=900000
+  # RATE_LIMIT_MAX_REQUESTS=100
+  # VITE_API_URL=https://copytradepro.onrender.com/api
+  # VITE_APP_NAME=CopyTrade Pro
+  # VITE_APP_VERSION=1.0.0
+  # VITE_NODE_ENV=production
+  # VITE_ENABLE_DEBUG=false
+  # VITE_ENABLE_ANALYTICS=true
+  #
   - type: web
     name: copytrade-pro
     runtime: node
@@ -7,15 +35,15 @@ services:
     buildCommand: |
       echo "🚀 Building CopyTrade Pro..."
 
-      # Install and build backend
-      cd backend
-      npm install --only=production
-      npm install typescript @types/node --save-dev
-      npx tsc
-
-      # Install and build frontend
-      cd ../frontend
+      # Install root dependencies to set up workspace
       npm install
+
+      # Build backend
+      cd backend
+      npm run build
+
+      # Build frontend
+      cd ../frontend
       npm run build
 
       # Copy frontend to backend public

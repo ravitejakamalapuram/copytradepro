@@ -9,6 +9,7 @@ export interface AuthenticatedRequest extends Request {
   };
   body: any;
   params: any;
+  query: any;
 }
 
 export const authenticateToken = (
