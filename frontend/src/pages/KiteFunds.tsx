@@ -12,8 +12,8 @@ interface FundTransaction {
 }
 
 const KiteFunds: React.FC = () => {
-  const [availableFunds, setAvailableFunds] = useState(125000);
-  const [usedMargin, setUsedMargin] = useState(75000);
+  const [availableFunds] = useState(125000);
+  const [usedMargin] = useState(75000);
   const [transactions, setTransactions] = useState<FundTransaction[]>([]);
   const [addFundsAmount, setAddFundsAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');

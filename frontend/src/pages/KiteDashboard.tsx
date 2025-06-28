@@ -21,9 +21,9 @@ interface Position {
 const KiteDashboard: React.FC = () => {
   const [marketData, setMarketData] = useState<MarketData[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [portfolioValue, setPortfolioValue] = useState(548025);
-  const [dayPnL, setDayPnL] = useState(2064);
-  const [totalPnL, setTotalPnL] = useState(48025);
+  const [portfolioValue] = useState(548025);
+  const [dayPnL] = useState(2064);
+  const [totalPnL] = useState(48025);
 
   useEffect(() => {
     // Mock market data

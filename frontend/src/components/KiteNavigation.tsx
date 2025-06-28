@@ -274,7 +274,7 @@ const KiteNavigation: React.FC = () => {
         ☰
       </button>
 
-      <style jsx>{`
+      <style>{`
         @media (max-width: 1024px) {
           .mobile-sidebar-toggle {
             display: block !important;
