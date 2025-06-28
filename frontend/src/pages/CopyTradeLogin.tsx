@@ -142,14 +142,6 @@ const CopyTradeLogin: React.FC = () => {
     return email.substring(0, 2).toUpperCase();
   };
 
-  // Generate user ID from email
-  const getUserId = (email: string): string => {
-    if (!email) return 'CT9734';
-    const emailPart = email.split('@')[0];
-    const numbers = Math.abs(emailPart.split('').reduce((a, b) => a + b.charCodeAt(0), 0));
-    return `CT${numbers.toString().substring(0, 4)}`;
-  };
-
   return (
     <div className="kite-theme" style={{
       minHeight: '100vh',
@@ -166,37 +158,27 @@ const CopyTradeLogin: React.FC = () => {
       }}>
         {/* User Avatar */}
         <div style={{
-          width: '120px',
-          height: '120px',
+          width: '80px',
+          height: '80px',
           borderRadius: '50%',
           backgroundColor: 'var(--kite-brand-primary)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           margin: '0 auto 2rem',
-          fontSize: '2.5rem',
-          fontWeight: '600',
-          color: 'white',
-          border: '4px solid var(--kite-border-primary)'
-        }}>
-          {getUserInitials(email)}
-        </div>
-
-        {/* User ID */}
-        <div style={{
           fontSize: '1.5rem',
           fontWeight: '600',
-          color: 'var(--kite-text-primary)',
-          marginBottom: '0.5rem'
+          color: 'white'
         }}>
-          {getUserId(email)}
+          {getUserInitials(email)}
         </div>
 
         {/* Mode Toggle */}
         <div style={{
           display: 'flex',
           gap: '1rem',
-          marginBottom: '1rem'
+          marginBottom: '2rem',
+          justifyContent: 'center'
         }}>
           <button
             onClick={() => {
@@ -211,14 +193,7 @@ const CopyTradeLogin: React.FC = () => {
               color: !isRegisterMode ? 'var(--kite-brand-primary)' : 'var(--kite-text-secondary)',
               fontSize: '0.875rem',
               cursor: 'pointer',
-              textDecoration: 'none',
               fontWeight: !isRegisterMode ? '600' : '400'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
             }}
           >
             Login
@@ -235,47 +210,12 @@ const CopyTradeLogin: React.FC = () => {
               color: isRegisterMode ? 'var(--kite-brand-primary)' : 'var(--kite-text-secondary)',
               fontSize: '0.875rem',
               cursor: 'pointer',
-              textDecoration: 'none',
               fontWeight: isRegisterMode ? '600' : '400'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
             }}
           >
             Register
           </button>
         </div>
-
-        {/* Change User Link */}
-        {!isRegisterMode && (
-          <button
-            onClick={() => {
-              setEmail('');
-              setPassword('');
-              setError('');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--kite-brand-primary)',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              marginBottom: '2rem',
-              textDecoration: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
-            }}
-          >
-            Change user
-          </button>
-        )}
 
         {/* Login/Register Form */}
         <div style={{ marginBottom: '2rem' }}>
@@ -487,36 +427,22 @@ const CopyTradeLogin: React.FC = () => {
           </button>
 
           {/* Forgot Password */}
-          <button
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--kite-text-secondary)',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-              textDecoration: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
-            }}
-          >
-            Forgot user ID or password?
-          </button>
+          {!isRegisterMode && (
+            <button
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--kite-text-secondary)',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
         </div>
 
-        {/* Platform Icons */}
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '1rem',
-          marginBottom: '2rem'
-        }}>
-          <div style={{ fontSize: '1.5rem' }}>▶️</div>
-          <div style={{ fontSize: '1.5rem' }}>🍎</div>
-        </div>
+
 
         {/* CopyTrade Pro Branding */}
         <div style={{
@@ -536,50 +462,16 @@ const CopyTradeLogin: React.FC = () => {
           </span>
         </div>
 
-        {/* Toggle Link */}
-        <div style={{
-          fontSize: '0.875rem',
-          color: 'var(--kite-text-secondary)',
-          marginBottom: '2rem'
-        }}>
-          {isRegisterMode ? 'Already have an account?' : "Don't have an account?"}{' '}
-          <button
-            onClick={() => {
-              setIsRegisterMode(!isRegisterMode);
-              setError('');
-              setConfirmPassword('');
-              setName('');
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--kite-brand-primary)',
-              cursor: 'pointer',
-              textDecoration: 'none'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.textDecoration = 'underline';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.textDecoration = 'none';
-            }}
-          >
-            {isRegisterMode ? 'Login here!' : 'Signup now!'}
-          </button>
-        </div>
+
 
         {/* Footer */}
         <div style={{
           fontSize: '0.75rem',
           color: 'var(--kite-text-secondary)',
-          lineHeight: '1.4'
+          textAlign: 'center',
+          marginTop: '2rem'
         }}>
-          CopyTrade Pro: Professional Multi-Broker Trading Platform | Secure API Integration
-          <br />
-          Advanced Portfolio Management | Real-time Market Data | Copy Trading Solutions
-          <br />
-          <br />
-          v1.0.0
+          CopyTrade Pro v1.0.0
         </div>
       </div>
     </div>
