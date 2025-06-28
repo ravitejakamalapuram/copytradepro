@@ -4,6 +4,7 @@
  */
 
 import React, { useState } from 'react';
+import Navigation from '../components/Navigation';
 import {
   Container,
   PageHeader,
@@ -39,7 +40,10 @@ const ComponentDemo: React.FC = () => {
 
   return (
     <div className="enterprise-app">
-      <Container>
+      <Navigation />
+
+      <main className="enterprise-main">
+        <Container>
         <PageHeader
           title="Enterprise Component Library"
           subtitle="Professional React components following enterprise design standards"
@@ -261,7 +265,8 @@ const ComponentDemo: React.FC = () => {
 
           <Spacer size={8} />
         </Stack>
-      </Container>
+        </Container>
+      </main>
     </div>
   );
 };
