@@ -365,6 +365,38 @@ class NotificationService {
   getPermission(): NotificationPermission {
     return Notification.permission;
   }
+
+  /**
+   * Check if user is subscribed to push notifications
+   */
+  async isSubscribed(): Promise<boolean> {
+    try {
+      if (!this.registration) {
+        return false;
+      }
+
+      const subscription = await this.registration.pushManager.getSubscription();
+      return subscription !== null;
+    } catch (error) {
+      console.error('Failed to check subscription status:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get current subscription status
+   */
+  getSubscriptionStatus(): {
+    isSupported: boolean;
+    permission: NotificationPermission;
+    isSubscribed: boolean;
+  } {
+    return {
+      isSupported: this.isSupported,
+      permission: this.isSupported ? Notification.permission : 'denied',
+      isSubscribed: this.subscription !== null
+    };
+  }
 }
 
 export const notificationService = new NotificationService();
