@@ -8,6 +8,7 @@ import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
 import ComponentDemo from './pages/ComponentDemo';
 import NotificationDisplay from './components/NotificationDisplay';
+import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -52,6 +53,14 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <TradeSetup />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/advanced-orders"
+          element={
+            <ProtectedRoute>
+              <AdvancedOrderManagement />
             </ProtectedRoute>
           }
         />
