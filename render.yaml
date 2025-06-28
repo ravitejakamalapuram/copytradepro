@@ -7,14 +7,15 @@ services:
     buildCommand: |
       echo "🚀 Building CopyTrade Pro..."
 
-      # Install and build backend with all dependencies
-      cd backend
+      # Install root dependencies to set up workspace
       npm install
+
+      # Build backend
+      cd backend
       npm run build
 
-      # Install and build frontend
+      # Build frontend
       cd ../frontend
-      npm install
       npm run build
 
       # Copy frontend to backend public
