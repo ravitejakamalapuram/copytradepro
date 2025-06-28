@@ -365,6 +365,23 @@ class NotificationService {
   getPermission(): NotificationPermission {
     return Notification.permission;
   }
+
+
+
+  /**
+   * Get current subscription status
+   */
+  getSubscriptionStatus(): {
+    isSupported: boolean;
+    permission: NotificationPermission;
+    isSubscribed: boolean;
+  } {
+    return {
+      isSupported: this.isSupported,
+      permission: this.isSupported ? Notification.permission : 'denied',
+      isSubscribed: this.subscription !== null
+    };
+  }
 }
 
 export const notificationService = new NotificationService();

@@ -7,6 +7,7 @@ import AccountSetup from './pages/AccountSetup';
 import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
 import ComponentDemo from './pages/ComponentDemo';
+import NotificationDisplay from './components/NotificationDisplay';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -77,6 +78,7 @@ const App: React.FC = () => {
     <Router>
       <AuthProvider>
         <AppContent />
+        <NotificationDisplay position="top-right" />
       </AuthProvider>
     </Router>
   );

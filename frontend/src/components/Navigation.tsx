@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Button, Flex } from '../components/ui';
+import NotificationIcon from './NotificationIcon';
 
 const Navigation: React.FC = () => {
   const navigate = useNavigate();
@@ -47,6 +48,11 @@ const Navigation: React.FC = () => {
 
         {/* User Menu */}
         <Flex align="center" gap={4}>
+          <NotificationIcon
+            onClick={() => navigate('/settings')}
+            showStatus={true}
+          />
+
           <div style={{ textAlign: 'right' }}>
             <div style={{
               fontWeight: '600',

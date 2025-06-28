@@ -70,6 +70,11 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
         setIsSubscribed(true);
         setPermission(notificationService.getPermission());
         setSuccess('Successfully subscribed to push notifications!');
+
+        // Trigger a global refresh event for other components
+        window.dispatchEvent(new CustomEvent('notificationStatusChanged', {
+          detail: { isSubscribed: true, permission: notificationService.getPermission() }
+        }));
       } else {
         throw new Error('Failed to subscribe to push notifications');
       }
@@ -90,7 +95,13 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       const success = await notificationService.unsubscribe();
       if (success) {
         setIsSubscribed(false);
+        setPermission(notificationService.getPermission());
         setSuccess('Successfully unsubscribed from push notifications');
+
+        // Trigger a global refresh event for other components
+        window.dispatchEvent(new CustomEvent('notificationStatusChanged', {
+          detail: { isSubscribed: false, permission: notificationService.getPermission() }
+        }));
       } else {
         throw new Error('Failed to unsubscribe from push notifications');
       }
