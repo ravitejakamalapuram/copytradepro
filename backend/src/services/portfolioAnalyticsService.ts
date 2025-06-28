@@ -110,7 +110,7 @@ class PortfolioAnalyticsService {
         // For now, use the last trade price as current price
         // In a real implementation, you'd fetch current market prices
         const lastOrder = orders[orders.length - 1];
-        const currentPrice = lastOrder.price;
+        const currentPrice = lastOrder?.price || averagePrice;
         const currentValue = netQuantity * currentPrice;
         
         const pnl = currentValue - investedValue;
@@ -301,8 +301,8 @@ class PortfolioAnalyticsService {
     
     for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
       const dateStr = d.toISOString().split('T')[0];
-      const dayOrders = executedOrders.filter(order => 
-        order.executed_at.startsWith(dateStr)
+      const dayOrders = executedOrders.filter(order =>
+        order.executed_at && dateStr && order.executed_at.startsWith(dateStr)
       );
       
       const dayPnL = this.calculatePnLFromOrders(dayOrders);
@@ -311,12 +311,14 @@ class PortfolioAnalyticsService {
       // Calculate portfolio value (simplified)
       const portfolioValue = 100000 + cumulativePnL; // Assuming starting value of 1 lakh
       
-      performanceData.push({
-        date: dateStr,
-        portfolioValue,
-        pnl: dayPnL,
-        cumulativePnL
-      });
+      if (dateStr) {
+        performanceData.push({
+          date: dateStr,
+          portfolioValue,
+          pnl: dayPnL,
+          cumulativePnL
+        });
+      }
     }
     
     return performanceData;
