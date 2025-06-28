@@ -10,6 +10,12 @@ import ComponentDemo from './pages/ComponentDemo';
 import PortfolioAnalytics from './pages/PortfolioAnalytics';
 import NotificationDisplay from './components/NotificationDisplay';
 import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
+// Kite-themed pages
+import KiteDashboard from './pages/KiteDashboard';
+import KiteHoldings from './pages/KiteHoldings';
+import KiteOrders from './pages/KiteOrders';
+import KitePositions from './pages/KitePositions';
+import KiteFunds from './pages/KiteFunds';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -38,9 +44,53 @@ const AppContent: React.FC = () => {
         <Route
           path="/"
           element={
-            isAuthenticated ? <Navigate to="/account-setup" replace /> : <LandingPage />
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : <LandingPage />
           }
         />
+
+        {/* Kite-themed routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <KiteDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/holdings"
+          element={
+            <ProtectedRoute>
+              <KiteHoldings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/orders"
+          element={
+            <ProtectedRoute>
+              <KiteOrders />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/positions"
+          element={
+            <ProtectedRoute>
+              <KitePositions />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/funds"
+          element={
+            <ProtectedRoute>
+              <KiteFunds />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Legacy routes */}
         <Route
           path="/account-setup"
           element={
