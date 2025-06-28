@@ -235,7 +235,7 @@ export class SQLiteUserDatabase {
         action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
         quantity INTEGER NOT NULL,
         price REAL,
-        order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET')),
+        order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET', 'BRACKET', 'COVER', 'ICEBERG', 'TRAILING_SL')),
         status TEXT NOT NULL DEFAULT 'PLACED' CHECK (status IN ('PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED')),
         exchange TEXT NOT NULL DEFAULT 'NSE',
         product_type TEXT NOT NULL DEFAULT 'C',
@@ -275,6 +275,90 @@ export class SQLiteUserDatabase {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         UNIQUE(user_id, endpoint)
+      )
+    `;
+
+    // Create order_templates table for saving order templates
+    const createOrderTemplatesTable = `
+      CREATE TABLE IF NOT EXISTS order_templates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        description TEXT,
+        symbol TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
+        quantity INTEGER NOT NULL,
+        order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET', 'BRACKET', 'COVER', 'ICEBERG', 'TRAILING_SL')),
+        price REAL,
+        trigger_price REAL,
+        stop_loss REAL,
+        take_profit REAL,
+        exchange TEXT NOT NULL DEFAULT 'NSE',
+        product_type TEXT NOT NULL DEFAULT 'C',
+        validity TEXT NOT NULL DEFAULT 'DAY' CHECK (validity IN ('DAY', 'IOC', 'GTD')),
+        iceberg_quantity INTEGER,
+        trail_amount REAL,
+        trail_percent REAL,
+        is_active BOOLEAN DEFAULT 1,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `;
+
+    // Create advanced_orders table for complex order types
+    const createAdvancedOrdersTable = `
+      CREATE TABLE IF NOT EXISTS advanced_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        parent_order_id INTEGER,
+        order_group_id TEXT,
+        symbol TEXT NOT NULL,
+        action TEXT NOT NULL CHECK (action IN ('BUY', 'SELL')),
+        quantity INTEGER NOT NULL,
+        order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET', 'BRACKET', 'COVER', 'ICEBERG', 'TRAILING_SL')),
+        price REAL,
+        trigger_price REAL,
+        stop_loss REAL,
+        take_profit REAL,
+        status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'ACTIVE', 'TRIGGERED', 'EXECUTED', 'CANCELLED', 'EXPIRED')),
+        exchange TEXT NOT NULL DEFAULT 'NSE',
+        product_type TEXT NOT NULL DEFAULT 'C',
+        validity TEXT NOT NULL DEFAULT 'DAY' CHECK (validity IN ('DAY', 'IOC', 'GTD')),
+        expiry_date DATETIME,
+        iceberg_quantity INTEGER,
+        iceberg_executed INTEGER DEFAULT 0,
+        trail_amount REAL,
+        trail_percent REAL,
+        trail_trigger_price REAL,
+        condition_type TEXT CHECK (condition_type IN ('PRICE_ABOVE', 'PRICE_BELOW', 'TIME_BASED', 'VOLUME_BASED')),
+        condition_value REAL,
+        is_bracket_order BOOLEAN DEFAULT 0,
+        bracket_stop_loss REAL,
+        bracket_take_profit REAL,
+        remarks TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        executed_at DATETIME,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (parent_order_id) REFERENCES advanced_orders(id) ON DELETE CASCADE
+      )
+    `;
+
+    // Create order_modifications table for tracking order changes
+    const createOrderModificationsTable = `
+      CREATE TABLE IF NOT EXISTS order_modifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        order_id INTEGER NOT NULL,
+        broker_order_id TEXT NOT NULL,
+        modification_type TEXT NOT NULL CHECK (modification_type IN ('PRICE', 'QUANTITY', 'TRIGGER_PRICE', 'STOP_LOSS', 'TAKE_PROFIT', 'CANCEL')),
+        old_value REAL,
+        new_value REAL,
+        status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'SUCCESS', 'FAILED')),
+        error_message TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
       )
     `;
 
@@ -343,6 +427,9 @@ export class SQLiteUserDatabase {
       this.db.exec(createPushSubscriptionsTable);
       this.db.exec(createPushSubscriptionsUserIndex);
       this.db.exec(createPushSubscriptionsEndpointIndex);
+      this.db.exec(createOrderTemplatesTable);
+      this.db.exec(createAdvancedOrdersTable);
+      this.db.exec(createOrderModificationsTable);
       this.db.exec(createNotificationPreferencesTable);
       this.db.exec(createNotificationPreferencesUserIndex);
       this.db.exec(createNotificationPreferencesUpdateTrigger);
@@ -774,6 +861,22 @@ export class SQLiteUserDatabase {
     }
   }
 
+  // Get order history for a user
+  getOrderHistory(userId: number): OrderHistory[] {
+    const getOrders = this.db.prepare(`
+      SELECT * FROM order_history
+      WHERE user_id = ?
+      ORDER BY executed_at DESC
+    `);
+
+    try {
+      return getOrders.all(userId) as OrderHistory[];
+    } catch (error) {
+      console.error('Failed to get order history:', error);
+      return [];
+    }
+  }
+
   // Get order history by ID
   getOrderHistoryById(id: number): OrderHistory | null {
     const selectOrder = this.db.prepare(`
@@ -835,6 +938,16 @@ export class SQLiteUserDatabase {
       console.error('🚨 Failed to get order count by user ID:', error);
       throw error;
     }
+  }
+
+  // Get database instance for advanced operations
+  getDatabase(): any {
+    return this.db;
+  }
+
+  // Execute transaction
+  executeTransaction(callback: () => void): void {
+    this.db.transaction(callback)();
   }
 
   // Update order status (for when we get actual execution updates)

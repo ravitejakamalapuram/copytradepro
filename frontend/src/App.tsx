@@ -8,6 +8,8 @@ import TradeSetup from './pages/TradeSetup';
 import Settings from './pages/Settings';
 import ComponentDemo from './pages/ComponentDemo';
 import PortfolioAnalytics from './pages/PortfolioAnalytics';
+import NotificationDisplay from './components/NotificationDisplay';
+import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -64,6 +66,14 @@ const AppContent: React.FC = () => {
           }
         />
         <Route
+          path="/advanced-orders"
+          element={
+            <ProtectedRoute>
+              <AdvancedOrderManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/settings"
           element={
             <ProtectedRoute>
@@ -86,6 +96,7 @@ const App: React.FC = () => {
     <Router>
       <AuthProvider>
         <AppContent />
+        <NotificationDisplay position="top-right" />
       </AuthProvider>
     </Router>
   );

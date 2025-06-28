@@ -259,7 +259,7 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
           },
           diversification: {
             totalSymbols: symbolPerformance.length,
-            concentrationRisk: symbolPerformance.length > 0 ? 
+            concentrationRisk: symbolPerformance.length > 0 ?
               (symbolPerformance[0]?.volume || 0) / symbolPerformance.reduce((sum, s) => sum + s.volume, 0) * 100 : 0
           }
         }

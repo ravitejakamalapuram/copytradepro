@@ -57,26 +57,26 @@ export interface SymbolPerformance {
 }
 
 class PortfolioAnalyticsService {
-  
+
   /**
    * Calculate portfolio positions from order history
    */
   calculatePortfolioPositions(userId: number): PortfolioPosition[] {
     const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
-    
+
     // Group orders by symbol
     const symbolGroups = new Map<string, OrderHistory[]>();
-    
+
     executedOrders.forEach(order => {
       if (!symbolGroups.has(order.symbol)) {
         symbolGroups.set(order.symbol, []);
       }
       symbolGroups.get(order.symbol)!.push(order);
     });
-    
+
     const positions: PortfolioPosition[] = [];
-    
+
     symbolGroups.forEach((orders, symbol) => {
       let totalBuyQuantity = 0;
       let totalSellQuantity = 0;
@@ -84,13 +84,13 @@ class PortfolioAnalyticsService {
       let totalSellValue = 0;
       const brokerAccounts = new Set<string>();
       let lastTradeDate = '';
-      
+
       orders.forEach(order => {
         brokerAccounts.add(order.broker_name);
         if (order.executed_at > lastTradeDate) {
           lastTradeDate = order.executed_at;
         }
-        
+
         if (order.action === 'BUY') {
           totalBuyQuantity += order.quantity;
           totalBuyValue += order.quantity * order.price;
@@ -99,23 +99,23 @@ class PortfolioAnalyticsService {
           totalSellValue += order.quantity * order.price;
         }
       });
-      
+
       const netQuantity = totalBuyQuantity - totalSellQuantity;
-      
+
       // Only include positions with net quantity > 0
       if (netQuantity > 0) {
         const averagePrice = totalBuyValue / totalBuyQuantity;
         const investedValue = netQuantity * averagePrice;
-        
+
         // For now, use the last trade price as current price
         // In a real implementation, you'd fetch current market prices
         const lastOrder = orders[orders.length - 1];
         const currentPrice = lastOrder?.price || averagePrice;
         const currentValue = netQuantity * currentPrice;
-        
+
         const pnl = currentValue - investedValue;
         const pnlPercentage = investedValue > 0 ? (pnl / investedValue) * 100 : 0;
-        
+
         positions.push({
           symbol,
           totalQuantity: netQuantity,
@@ -129,7 +129,7 @@ class PortfolioAnalyticsService {
         });
       }
     });
-    
+
     return positions.sort((a, b) => b.currentValue - a.currentValue);
   }
   
