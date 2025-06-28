@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { notificationService, NotificationPreferences } from '../services/notificationService';
+import { notificationService, type NotificationPreferences } from '../services/notificationService';
 import {
   Card,
   CardHeader,

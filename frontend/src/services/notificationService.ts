@@ -366,22 +366,7 @@ class NotificationService {
     return Notification.permission;
   }
 
-  /**
-   * Check if user is subscribed to push notifications
-   */
-  async isSubscribed(): Promise<boolean> {
-    try {
-      if (!this.registration) {
-        return false;
-      }
 
-      const subscription = await this.registration.pushManager.getSubscription();
-      return subscription !== null;
-    } catch (error) {
-      console.error('Failed to check subscription status:', error);
-      return false;
-    }
-  }
 
   /**
    * Get current subscription status

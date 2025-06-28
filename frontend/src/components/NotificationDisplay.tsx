@@ -214,7 +214,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
           </div>
         )}
         
-        <Stack gap={0}>
+        <Stack gap={1}>
           {notifications.map((notification) => (
             <div
               key={notification.id}
