@@ -18,7 +18,9 @@ router.get('/positions', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const positions = portfolioAnalyticsService.calculatePortfolioPositions(userId);
+    console.log(`📊 Calculating positions with live prices for user ${userId}...`);
+    const positions = await portfolioAnalyticsService.calculatePortfolioPositions(userId);
+    console.log(`✅ Calculated ${positions.length} positions with live market data`);
 
     return res.json({
       success: true,
