@@ -16,6 +16,7 @@ import KiteHoldings from './pages/KiteHoldings';
 import KiteOrders from './pages/KiteOrders';
 import KitePositions from './pages/KitePositions';
 import KiteFunds from './pages/KiteFunds';
+import KiteTradeSetup from './pages/KiteTradeSetup';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -90,6 +91,16 @@ const AppContent: React.FC = () => {
           }
         />
 
+        {/* Trading routes */}
+        <Route
+          path="/trade-setup"
+          element={
+            <ProtectedRoute>
+              <KiteTradeSetup />
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy routes */}
         <Route
           path="/account-setup"
@@ -100,7 +111,7 @@ const AppContent: React.FC = () => {
           }
         />
         <Route
-          path="/trade-setup"
+          path="/legacy-trade-setup"
           element={
             <ProtectedRoute>
               <TradeSetup />
