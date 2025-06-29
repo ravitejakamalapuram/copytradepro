@@ -227,20 +227,26 @@ class NSECSVService {
   private async processCSVFile(): Promise<void> {
     return new Promise((resolve, reject) => {
       const symbols: NSESymbolData[] = [];
+      let isFirstRow = true;
 
       fs.createReadStream(this.CSV_FILE_PATH)
         .pipe(csv())
         .on('data', (row) => {
+          // Debug: Log column names from first row
+          if (isFirstRow) {
+            console.log('📋 CSV columns detected:', Object.keys(row));
+            isFirstRow = false;
+          }
           try {
-            // NSE CSV columns: SYMBOL, NAME OF COMPANY, SERIES, DATE OF LISTING, PAID UP VALUE, MARKET LOT, ISIN NUMBER, FACE VALUE
+            // NSE CSV columns with spaces: SYMBOL, NAME OF COMPANY, SERIES, DATE OF LISTING, PAID UP VALUE, MARKET LOT, ISIN NUMBER, FACE VALUE
             const symbol: NSESymbolData = {
-              symbol: row['SYMBOL']?.trim() || '',
-              name: row['NAME OF COMPANY']?.trim() || '',
-              series: row['SERIES']?.trim() || '',
-              listingDate: row['DATE OF LISTING']?.trim() || '',
-              isin: row['ISIN NUMBER']?.trim() || '',
-              marketLot: parseInt(row['MARKET LOT']) || 1,
-              faceValue: parseFloat(row['FACE VALUE']) || 0
+              symbol: (row['SYMBOL'] || row[' SYMBOL'])?.trim() || '',
+              name: (row['NAME OF COMPANY'] || row[' NAME OF COMPANY'])?.trim() || '',
+              series: (row['SERIES'] || row[' SERIES'])?.trim() || '',
+              listingDate: (row['DATE OF LISTING'] || row[' DATE OF LISTING'])?.trim() || '',
+              isin: (row['ISIN NUMBER'] || row[' ISIN NUMBER'])?.trim() || '',
+              marketLot: parseInt(row['MARKET LOT'] || row[' MARKET LOT']) || 1,
+              faceValue: parseFloat(row['FACE VALUE'] || row[' FACE VALUE']) || 0
             };
 
             // Only include valid symbols
@@ -249,6 +255,7 @@ class NSECSVService {
             }
           } catch (error) {
             // Skip invalid rows
+            console.warn('Failed to parse CSV row:', error);
           }
         })
         .on('end', () => {
