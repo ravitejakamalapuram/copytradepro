@@ -1,14 +1,15 @@
 import { nseService, NSESymbol } from './nseService';
+import { nseCSVService, NSESymbolData } from './nseCSVService';
 
 class SymbolDatabaseService {
   constructor() {
     console.log('🚀 NSE Symbol Database Service initialized');
-    console.log('📊 Direct NSE API integration enabled');
-    console.log('🔗 Using integrated NSE service');
+    console.log('📊 NSE CSV + Live API integration enabled');
+    console.log('🔗 Using NSE CSV for symbol search and live API for market data');
   }
 
   /**
-   * Search symbols using NSE Direct API
+   * Search symbols using NSE CSV data (faster and more comprehensive)
    */
   async searchSymbols(query: string, limit: number = 10): Promise<NSESymbol[]> {
     if (!query || query.length < 1) {
@@ -16,17 +17,35 @@ class SymbolDatabaseService {
     }
 
     try {
-      console.log(`🔍 Searching NSE stocks for: "${query}"`);
+      console.log(`🔍 Searching NSE symbols for: "${query}"`);
 
-      // Use NSE Direct API for symbol search
-      const results = await nseService.searchStocks(query);
+      // Use NSE CSV service for symbol search (faster and offline)
+      const csvResults = nseCSVService.searchSymbols(query, limit);
 
-      console.log(`📊 Found ${results.length} NSE stocks for "${query}"`);
-      return results.slice(0, limit);
+      // Convert NSESymbolData to NSESymbol format
+      const results: NSESymbol[] = csvResults.map(symbol => ({
+        symbol: symbol.symbol,
+        name: symbol.name,
+        exchange: 'NSE',
+        isin: symbol.isin,
+        series: symbol.series
+      }));
+
+      console.log(`📊 Found ${results.length} NSE symbols for "${query}" from CSV data`);
+      return results;
 
     } catch (error: any) {
-      console.error('❌ NSE API search failed:', error.message);
-      return [];
+      console.error('❌ NSE CSV search failed, falling back to API:', error.message);
+
+      // Fallback to live API if CSV search fails
+      try {
+        const apiResults = await nseService.searchStocks(query);
+        console.log(`📊 Found ${apiResults.length} NSE stocks from API fallback`);
+        return apiResults.slice(0, limit);
+      } catch (apiError: any) {
+        console.error('❌ NSE API fallback also failed:', apiError.message);
+        return [];
+      }
     }
   }
 
@@ -37,20 +56,22 @@ class SymbolDatabaseService {
    */
   getStats(): any {
     return {
-      service: 'NSE Direct API',
+      service: 'NSE CSV + Live API',
       status: 'active',
-      searchType: 'live_api',
+      searchType: 'csv_primary_api_fallback',
       supportedExchanges: ['NSE'],
       lastCheck: new Date().toISOString(),
+      csvServiceStats: nseCSVService.getStats(),
       nseServiceStats: nseService.getStats()
     };
   }
 
   /**
-   * Force update (not needed for live API)
+   * Force update NSE CSV data
    */
   async forceUpdate(): Promise<void> {
-    console.log('🔄 Using live API - no update needed');
+    console.log('🔄 Force updating NSE CSV data...');
+    await nseCSVService.forceUpdate();
   }
 
   /**
@@ -103,10 +124,17 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Get all symbols (returns empty array - use search instead)
+   * Get all symbols from CSV data
    */
   getAllSymbols(): NSESymbol[] {
-    return [];
+    const csvSymbols = nseCSVService.getAllSymbols();
+    return csvSymbols.map(symbol => ({
+      symbol: symbol.symbol,
+      name: symbol.name,
+      exchange: 'NSE',
+      isin: symbol.isin,
+      series: symbol.series
+    }));
   }
 }
 

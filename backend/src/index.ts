@@ -18,6 +18,7 @@ import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
 import { symbolDatabaseService } from './services/symbolDatabaseService';
 import { realTimeDataService } from './services/realTimeDataService';
+import { nseCSVService } from './services/nseCSVService';
 
 // Load environment variables
 dotenv.config();
@@ -172,7 +173,7 @@ server.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔄 Socket.IO enabled for real-time updates`);
   console.log(`📊 Order status monitoring active`);
-  console.log(`📈 NSE Symbol Database initialized with daily auto-updates`);
+  console.log(`📈 NSE CSV Database initialized with daily auto-updates at 6:30 AM IST`);
   console.log(`⚡ Real-time price streaming active`);
 });
 

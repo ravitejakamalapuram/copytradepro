@@ -250,6 +250,28 @@ router.get('/market-status', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
+ * Force update NSE CSV data
+ */
+router.post('/force-update-csv', authenticateToken, async (req: any, res: any) => {
+  try {
+    console.log('🔄 Manual NSE CSV update triggered');
+    await symbolDatabaseService.forceUpdate();
+
+    return res.json({
+      success: true,
+      message: 'NSE CSV data updated successfully'
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to update NSE CSV:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update NSE CSV data',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Get NSE gainers
  */
 router.get('/gainers', authenticateToken, async (req: any, res: any) => {
