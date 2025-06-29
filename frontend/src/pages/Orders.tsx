@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
-import RealTimeStatusIndicator from '../components/RealTimeStatusIndicator';
 import '../styles/app-theme.css';
 
 interface Order {
@@ -29,6 +28,7 @@ const Orders: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
 
   // Function to fetch orders (for refresh)
   const fetchOrders = async () => {
@@ -64,6 +64,7 @@ const Orders: React.FC = () => {
         }));
 
         setOrders(ordersData);
+        setLastRefresh(new Date());
       } else {
         setError(response.message || 'Failed to load orders');
       }
@@ -76,20 +77,7 @@ const Orders: React.FC = () => {
     }
   };
 
-  // Handle real-time order updates
-  const handleOrderUpdate = (orderId: string, newStatus: string) => {
-    setOrders(prevOrders =>
-      prevOrders.map(order =>
-        order.brokerOrderId === orderId
-          ? {
-              ...order,
-              status: newStatus.toUpperCase() as any,
-              filledQty: newStatus === 'EXECUTED' ? order.qty : order.filledQty
-            }
-          : order
-      )
-    );
-  };
+
 
   useEffect(() => {
     fetchOrders();
@@ -188,19 +176,39 @@ const Orders: React.FC = () => {
       <div className="kite-main">
         <div className="kite-card">
           <div className="kite-card-header">
-            <h2 className="kite-card-title">Orders</h2>
+            <div>
+              <h2 className="kite-card-title">Orders</h2>
+              {lastRefresh && (
+                <p style={{
+                  margin: 0,
+                  fontSize: '0.875rem',
+                  color: 'var(--kite-text-secondary)'
+                }}>
+                  Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
+                </p>
+              )}
+            </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <RealTimeStatusIndicator onOrderUpdate={handleOrderUpdate} />
               <button
                 className="kite-btn kite-btn-secondary"
                 onClick={fetchOrders}
                 disabled={loading}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
               >
                 🔄 {loading ? 'Loading...' : 'Refresh'}
               </button>
               <button
                 className="kite-btn kite-btn-primary"
                 onClick={() => navigate('/trade-setup')}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
               >
                 + Place Order
               </button>
