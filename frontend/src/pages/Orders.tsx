@@ -1,76 +1,103 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
-import { advancedOrderService } from '../services/advancedOrderService';
+import { brokerService } from '../services/brokerService';
+import RealTimeStatusIndicator from '../components/RealTimeStatusIndicator';
 import '../styles/app-theme.css';
 
 interface Order {
   id: string;
   symbol: string;
   type: 'BUY' | 'SELL';
-  orderType: 'MARKET' | 'LIMIT' | 'SL' | 'SL-M';
+  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
   qty: number;
   price?: number;
   triggerPrice?: number;
-  status: 'PENDING' | 'COMPLETE' | 'CANCELLED' | 'REJECTED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
   time: string;
   filledQty: number;
   avgPrice?: number;
   createdAt?: string;
+  brokerName?: string;
+  brokerOrderId?: string;
+  exchange?: string;
 }
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  // Function to fetch orders (for refresh)
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-        // Fetch orders from the backend
-        const response = await advancedOrderService.getAdvancedOrders();
+      // Fetch orders from broker order history
+      const response = await brokerService.getOrderHistory(100, 0);
 
+      if (response.success && response.data) {
         // Convert backend order format to our interface
-        const ordersData = response.orders.map((order: any) => ({
-          id: order.id,
+        const ordersData = response.data.orders.map((order: any) => ({
+          id: order.id.toString(),
           symbol: order.symbol,
-          type: order.side.toUpperCase() as 'BUY' | 'SELL',
-          orderType: order.orderType.toUpperCase() as 'MARKET' | 'LIMIT' | 'SL' | 'SL-M',
+          type: order.action.toUpperCase() as 'BUY' | 'SELL',
+          orderType: order.order_type as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
           qty: order.quantity,
           price: order.price,
-          triggerPrice: order.triggerPrice,
-          status: order.status.toUpperCase() as 'PENDING' | 'COMPLETE' | 'CANCELLED' | 'REJECTED',
-          time: new Date(order.createdAt).toLocaleTimeString('en-IN', {
+          triggerPrice: 0, // Not available in broker order history
+          status: order.status.toUpperCase() as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED',
+          time: new Date(order.executed_at || order.created_at).toLocaleTimeString('en-IN', {
             hour: '2-digit',
             minute: '2-digit',
             second: '2-digit'
           }),
-          filledQty: order.filledQuantity || 0,
-          avgPrice: order.averagePrice,
-          createdAt: order.createdAt
+          filledQty: order.status === 'EXECUTED' ? order.quantity : 0,
+          avgPrice: order.status === 'EXECUTED' ? order.price : undefined,
+          createdAt: order.executed_at || order.created_at,
+          brokerName: order.broker_name,
+          brokerOrderId: order.broker_order_id,
+          exchange: order.exchange
         }));
 
         setOrders(ordersData);
-
-      } catch (error: any) {
-        console.error('Failed to fetch orders:', error);
-        setError('Failed to load orders');
-      } finally {
-        setLoading(false);
+      } else {
+        setError(response.message || 'Failed to load orders');
       }
-    };
 
+    } catch (error: any) {
+      console.error('Failed to fetch orders:', error);
+      setError('Failed to load orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle real-time order updates
+  const handleOrderUpdate = (orderId: string, newStatus: string) => {
+    setOrders(prevOrders =>
+      prevOrders.map(order =>
+        order.brokerOrderId === orderId
+          ? {
+              ...order,
+              status: newStatus.toUpperCase() as any,
+              filledQty: newStatus === 'EXECUTED' ? order.qty : order.filledQty
+            }
+          : order
+      )
+    );
+  };
+
+  useEffect(() => {
     fetchOrders();
   }, []);
 
   const filteredOrders = orders.filter(order => {
-    if (activeTab === 'pending') return order.status === 'PENDING';
-    if (activeTab === 'completed') return order.status === 'COMPLETE';
+    if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
+    if (activeTab === 'executed') return order.status === 'EXECUTED';
     return true;
   });
 
@@ -83,8 +110,10 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'COMPLETE': return 'var(--kite-profit)';
+      case 'PLACED': return 'var(--kite-neutral)';
       case 'PENDING': return 'var(--kite-neutral)';
+      case 'EXECUTED': return 'var(--kite-profit)';
+      case 'PARTIALLY_FILLED': return 'var(--kite-neutral)';
       case 'CANCELLED': return 'var(--kite-text-secondary)';
       case 'REJECTED': return 'var(--kite-loss)';
       default: return 'var(--kite-text-primary)';
@@ -95,13 +124,17 @@ const Orders: React.FC = () => {
     return type === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)';
   };
 
+  const handleModifyOrder = (orderId: string) => {
+    // TODO: Implement order modification
+    console.log('Modify order:', orderId);
+  };
+
   const handleCancelOrder = async (orderId: string) => {
     try {
-      await advancedOrderService.cancelAdvancedOrder(parseInt(orderId));
-      // Refresh orders after cancellation
-      setOrders(orders.map(order =>
-        order.id === orderId ? { ...order, status: 'CANCELLED' as const } : order
-      ));
+      // TODO: Implement broker order cancellation
+      console.log('Cancel order:', orderId);
+      // For now, just refresh the orders
+      await fetchOrders();
     } catch (error) {
       console.error('Failed to cancel order:', error);
     }
@@ -157,14 +190,19 @@ const Orders: React.FC = () => {
           <div className="kite-card-header">
             <h2 className="kite-card-title">Orders</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <RealTimeStatusIndicator onOrderUpdate={handleOrderUpdate} />
+              <button
+                className="kite-btn kite-btn-secondary"
+                onClick={fetchOrders}
+                disabled={loading}
+              >
+                🔄 {loading ? 'Loading...' : 'Refresh'}
+              </button>
               <button
                 className="kite-btn kite-btn-primary"
                 onClick={() => navigate('/trade-setup')}
               >
                 + Place Order
-              </button>
-              <button className="kite-btn">
-                📥 Export
               </button>
             </div>
           </div>
@@ -179,8 +217,8 @@ const Orders: React.FC = () => {
           }}>
             {[
               { key: 'all', label: 'All Orders', count: orders.length },
-              { key: 'pending', label: 'Pending', count: orders.filter(o => o.status === 'PENDING').length },
-              { key: 'completed', label: 'Completed', count: orders.filter(o => o.status === 'COMPLETE').length }
+              { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
+              { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
             ].map(tab => (
               <button
                 key={tab.key}
@@ -274,14 +312,15 @@ const Orders: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          {order.status === 'PENDING' && (
+                          {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
-                              <button 
+                              <button
                                 className="kite-btn"
-                                style={{ 
+                                style={{
                                   padding: '0.25rem 0.5rem',
                                   fontSize: '0.75rem'
                                 }}
+                                onClick={() => handleModifyOrder(order.id)}
                               >
                                 Modify
                               </button>
@@ -297,7 +336,7 @@ const Orders: React.FC = () => {
                               </button>
                             </>
                           )}
-                          {order.status === 'COMPLETE' && (
+                          {order.status === 'EXECUTED' && (
                             <button 
                               className="kite-btn"
                               style={{ 
@@ -361,7 +400,7 @@ const Orders: React.FC = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-profit)' }}>
-                {orders.filter(o => o.status === 'COMPLETE').length}
+                {orders.filter(o => o.status === 'EXECUTED').length}
               </div>
               <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                 Executed
