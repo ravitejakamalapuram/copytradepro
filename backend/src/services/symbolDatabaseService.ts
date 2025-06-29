@@ -26,40 +26,11 @@ class SymbolDatabaseService {
 
     } catch (error: any) {
       console.error('❌ NSE API search failed:', error.message);
-
-      // Fallback to static popular stocks if API fails
-      return this.getFallbackSymbols(query, limit);
+      return [];
     }
   }
 
-  /**
-   * Fallback symbols for common Indian stocks
-   */
-  private getFallbackSymbols(query: string, limit: number): NSESymbol[] {
-    const popularStocks: NSESymbol[] = [
-      { symbol: 'RELIANCE', name: 'Reliance Industries Limited', exchange: 'NSE' },
-      { symbol: 'TCS', name: 'Tata Consultancy Services Limited', exchange: 'NSE' },
-      { symbol: 'HDFCBANK', name: 'HDFC Bank Limited', exchange: 'NSE' },
-      { symbol: 'INFY', name: 'Infosys Limited', exchange: 'NSE' },
-      { symbol: 'ICICIBANK', name: 'ICICI Bank Limited', exchange: 'NSE' },
-      { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank Limited', exchange: 'NSE' },
-      { symbol: 'BHARTIARTL', name: 'Bharti Airtel Limited', exchange: 'NSE' },
-      { symbol: 'ITC', name: 'ITC Limited', exchange: 'NSE' },
-      { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
-      { symbol: 'LT', name: 'Larsen & Toubro Limited', exchange: 'NSE' },
-      { symbol: 'ASIANPAINT', name: 'Asian Paints Limited', exchange: 'NSE' },
-      { symbol: 'MARUTI', name: 'Maruti Suzuki India Limited', exchange: 'NSE' },
-      { symbol: 'BAJFINANCE', name: 'Bajaj Finance Limited', exchange: 'NSE' },
-      { symbol: 'HCLTECH', name: 'HCL Technologies Limited', exchange: 'NSE' },
-      { symbol: 'WIPRO', name: 'Wipro Limited', exchange: 'NSE' }
-    ];
 
-    const queryLower = query.toLowerCase();
-    return popularStocks.filter(stock =>
-      stock.symbol.toLowerCase().includes(queryLower) ||
-      stock.name.toLowerCase().includes(queryLower)
-    ).slice(0, limit);
-  }
 
   /**
    * Get service stats
@@ -70,7 +41,6 @@ class SymbolDatabaseService {
       status: 'active',
       searchType: 'live_api',
       supportedExchanges: ['NSE'],
-      fallbackSymbols: 15,
       lastCheck: new Date().toISOString(),
       nseServiceStats: nseService.getStats()
     };
@@ -133,10 +103,10 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Get all symbols (returns popular symbols for live API)
+   * Get all symbols (returns empty array - use search instead)
    */
   getAllSymbols(): NSESymbol[] {
-    return this.getFallbackSymbols('', 15);
+    return [];
   }
 }
 

@@ -88,47 +88,7 @@ class MarketDataService {
     });
   }
 
-  /**
-   * Get fallback price for a symbol
-   */
-  private getFallbackPrice(symbol: string, exchange: string = 'NSE'): MarketPrice {
-    // Mock data for common Indian stocks
-    const mockPrices: Record<string, { price: number; change: number }> = {
-      'RELIANCE': { price: 2847.65, change: 12.45 },
-      'TCS': { price: 4156.30, change: -23.70 },
-      'INFY': { price: 1789.25, change: 8.90 },
-      'HDFC': { price: 1654.80, change: -5.20 },
-      'HDFCBANK': { price: 1654.80, change: -5.20 },
-      'ICICIBANK': { price: 1234.56, change: 15.30 },
-      'KOTAKBANK': { price: 1876.45, change: -8.90 },
-      'BHARTIARTL': { price: 1567.89, change: 23.45 },
-      'ITC': { price: 456.78, change: -2.34 },
-      'SBIN': { price: 789.12, change: 12.67 },
-      'LT': { price: 3456.78, change: -45.67 },
-      'ASIANPAINT': { price: 2987.65, change: 34.56 },
-      'MARUTI': { price: 11234.56, change: -123.45 },
-      'BAJFINANCE': { price: 6789.12, change: 89.34 },
-      'HCLTECH': { price: 1567.89, change: 23.45 }
-    };
 
-    const baseData = mockPrices[symbol.toUpperCase()] || { price: 1000, change: 0 };
-
-    // Add small random variations
-    const variation = (Math.random() - 0.5) * 20; // ±10 variation
-    const price = baseData.price + variation;
-    const change = baseData.change + (Math.random() - 0.5) * 5; // ±2.5 variation
-    const changePercent = (change / price) * 100;
-
-    return {
-      symbol,
-      price: Math.round(price * 100) / 100,
-      change: Math.round(change * 100) / 100,
-      changePercent: Math.round(changePercent * 100) / 100,
-      volume: Math.floor(Math.random() * 1000000) + 100000, // Random volume
-      lastUpdated: new Date(),
-      exchange
-    };
-  }
 
   /**
    * Fetch real-time price from NSE API with Yahoo Finance fallback
@@ -181,8 +141,8 @@ class MarketDataService {
 
       const quote = response.data?.quoteResponse?.result?.[0];
       if (!quote) {
-        console.warn(`⚠️ No data available for ${symbol}, using fallback`);
-        return this.getFallbackPrice(symbol, exchange);
+        console.warn(`⚠️ No data available for ${symbol}`);
+        return null;
       }
 
       const marketPrice: MarketPrice = {
@@ -201,8 +161,8 @@ class MarketDataService {
       return marketPrice;
 
     } catch (error: any) {
-      console.warn(`⚠️ Failed to fetch ${symbol}, using fallback:`, error.message);
-      return this.getFallbackPrice(symbol, exchange);
+      console.warn(`⚠️ Failed to fetch ${symbol}:`, error.message);
+      return null;
     }
   }
 
@@ -288,34 +248,7 @@ class MarketDataService {
     return results;
   }
 
-  /**
-   * Get fallback market indices data
-   */
-  private getFallbackIndices(): MarketIndex[] {
-    // Generate realistic mock data with slight variations
-    const baseData = [
-      { name: 'NIFTY 50', baseValue: 25637.80, baseChange: -1.26 },
-      { name: 'SENSEX', baseValue: 84058.90, baseChange: 181.87 },
-      { name: 'BANK NIFTY', baseValue: 54234.15, baseChange: -45.30 },
-      { name: 'NIFTY IT', baseValue: 43567.25, baseChange: 123.45 }
-    ];
 
-    return baseData.map(index => {
-      // Add small random variations to simulate live data
-      const variation = (Math.random() - 0.5) * 100; // ±50 points variation
-      const value = index.baseValue + variation;
-      const change = index.baseChange + (Math.random() - 0.5) * 20; // ±10 points variation
-      const changePercent = (change / value) * 100;
-
-      return {
-        name: index.name,
-        value: Math.round(value * 100) / 100,
-        change: Math.round(change * 100) / 100,
-        changePercent: Math.round(changePercent * 100) / 100,
-        lastUpdated: new Date()
-      };
-    });
-  }
 
   /**
    * Get major Indian market indices from NSE API with Yahoo Finance fallback
@@ -384,27 +317,7 @@ class MarketDataService {
       }
     }
 
-    // If we couldn't fetch any real data, use fallback
-    if (successCount === 0) {
-      console.log('📊 Using fallback market data (Yahoo Finance unavailable)');
-      return this.getFallbackIndices();
-    }
-
-    // If we got some data but not all, fill in missing with fallback
-    if (results.length < indices.length) {
-      const fallbackData = this.getFallbackIndices();
-      const missingIndices = indices.filter(index =>
-        !results.some(result => result.name === index.name)
-      );
-
-      missingIndices.forEach(index => {
-        const fallback = fallbackData.find(f => f.name === index.name);
-        if (fallback) {
-          results.push(fallback);
-        }
-      });
-    }
-
+    console.log(`📊 Successfully fetched ${successCount}/${indices.length} market indices from Yahoo Finance`);
     return results;
   }
 

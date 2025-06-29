@@ -20,18 +20,7 @@ interface LivePriceTickerProps {
   className?: string;
 }
 
-const defaultSymbols: TickerSymbol[] = [
-  { symbol: 'RELIANCE', name: 'Reliance Industries', exchange: 'NSE' },
-  { symbol: 'TCS', name: 'Tata Consultancy Services', exchange: 'NSE' },
-  { symbol: 'HDFCBANK', name: 'HDFC Bank', exchange: 'NSE' },
-  { symbol: 'INFY', name: 'Infosys', exchange: 'NSE' },
-  { symbol: 'ICICIBANK', name: 'ICICI Bank', exchange: 'NSE' },
-  { symbol: 'HINDUNILVR', name: 'Hindustan Unilever', exchange: 'NSE' },
-  { symbol: 'ITC', name: 'ITC Limited', exchange: 'NSE' },
-  { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
-  { symbol: 'BHARTIARTL', name: 'Bharti Airtel', exchange: 'NSE' },
-  { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank', exchange: 'NSE' }
-];
+const defaultSymbols: TickerSymbol[] = [];
 
 const LivePriceTicker: React.FC<LivePriceTickerProps> = ({
   symbols = defaultSymbols,

@@ -342,8 +342,8 @@ class PortfolioAnalyticsService {
       const dayPnL = this.calculatePnLFromOrders(dayOrders);
       cumulativePnL += dayPnL;
       
-      // Calculate portfolio value (simplified)
-      const portfolioValue = 100000 + cumulativePnL; // Assuming starting value of 1 lakh
+      // Calculate portfolio value based on actual invested amount
+      const portfolioValue = cumulativePnL;
       
       if (dateStr) {
         performanceData.push({

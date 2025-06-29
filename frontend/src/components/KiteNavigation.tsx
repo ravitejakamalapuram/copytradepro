@@ -53,20 +53,13 @@ const KiteNavigation: React.FC = () => {
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
 
-  // Use live market indices for watchlist, fallback to mock data
-  const watchlistItems = marketIndices.length > 0 ? marketIndices.map(index => ({
+  // Use live market indices for watchlist
+  const watchlistItems = marketIndices.map(index => ({
     symbol: index.name,
     ltp: index.value,
     change: index.change,
     changePercent: index.changePercent
-  })) : [
-    { symbol: 'NIFTY 50', ltp: 25637.80, change: -1.26, changePercent: -0.05 },
-    { symbol: 'SENSEX', ltp: 84058.90, change: 181.87, changePercent: 0.22 },
-    { symbol: 'RELIANCE', ltp: 2847.65, change: 12.45, changePercent: 0.44 },
-    { symbol: 'TCS', ltp: 4156.30, change: -23.70, changePercent: -0.57 },
-    { symbol: 'INFY', ltp: 1789.25, change: 8.90, changePercent: 0.50 },
-    { symbol: 'HDFC BANK', ltp: 1654.80, change: -5.20, changePercent: -0.31 },
-  ];
+  }));
 
   return (
     <div className="kite-theme">
