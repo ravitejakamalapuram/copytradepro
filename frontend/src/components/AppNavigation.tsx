@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
+import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
 
 interface PortfolioSummary {
@@ -27,6 +28,9 @@ const AppNavigation: React.FC = () => {
     totalPnLPercent: 0,
     dayPnLPercent: 0
   });
+
+  // Real-time data hook for market status
+  const { marketStatus } = useRealTimeData();
 
   // Fetch live market indices and portfolio data
   useEffect(() => {
@@ -124,20 +128,20 @@ const AppNavigation: React.FC = () => {
           {/* User Menu */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
             {/* Market Status */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
               gap: '0.5rem',
               fontSize: '0.75rem',
               color: 'var(--kite-text-secondary)'
             }}>
-              <div style={{ 
-                width: '8px', 
-                height: '8px', 
-                borderRadius: '50%', 
-                backgroundColor: 'var(--kite-profit)' 
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}></div>
-              Market Open
+              {marketStatus?.status || 'Market Status Unknown'}
             </div>
 
             {/* User Info */}
