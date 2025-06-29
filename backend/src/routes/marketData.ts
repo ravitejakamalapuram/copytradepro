@@ -119,7 +119,7 @@ router.get('/indices', authenticateToken, async (req: any, res: any) => {
 router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
   try {
     const { query } = req.params;
-    const { limit = 10, exchange = 'NSE' } = req.query;
+    const { limit = 10, exchange = 'NSE', includePrices = 'false' } = req.query;
     const userId = req.user?.id;
 
     if (!query || query.length < 2) {
@@ -163,16 +163,20 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       searchResults = [];
     }
 
-    // Fetch live prices for search results
+    // Fetch live prices for search results (only if requested)
     const symbols = searchResults.map((r: any) => r.symbol);
     let prices = new Map();
 
-    if (symbols.length > 0) {
+    if (includePrices === 'true' && symbols.length > 0) {
       try {
+        console.log(`💰 Fetching prices for ${symbols.length} symbols...`);
         prices = await marketDataService.getPrices(symbols, exchange as string);
+        console.log(`💰 Fetched prices for ${prices.size} symbols`);
       } catch (error) {
         console.warn('⚠️ Failed to fetch live prices, continuing without prices');
       }
+    } else {
+      console.log(`⚡ Skipping price fetch for faster search response`);
     }
 
     const enrichedResults = searchResults.map((stock: any) => ({
