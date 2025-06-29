@@ -224,26 +224,26 @@ const KitePortfolio: React.FC = () => {
           alignItems: 'center',
           marginBottom: '1.5rem'
         }}>
-          <h1 style={{ 
-            fontSize: '1.5rem', 
-            fontWeight: '600', 
+          <h1 style={{
+            fontSize: '16px',
+            fontWeight: '600',
             color: 'var(--kite-text-primary)',
             margin: 0
           }}>
             Portfolio
           </h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button 
+            <button
               className="kite-btn kite-btn-primary"
               onClick={() => navigate('/trade-setup')}
-              style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+              style={{ fontSize: '11px', padding: '6px 12px' }}
             >
               + Buy/Sell
             </button>
-            <button 
+            <button
               className="kite-btn"
               onClick={fetchPortfolioData}
-              style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+              style={{ fontSize: '11px', padding: '6px 12px' }}
             >
               🔄 Refresh
             </button>

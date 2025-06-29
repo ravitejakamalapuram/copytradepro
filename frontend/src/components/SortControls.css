@@ -5,22 +5,22 @@
 }
 
 .sort-controls__label {
-  font-size: 0.875rem;
+  font-size: 11px;
   color: var(--kite-text-secondary);
   font-weight: 500;
 }
 
 .sort-controls__select {
-  padding: 0.375rem 0.75rem;
+  padding: 4px 8px;
   border: 1px solid var(--kite-border-secondary);
   border-radius: var(--kite-radius-sm);
   background: var(--kite-bg-secondary);
   color: var(--kite-text-primary);
-  font-size: 0.875rem;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  min-width: 120px;
+  min-width: 100px;
 }
 
 .sort-controls__select:hover {
@@ -37,13 +37,13 @@
   background: var(--kite-bg-secondary);
   border: 1px solid var(--kite-border-secondary);
   border-radius: var(--kite-radius-sm);
-  padding: 0.375rem 0.75rem;
+  padding: 4px 8px;
   cursor: pointer;
   color: var(--kite-text-secondary);
-  font-size: 0.875rem;
+  font-size: 11px;
   font-weight: 600;
   transition: all 0.2s ease;
-  min-width: 2.5rem;
+  min-width: 24px;
   display: flex;
   align-items: center;
   justify-content: center;

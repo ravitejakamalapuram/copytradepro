@@ -12,7 +12,7 @@
 .portfolio-table__table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: 12px;
 }
 
 .portfolio-table__header {
@@ -21,12 +21,13 @@
 }
 
 .portfolio-table__header-cell {
-  padding: var(--kite-space-lg) var(--kite-space-md);
+  padding: 8px 12px;
   text-align: left;
   font-weight: 600;
   color: var(--kite-text-primary);
   border-bottom: 1px solid var(--kite-border-secondary);
   white-space: nowrap;
+  font-size: 11px;
 }
 
 .portfolio-table__header-cell--right {
@@ -61,7 +62,7 @@
 }
 
 .portfolio-table__cell {
-  padding: var(--kite-space-lg) var(--kite-space-md);
+  padding: 8px 12px;
   color: var(--kite-text-primary);
   vertical-align: middle;
 }
@@ -79,19 +80,19 @@
 }
 
 .portfolio-table__cell-sub {
-  font-size: 0.75rem;
-  margin-top: 0.125rem;
+  font-size: 10px;
+  margin-top: 1px;
   opacity: 0.8;
 }
 
 .portfolio-table__instrument {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 6px;
 }
 
 .portfolio-table__instrument-icon {
-  font-size: 1.25rem;
+  font-size: 14px;
   flex-shrink: 0;
 }
 
@@ -105,12 +106,13 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 12px;
 }
 
 .portfolio-table__instrument-meta {
-  font-size: 0.75rem;
+  font-size: 10px;
   color: var(--kite-text-secondary);
-  margin-top: 0.125rem;
+  margin-top: 1px;
 }
 
 /* Empty State */

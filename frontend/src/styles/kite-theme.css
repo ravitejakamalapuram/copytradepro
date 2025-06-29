@@ -67,7 +67,8 @@
   background-color: var(--kite-bg-primary);
   color: var(--kite-text-primary);
   font-family: var(--kite-font-family);
-  line-height: 1.5;
+  line-height: 1.4;
+  font-size: 13px; /* Smaller base font size like professional trading platforms */
 }
 
 /* Kite Navigation */
@@ -113,12 +114,12 @@
 .kite-nav-link {
   display: flex;
   align-items: center;
-  gap: var(--kite-space-xs);
-  padding: var(--kite-space-sm) var(--kite-space-md);
+  gap: 4px;
+  padding: 6px 12px;
   border: none;
   background: transparent;
   color: var(--kite-text-secondary);
-  font-size: 0.875rem;
+  font-size: 12px;
   font-weight: 500;
   border-radius: var(--kite-radius-md);
   cursor: pointer;
@@ -189,7 +190,7 @@
 }
 
 .kite-card-title {
-  font-size: 1.125rem;
+  font-size: 14px;
   font-weight: 600;
   color: var(--kite-text-primary);
   margin: 0;
