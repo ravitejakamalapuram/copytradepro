@@ -136,9 +136,10 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       });
     }
 
+    console.log(`🔍 Symbol search request: query="${query}", limit=${limit}, exchange=${exchange}, userId=${userId}`);
+
     // Try to get live search results from connected brokers
     let brokerResults: any[] = [];
-    let fallbackUsed = false;
 
     // Get user's broker connections
     const userConnections = userBrokerConnections.get(userId);
@@ -185,33 +186,23 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       }
     }
 
-    // Fallback to static database if no broker results
+    // If no broker results and no connected brokers, return empty results
     if (brokerResults.length === 0) {
-      console.log('📋 Using fallback static symbol database');
-      fallbackUsed = true;
-
-      const fallbackSymbols = [
-        { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE' },
-        { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE' },
-        { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE' },
-        { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE' },
-        { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE' },
-        { symbol: 'HINDUNILVR', name: 'Hindustan Unilever Ltd', exchange: 'NSE' },
-        { symbol: 'ITC', name: 'ITC Ltd', exchange: 'NSE' },
-        { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
-        { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', exchange: 'NSE' },
-        { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank Ltd', exchange: 'NSE' },
-        { symbol: 'ZOMATO', name: 'Zomato Ltd', exchange: 'NSE' },
-        { symbol: 'PAYTM', name: 'One 97 Communications Ltd', exchange: 'NSE' },
-        { symbol: 'NYKAA', name: 'FSN E-Commerce Ventures Ltd', exchange: 'NSE' }
-      ];
-
-      brokerResults = fallbackSymbols
-        .filter(stock =>
-          stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-          stock.name.toLowerCase().includes(query.toLowerCase())
-        )
-        .slice(0, parseInt(limit as string));
+      if (!userConnections || userConnections.size === 0) {
+        console.log('❌ No connected brokers available for symbol search');
+        return res.status(400).json({
+          success: false,
+          error: 'No connected brokers available. Please connect a broker account to search symbols.',
+          data: {
+            results: [],
+            count: 0,
+            query,
+            source: 'no_brokers'
+          }
+        });
+      } else {
+        console.log('❌ No results found from connected brokers');
+      }
     }
 
     // Fetch live prices for search results
@@ -239,7 +230,7 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
         results: enrichedResults,
         count: enrichedResults.length,
         query,
-        source: fallbackUsed ? 'fallback' : 'broker_api',
+        source: 'live_broker_api',
         exchange: exchange
       }
     });

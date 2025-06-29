@@ -117,8 +117,12 @@ const KiteTradeSetup: React.FC = () => {
         setSearchLoading(true);
         timeoutId = setTimeout(async () => {
           try {
+            console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
+
             // Use live broker API search with fallback to market data service
             const results = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
+
+            console.log(`📊 Frontend: Received ${results.length} results:`, results);
 
             // Transform results to match expected format
             const transformedResults = results.map(result => ({
@@ -129,15 +133,24 @@ const KiteTradeSetup: React.FC = () => {
               token: result.token || null
             }));
 
+            console.log(`✅ Frontend: Transformed results:`, transformedResults);
+
             setSearchResults(transformedResults);
             setShowSearchResults(transformedResults.length > 0);
 
             if (transformedResults.length === 0) {
-              console.log('No results found for:', searchTerm);
+              console.log('❌ Frontend: No results found for:', searchTerm);
             }
-          } catch (error) {
-            console.error('Symbol search failed:', error);
-            // Fallback to empty results on error
+          } catch (error: any) {
+            console.error('❌ Frontend: Symbol search failed:', error);
+
+            // Check if it's a "no brokers" error
+            if (error.response?.data?.error?.includes('No connected brokers')) {
+              console.log('ℹ️ No connected brokers available for symbol search');
+              // You could show a message to connect brokers here
+            }
+
+            // Always show empty results on error
             setSearchResults([]);
             setShowSearchResults(false);
           } finally {
