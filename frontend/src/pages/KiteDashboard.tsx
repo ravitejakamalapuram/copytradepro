@@ -265,42 +265,7 @@ const KiteDashboard: React.FC = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Quick Actions</h2>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-            <button
-              className="kite-btn kite-btn-primary"
-              style={{ padding: '1rem', justifyContent: 'center' }}
-              onClick={() => navigate('/trade-setup')}
-            >
-              📈 Place Order
-            </button>
-            <button
-              className="kite-btn"
-              style={{ padding: '1rem', justifyContent: 'center' }}
-              onClick={() => navigate('/holdings')}
-            >
-              📊 View Holdings
-            </button>
-            <button
-              className="kite-btn"
-              style={{ padding: '1rem', justifyContent: 'center' }}
-              onClick={() => navigate('/positions')}
-            >
-              🎯 Positions
-            </button>
-            <button
-              className="kite-btn"
-              style={{ padding: '1rem', justifyContent: 'center' }}
-              onClick={() => navigate('/funds')}
-            >
-              💰 Add Funds
-            </button>
-          </div>
-        </div>
+
       </div>
     </div>
   );

@@ -443,7 +443,7 @@ const TradeSetup: React.FC = () => {
                     onChange={handleInputChange}
                     state={errors.symbol ? 'error' : 'default'}
                     error={errors.symbol}
-                    placeholder="e.g., RELIANCE, TCS"
+                    placeholder="Search stocks..."
                     disabled={isSubmitting}
                     fullWidth
                   />
