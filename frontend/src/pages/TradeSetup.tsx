@@ -127,12 +127,12 @@ const TradeSetup: React.FC = () => {
             // Handle the new response format
             const results = response.success ? response.data.results : [];
 
-            // Transform results to match expected format
+            // Transform results to match expected format (no prices for fast search)
             const transformedResults = results.map((result: any) => ({
               symbol: result.symbol,
               name: result.name,
               exchange: result.exchange,
-              ltp: result.price || 0,
+              ltp: 0, // No price in search results for speed
               token: result.token || null
             }));
 
@@ -164,7 +164,8 @@ const TradeSetup: React.FC = () => {
       ...prev,
       symbol: selectedSymbol.symbol,
       exchange: selectedSymbol.exchange,
-      price: selectedSymbol.ltp.toString()
+      // Don't set price from search results - user will enter manually or fetch separately
+      price: prev.price // Keep existing price
     }));
     setShowSearchResults(false);
   };
@@ -398,7 +399,7 @@ const TradeSetup: React.FC = () => {
                           {result.symbol}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
-                          {result.name} • ₹{result.ltp}
+                          {result.name}
                         </div>
                       </div>
                     ))}
