@@ -1,6 +1,7 @@
 import express from 'express';
 import { marketDataService } from '../services/marketDataService';
 import { authenticateToken } from '../middleware/auth';
+import { userBrokerConnections } from '../controllers/brokerController';
 
 const router = express.Router();
 
@@ -113,12 +114,13 @@ router.get('/indices', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Search for symbols (for autocomplete)
+ * Search for symbols (for autocomplete) using live broker APIs
  */
 router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
   try {
     const { query } = req.params;
-    const { limit = 10 } = req.query;
+    const { limit = 10, exchange = 'NSE' } = req.query;
+    const userId = req.user?.id;
 
     if (!query || query.length < 2) {
       return res.status(400).json({
@@ -127,113 +129,104 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    // Comprehensive Indian stock symbol database
-    const stockSymbols = [
-      // NIFTY 50 Stocks
-      { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE' },
-      { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE' },
-      { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE' },
-      { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE' },
-      { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE' },
-      { symbol: 'HINDUNILVR', name: 'Hindustan Unilever Ltd', exchange: 'NSE' },
-      { symbol: 'ITC', name: 'ITC Ltd', exchange: 'NSE' },
-      { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
-      { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', exchange: 'NSE' },
-      { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank Ltd', exchange: 'NSE' },
-      { symbol: 'LT', name: 'Larsen & Toubro Ltd', exchange: 'NSE' },
-      { symbol: 'ASIANPAINT', name: 'Asian Paints Ltd', exchange: 'NSE' },
-      { symbol: 'MARUTI', name: 'Maruti Suzuki India Ltd', exchange: 'NSE' },
-      { symbol: 'BAJFINANCE', name: 'Bajaj Finance Ltd', exchange: 'NSE' },
-      { symbol: 'HCLTECH', name: 'HCL Technologies Ltd', exchange: 'NSE' },
-      { symbol: 'AXISBANK', name: 'Axis Bank Ltd', exchange: 'NSE' },
-      { symbol: 'WIPRO', name: 'Wipro Ltd', exchange: 'NSE' },
-      { symbol: 'ULTRACEMCO', name: 'UltraTech Cement Ltd', exchange: 'NSE' },
-      { symbol: 'NESTLEIND', name: 'Nestle India Ltd', exchange: 'NSE' },
-      { symbol: 'TITAN', name: 'Titan Company Ltd', exchange: 'NSE' },
-      { symbol: 'SUNPHARMA', name: 'Sun Pharmaceutical Industries Ltd', exchange: 'NSE' },
-      { symbol: 'POWERGRID', name: 'Power Grid Corporation of India Ltd', exchange: 'NSE' },
-      { symbol: 'NTPC', name: 'NTPC Ltd', exchange: 'NSE' },
-      { symbol: 'TECHM', name: 'Tech Mahindra Ltd', exchange: 'NSE' },
-      { symbol: 'ONGC', name: 'Oil & Natural Gas Corporation Ltd', exchange: 'NSE' },
-      { symbol: 'TATAMOTORS', name: 'Tata Motors Ltd', exchange: 'NSE' },
-      { symbol: 'TATASTEEL', name: 'Tata Steel Ltd', exchange: 'NSE' },
-      { symbol: 'BAJAJFINSV', name: 'Bajaj Finserv Ltd', exchange: 'NSE' },
-      { symbol: 'JSWSTEEL', name: 'JSW Steel Ltd', exchange: 'NSE' },
-      { symbol: 'INDUSINDBK', name: 'IndusInd Bank Ltd', exchange: 'NSE' },
-      { symbol: 'DRREDDY', name: 'Dr Reddys Laboratories Ltd', exchange: 'NSE' },
-      { symbol: 'CIPLA', name: 'Cipla Ltd', exchange: 'NSE' },
-      { symbol: 'EICHERMOT', name: 'Eicher Motors Ltd', exchange: 'NSE' },
-      { symbol: 'COALINDIA', name: 'Coal India Ltd', exchange: 'NSE' },
-      { symbol: 'GRASIM', name: 'Grasim Industries Ltd', exchange: 'NSE' },
-      { symbol: 'HEROMOTOCO', name: 'Hero MotoCorp Ltd', exchange: 'NSE' },
-      { symbol: 'BRITANNIA', name: 'Britannia Industries Ltd', exchange: 'NSE' },
-      { symbol: 'DIVISLAB', name: 'Divis Laboratories Ltd', exchange: 'NSE' },
-      { symbol: 'ADANIPORTS', name: 'Adani Ports and Special Economic Zone Ltd', exchange: 'NSE' },
-      { symbol: 'BPCL', name: 'Bharat Petroleum Corporation Ltd', exchange: 'NSE' },
-      { symbol: 'SHREECEM', name: 'Shree Cement Ltd', exchange: 'NSE' },
-      { symbol: 'APOLLOHOSP', name: 'Apollo Hospitals Enterprise Ltd', exchange: 'NSE' },
-      { symbol: 'HINDALCO', name: 'Hindalco Industries Ltd', exchange: 'NSE' },
-      { symbol: 'TATACONSUM', name: 'Tata Consumer Products Ltd', exchange: 'NSE' },
-      { symbol: 'ADANIENT', name: 'Adani Enterprises Ltd', exchange: 'NSE' },
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
 
-      // Popular Mid & Small Cap Stocks
-      { symbol: 'ZOMATO', name: 'Zomato Ltd', exchange: 'NSE' },
-      { symbol: 'PAYTM', name: 'One 97 Communications Ltd', exchange: 'NSE' },
-      { symbol: 'NYKAA', name: 'FSN E-Commerce Ventures Ltd', exchange: 'NSE' },
-      { symbol: 'POLICYBZR', name: 'PB Fintech Ltd', exchange: 'NSE' },
-      { symbol: 'IRCTC', name: 'Indian Railway Catering And Tourism Corporation Ltd', exchange: 'NSE' },
-      { symbol: 'DMART', name: 'Avenue Supermarts Ltd', exchange: 'NSE' },
-      { symbol: 'PIDILITIND', name: 'Pidilite Industries Ltd', exchange: 'NSE' },
-      { symbol: 'GODREJCP', name: 'Godrej Consumer Products Ltd', exchange: 'NSE' },
-      { symbol: 'MARICO', name: 'Marico Ltd', exchange: 'NSE' },
-      { symbol: 'DABUR', name: 'Dabur India Ltd', exchange: 'NSE' },
-      { symbol: 'BIOCON', name: 'Biocon Ltd', exchange: 'NSE' },
-      { symbol: 'LUPIN', name: 'Lupin Ltd', exchange: 'NSE' },
-      { symbol: 'AUBANK', name: 'AU Small Finance Bank Ltd', exchange: 'NSE' },
-      { symbol: 'BANDHANBNK', name: 'Bandhan Bank Ltd', exchange: 'NSE' },
-      { symbol: 'FEDERALBNK', name: 'Federal Bank Ltd', exchange: 'NSE' },
-      { symbol: 'IDFCFIRSTB', name: 'IDFC First Bank Ltd', exchange: 'NSE' },
-      { symbol: 'PNB', name: 'Punjab National Bank', exchange: 'NSE' },
-      { symbol: 'CANBK', name: 'Canara Bank', exchange: 'NSE' },
-      { symbol: 'BANKBARODA', name: 'Bank of Baroda', exchange: 'NSE' },
-      { symbol: 'IOC', name: 'Indian Oil Corporation Ltd', exchange: 'NSE' },
-      { symbol: 'GAIL', name: 'GAIL (India) Ltd', exchange: 'NSE' },
-      { symbol: 'SAIL', name: 'Steel Authority of India Ltd', exchange: 'NSE' },
-      { symbol: 'VEDL', name: 'Vedanta Ltd', exchange: 'NSE' },
-      { symbol: 'NMDC', name: 'NMDC Ltd', exchange: 'NSE' },
-      { symbol: 'MOTHERSON', name: 'Motherson Sumi Systems Ltd', exchange: 'NSE' },
-      { symbol: 'ASHOKLEY', name: 'Ashok Leyland Ltd', exchange: 'NSE' },
-      { symbol: 'M&M', name: 'Mahindra & Mahindra Ltd', exchange: 'NSE' },
-      { symbol: 'BAJAJ-AUTO', name: 'Bajaj Auto Ltd', exchange: 'NSE' },
-      { symbol: 'TVSMOTOR', name: 'TVS Motor Company Ltd', exchange: 'NSE' },
-      { symbol: 'ESCORTS', name: 'Escorts Ltd', exchange: 'NSE' },
-      { symbol: 'SIEMENS', name: 'Siemens Ltd', exchange: 'NSE' },
-      { symbol: 'ABB', name: 'ABB India Ltd', exchange: 'NSE' },
-      { symbol: 'HAVELLS', name: 'Havells India Ltd', exchange: 'NSE' },
-      { symbol: 'VOLTAS', name: 'Voltas Ltd', exchange: 'NSE' },
-      { symbol: 'WHIRLPOOL', name: 'Whirlpool of India Ltd', exchange: 'NSE' },
-      { symbol: 'CROMPTON', name: 'Crompton Greaves Consumer Electricals Ltd', exchange: 'NSE' },
+    // Try to get live search results from connected brokers
+    let brokerResults: any[] = [];
+    let fallbackUsed = false;
 
-      // BSE Listed Stocks
-      { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'BSE' },
-      { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'BSE' },
-      { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'BSE' },
-      { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'BSE' },
-      { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'BSE' }
-    ];
+    // Get user's broker connections
+    const userConnections = userBrokerConnections.get(userId);
 
-    const results = stockSymbols
-      .filter(stock =>
-        stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-        stock.name.toLowerCase().includes(query.toLowerCase())
-      )
-      .slice(0, parseInt(limit as string));
+    if (userConnections && userConnections.size > 0) {
+      // Try each connected broker for symbol search
+      for (const [brokerName, brokerService] of userConnections) {
+        try {
+          console.log(`🔍 Searching symbols via ${brokerName} for query: ${query}`);
+          const searchResults = await brokerService.searchScrip(exchange as string, query);
+
+          if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
+            // Transform broker results to standard format
+            const transformedResults = searchResults.slice(0, parseInt(limit as string)).map((result: any) => {
+              // Handle different broker response formats
+              if (brokerName === 'shoonya') {
+                return {
+                  symbol: result.tsym || result.symbol,
+                  name: result.cname || result.name || result.tsym,
+                  exchange: result.exch || exchange,
+                  token: result.token,
+                  brokerData: result
+                };
+              } else if (brokerName === 'fyers') {
+                return {
+                  symbol: result.symbol?.split(':')[1] || result.symbol,
+                  name: result.description || result.name || result.symbol,
+                  exchange: result.symbol?.split(':')[0] || exchange,
+                  token: result.fyToken,
+                  brokerData: result
+                };
+              }
+              return result;
+            });
+
+            brokerResults = transformedResults;
+            console.log(`✅ Found ${brokerResults.length} results from ${brokerName}`);
+            break; // Use first successful broker
+          }
+        } catch (error: any) {
+          console.warn(`⚠️ ${brokerName} search failed:`, error.message);
+          continue; // Try next broker
+        }
+      }
+    }
+
+    // Fallback to static database if no broker results
+    if (brokerResults.length === 0) {
+      console.log('📋 Using fallback static symbol database');
+      fallbackUsed = true;
+
+      const fallbackSymbols = [
+        { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE' },
+        { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE' },
+        { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE' },
+        { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE' },
+        { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE' },
+        { symbol: 'HINDUNILVR', name: 'Hindustan Unilever Ltd', exchange: 'NSE' },
+        { symbol: 'ITC', name: 'ITC Ltd', exchange: 'NSE' },
+        { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
+        { symbol: 'BHARTIARTL', name: 'Bharti Airtel Ltd', exchange: 'NSE' },
+        { symbol: 'KOTAKBANK', name: 'Kotak Mahindra Bank Ltd', exchange: 'NSE' },
+        { symbol: 'ZOMATO', name: 'Zomato Ltd', exchange: 'NSE' },
+        { symbol: 'PAYTM', name: 'One 97 Communications Ltd', exchange: 'NSE' },
+        { symbol: 'NYKAA', name: 'FSN E-Commerce Ventures Ltd', exchange: 'NSE' }
+      ];
+
+      brokerResults = fallbackSymbols
+        .filter(stock =>
+          stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
+          stock.name.toLowerCase().includes(query.toLowerCase())
+        )
+        .slice(0, parseInt(limit as string));
+    }
 
     // Fetch live prices for search results
-    const symbols = results.map(r => r.symbol);
-    const prices = await marketDataService.getPrices(symbols);
+    const symbols = brokerResults.map(r => r.symbol);
+    let prices = new Map();
 
-    const enrichedResults = results.map(stock => ({
+    if (symbols.length > 0) {
+      try {
+        prices = await marketDataService.getPrices(symbols, exchange as string);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch live prices, continuing without prices');
+      }
+    }
+
+    const enrichedResults = brokerResults.map(stock => ({
       ...stock,
       price: prices.get(stock.symbol)?.price || null,
       change: prices.get(stock.symbol)?.change || null,
@@ -245,7 +238,9 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       data: {
         results: enrichedResults,
         count: enrichedResults.length,
-        query
+        query,
+        source: fallbackUsed ? 'fallback' : 'broker_api',
+        exchange: exchange
       }
     });
   } catch (error: any) {

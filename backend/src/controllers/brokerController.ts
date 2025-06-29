@@ -9,7 +9,7 @@ import orderStatusService from '../services/orderStatusService';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
-const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
+export const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
 
 // Store connected account data per user
 interface ConnectedAccount {

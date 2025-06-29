@@ -117,19 +117,24 @@ const KiteTradeSetup: React.FC = () => {
         setSearchLoading(true);
         timeoutId = setTimeout(async () => {
           try {
-            // Use live market data service for symbol search
-            const results = await marketDataService.searchSymbols(searchTerm, 8);
+            // Use live broker API search with fallback to market data service
+            const results = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
 
             // Transform results to match expected format
             const transformedResults = results.map(result => ({
               symbol: result.symbol,
               name: result.name,
               exchange: result.exchange,
-              ltp: result.price || 0
+              ltp: result.price || 0,
+              token: result.token || null
             }));
 
             setSearchResults(transformedResults);
-            setShowSearchResults(true);
+            setShowSearchResults(transformedResults.length > 0);
+
+            if (transformedResults.length === 0) {
+              console.log('No results found for:', searchTerm);
+            }
           } catch (error) {
             console.error('Symbol search failed:', error);
             // Fallback to empty results on error

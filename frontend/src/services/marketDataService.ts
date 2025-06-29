@@ -25,6 +25,8 @@ export interface SymbolSearchResult {
   price?: number;
   change?: number;
   changePercent?: number;
+  token?: string;
+  brokerData?: any;
 }
 
 class MarketDataService {
@@ -78,15 +80,44 @@ class MarketDataService {
   }
 
   /**
-   * Search for symbols (for autocomplete)
+   * Search for symbols (for autocomplete) using live broker APIs
    */
-  async searchSymbols(query: string, limit: number = 10): Promise<SymbolSearchResult[]> {
+  async searchSymbols(query: string, limit: number = 10, exchange: string = 'NSE'): Promise<SymbolSearchResult[]> {
     if (query.length < 2) {
       return [];
     }
-    
-    const response = await this.makeRequest(`/search/${encodeURIComponent(query)}?limit=${limit}`);
+
+    const response = await this.makeRequest(`/search/${encodeURIComponent(query)}?limit=${limit}&exchange=${exchange}`);
     return response.data.results;
+  }
+
+  /**
+   * Search symbols using specific broker API
+   */
+  async searchSymbolsViaBroker(brokerName: string, exchange: string, query: string): Promise<any> {
+    if (query.length < 2) {
+      return { success: false, data: [] };
+    }
+
+    try {
+      // Use the broker API endpoint directly
+      const response = await fetch(`/api/broker/search/${brokerName}/${exchange}/${encodeURIComponent(query)}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Broker symbol search failed:', error);
+      return { success: false, data: [] };
+    }
   }
 
   /**
