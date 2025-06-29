@@ -258,6 +258,13 @@ class WebSocketService {
   }
 
   /**
+   * Get Socket.IO server instance
+   */
+  getIO(): Server | null {
+    return this.io;
+  }
+
+  /**
    * Shutdown Socket.IO service
    */
   shutdown(): void {

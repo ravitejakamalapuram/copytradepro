@@ -20,6 +20,7 @@ import KiteFunds from './pages/KiteFunds';
 import KiteTradeSetup from './pages/KiteTradeSetup';
 import KiteAccountSetup from './pages/KiteAccountSetup';
 import KitePortfolio from './pages/KitePortfolio';
+import MarketOverview from './pages/MarketOverview';
 import './styles/enterprise-base.css';
 
 // Protected Route Component
@@ -165,6 +166,14 @@ const AppContent: React.FC = () => {
         <Route
           path="/demo"
           element={<ComponentDemo />}
+        />
+        <Route
+          path="/market-overview"
+          element={
+            <ProtectedRoute>
+              <MarketOverview />
+            </ProtectedRoute>
+          }
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

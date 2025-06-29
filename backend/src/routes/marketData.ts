@@ -1,7 +1,7 @@
 import express from 'express';
 import { marketDataService } from '../services/marketDataService';
 import { authenticateToken } from '../middleware/auth';
-import { userBrokerConnections } from '../controllers/brokerController';
+import { symbolDatabaseService } from '../services/symbolDatabaseService';
 
 const router = express.Router();
 
@@ -138,92 +138,33 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
 
     console.log(`🔍 Symbol search request: query="${query}", limit=${limit}, exchange=${exchange}, userId=${userId}`);
 
-    // Try to get live search results from connected brokers
-    let brokerResults: any[] = [];
+    // Use NSE official symbol database for search (broker-independent)
+    let searchResults: any[] = [];
 
-    // Get user's broker connections
-    const userConnections = userBrokerConnections.get(userId);
+    try {
+      console.log(`🔍 Searching NSE symbols for query: "${query}" on ${exchange}`);
 
-    console.log(`📊 User connections check:`, {
-      userId,
-      hasConnections: !!userConnections,
-      connectionCount: userConnections?.size || 0,
-      brokerNames: userConnections ? Array.from(userConnections.keys()) : []
-    });
+      // Search using symbol database service
+      const nseResults = await symbolDatabaseService.searchSymbols(query, parseInt(limit as string));
 
-    if (userConnections && userConnections.size > 0) {
-      // Try each connected broker for symbol search
-      for (const [brokerName, brokerService] of userConnections) {
-        try {
-          console.log(`🔍 Searching symbols via ${brokerName} for query: ${query}`);
-          const searchResults = await brokerService.searchScrip(exchange as string, query);
+      searchResults = nseResults.map((result: any) => ({
+        symbol: result.symbol,
+        name: result.name,
+        exchange: result.exchange,
+        isin: result.isin,
+        series: result.series,
+        source: 'nse_official'
+      }));
 
-          console.log(`📊 ${brokerName} search results:`, {
-            query,
-            exchange,
-            resultsType: typeof searchResults,
-            isArray: Array.isArray(searchResults),
-            length: Array.isArray(searchResults) ? searchResults.length : 'N/A',
-            firstResult: Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null
-          });
+      console.log(`📊 NSE search results: ${searchResults.length} symbols found`);
 
-          if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
-            // Transform broker results to standard format
-            const transformedResults = searchResults.slice(0, parseInt(limit as string)).map((result: any) => {
-              // Handle different broker response formats
-              if (brokerName === 'shoonya') {
-                return {
-                  symbol: result.tsym || result.symbol,
-                  name: result.cname || result.name || result.tsym,
-                  exchange: result.exch || exchange,
-                  token: result.token,
-                  brokerData: result
-                };
-              } else if (brokerName === 'fyers') {
-                return {
-                  symbol: result.symbol?.split(':')[1] || result.symbol,
-                  name: result.description || result.name || result.symbol,
-                  exchange: result.symbol?.split(':')[0] || exchange,
-                  token: result.fyToken,
-                  brokerData: result
-                };
-              }
-              return result;
-            });
-
-            brokerResults = transformedResults;
-            console.log(`✅ Found ${brokerResults.length} results from ${brokerName}`);
-            break; // Use first successful broker
-          }
-        } catch (error: any) {
-          console.warn(`⚠️ ${brokerName} search failed:`, error.message);
-          continue; // Try next broker
-        }
-      }
-    }
-
-    // If no broker results, return empty (no fallback)
-    if (brokerResults.length === 0) {
-      if (!userConnections || userConnections.size === 0) {
-        console.log('❌ No connected brokers available for symbol search');
-        return res.status(400).json({
-          success: false,
-          error: 'No connected brokers available. Please connect a broker account to search symbols.',
-          data: {
-            results: [],
-            count: 0,
-            query,
-            source: 'no_brokers'
-          }
-        });
-      } else {
-        console.log('❌ No results found from connected broker APIs');
-        // Continue with empty results - this is the issue we need to fix
-      }
+    } catch (error: any) {
+      console.error('❌ NSE symbol search failed:', error.message);
+      searchResults = [];
     }
 
     // Fetch live prices for search results
-    const symbols = brokerResults.map(r => r.symbol);
+    const symbols = searchResults.map((r: any) => r.symbol);
     let prices = new Map();
 
     if (symbols.length > 0) {
@@ -234,7 +175,7 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       }
     }
 
-    const enrichedResults = brokerResults.map(stock => ({
+    const enrichedResults = searchResults.map((stock: any) => ({
       ...stock,
       price: prices.get(stock.symbol)?.price || null,
       change: prices.get(stock.symbol)?.change || null,
@@ -265,32 +206,170 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Check broker connection status (for debugging)
+ * Check symbol database status (for debugging)
  */
-router.get('/broker-status', authenticateToken, async (req: any, res: any) => {
+router.get('/symbol-status', authenticateToken, async (req: any, res: any) => {
   try {
-    const userId = req.user?.id;
-    const userConnections = userBrokerConnections.get(userId);
+    const status = symbolDatabaseService.getStats();
 
-    const status = {
-      userId,
-      hasConnections: !!userConnections,
-      connectionCount: userConnections?.size || 0,
-      brokers: userConnections ? Array.from(userConnections.keys()) : [],
-      allUserConnections: Array.from(userBrokerConnections.keys())
-    };
-
-    console.log('📊 Broker status check:', status);
+    console.log('📊 Symbol database status check:', status);
 
     return res.json({
       success: true,
       data: status
     });
   } catch (error: any) {
-    console.error('❌ Failed to check broker status:', error);
+    console.error('❌ Failed to check symbol database status:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to check broker status',
+      error: 'Failed to check symbol database status',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get NSE market status
+ */
+router.get('/market-status', authenticateToken, async (req: any, res: any) => {
+  try {
+    const status = await symbolDatabaseService.getMarketStatus();
+
+    return res.json({
+      success: true,
+      data: status
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get market status:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get market status',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get NSE gainers
+ */
+router.get('/gainers', authenticateToken, async (req: any, res: any) => {
+  try {
+    const gainers = await symbolDatabaseService.getGainers();
+
+    return res.json({
+      success: true,
+      data: gainers
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get gainers:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get gainers',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get NSE losers
+ */
+router.get('/losers', authenticateToken, async (req: any, res: any) => {
+  try {
+    const losers = await symbolDatabaseService.getLosers();
+
+    return res.json({
+      success: true,
+      data: losers
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get losers:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get losers',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get 52-week high stocks
+ */
+router.get('/52-week-high', authenticateToken, async (req: any, res: any) => {
+  try {
+    const stocks = await symbolDatabaseService.get52WeekHigh();
+
+    return res.json({
+      success: true,
+      data: stocks
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get 52-week high stocks:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get 52-week high stocks',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get 52-week low stocks
+ */
+router.get('/52-week-low', authenticateToken, async (req: any, res: any) => {
+  try {
+    const stocks = await symbolDatabaseService.get52WeekLow();
+
+    return res.json({
+      success: true,
+      data: stocks
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get 52-week low stocks:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get 52-week low stocks',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get top value stocks
+ */
+router.get('/top-value', authenticateToken, async (req: any, res: any) => {
+  try {
+    const stocks = await symbolDatabaseService.getTopValueStocks();
+
+    return res.json({
+      success: true,
+      data: stocks
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get top value stocks:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get top value stocks',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get top volume stocks
+ */
+router.get('/top-volume', authenticateToken, async (req: any, res: any) => {
+  try {
+    const stocks = await symbolDatabaseService.getTopVolumeStocks();
+
+    return res.json({
+      success: true,
+      data: stocks
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get top volume stocks:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get top volume stocks',
       details: error.message
     });
   }

@@ -352,11 +352,24 @@ export class ShoonyaService {
     }
 
     try {
+      console.log(`🔍 Shoonya searchScrip called:`, {
+        exchange,
+        searchText,
+        hasSessionToken: !!this.sessionToken
+      });
+
       const response = await this.makeRequest('SearchScrip', {
-        uid: '',
+        uid: this.userId,
         exch: exchange,
         stext: searchText,
         token: this.sessionToken,
+      });
+
+      console.log(`📊 Shoonya searchScrip response:`, {
+        responseType: typeof response,
+        isArray: Array.isArray(response),
+        length: Array.isArray(response) ? response.length : 'N/A',
+        response: response
       });
 
       return response;

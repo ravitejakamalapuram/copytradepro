@@ -80,28 +80,15 @@ class MarketDataService {
   }
 
   /**
-   * Search for symbols (for autocomplete) using live broker APIs
+   * Search symbols using NSE API (broker-independent)
    */
-  async searchSymbols(query: string, limit: number = 10, exchange: string = 'NSE'): Promise<SymbolSearchResult[]> {
-    if (query.length < 2) {
-      return [];
-    }
-
-    const response = await this.makeRequest(`/search/${encodeURIComponent(query)}?limit=${limit}&exchange=${exchange}`);
-    return response.data.results;
-  }
-
-  /**
-   * Search symbols using specific broker API
-   */
-  async searchSymbolsViaBroker(brokerName: string, exchange: string, query: string): Promise<any> {
+  async searchSymbols(query: string, limit: number = 10, exchange: string = 'NSE'): Promise<any> {
     if (query.length < 2) {
       return { success: false, data: [] };
     }
 
     try {
-      // Use the broker API endpoint directly
-      const response = await fetch(`/api/broker/search/${brokerName}/${exchange}/${encodeURIComponent(query)}`, {
+      const response = await fetch(`/api/market-data/search/${encodeURIComponent(query)}?limit=${limit}&exchange=${exchange}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -115,7 +102,175 @@ class MarketDataService {
 
       return await response.json();
     } catch (error) {
-      console.error('Broker symbol search failed:', error);
+      console.error('Symbol search failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get NSE market status
+   */
+  async getMarketStatus(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/market-status', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Market status fetch failed:', error);
+      return { success: false, data: null };
+    }
+  }
+
+  /**
+   * Get NSE gainers
+   */
+  async getGainers(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/gainers', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Gainers fetch failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get NSE losers
+   */
+  async getLosers(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/losers', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Losers fetch failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get 52-week high stocks
+   */
+  async get52WeekHigh(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/52-week-high', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('52-week high fetch failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get 52-week low stocks
+   */
+  async get52WeekLow(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/52-week-low', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('52-week low fetch failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get top value stocks
+   */
+  async getTopValueStocks(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/top-value', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Top value stocks fetch failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * Get top volume stocks
+   */
+  async getTopVolumeStocks(): Promise<any> {
+    try {
+      const response = await fetch('/api/market-data/top-volume', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Top volume stocks fetch failed:', error);
       return { success: false, data: [] };
     }
   }

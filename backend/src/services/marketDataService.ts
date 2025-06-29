@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { nseService, NSEMarketIndex } from './nseService';
 
 export interface MarketPrice {
   symbol: string;
@@ -130,7 +131,7 @@ class MarketDataService {
   }
 
   /**
-   * Fetch real-time price from Yahoo Finance
+   * Fetch real-time price from NSE API with Yahoo Finance fallback
    */
   async getPrice(symbol: string, exchange: string = 'NSE'): Promise<MarketPrice | null> {
     try {
@@ -140,6 +141,31 @@ class MarketDataService {
         return cached;
       }
 
+      // Try NSE API first for NSE symbols
+      if (exchange === 'NSE') {
+        try {
+          const nseQuote = await nseService.getQuoteInfo(symbol);
+          if (nseQuote) {
+            const marketPrice: MarketPrice = {
+              symbol: symbol,
+              price: nseQuote.lastPrice || 0,
+              change: nseQuote.change || 0,
+              changePercent: nseQuote.pChange || 0,
+              volume: 0, // NSE API doesn't provide volume in this format
+              lastUpdated: new Date(),
+              exchange: 'NSE'
+            };
+
+            // Cache the result
+            this.cachePrice(symbol, marketPrice);
+            return marketPrice;
+          }
+        } catch (nseError) {
+          console.warn(`⚠️ NSE API failed for ${symbol}, trying Yahoo Finance:`, nseError);
+        }
+      }
+
+      // Fallback to Yahoo Finance
       const yahooSymbol = this.formatSymbolForYahoo(symbol, exchange);
 
       const response = await axios.get<YahooFinanceResponse>(this.YAHOO_BASE_URL, {
@@ -147,7 +173,7 @@ class MarketDataService {
           symbols: yahooSymbol,
           fields: 'regularMarketPrice,regularMarketChange,regularMarketChangePercent,regularMarketVolume,marketState,fullExchangeName'
         },
-        timeout: 3000, // Reduced timeout
+        timeout: 3000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -155,12 +181,12 @@ class MarketDataService {
 
       const quote = response.data?.quoteResponse?.result?.[0];
       if (!quote) {
-        console.warn(`⚠️ No Yahoo Finance data for ${symbol}, using fallback`);
+        console.warn(`⚠️ No data available for ${symbol}, using fallback`);
         return this.getFallbackPrice(symbol, exchange);
       }
 
       const marketPrice: MarketPrice = {
-        symbol: symbol, // Use original symbol
+        symbol: symbol,
         price: quote.regularMarketPrice || 0,
         change: quote.regularMarketChange || 0,
         changePercent: quote.regularMarketChangePercent || 0,
@@ -175,7 +201,7 @@ class MarketDataService {
       return marketPrice;
 
     } catch (error: any) {
-      console.warn(`⚠️ Failed to fetch ${symbol} from Yahoo Finance, using fallback:`, error.message);
+      console.warn(`⚠️ Failed to fetch ${symbol}, using fallback:`, error.message);
       return this.getFallbackPrice(symbol, exchange);
     }
   }
@@ -292,9 +318,29 @@ class MarketDataService {
   }
 
   /**
-   * Get major Indian market indices
+   * Get major Indian market indices from NSE API with Yahoo Finance fallback
    */
   async getMarketIndices(): Promise<MarketIndex[]> {
+    try {
+      // Try NSE API first
+      const nseIndices = await nseService.getIndices();
+      if (nseIndices && nseIndices.length > 0) {
+        const results: MarketIndex[] = nseIndices.map((index: NSEMarketIndex) => ({
+          name: index.name,
+          value: index.last || 0,
+          change: index.variation || 0,
+          changePercent: index.percentChange || 0,
+          lastUpdated: new Date()
+        }));
+
+        console.log(`📊 Successfully fetched ${results.length} market indices from NSE`);
+        return results;
+      }
+    } catch (error) {
+      console.warn('⚠️ NSE indices API failed, trying Yahoo Finance:', error);
+    }
+
+    // Fallback to Yahoo Finance
     const indices = [
       { symbol: '^NSEI', name: 'NIFTY 50' },
       { symbol: '^BSESN', name: 'SENSEX' },
@@ -368,6 +414,8 @@ class MarketDataService {
   clearCache(): void {
     this.cache.clear();
   }
+
+
 
   /**
    * Get cache statistics

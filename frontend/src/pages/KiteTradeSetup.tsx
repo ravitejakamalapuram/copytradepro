@@ -119,13 +119,16 @@ const KiteTradeSetup: React.FC = () => {
           try {
             console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
 
-            // Use live broker API search with fallback to market data service
-            const results = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
+            // Use NSE API search (broker-independent)
+            const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
 
-            console.log(`📊 Frontend: Received ${results.length} results:`, results);
+            console.log(`📊 Frontend: Received response:`, response);
+
+            // Handle the new response format
+            const results = response.success ? response.data.results : [];
 
             // Transform results to match expected format
-            const transformedResults = results.map(result => ({
+            const transformedResults = results.map((result: any) => ({
               symbol: result.symbol,
               name: result.name,
               exchange: result.exchange,
@@ -143,12 +146,6 @@ const KiteTradeSetup: React.FC = () => {
             }
           } catch (error: any) {
             console.error('❌ Frontend: Symbol search failed:', error);
-
-            // Check if it's a "no brokers" error
-            if (error.response?.data?.error?.includes('No connected brokers')) {
-              console.log('ℹ️ No connected brokers available for symbol search');
-              // You could show a message to connect brokers here
-            }
 
             // Always show empty results on error
             setSearchResults([]);

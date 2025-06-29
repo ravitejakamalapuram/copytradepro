@@ -16,6 +16,8 @@ import { errorHandler } from './middleware/errorHandler';
 import { validateEnv } from './utils/validateEnv';
 import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
+import { symbolDatabaseService } from './services/symbolDatabaseService';
+import { realTimeDataService } from './services/realTimeDataService';
 
 // Load environment variables
 dotenv.config();
@@ -191,6 +193,12 @@ const server = createServer(app);
 // Initialize Socket.IO
 websocketService.initialize(server);
 
+// Initialize real-time data service
+const io = websocketService.getIO();
+if (io) {
+  realTimeDataService.initialize(io);
+}
+
 // Start order status monitoring
 orderStatusService.startMonitoring().catch((error: any) => {
   console.error('Failed to start order status monitoring:', error);
@@ -203,6 +211,8 @@ server.listen(PORT, () => {
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
   console.log(`🔄 Socket.IO enabled for real-time updates`);
   console.log(`📊 Order status monitoring active`);
+  console.log(`📈 NSE Symbol Database initialized with daily auto-updates`);
+  console.log(`⚡ Real-time price streaming active`);
 });
 
 // Graceful shutdown
