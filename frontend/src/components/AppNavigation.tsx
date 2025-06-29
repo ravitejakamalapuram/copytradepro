@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -13,7 +13,7 @@ interface PortfolioSummary {
   dayPnLPercent: number;
 }
 
-const KiteNavigation: React.FC = () => {
+const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
@@ -375,4 +375,4 @@ const KiteNavigation: React.FC = () => {
   );
 };
 
-export default KiteNavigation;
+export default AppNavigation;

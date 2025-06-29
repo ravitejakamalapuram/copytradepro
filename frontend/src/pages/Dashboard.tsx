@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import KiteNavigation from '../components/KiteNavigation';
+import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 
 
@@ -26,7 +26,7 @@ interface DashboardSummary {
   dayPnLPercent: number;
 }
 
-const KiteDashboard: React.FC = () => {
+const Dashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const [positions, setPositions] = useState<Position[]>([]);
@@ -96,7 +96,7 @@ const KiteDashboard: React.FC = () => {
   if (loading) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div style={{
             display: 'flex',
@@ -117,7 +117,7 @@ const KiteDashboard: React.FC = () => {
   if (error) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
@@ -136,7 +136,7 @@ const KiteDashboard: React.FC = () => {
 
   return (
     <div className="kite-theme">
-      <KiteNavigation />
+      <AppNavigation />
 
       <div className="kite-main">
         {/* Portfolio Overview */}
@@ -271,4 +271,4 @@ const KiteDashboard: React.FC = () => {
   );
 };
 
-export default KiteDashboard;
+export default Dashboard;

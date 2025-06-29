@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import KiteNavigation from '../components/KiteNavigation';
+import AppNavigation from '../components/AppNavigation';
 import { advancedOrderService } from '../services/advancedOrderService';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 interface Order {
   id: string;
@@ -19,7 +19,7 @@ interface Order {
   createdAt?: string;
 }
 
-const KiteOrders: React.FC = () => {
+const Orders: React.FC = () => {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed'>('all');
@@ -110,7 +110,7 @@ const KiteOrders: React.FC = () => {
   if (loading) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div style={{
             display: 'flex',
@@ -131,7 +131,7 @@ const KiteOrders: React.FC = () => {
   if (error) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
@@ -150,7 +150,7 @@ const KiteOrders: React.FC = () => {
 
   return (
     <div className="kite-theme">
-      <KiteNavigation />
+      <AppNavigation />
       
       <div className="kite-main">
         <div className="kite-card">
@@ -390,4 +390,4 @@ const KiteOrders: React.FC = () => {
   );
 };
 
-export default KiteOrders;
+export default Orders;

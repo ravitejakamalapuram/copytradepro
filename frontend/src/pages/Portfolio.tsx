@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import KiteNavigation from '../components/KiteNavigation';
+import AppNavigation from '../components/AppNavigation';
 import PortfolioSummary from '../components/PortfolioSummary';
 import TabbedNavigation from '../components/TabbedNavigation';
 import PortfolioTable from '../components/PortfolioTable';
 import SortControls from '../components/SortControls';
 import { portfolioService } from '../services/portfolioService';
 import type { PortfolioItem, SortField, SortOrder } from '../components/PortfolioTable';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 // PortfolioItem interface is now imported from PortfolioTable component
 
@@ -27,7 +27,7 @@ interface PortfolioSummary {
 type ViewMode = 'all' | 'holdings' | 'positions';
 // SortField and SortOrder types are now imported from PortfolioTable component
 
-const KitePortfolio: React.FC = () => {
+const Portfolio: React.FC = () => {
   const navigate = useNavigate();
   const [portfolioItems, setPortfolioItems] = useState<PortfolioItem[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary>({
@@ -195,7 +195,7 @@ const KitePortfolio: React.FC = () => {
   if (loading) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main" style={{
           display: 'flex',
           justifyContent: 'center',
@@ -220,7 +220,7 @@ const KitePortfolio: React.FC = () => {
   if (error) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
@@ -244,7 +244,7 @@ const KitePortfolio: React.FC = () => {
 
   return (
     <div className="kite-theme">
-      <KiteNavigation />
+      <AppNavigation />
       <div className="kite-main">
         {/* Header */}
         <div style={{ 
@@ -339,4 +339,4 @@ const KitePortfolio: React.FC = () => {
   );
 };
 
-export default KitePortfolio;
+export default Portfolio;

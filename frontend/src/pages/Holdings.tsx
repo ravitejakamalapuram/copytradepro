@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import KiteNavigation from '../components/KiteNavigation';
+import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 interface Holding {
   symbol: string;
@@ -27,7 +27,7 @@ interface HoldingsSummary {
   dayPnLPercent: number;
 }
 
-const KiteHoldings: React.FC = () => {
+const Holdings: React.FC = () => {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [portfolioSummary, setPortfolioSummary] = useState<HoldingsSummary>({
     totalValue: 0,
@@ -104,7 +104,7 @@ const KiteHoldings: React.FC = () => {
   if (loading) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div style={{
             display: 'flex',
@@ -125,7 +125,7 @@ const KiteHoldings: React.FC = () => {
   if (error) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
@@ -144,7 +144,7 @@ const KiteHoldings: React.FC = () => {
 
   return (
     <div className="kite-theme">
-      <KiteNavigation />
+      <AppNavigation />
       
       <div className="kite-main">
         {/* Portfolio Summary */}
@@ -312,4 +312,4 @@ const KiteHoldings: React.FC = () => {
   );
 };
 
-export default KiteHoldings;
+export default Holdings;

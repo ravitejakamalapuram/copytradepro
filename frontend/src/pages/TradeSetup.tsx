@@ -1,759 +1,653 @@
 import React, { useState, useEffect } from 'react';
-import Navigation from '../components/Navigation';
-import { brokerService } from '../services/brokerService';
-import { accountService } from '../services/accountService';
-import OrderConfirmationDialog from '../components/OrderConfirmationDialog';
-import OrderSearchInput from '../components/OrderSearchInput';
-import ErrorDisplay, { InlineErrorDisplay } from '../components/ErrorDisplay';
-import RealTimeStatusIndicator from '../components/RealTimeStatusIndicator';
-// Removed unused ButtonSpinner import
-import { SkeletonTradeHistory, SkeletonAccountList } from '../components/SkeletonLoader';
-import type { PlaceOrderRequest } from '../services/brokerService';
-import type { ConnectedAccount } from '../services/accountService';
-import { Button, Input, Select, HStack, Checkbox, Card, CardHeader, CardContent } from '../components/ui';
-import './TradeSetup.css';
+import { useNavigate } from 'react-router-dom';
+import AppNavigation from '../components/AppNavigation';
+import { brokerService, type PlaceOrderRequest } from '../services/brokerService';
+import { accountService, type ConnectedAccount } from '../services/accountService';
+import { fundsService } from '../services/fundsService';
+import { marketDataService } from '../services/marketDataService';
+import '../styles/app-theme.css';
 
-interface Trade {
-  id: string;
+interface OrderForm {
   symbol: string;
+  exchange: 'NSE' | 'BSE';
   action: 'BUY' | 'SELL';
-  quantity: number;
-  price: number;
+  quantity: string;
+  price: string;
   orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
-  timestamp: Date;
-  brokerAccounts: string[];
+  product: 'CNC' | 'MIS' | 'NRML';
+  validity: 'DAY' | 'IOC';
+  triggerPrice: string;
+  brokerAccount: string;
+}
+
+interface MarginInfo {
+  required: number;
+  available: number;
+  shortfall: number;
 }
 
 const TradeSetup: React.FC = () => {
-  // const { user } = useAuth(); // Not currently used
-  const [trades, setTrades] = useState<Trade[]>([]);
-  const [showTradeForm, setShowTradeForm] = useState(false);
+  const navigate = useNavigate();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [formData, setFormData] = useState({
+  const [orderForm, setOrderForm] = useState<OrderForm>({
     symbol: '',
-    action: 'BUY' as 'BUY' | 'SELL',
+    exchange: 'NSE',
+    action: 'BUY',
     quantity: '',
     price: '',
-    orderType: 'MARKET' as 'MARKET' | 'LIMIT',
-    brokerAccounts: [] as string[],
+    orderType: 'MARKET',
+    product: 'CNC',
+    validity: 'DAY',
+    triggerPrice: '',
+    brokerAccount: ''
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [generalError, setGeneralError] = useState<any>(null);
-
-  // Order history filtering state
-  const [orderFilters, setOrderFilters] = useState({
-    status: '',
-    symbol: '',
-    brokerName: '',
-    startDate: '',
-    endDate: '',
-    action: '' as '' | 'BUY' | 'SELL',
+  const [marginInfo, setMarginInfo] = useState<MarginInfo>({
+    required: 0,
+    available: 0,
+    shortfall: 0
   });
-  const [showFilters, setShowFilters] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  // Search state
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Loading states
-  const [loadingOrderHistory, setLoadingOrderHistory] = useState(false);
-
-  // Order confirmation dialog state
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingOrderData, setPendingOrderData] = useState<any>(null);
-
-  // Load connected accounts and order history on component mount
   useEffect(() => {
-    loadConnectedAccounts();
-    loadOrderHistory();
+    const fetchAccounts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const accounts = await accountService.getConnectedAccounts();
+        const activeAccounts = accounts.filter(account => account.isActive);
+        setConnectedAccounts(activeAccounts);
+
+        if (activeAccounts.length > 0) {
+          setOrderForm(prev => ({ ...prev, brokerAccount: activeAccounts[0].id }));
+        }
+
+      } catch (error: any) {
+        console.error('Failed to fetch accounts:', error);
+        setError('Failed to load broker accounts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAccounts();
   }, []);
 
-  const loadConnectedAccounts = async () => {
-    try {
-      setLoadingAccounts(true);
-      const accounts = await accountService.getConnectedAccounts();
-      // Filter to show only active accounts for trading
-      const activeAccounts = accounts.filter(account => account.isActive);
-      setConnectedAccounts(activeAccounts);
-    } catch (error) {
-      console.error('Failed to load connected accounts:', error);
-      setGeneralError(error);
-    } finally {
-      setLoadingAccounts(false);
-    }
-  };
-
-  const loadOrderHistory = async (filters?: typeof orderFilters, search?: string) => {
-    try {
-      setLoadingOrderHistory(true);
-
-      // Prepare filters for API call
-      const apiFilters = filters || orderFilters;
-      const cleanFilters = Object.fromEntries(
-        Object.entries(apiFilters).filter(([_, value]) => value !== '')
-      );
-
-      // Add search term if provided
-      if (search || searchTerm) {
-        cleanFilters.search = search || searchTerm;
+  // Calculate margin when form changes
+  useEffect(() => {
+    const calculateMargin = async () => {
+      if (orderForm.symbol && orderForm.quantity && orderForm.price) {
+        try {
+          const margin = await fundsService.getMarginRequirement(
+            orderForm.symbol,
+            parseInt(orderForm.quantity),
+            parseFloat(orderForm.price)
+          );
+          setMarginInfo(margin);
+        } catch (error) {
+          console.error('Failed to calculate margin:', error);
+        }
       }
-
-      const response = await brokerService.getOrderHistory(50, 0, Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
-      if (response.success && response.data) {
-        // Convert order history to Trade format for display
-        const historyTrades: Trade[] = response.data.orders.map(order => ({
-          id: order.broker_order_id,
-          symbol: order.symbol,
-          action: order.action,
-          quantity: order.quantity,
-          price: order.price,
-          orderType: order.order_type,
-          status: order.status as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED',
-          timestamp: new Date(order.executed_at),
-          brokerAccounts: [order.broker_name], // Use broker name as identifier
-        }));
-        setTrades(historyTrades);
-      }
-    } catch (error) {
-      console.error('Failed to load order history:', error);
-      // Don't show error for order history loading failure
-    } finally {
-      setLoadingOrderHistory(false);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
-
-  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setOrderFilters(prev => ({ ...prev, [name]: value }));
-  };
-
-  const applyFilters = () => {
-    loadOrderHistory(orderFilters);
-  };
-
-  const clearFilters = () => {
-    const emptyFilters = {
-      status: '',
-      symbol: '',
-      brokerName: '',
-      startDate: '',
-      endDate: '',
-      action: '' as '' | 'BUY' | 'SELL',
     };
-    setOrderFilters(emptyFilters);
-    setSearchTerm('');
-    loadOrderHistory(emptyFilters, '');
-  };
 
-  const handleSearch = (search: string) => {
-    setSearchTerm(search);
-    loadOrderHistory(orderFilters, search);
-  };
+    if (orderForm.orderType !== 'MARKET') {
+      calculateMargin();
+    }
+  }, [orderForm.symbol, orderForm.quantity, orderForm.price, orderForm.orderType]);
 
-  const handleRealTimeOrderUpdate = (orderId: string, newStatus: string) => {
-    // Update the order in the trades list
-    setTrades(prevTrades =>
-      prevTrades.map(trade =>
-        trade.id === orderId
-          ? { ...trade, status: newStatus as Trade['status'] }
-          : trade
-      )
-    );
+  // Debounced symbol search
+  const handleSymbolSearch = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchTerm: string) => {
+        clearTimeout(timeoutId);
 
-    // Reload order history to get the latest data
-    loadOrderHistory(orderFilters, searchTerm);
-  };
+        if (searchTerm.length < 2) {
+          setSearchResults([]);
+          setShowSearchResults(false);
+          setSearchLoading(false);
+          return;
+        }
 
-  const handleSearchChange = (search: string) => {
-    setSearchTerm(search);
-  };
+        setSearchLoading(true);
+        timeoutId = setTimeout(async () => {
+          try {
+            console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
 
-  const handleAccountSelection = (accountId: string) => {
-    setFormData(prev => ({
+            // Use NSE API search (broker-independent)
+            const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
+
+            console.log(`📊 Frontend: Received response:`, response);
+
+            // Handle the new response format
+            const results = response.success ? response.data.results : [];
+
+            // Transform results to match expected format
+            const transformedResults = results.map((result: any) => ({
+              symbol: result.symbol,
+              name: result.name,
+              exchange: result.exchange,
+              ltp: result.price || 0,
+              token: result.token || null
+            }));
+
+            console.log(`✅ Frontend: Transformed results:`, transformedResults);
+
+            setSearchResults(transformedResults);
+            setShowSearchResults(transformedResults.length > 0);
+
+            if (transformedResults.length === 0) {
+              console.log('❌ Frontend: No results found for:', searchTerm);
+            }
+          } catch (error: any) {
+            console.error('❌ Frontend: Symbol search failed:', error);
+
+            // Always show empty results on error
+            setSearchResults([]);
+            setShowSearchResults(false);
+          } finally {
+            setSearchLoading(false);
+          }
+        }, 300); // 300ms debounce
+      };
+    }, []),
+    []
+  );
+
+  const handleSymbolSelect = (selectedSymbol: any) => {
+    setOrderForm(prev => ({
       ...prev,
-      brokerAccounts: prev.brokerAccounts.includes(accountId)
-        ? prev.brokerAccounts.filter(id => id !== accountId)
-        : [...prev.brokerAccounts, accountId]
+      symbol: selectedSymbol.symbol,
+      exchange: selectedSymbol.exchange,
+      price: selectedSymbol.ltp.toString()
     }));
+    setShowSearchResults(false);
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.symbol.trim()) {
-      newErrors.symbol = 'Please enter a stock symbol (e.g., RELIANCE, TCS)';
-    }
-
-    if (!formData.quantity || Number(formData.quantity) <= 0) {
-      newErrors.quantity = 'Please enter a valid quantity (minimum 1 share)';
-    }
-
-    if (formData.orderType === 'LIMIT' && (!formData.price || Number(formData.price) <= 0)) {
-      newErrors.price = 'Please enter a valid price for limit orders';
-    }
-
-    if (formData.brokerAccounts.length === 0) {
-      newErrors.brokerAccounts = 'Please select at least one active broker account to place the order';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmitTrade = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
+  const handlePlaceOrder = async () => {
+    if (!orderForm.symbol || !orderForm.quantity || !orderForm.brokerAccount) {
+      setError('Please fill all required fields');
       return;
     }
 
-    // Prepare order details for confirmation dialog
-    const selectedAccounts = connectedAccounts.filter(account =>
-      formData.brokerAccounts.includes(account.id)
-    );
+    if (orderForm.orderType !== 'MARKET' && !orderForm.price) {
+      setError('Price is required for limit orders');
+      return;
+    }
 
-    const orderDetails = {
-      symbol: formData.symbol.toUpperCase().trim(),
-      action: formData.action,
-      quantity: Number(formData.quantity),
-      orderType: formData.orderType,
-      price: formData.orderType === 'LIMIT' ? Number(formData.price) : undefined,
-      triggerPrice: undefined, // Add trigger price support later
-      exchange: 'NSE',
-      productType: 'C',
-      selectedAccounts: selectedAccounts.map(account => ({
-        id: account.id,
-        brokerDisplayName: account.brokerDisplayName,
-        brokerName: account.brokerName,
-      })),
-    };
-
-    setPendingOrderData(orderDetails);
-    setShowConfirmDialog(true);
-  };
-
-  const handleConfirmOrder = async () => {
-    if (!pendingOrderData) return;
-
-    setIsSubmitting(true);
+    if (marginInfo.shortfall > 0) {
+      setError(`Insufficient margin. Shortfall: ₹${marginInfo.shortfall.toLocaleString()}`);
+      return;
+    }
 
     try {
-      // Close confirmation dialog
-      setShowConfirmDialog(false);
+      setSubmitting(true);
+      setError(null);
 
-      // Place orders for each selected broker account
-      const orderPromises = formData.brokerAccounts.map(async (accountId) => {
-        const account = connectedAccounts.find(acc => acc.id === accountId);
-        if (!account) {
-          throw new Error(`Account ${accountId} not found`);
-        }
+      const orderRequest: PlaceOrderRequest = {
+        brokerName: connectedAccounts.find(acc => acc.id === orderForm.brokerAccount)?.brokerName || 'Unknown',
+        accountId: orderForm.brokerAccount,
+        symbol: orderForm.symbol,
+        action: orderForm.action,
+        quantity: parseInt(orderForm.quantity),
+        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+        orderType: orderForm.orderType,
+        exchange: orderForm.exchange,
+        productType: orderForm.product,
+        remarks: `${orderForm.validity} order`
+      };
 
-        const orderRequest: PlaceOrderRequest = {
-          brokerName: account.brokerName,
-          accountId: account.id, // Include the specific account ID
-          symbol: pendingOrderData.symbol,
-          action: pendingOrderData.action,
-          quantity: pendingOrderData.quantity,
-          orderType: pendingOrderData.orderType === 'MARKET' ? 'MARKET' : 'LIMIT',
-          price: pendingOrderData.orderType === 'LIMIT' ? pendingOrderData.price : undefined,
-          exchange: pendingOrderData.exchange,
-          productType: pendingOrderData.productType,
-          remarks: `Order placed via CopyTrade Pro at ${new Date().toISOString()}`,
-        };
-
-        return brokerService.placeOrder(orderRequest);
-      });
-
-      const responses = await Promise.allSettled(orderPromises);
-
-      // Process results
-      const successfulOrders: Trade[] = [];
-      const failedOrders: string[] = [];
-
-      responses.forEach((result, index) => {
-        const accountId = formData.brokerAccounts[index];
-        const account = connectedAccounts.find(acc => acc.id === accountId);
-
-        if (result.status === 'fulfilled' && result.value.success && result.value.data) {
-          const response = result.value;
-          const orderData = response.data!; // We know it exists from the condition above
-          const newTrade: Trade = {
-            id: `${orderData.orderId}-${accountId}`,
-            symbol: orderData.symbol,
-            action: orderData.action as 'BUY' | 'SELL',
-            quantity: orderData.quantity,
-            price: orderData.price || 0,
-            orderType: orderData.orderType as 'MARKET' | 'LIMIT',
-            status: 'PLACED',
-            timestamp: new Date(orderData.timestamp),
-            brokerAccounts: [accountId],
-          };
-          successfulOrders.push(newTrade);
-        } else {
-          const errorMsg = result.status === 'rejected'
-            ? result.reason?.message || 'Unknown error'
-            : result.value.message || 'Order failed';
-          failedOrders.push(`${account?.brokerDisplayName || accountId}: ${errorMsg}`);
-        }
-      });
-
-      // Update trades with successful orders and reload history
-      if (successfulOrders.length > 0) {
-        setTrades(prev => [...successfulOrders, ...prev]);
-        // Reload order history to get the latest data from database
-        loadOrderHistory();
-      }
-
-      // Handle results
-      if (successfulOrders.length === formData.brokerAccounts.length) {
-        // All orders successful
-        setFormData({
+      const result = await brokerService.placeOrder(orderRequest);
+      
+      if (result.success) {
+        alert(`Order placed successfully! Order ID: ${result.data?.orderId}`);
+        // Reset form
+        setOrderForm(prev => ({
+          ...prev,
           symbol: '',
-          action: 'BUY',
           quantity: '',
           price: '',
-          orderType: 'MARKET',
-          brokerAccounts: [],
-        });
-        setShowTradeForm(false);
-        setErrors({});
-      } else if (successfulOrders.length > 0) {
-        // Partial success
-        setGeneralError({
-          message: `${successfulOrders.length}/${formData.brokerAccounts.length} orders placed successfully`,
-          type: 'partial_success',
-          failedOrders,
-          successfulOrders
-        });
+          triggerPrice: ''
+        }));
+        // Navigate to orders page
+        navigate('/orders');
       } else {
-        // All failed
-        setGeneralError({
-          message: `All orders failed: ${failedOrders.join(', ')}`,
-          type: 'all_failed',
-          failedOrders
-        });
+        setError(result.message || 'Failed to place order');
       }
-    } catch (error) {
-      console.error('🚨 Trade submission error:', error);
-      setGeneralError(error);
+
+    } catch (error: any) {
+      console.error('Order placement failed:', error);
+      setError(error.message || 'Failed to place order');
     } finally {
-      setIsSubmitting(false);
-      setPendingOrderData(null);
+      setSubmitting(false);
     }
   };
 
-  const handleCloseConfirmDialog = () => {
-    if (!isSubmitting) {
-      setShowConfirmDialog(false);
-      setPendingOrderData(null);
-    }
+  const formatCurrency = (amount: number): string => {
+    return new Intl.NumberFormat('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(amount);
   };
 
-  const getStatusColor = (status: Trade['status']) => {
-    switch (status) {
-      case 'PENDING': return 'warning';
-      case 'EXECUTED': return 'success';
-      case 'CANCELLED': return 'secondary';
-      case 'FAILED': return 'error';
-      default: return 'secondary';
-    }
-  };
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <AppNavigation />
+        <div className="kite-main">
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>📈</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading trading setup...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (connectedAccounts.length === 0) {
+    return (
+      <div className="kite-theme">
+        <AppNavigation />
+        <div className="kite-main">
+          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem' }}>
+              No Active Broker Accounts
+            </div>
+            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
+              Connect and activate a broker account to start trading
+            </div>
+            <button 
+              className="kite-btn kite-btn-primary"
+              onClick={() => navigate('/account-setup')}
+            >
+              Connect Broker Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="app">
-      <Navigation />
-
-      <main className="app-main">
-        <div className="main-container">
-          <div className="page-header">
-            <h1 className="page-title">Trade Setup & History</h1>
-            <p className="page-subtitle">Execute trades across multiple broker accounts</p>
-          </div>
-
-          <div className="section">
-            <div className="section-header">
-              <h2 className="section-title">Real-time Status</h2>
+    <div className="kite-theme">
+      <AppNavigation />
+      
+      <div className="kite-main">
+        {/* Page Header */}
+        <div className="kite-card">
+          <div className="kite-card-header">
+            <h1 className="kite-card-title">Place Order</h1>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button 
+                className="kite-btn"
+                onClick={() => navigate('/orders')}
+              >
+                📋 View Orders
+              </button>
+              <button 
+                className="kite-btn"
+                onClick={() => navigate('/positions')}
+              >
+                🎯 Positions
+              </button>
             </div>
-            <div className="card">
-              <div className="card-body">
-                <RealTimeStatusIndicator
+          </div>
+        </div>
 
-                  onOrderUpdate={handleRealTimeOrderUpdate}
-                />
+        {/* Order Form */}
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
+          {/* Main Order Form */}
+          <div className="kite-card">
+            <div className="kite-card-header">
+              <h2 className="kite-card-title">Order Details</h2>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className={`kite-btn ${orderForm.action === 'BUY' ? 'kite-btn-primary' : ''}`}
+                  onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
+                  style={{
+                    backgroundColor: orderForm.action === 'BUY' ? 'var(--kite-profit)' : undefined,
+                    color: orderForm.action === 'BUY' ? 'white' : undefined
+                  }}
+                >
+                  BUY
+                </button>
+                <button
+                  className={`kite-btn ${orderForm.action === 'SELL' ? 'kite-btn-danger' : ''}`}
+                  onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
+                  style={{
+                    backgroundColor: orderForm.action === 'SELL' ? 'var(--kite-loss)' : undefined,
+                    color: orderForm.action === 'SELL' ? 'white' : undefined
+                  }}
+                >
+                  SELL
+                </button>
               </div>
             </div>
-          </div>
 
-        {/* General Error Display */}
-        {generalError && (
-          <ErrorDisplay
-            error={generalError}
-            context="trading"
-            onRetry={() => {
-              setGeneralError(null);
-              loadConnectedAccounts();
-            }}
-            onAction={() => {
-              setGeneralError(null);
-              // Navigate to account setup if needed
-            }}
-            actionLabel="🔧 Fix Account Setup"
-            dismissible
-            onDismiss={() => setGeneralError(null)}
-          />
-        )}
-
-        {/* Trade Form */}
-        <Card>
-          <CardHeader>
-            <h3 className="card-title">New Trade</h3>
-            <Button
-              variant="primary"
-              onClick={() => setShowTradeForm(!showTradeForm)}
-            >
-              {showTradeForm ? 'Cancel' : 'Place Trade'}
-            </Button>
-          </CardHeader>
-
-          {showTradeForm && (
-            <CardContent>
-              <form onSubmit={handleSubmitTrade} className="trade-form">
-              {errors.general && (
-                <div className="form-error mb-3">{errors.general}</div>
-              )}
-
-              <div className="form-row">
-                <div className="form-group">
-                  <Input
-                    type="text"
-                    label="Symbol"
-                    name="symbol"
-                    value={formData.symbol}
-                    onChange={handleInputChange}
-                    state={errors.symbol ? 'error' : 'default'}
-                    error={errors.symbol}
-                    placeholder="Search stocks..."
-                    disabled={isSubmitting}
-                    fullWidth
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Select
-                    label="Action"
-                    name="action"
-                    value={formData.action}
-                    onChange={handleInputChange}
-                    disabled={isSubmitting}
-                    fullWidth
-                    options={[
-                      { value: 'BUY', label: 'BUY' },
-                      { value: 'SELL', label: 'SELL' }
-                    ]}
-                  />
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <Input
-                    type="number"
-                    label="Quantity"
-                    name="quantity"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    state={errors.quantity ? 'error' : 'default'}
-                    error={errors.quantity}
-                    placeholder="Enter quantity"
-                    min="1"
-                    disabled={isSubmitting}
-                    fullWidth
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Select
-                    label="Order Type"
-                    name="orderType"
-                    value={formData.orderType}
-                    onChange={handleInputChange}
-                    disabled={isSubmitting}
-                    fullWidth
-                    options={[
-                      { value: 'MARKET', label: 'MARKET' },
-                      { value: 'LIMIT', label: 'LIMIT' }
-                    ]}
-                  />
-                </div>
-              </div>
-
-              {formData.orderType === 'LIMIT' && (
-                <div className="form-group">
-                  <Input
-                    type="number"
-                    label="Limit Price"
-                    name="price"
-                    value={formData.price}
-                    onChange={handleInputChange}
-                    state={errors.price ? 'error' : 'default'}
-                    error={errors.price}
-                    placeholder="Enter limit price"
-                    step="0.01"
-                    min="0.01"
-                    disabled={isSubmitting}
-                    fullWidth
-                  />
-                </div>
-              )}
-
-              <div className="form-group">
-                <label className="form-label">
-                  Broker Accounts (Active Only)
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Symbol Search */}
+              <div style={{ position: 'relative' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  Symbol *
                 </label>
-                {loadingAccounts ? (
-                  <SkeletonAccountList accounts={3} />
-                ) : connectedAccounts.length === 0 ? (
-                  <div className="no-accounts">
-                    <p>No active broker accounts found.</p>
-                    <p>Please connect and activate a broker account first.</p>
-                  </div>
-                ) : (
-                  <div className="account-selection">
-                    {connectedAccounts.map(account => (
-                      <Checkbox
-                        key={account.id}
-                        checked={formData.brokerAccounts.includes(account.id)}
-                        onChange={() => handleAccountSelection(account.id)}
-                        disabled={isSubmitting}
-                        state={errors.brokerAccounts ? 'error' : 'default'}
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search stocks (e.g., RELIANCE, TCS)"
+                    value={orderForm.symbol}
+                    onChange={(e) => {
+                      setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
+                      handleSymbolSearch(e.target.value);
+                    }}
+                    className="kite-input"
+                    style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
+                  />
+                  {searchLoading && (
+                    <div style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: '0.875rem'
+                    }}>
+                      ⏳
+                    </div>
+                  )}
+                </div>
+
+                {/* Search Results Dropdown */}
+                {showSearchResults && searchResults.length > 0 && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'var(--kite-bg-secondary)',
+                    border: '1px solid var(--kite-border-primary)',
+                    borderRadius: 'var(--kite-radius-md)',
+                    zIndex: 1000,
+                    maxHeight: '200px',
+                    overflowY: 'auto'
+                  }}>
+                    {searchResults.map((result, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleSymbolSelect(result)}
+                        style={{
+                          padding: '0.75rem',
+                          cursor: 'pointer',
+                          borderBottom: index < searchResults.length - 1 ? '1px solid var(--kite-border-secondary)' : 'none'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <div className="account-info">
-                          <span className="account-name">
-                            {account.brokerDisplayName} - {account.accountId}
-                          </span>
-                          <span className="account-status">✓ Active</span>
+                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                          {result.symbol}
                         </div>
-                      </Checkbox>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                          {result.name} • ₹{result.ltp}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
-                {errors.brokerAccounts && (
-                  <InlineErrorDisplay
-                    error={{ message: errors.brokerAccounts, type: 'validation' }}
-                    context="form"
+              </div>
+
+              {/* Quantity and Price */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                    Quantity *
+                  </label>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={orderForm.quantity}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
+                    className="kite-input"
+                    style={{ fontSize: '1rem' }}
                   />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                    Price {orderForm.orderType === 'MARKET' ? '(Market)' : '*'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    placeholder="0.00"
+                    value={orderForm.price}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
+                    className="kite-input"
+                    style={{ fontSize: '1rem' }}
+                    disabled={orderForm.orderType === 'MARKET'}
+                  />
+                </div>
+              </div>
+
+              {/* Order Type and Product */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                    Order Type
+                  </label>
+                  <select
+                    value={orderForm.orderType}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as any }))}
+                    className="kite-input"
+                    style={{ fontSize: '1rem' }}
+                  >
+                    <option value="MARKET">Market</option>
+                    <option value="LIMIT">Limit</option>
+                    <option value="SL-LIMIT">Stop Loss Limit</option>
+                    <option value="SL-MARKET">Stop Loss Market</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                    Product
+                  </label>
+                  <select
+                    value={orderForm.product}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as any }))}
+                    className="kite-input"
+                    style={{ fontSize: '1rem' }}
+                  >
+                    <option value="CNC">CNC (Delivery)</option>
+                    <option value="MIS">MIS (Intraday)</option>
+                    <option value="NRML">NRML (Normal)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Trigger Price for Stop Loss Orders */}
+              {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                <div>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                    Trigger Price *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    placeholder="0.00"
+                    value={orderForm.triggerPrice}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }))}
+                    className="kite-input"
+                    style={{ fontSize: '1rem' }}
+                  />
+                </div>
+              )}
+
+              {/* Broker Account Selection */}
+              <div>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  Broker Account
+                </label>
+                <select
+                  value={orderForm.brokerAccount}
+                  onChange={(e) => setOrderForm(prev => ({ ...prev, brokerAccount: e.target.value }))}
+                  className="kite-input"
+                  style={{ fontSize: '1rem' }}
+                >
+                  {connectedAccounts.map(account => (
+                    <option key={account.id} value={account.id}>
+                      {account.brokerName} - {account.userId}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Error Display */}
+              {error && (
+                <div style={{
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--kite-bg-danger)',
+                  border: '1px solid var(--kite-loss)',
+                  borderRadius: 'var(--kite-radius-md)',
+                  color: 'var(--kite-loss)',
+                  fontSize: '0.875rem'
+                }}>
+                  {error}
+                </div>
+              )}
+
+              {/* Place Order Button */}
+              <button
+                className="kite-btn kite-btn-primary"
+                onClick={handlePlaceOrder}
+                disabled={submitting || !orderForm.symbol || !orderForm.quantity || !orderForm.brokerAccount}
+                style={{
+                  width: '100%',
+                  justifyContent: 'center',
+                  fontSize: '1rem',
+                  padding: '0.75rem'
+                }}
+              >
+                {submitting ? 'Placing Order...' : `${orderForm.action} ${orderForm.symbol || 'Stock'}`}
+              </button>
+            </div>
+          </div>
+
+          {/* Order Summary & Margin Info */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Order Summary */}
+            <div className="kite-card">
+              <div className="kite-card-header">
+                <h3 className="kite-card-title">Order Summary</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                {orderForm.symbol ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                      }}>
+                        {orderForm.action}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
+                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                        {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
+                    </div>
+                    {orderForm.quantity && orderForm.price && (
+                      <>
+                        <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
+                          <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
+                            ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
+                    <div>Enter order details to see summary</div>
+                  </div>
                 )}
               </div>
-
-              <div className="form-actions">
-                <HStack gap={3}>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowTradeForm(false)}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={isSubmitting}
-                    loading={isSubmitting}
-                  >
-                    {isSubmitting ? 'Placing Trade...' : 'Place Trade'}
-                  </Button>
-                </HStack>
-              </div>
-            </form>
-            </CardContent>
-          )}
-        </Card>
-
-        {/* Trade History */}
-        <div className="card">
-          <div className="card-header">
-            <h3 className="card-title">Trade History</h3>
-            <Button
-              variant="secondary"
-              onClick={() => setShowFilters(!showFilters)}
-            >
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </Button>
-          </div>
-
-          {/* Search Input */}
-          <div className="search-section">
-            <OrderSearchInput
-              value={searchTerm}
-              onChange={handleSearchChange}
-              onSearch={handleSearch}
-              placeholder="Search by symbol (e.g., RELIANCE), order ID, or broker order ID..."
-            />
-          </div>
-
-          {/* Order History Filters */}
-          {showFilters && (
-            <div className="filters-section">
-              <div className="filters-grid">
-                <div className="form-group">
-                  <Select
-                    label="Status"
-                    name="status"
-                    value={orderFilters.status}
-                    onChange={handleFilterChange}
-                    fullWidth
-                    options={[
-                      { value: '', label: 'All Statuses' },
-                      { value: 'PLACED', label: 'PLACED' },
-                      { value: 'PENDING', label: 'PENDING' },
-                      { value: 'EXECUTED', label: 'EXECUTED' },
-                      { value: 'CANCELLED', label: 'CANCELLED' },
-                      { value: 'REJECTED', label: 'REJECTED' }
-                    ]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Input
-                    type="text"
-                    label="Symbol"
-                    name="symbol"
-                    value={orderFilters.symbol}
-                    onChange={handleFilterChange}
-                    placeholder="e.g., RELIANCE"
-                    fullWidth
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Select
-                    label="Action"
-                    name="action"
-                    value={orderFilters.action}
-                    onChange={handleFilterChange}
-                    fullWidth
-                    options={[
-                      { value: '', label: 'All Actions' },
-                      { value: 'BUY', label: 'BUY' },
-                      { value: 'SELL', label: 'SELL' }
-                    ]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Select
-                    label="Broker"
-                    name="brokerName"
-                    value={orderFilters.brokerName}
-                    onChange={handleFilterChange}
-                    fullWidth
-                    options={[
-                      { value: '', label: 'All Brokers' },
-                      { value: 'shoonya', label: 'Shoonya' },
-                      { value: 'fyers', label: 'Fyers' }
-                    ]}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Input
-                    type="date"
-                    label="From Date"
-                    name="startDate"
-                    value={orderFilters.startDate}
-                    onChange={handleFilterChange}
-                    fullWidth
-                  />
-                </div>
-
-                <div className="form-group">
-                  <Input
-                    type="date"
-                    label="To Date"
-                    name="endDate"
-                    value={orderFilters.endDate}
-                    onChange={handleFilterChange}
-                    fullWidth
-                  />
-                </div>
-              </div>
-
-              <div className="filters-actions">
-                <HStack gap={3}>
-                  <Button variant="primary" onClick={applyFilters}>
-                    Apply Filters
-                  </Button>
-                  <Button variant="secondary" onClick={clearFilters}>
-                    Clear Filters
-                  </Button>
-                </HStack>
-              </div>
             </div>
-          )}
 
-          {loadingOrderHistory ? (
-            <SkeletonTradeHistory items={5} />
-          ) : trades.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-icon">📊</div>
-              <h4>No trades yet</h4>
-              <p>Place your first trade to see it here</p>
-            </div>
-          ) : (
-            <div className="trade-history-container">
-              <div className="trades-list">
-                {trades.map(trade => (
-                <div key={trade.id} className="trade-item">
-                  <div className="trade-info">
-                    <div className="trade-header">
-                      <h4>{trade.symbol}</h4>
-                      <span className={`status-badge ${getStatusColor(trade.status)}`}>
-                        {trade.status}
-                      </span>
-                    </div>
-                    <div className="trade-details">
-                      <span className={`action-badge ${trade.action.toLowerCase()}`}>
-                        {trade.action}
-                      </span>
-                      <span>Qty: {trade.quantity}</span>
-                      <span>Type: {trade.orderType}</span>
-                      {trade.price > 0 && <span>Price: ₹{trade.price}</span>}
-                    </div>
-                    <div className="trade-meta">
-                      <span>Accounts: {trade.brokerAccounts.length}</span>
-                      <span>{trade.timestamp.toLocaleString()}</span>
-                    </div>
+            {/* Margin Information */}
+            <div className="kite-card">
+              <div className="kite-card-header">
+                <h3 className="kite-card-title">Margin Info</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                      ₹{formatCurrency(marginInfo.required)}
+                    </span>
                   </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                      ₹{formatCurrency(marginInfo.available)}
+                    </span>
+                  </div>
+                  {marginInfo.shortfall > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
+                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
+                        ₹{formatCurrency(marginInfo.shortfall)}
+                      </span>
+                    </div>
+                  )}
+
+                  {marginInfo.shortfall > 0 && (
+                    <button
+                      className="kite-btn kite-btn-primary"
+                      onClick={() => navigate('/funds')}
+                      style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+                    >
+                      Add Funds
+                    </button>
+                  )}
                 </div>
-              ))}
               </div>
             </div>
-          )}
+          </div>
         </div>
-
-        {/* Order Confirmation Dialog */}
-        {pendingOrderData && (
-          <OrderConfirmationDialog
-            isOpen={showConfirmDialog}
-            onClose={handleCloseConfirmDialog}
-            onConfirm={handleConfirmOrder}
-            orderDetails={pendingOrderData}
-            isSubmitting={isSubmitting}
-          />
-        )}
-        </div>
-      </main>
+      </div>
     </div>
   );
 };

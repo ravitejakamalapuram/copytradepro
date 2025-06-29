@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import KiteNavigation from '../components/KiteNavigation';
+import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 interface Position {
   symbol: string;
@@ -26,7 +26,7 @@ interface PositionsSummary {
   dayPnLPercent: number;
 }
 
-const KitePositions: React.FC = () => {
+const Positions: React.FC = () => {
   const navigate = useNavigate();
   const [positions, setPositions] = useState<Position[]>([]);
   const [positionsSummary, setPositionsSummary] = useState<PositionsSummary>({
@@ -104,7 +104,7 @@ const KitePositions: React.FC = () => {
   if (loading) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div style={{
             display: 'flex',
@@ -125,7 +125,7 @@ const KitePositions: React.FC = () => {
   if (error) {
     return (
       <div className="kite-theme">
-        <KiteNavigation />
+        <AppNavigation />
         <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
@@ -144,7 +144,7 @@ const KitePositions: React.FC = () => {
 
   return (
     <div className="kite-theme">
-      <KiteNavigation />
+      <AppNavigation />
       
       <div className="kite-main">
         {/* Positions Summary */}
@@ -387,4 +387,4 @@ const KitePositions: React.FC = () => {
   );
 };
 
-export default KitePositions;
+export default Positions;

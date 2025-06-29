@@ -4,22 +4,21 @@ import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
 import LandingPage from './pages/LandingPage';
 import CopyTradeLogin from './pages/CopyTradeLogin';
-import AccountSetup from './pages/AccountSetup';
-import TradeSetup from './pages/TradeSetup';
+
 import Settings from './pages/Settings';
 import ComponentDemo from './pages/ComponentDemo';
 import PortfolioAnalytics from './pages/PortfolioAnalytics';
 import NotificationDisplay from './components/NotificationDisplay';
 import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
-// Kite-themed pages
-import KiteDashboard from './pages/KiteDashboard';
-import KiteHoldings from './pages/KiteHoldings';
-import KiteOrders from './pages/KiteOrders';
-import KitePositions from './pages/KitePositions';
+// Main application pages
+import Dashboard from './pages/Dashboard';
+import Holdings from './pages/Holdings';
+import Orders from './pages/Orders';
+import Positions from './pages/Positions';
 
-import KiteTradeSetup from './pages/KiteTradeSetup';
-import KiteAccountSetup from './pages/KiteAccountSetup';
-import KitePortfolio from './pages/KitePortfolio';
+import TradeSetup from './pages/TradeSetup';
+import AccountSetup from './pages/AccountSetup';
+import Portfolio from './pages/Portfolio';
 import MarketOverview from './pages/MarketOverview';
 import './styles/enterprise-base.css';
 
@@ -54,12 +53,12 @@ const AppContent: React.FC = () => {
         />
         <Route path="/landing" element={<LandingPage />} />
 
-        {/* Kite-themed routes */}
+        {/* Main application routes */}
         <Route
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <KiteDashboard />
+              <Dashboard />
             </ProtectedRoute>
           }
         />
@@ -67,7 +66,7 @@ const AppContent: React.FC = () => {
           path="/holdings"
           element={
             <ProtectedRoute>
-              <KiteHoldings />
+              <Holdings />
             </ProtectedRoute>
           }
         />
@@ -75,7 +74,7 @@ const AppContent: React.FC = () => {
           path="/orders"
           element={
             <ProtectedRoute>
-              <KiteOrders />
+              <Orders />
             </ProtectedRoute>
           }
         />
@@ -83,7 +82,7 @@ const AppContent: React.FC = () => {
           path="/positions"
           element={
             <ProtectedRoute>
-              <KitePositions />
+              <Positions />
             </ProtectedRoute>
           }
         />
@@ -94,7 +93,7 @@ const AppContent: React.FC = () => {
           path="/trade-setup"
           element={
             <ProtectedRoute>
-              <KiteTradeSetup />
+              <TradeSetup />
             </ProtectedRoute>
           }
         />
@@ -102,7 +101,7 @@ const AppContent: React.FC = () => {
           path="/account-setup"
           element={
             <ProtectedRoute>
-              <KiteAccountSetup />
+              <AccountSetup />
             </ProtectedRoute>
           }
         />
@@ -110,7 +109,7 @@ const AppContent: React.FC = () => {
           path="/portfolio"
           element={
             <ProtectedRoute>
-              <KitePortfolio />
+              <Portfolio />
             </ProtectedRoute>
           }
         />

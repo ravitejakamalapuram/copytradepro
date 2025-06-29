@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import '../styles/kite-theme.css';
+import '../styles/app-theme.css';
 
 const CopyTradeLogin: React.FC = () => {
   const { login, register } = useAuth();
