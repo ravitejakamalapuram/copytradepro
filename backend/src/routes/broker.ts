@@ -97,7 +97,7 @@ const placeOrderValidation = [
     .isIn(['NSE', 'BSE', 'NFO', 'MCX', 'CDS'])
     .withMessage('Invalid exchange'),
   body('productType')
-    .isIn(['C', 'M', 'H', 'B'])
+    .isIn(['C', 'M', 'H', 'B', 'CNC', 'MIS', 'NRML', 'BO'])
     .withMessage('Invalid product type'),
 ];
 

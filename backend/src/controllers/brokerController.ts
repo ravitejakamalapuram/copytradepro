@@ -839,9 +839,23 @@ export const placeOrder = async (
       price,
       triggerPrice,
       exchange,
-      productType,
+      productType: rawProductType,
       remarks
     } = req.body;
+
+    // Convert product type to single character format if needed
+    const productTypeMap: { [key: string]: string } = {
+      'CNC': 'C',
+      'MIS': 'M',
+      'NRML': 'H',
+      'BO': 'B',
+      'C': 'C',
+      'M': 'M',
+      'H': 'H',
+      'B': 'B'
+    };
+
+    const productType = productTypeMap[rawProductType] || rawProductType;
     
     const userId = req.user?.id;
 
