@@ -113,35 +113,38 @@ const KiteNavigation: React.FC = () => {
             </div>
 
             {/* User Info */}
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.75rem',
-              padding: '0.5rem',
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px',
               borderRadius: 'var(--kite-radius-md)',
               backgroundColor: 'var(--kite-bg-tertiary)'
             }}>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ 
-                  fontSize: '0.875rem', 
+                <div style={{
+                  fontSize: '11px',
                   fontWeight: '500',
-                  color: 'var(--kite-text-primary)' 
+                  color: 'var(--kite-text-primary)',
+                  lineHeight: '1.2'
                 }}>
-                  {user?.name || 'User'}
+                  {user?.name || 'Kamalapuram'}
                 </div>
-                <div style={{ 
-                  fontSize: '0.75rem', 
-                  color: 'var(--kite-text-secondary)' 
+                <div style={{
+                  fontSize: '10px',
+                  color: 'var(--kite-text-secondary)',
+                  lineHeight: '1.2'
                 }}>
-                  ID: {user?.id || 'USER123'}
+                  Y9724
                 </div>
               </div>
               <button
                 className="kite-btn"
                 onClick={handleLogout}
-                style={{ 
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem'
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '10px',
+                  minHeight: 'auto'
                 }}
               >
                 Logout

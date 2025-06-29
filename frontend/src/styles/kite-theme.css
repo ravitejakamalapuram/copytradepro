@@ -229,12 +229,12 @@
 .kite-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--kite-space-xs);
-  padding: var(--kite-space-sm) var(--kite-space-md);
+  gap: 4px;
+  padding: 6px 12px;
   border: 1px solid var(--kite-border-primary);
   background-color: var(--kite-bg-tertiary);
   color: var(--kite-text-primary);
-  font-size: 0.875rem;
+  font-size: 11px;
   font-weight: 500;
   border-radius: var(--kite-radius-md);
   cursor: pointer;
