@@ -16,7 +16,7 @@ import KiteDashboard from './pages/KiteDashboard';
 import KiteHoldings from './pages/KiteHoldings';
 import KiteOrders from './pages/KiteOrders';
 import KitePositions from './pages/KitePositions';
-import KiteFunds from './pages/KiteFunds';
+
 import KiteTradeSetup from './pages/KiteTradeSetup';
 import KiteAccountSetup from './pages/KiteAccountSetup';
 import KitePortfolio from './pages/KitePortfolio';
@@ -87,14 +87,7 @@ const AppContent: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/funds"
-          element={
-            <ProtectedRoute>
-              <KiteFunds />
-            </ProtectedRoute>
-          }
-        />
+
 
         {/* Trading routes */}
         <Route

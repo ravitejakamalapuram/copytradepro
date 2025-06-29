@@ -44,7 +44,7 @@ class OrderStatusService extends EventEmitter {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private activeOrders: Map<string, Order> = new Map();
   private isPolling: boolean = false;
-  private pollingFrequency: number = 10000; // 10 seconds for demo
+  private pollingFrequency: number = 30000; // 30 seconds for production
   private maxRetries: number = 3;
 
   constructor() {
@@ -296,20 +296,7 @@ class OrderStatusService extends EventEmitter {
         }
       }
 
-      // If no real status change detected, fall back to demo simulation
-      if (newStatus === order.status) {
-        const orderAge = Date.now() - new Date(order.created_at).getTime();
-
-        if (orderAge > 15000 && order.status === 'PLACED') { // After 15 seconds
-          if (order.symbol === 'TCS') {
-            newStatus = 'REJECTED';
-            logger.info(`🎯 DEMO: TCS order ${order.id} simulated as REJECTED due to insufficient balance`);
-          } else if (Math.random() < 0.7) {
-            newStatus = 'EXECUTED';
-            logger.info(`✅ DEMO: Order ${order.id} simulated as EXECUTED`);
-          }
-        }
-      }
+      // Status will only change based on real broker API responses
 
       // Update status if changed
       if (newStatus !== order.status) {
@@ -378,32 +365,7 @@ class OrderStatusService extends EventEmitter {
     return statusMap[shoonyaStatus] || shoonyaStatus;
   }
 
-  /**
-   * Map broker-specific status to standard status
-   */
-  private mapBrokerStatus(brokerStatus: string): string {
-    const statusMap: { [key: string]: string } = {
-      // Shoonya statuses
-      'PENDING': 'PENDING',
-      'OPEN': 'PLACED',
-      'COMPLETE': 'EXECUTED',
-      'CANCELLED': 'CANCELLED',
-      'REJECTED': 'REJECTED',
 
-      // Fyers statuses
-      'PLACED': 'PLACED',
-      'EXECUTED': 'EXECUTED',
-      'CANCELED': 'CANCELLED',
-      'PARTIAL': 'PARTIALLY_FILLED',
-
-      // Generic statuses
-      'FILLED': 'EXECUTED',
-      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
-      'NEW': 'PLACED'
-    };
-
-    return statusMap[brokerStatus] || brokerStatus;
-  }
 
   /**
    * Update order status in database and emit event
