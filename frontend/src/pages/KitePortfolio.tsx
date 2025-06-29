@@ -196,10 +196,9 @@ const KitePortfolio: React.FC = () => {
     return (
       <div className="kite-theme">
         <KiteNavigation />
-        <div style={{ 
-          padding: '2rem', 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div className="kite-main" style={{
+          display: 'flex',
+          justifyContent: 'center',
           alignItems: 'center',
           minHeight: '60vh'
         }}>
@@ -222,7 +221,7 @@ const KitePortfolio: React.FC = () => {
     return (
       <div className="kite-theme">
         <KiteNavigation />
-        <div style={{ padding: '2rem' }}>
+        <div className="kite-main">
           <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
             <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
@@ -246,7 +245,7 @@ const KitePortfolio: React.FC = () => {
   return (
     <div className="kite-theme">
       <KiteNavigation />
-      <div style={{ padding: '1.5rem', maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="kite-main">
         {/* Header */}
         <div style={{ 
           display: 'flex', 
