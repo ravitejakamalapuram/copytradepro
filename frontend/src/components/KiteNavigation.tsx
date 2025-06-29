@@ -48,7 +48,6 @@ const KiteNavigation: React.FC = () => {
     { path: '/holdings', label: 'Holdings', icon: '📊' },
     { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/orders', label: 'Orders', icon: '📋' },
-    { path: '/funds', label: 'Funds', icon: '💰' },
     { path: '/trade-setup', label: 'Trade', icon: '⚡' },
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
