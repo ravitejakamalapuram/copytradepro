@@ -22,12 +22,15 @@ class NSECSVService {
   private symbols: NSESymbolData[] = [];
   private lastUpdated: Date | null = null;
   private isUpdating = false;
+  private lastDataDate: string | null = null; // Track the date of current data (YYYY-MM-DD)
+  private dayChangeMonitor: NodeJS.Timeout | null = null;
 
   constructor() {
     this.ensureDataDirectory();
     this.loadExistingData();
     this.setupDailyCron();
-    
+    this.setupDayChangeMonitor();
+
     // Download on startup if no data exists or data is old
     this.checkAndDownloadOnStartup();
   }
@@ -52,10 +55,16 @@ class NSECSVService {
         const parsed = JSON.parse(data);
         this.symbols = parsed.symbols || [];
         this.lastUpdated = parsed.lastUpdated ? new Date(parsed.lastUpdated) : null;
-        
+
+        // Set the data date from when it was last updated
+        if (this.lastUpdated) {
+          this.lastDataDate = this.lastUpdated.toISOString().split('T')[0] || null;
+        }
+
         console.log(`📊 Loaded ${this.symbols.length} NSE symbols from cache`);
         if (this.lastUpdated) {
           console.log(`📅 Last updated: ${this.lastUpdated.toISOString()}`);
+          console.log(`📅 Data date: ${this.lastDataDate}`);
         }
       }
     } catch (error) {
@@ -88,6 +97,64 @@ class NSECSVService {
     if (!this.lastUpdated) return true;
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     return this.lastUpdated < twentyFourHoursAgo;
+  }
+
+  /**
+   * Setup day change monitor that checks every hour for date changes
+   */
+  private setupDayChangeMonitor(): void {
+    // Check every hour for day changes
+    this.dayChangeMonitor = setInterval(async () => {
+      await this.checkForDayChange();
+    }, 60 * 60 * 1000); // 1 hour
+
+    console.log('⏰ Day change monitor started (checks every hour)');
+  }
+
+  /**
+   * Check if the day has changed and update data if needed
+   */
+  private async checkForDayChange(): Promise<void> {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // If we have data and it's from a different day, update it
+    if (this.lastDataDate && this.lastDataDate !== today) {
+      console.log(`📅 Day changed from ${this.lastDataDate} to ${today}`);
+      console.log(`🔄 Updating NSE CSV data for new day...`);
+
+      try {
+        // Delete old files to force fresh download
+        await this.deleteOldCSVFile();
+
+        // Download fresh data
+        await this.downloadAndProcessCSV();
+
+        console.log(`✅ NSE CSV data updated for ${today}`);
+      } catch (error) {
+        console.error(`❌ Failed to update NSE CSV for new day:`, error);
+      }
+    } else if (!this.lastDataDate) {
+      // Set initial date if not set
+      this.lastDataDate = today || null;
+    }
+  }
+
+  /**
+   * Delete old CSV file to ensure fresh download
+   */
+  private async deleteOldCSVFile(): Promise<void> {
+    try {
+      if (fs.existsSync(this.CSV_FILE_PATH)) {
+        fs.unlinkSync(this.CSV_FILE_PATH);
+        console.log('🗑️ Deleted old CSV file');
+      }
+      if (fs.existsSync(this.JSON_FILE_PATH)) {
+        fs.unlinkSync(this.JSON_FILE_PATH);
+        console.log('🗑️ Deleted old JSON cache');
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to delete old files:', error);
+    }
   }
 
   /**
@@ -187,7 +254,9 @@ class NSECSVService {
         .on('end', () => {
           this.symbols = symbols;
           this.lastUpdated = new Date();
+          this.lastDataDate = new Date().toISOString().split('T')[0] || null;
           console.log(`📊 Processed ${symbols.length} symbols from NSE CSV`);
+          console.log(`📅 Data date set to: ${this.lastDataDate}`);
           resolve();
         })
         .on('error', (error) => {
@@ -227,7 +296,7 @@ class NSECSVService {
     }
 
     const searchTerm = query.toLowerCase();
-    const results = this.symbols.filter(symbol => 
+    const results = this.symbols.filter(symbol =>
       symbol.symbol.toLowerCase().includes(searchTerm) ||
       symbol.name.toLowerCase().includes(searchTerm)
     );
@@ -239,7 +308,7 @@ class NSECSVService {
    * Get symbol by exact symbol name
    */
   getSymbol(symbolName: string): NSESymbolData | null {
-    return this.symbols.find(symbol => 
+    return this.symbols.find(symbol =>
       symbol.symbol.toUpperCase() === symbolName.toUpperCase()
     ) || null;
   }
@@ -255,19 +324,34 @@ class NSECSVService {
    * Get service statistics
    */
   getStats(): any {
+    const today = new Date().toISOString().split('T')[0];
     return {
       service: 'NSE CSV Service',
       status: 'active',
       totalSymbols: this.symbols.length,
       lastUpdated: this.lastUpdated?.toISOString(),
-      dataAge: this.lastUpdated ? 
-        Math.floor((Date.now() - this.lastUpdated.getTime()) / (1000 * 60 * 60)) + ' hours' : 
+      dataDate: this.lastDataDate,
+      isDataCurrent: this.lastDataDate === today,
+      dataAge: this.lastUpdated ?
+        Math.floor((Date.now() - this.lastUpdated.getTime()) / (1000 * 60 * 60)) + ' hours' :
         'unknown',
       isUpdating: this.isUpdating,
       csvFilePath: this.CSV_FILE_PATH,
       jsonFilePath: this.JSON_FILE_PATH,
-      nextUpdate: 'Daily at 6:30 AM IST'
+      nextUpdate: 'Daily at 6:30 AM IST',
+      dayChangeMonitor: 'Active (checks every hour)'
     };
+  }
+
+  /**
+   * Cleanup resources
+   */
+  cleanup(): void {
+    if (this.dayChangeMonitor) {
+      clearInterval(this.dayChangeMonitor);
+      this.dayChangeMonitor = null;
+      console.log('🧹 Day change monitor stopped');
+    }
   }
 
   /**
