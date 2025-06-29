@@ -2,7 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
+import { portfolioService } from '../services/portfolioService';
 import '../styles/kite-theme.css';
+
+interface PortfolioSummary {
+  totalValue: number;
+  totalPnL: number;
+  dayPnL: number;
+  totalPnLPercent: number;
+  dayPnLPercent: number;
+}
 
 const KiteNavigation: React.FC = () => {
   const navigate = useNavigate();
@@ -11,8 +20,15 @@ const KiteNavigation: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary>({
+    totalValue: 0,
+    totalPnL: 0,
+    dayPnL: 0,
+    totalPnLPercent: 0,
+    dayPnLPercent: 0
+  });
 
-  // Fetch live market indices
+  // Fetch live market indices and portfolio data
   useEffect(() => {
     const fetchMarketData = async () => {
       try {
@@ -24,11 +40,31 @@ const KiteNavigation: React.FC = () => {
       }
     };
 
+    const fetchPortfolioData = async () => {
+      try {
+        const metrics = await portfolioService.getMetrics();
+        setPortfolioSummary({
+          totalValue: metrics.currentValue,
+          totalPnL: metrics.totalPnL,
+          dayPnL: metrics.dayPnL,
+          totalPnLPercent: metrics.totalPnLPercentage,
+          dayPnLPercent: metrics.dayPnL > 0 ? (metrics.dayPnL / metrics.currentValue) * 100 : 0
+        });
+      } catch (error) {
+        console.error('Failed to fetch portfolio data:', error);
+        // Keep default values on error
+      }
+    };
+
     // Initial fetch
     fetchMarketData();
+    fetchPortfolioData();
 
     // Update every 30 seconds
-    const interval = setInterval(fetchMarketData, 30000);
+    const interval = setInterval(() => {
+      fetchMarketData();
+      fetchPortfolioData();
+    }, 30000);
 
     return () => clearInterval(interval);
   }, []);
@@ -243,36 +279,36 @@ const KiteNavigation: React.FC = () => {
               <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
                 Total Value
               </span>
-              <span style={{ 
+              <span style={{
                 fontFamily: 'var(--kite-font-mono)',
                 fontWeight: '500',
                 color: 'var(--kite-text-primary)'
               }}>
-                ₹5,48,025
+                ₹{portfolioSummary.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
                 Day's P&L
               </span>
-              <span style={{ 
+              <span style={{
                 fontFamily: 'var(--kite-font-mono)',
                 fontWeight: '500',
-                color: 'var(--kite-profit)'
+                color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                +₹2,064 (+0.38%)
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary.dayPnL).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%)
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
                 Total P&L
               </span>
-              <span style={{ 
+              <span style={{
                 fontFamily: 'var(--kite-font-mono)',
                 fontWeight: '500',
-                color: 'var(--kite-profit)'
+                color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                +₹48,025 (+9.61%)
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary.totalPnL).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
               </span>
             </div>
           </div>

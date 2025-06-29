@@ -60,7 +60,7 @@ const KitePortfolio: React.FC = () => {
       // Fetch portfolio positions (this includes both holdings and positions)
       const positionsResponse = await portfolioService.getPositions();
 
-      if (positionsResponse.positions) {
+      if (positionsResponse.positions && positionsResponse.positions.length > 0) {
         // Transform positions data to unified format
         const items: PortfolioItem[] = positionsResponse.positions.map(position => ({
           symbol: position.symbol,
@@ -85,10 +85,40 @@ const KitePortfolio: React.FC = () => {
         // Calculate summary
         const summary = calculateSummary(items);
         setPortfolioSummary(summary);
+      } else {
+        // No positions found - set empty state
+        setPortfolioItems([]);
+        setPortfolioSummary({
+          totalValue: 0,
+          totalInvested: 0,
+          totalPnL: 0,
+          dayPnL: 0,
+          totalPnLPercent: 0,
+          dayPnLPercent: 0,
+          holdingsValue: 0,
+          positionsValue: 0,
+          holdingsPnL: 0,
+          positionsPnL: 0
+        });
       }
     } catch (err: any) {
       console.error('Failed to fetch portfolio data:', err);
       setError(err.message || 'Failed to load portfolio data');
+
+      // Set empty state on error
+      setPortfolioItems([]);
+      setPortfolioSummary({
+        totalValue: 0,
+        totalInvested: 0,
+        totalPnL: 0,
+        dayPnL: 0,
+        totalPnLPercent: 0,
+        dayPnLPercent: 0,
+        holdingsValue: 0,
+        positionsValue: 0,
+        holdingsPnL: 0,
+        positionsPnL: 0
+      });
     } finally {
       setLoading(false);
     }
