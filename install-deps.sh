@@ -56,33 +56,70 @@ if [ ! -f "package.json" ] || [ ! -d "backend" ] || [ ! -d "frontend" ]; then
     exit 1
 fi
 
-# Install root dependencies
-print_status "📦 Installing root dependencies..."
-npm install --silent
-print_success "Root dependencies installed"
+# Function to check if dependencies need to be installed
+needs_install() {
+    local dir="$1"
+    local name="$2"
+
+    # Check if node_modules exists and package.json is newer than node_modules
+    if [ ! -d "$dir/node_modules" ]; then
+        return 0  # Need install
+    fi
+
+    # Check if package.json is newer than node_modules
+    if [ "$dir/package.json" -nt "$dir/node_modules" ]; then
+        return 0  # Need install
+    fi
+
+    # Check if package-lock.json exists and is newer than node_modules
+    if [ -f "$dir/package-lock.json" ] && [ "$dir/package-lock.json" -nt "$dir/node_modules" ]; then
+        return 0  # Need install
+    fi
+
+    return 1  # No install needed
+}
+
+# Install root dependencies only if needed
+if needs_install "." "root"; then
+    print_status "📦 Installing root dependencies..."
+    npm install --silent
+    print_success "Root dependencies installed"
+else
+    print_status "✅ Root dependencies are up to date"
+fi
 echo
 
-# Install backend dependencies
-print_status "📦 Installing backend dependencies..."
+# Install backend dependencies only if needed
 cd backend
 if [ ! -f "package.json" ]; then
     print_error "Backend package.json not found!"
     exit 1
 fi
-npm install --silent
-print_success "Backend dependencies installed"
+
+if needs_install "." "backend"; then
+    print_status "📦 Installing backend dependencies..."
+    npm install --silent
+    print_success "Backend dependencies installed"
+else
+    print_status "✅ Backend dependencies are up to date"
+fi
 cd ..
 echo
 
-# Install frontend dependencies
-print_status "📦 Installing frontend dependencies..."
+# Install frontend dependencies only if needed
 cd frontend
 if [ ! -f "package.json" ]; then
     print_error "Frontend package.json not found!"
     exit 1
 fi
-npm install --silent
-print_success "Frontend dependencies installed"
+
+if needs_install "." "frontend"; then
+    print_status "📦 Installing frontend dependencies..."
+    npm install --silent
+    print_success "Frontend dependencies installed"
+else
+    print_status "✅ Frontend dependencies are up to date"
+fi
 cd ..
 echo
 
