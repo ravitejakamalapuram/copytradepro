@@ -44,10 +44,13 @@ const KiteNavigation: React.FC = () => {
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/holdings', label: 'Holdings', icon: '📈' },
+    { path: '/portfolio', label: 'Portfolio', icon: '📈' },
+    { path: '/holdings', label: 'Holdings', icon: '📊' },
     { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/orders', label: 'Orders', icon: '📋' },
     { path: '/funds', label: 'Funds', icon: '💰' },
+    { path: '/trade-setup', label: 'Trade', icon: '⚡' },
+    { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
 
   // Use live market indices for watchlist, fallback to mock data
