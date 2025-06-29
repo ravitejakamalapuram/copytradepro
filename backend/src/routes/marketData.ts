@@ -144,12 +144,28 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
     // Get user's broker connections
     const userConnections = userBrokerConnections.get(userId);
 
+    console.log(`📊 User connections check:`, {
+      userId,
+      hasConnections: !!userConnections,
+      connectionCount: userConnections?.size || 0,
+      brokerNames: userConnections ? Array.from(userConnections.keys()) : []
+    });
+
     if (userConnections && userConnections.size > 0) {
       // Try each connected broker for symbol search
       for (const [brokerName, brokerService] of userConnections) {
         try {
           console.log(`🔍 Searching symbols via ${brokerName} for query: ${query}`);
           const searchResults = await brokerService.searchScrip(exchange as string, query);
+
+          console.log(`📊 ${brokerName} search results:`, {
+            query,
+            exchange,
+            resultsType: typeof searchResults,
+            isArray: Array.isArray(searchResults),
+            length: Array.isArray(searchResults) ? searchResults.length : 'N/A',
+            firstResult: Array.isArray(searchResults) && searchResults.length > 0 ? searchResults[0] : null
+          });
 
           if (searchResults && Array.isArray(searchResults) && searchResults.length > 0) {
             // Transform broker results to standard format
@@ -186,20 +202,31 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       }
     }
 
-    // If no broker results and no connected brokers, return empty results
+    // If no broker results, use minimal fallback for testing
     if (brokerResults.length === 0) {
       if (!userConnections || userConnections.size === 0) {
-        console.log('❌ No connected brokers available for symbol search');
-        return res.status(400).json({
-          success: false,
-          error: 'No connected brokers available. Please connect a broker account to search symbols.',
-          data: {
-            results: [],
-            count: 0,
-            query,
-            source: 'no_brokers'
-          }
-        });
+        console.log('⚠️ No connected brokers - using minimal fallback for testing');
+
+        // Minimal fallback symbols for testing only
+        const testSymbols = [
+          { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE' },
+          { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE' },
+          { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE' },
+          { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE' },
+          { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE' },
+          { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
+          { symbol: 'BPCL', name: 'Bharat Petroleum Corporation Ltd', exchange: 'NSE' },
+          { symbol: 'ZOMATO', name: 'Zomato Ltd', exchange: 'NSE' }
+        ];
+
+        brokerResults = testSymbols
+          .filter(stock =>
+            stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
+            stock.name.toLowerCase().includes(query.toLowerCase())
+          )
+          .slice(0, parseInt(limit as string));
+
+        console.log(`📋 Fallback results: ${brokerResults.length} symbols found`);
       } else {
         console.log('❌ No results found from connected brokers');
       }
@@ -224,14 +251,17 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       changePercent: prices.get(stock.symbol)?.changePercent || null
     }));
 
+    const source = (!userConnections || userConnections.size === 0) ? 'test_fallback' : 'live_broker_api';
+
     return res.json({
       success: true,
       data: {
         results: enrichedResults,
         count: enrichedResults.length,
         query,
-        source: 'live_broker_api',
-        exchange: exchange
+        source: source,
+        exchange: exchange,
+        message: source === 'test_fallback' ? 'Using test data - connect a broker for live search' : undefined
       }
     });
   } catch (error: any) {
@@ -239,6 +269,38 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to search symbols',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Check broker connection status (for debugging)
+ */
+router.get('/broker-status', authenticateToken, async (req: any, res: any) => {
+  try {
+    const userId = req.user?.id;
+    const userConnections = userBrokerConnections.get(userId);
+
+    const status = {
+      userId,
+      hasConnections: !!userConnections,
+      connectionCount: userConnections?.size || 0,
+      brokers: userConnections ? Array.from(userConnections.keys()) : [],
+      allUserConnections: Array.from(userBrokerConnections.keys())
+    };
+
+    console.log('📊 Broker status check:', status);
+
+    return res.json({
+      success: true,
+      data: status
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to check broker status:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check broker status',
       details: error.message
     });
   }
