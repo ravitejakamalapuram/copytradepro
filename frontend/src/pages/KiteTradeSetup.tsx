@@ -4,6 +4,7 @@ import KiteNavigation from '../components/KiteNavigation';
 import { brokerService, type PlaceOrderRequest } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
+import { marketDataService } from '../services/marketDataService';
 import '../styles/kite-theme.css';
 
 interface OrderForm {
@@ -50,6 +51,7 @@ const KiteTradeSetup: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -98,32 +100,49 @@ const KiteTradeSetup: React.FC = () => {
     }
   }, [orderForm.symbol, orderForm.quantity, orderForm.price, orderForm.orderType]);
 
-  const handleSymbolSearch = async (searchTerm: string) => {
-    if (searchTerm.length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
+  // Debounced symbol search
+  const handleSymbolSearch = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (searchTerm: string) => {
+        clearTimeout(timeoutId);
 
-    try {
-      // Mock search results - in real implementation, this would call broker API
-      const mockResults = [
-        { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE', ltp: 2847.65 },
-        { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE', ltp: 4156.30 },
-        { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE', ltp: 1789.25 },
-        { symbol: 'HDFC', name: 'HDFC Bank Ltd', exchange: 'NSE', ltp: 1654.80 },
-        { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE', ltp: 1234.50 }
-      ].filter(stock => 
-        stock.symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        stock.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+        if (searchTerm.length < 2) {
+          setSearchResults([]);
+          setShowSearchResults(false);
+          setSearchLoading(false);
+          return;
+        }
 
-      setSearchResults(mockResults);
-      setShowSearchResults(true);
-    } catch (error) {
-      console.error('Symbol search failed:', error);
-    }
-  };
+        setSearchLoading(true);
+        timeoutId = setTimeout(async () => {
+          try {
+            // Use live market data service for symbol search
+            const results = await marketDataService.searchSymbols(searchTerm, 8);
+
+            // Transform results to match expected format
+            const transformedResults = results.map(result => ({
+              symbol: result.symbol,
+              name: result.name,
+              exchange: result.exchange,
+              ltp: result.price || 0
+            }));
+
+            setSearchResults(transformedResults);
+            setShowSearchResults(true);
+          } catch (error) {
+            console.error('Symbol search failed:', error);
+            // Fallback to empty results on error
+            setSearchResults([]);
+            setShowSearchResults(false);
+          } finally {
+            setSearchLoading(false);
+          }
+        }, 300); // 300ms debounce
+      };
+    }, []),
+    []
+  );
 
   const handleSymbolSelect = (selectedSymbol: any) => {
     setOrderForm(prev => ({
@@ -309,17 +328,30 @@ const KiteTradeSetup: React.FC = () => {
                 <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                   Symbol *
                 </label>
-                <input
-                  type="text"
-                  placeholder="Search stocks (e.g., RELIANCE, TCS)"
-                  value={orderForm.symbol}
-                  onChange={(e) => {
-                    setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
-                    handleSymbolSearch(e.target.value);
-                  }}
-                  className="kite-input"
-                  style={{ fontSize: '1rem' }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="Search stocks (e.g., RELIANCE, TCS)"
+                    value={orderForm.symbol}
+                    onChange={(e) => {
+                      setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
+                      handleSymbolSearch(e.target.value);
+                    }}
+                    className="kite-input"
+                    style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
+                  />
+                  {searchLoading && (
+                    <div style={{
+                      position: 'absolute',
+                      right: '0.75rem',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      fontSize: '0.875rem'
+                    }}>
+                      ⏳
+                    </div>
+                  )}
+                </div>
 
                 {/* Search Results Dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
