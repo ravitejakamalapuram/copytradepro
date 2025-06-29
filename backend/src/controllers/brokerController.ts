@@ -1204,6 +1204,118 @@ export const getOrderHistory = async (
   }
 };
 
+// Check individual order status from broker API
+export const getOrderStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { brokerOrderId } = req.params;
+    const { brokerName } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!brokerOrderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Broker order ID is required',
+      });
+      return;
+    }
+
+    if (!brokerName) {
+      res.status(400).json({
+        success: false,
+        message: 'Broker name is required as query parameter',
+      });
+      return;
+    }
+
+    // Get the user's connected accounts
+    const accounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+    const brokerAccount = accounts.find((account: any) => account.broker_name === brokerName);
+
+    if (!brokerAccount) {
+      res.status(404).json({
+        success: false,
+        message: `No ${brokerName} account found for user`,
+      });
+      return;
+    }
+
+    // Get the broker connection using the existing pattern
+    const userConnections = userBrokerConnections.get(userId);
+    if (!userConnections || !userConnections.has(brokerName as string)) {
+      res.status(400).json({
+        success: false,
+        message: `${brokerName} broker not connected. Please activate your account first.`,
+      });
+      return;
+    }
+
+    const brokerService = userConnections.get(brokerName as string)!;
+
+    if (!brokerService) {
+      res.status(400).json({
+        success: false,
+        message: `${brokerName} broker not connected. Please activate your account first.`,
+      });
+      return;
+    }
+
+    // Get order status from broker API
+    console.log(`📊 Checking order status for ${brokerOrderId} via API endpoint`);
+    const orderStatus = await (brokerService as any).getOrderStatus(
+      userId,
+      brokerOrderId
+    );
+
+    if (orderStatus.stat === 'Ok') {
+      res.status(200).json({
+        success: true,
+        data: {
+          brokerOrderId,
+          status: orderStatus.status,
+          symbol: orderStatus.symbol,
+          quantity: orderStatus.quantity,
+          price: orderStatus.price,
+          executedQuantity: orderStatus.executedQuantity,
+          averagePrice: orderStatus.averagePrice,
+          rejectionReason: orderStatus.rejectionReason,
+          orderTime: orderStatus.orderTime,
+          updateTime: orderStatus.updateTime,
+          rawResponse: orderStatus.rawOrder
+        }
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: orderStatus.emsg || 'Order not found in broker system',
+        data: {
+          brokerOrderId,
+          status: 'NOT_FOUND',
+          details: orderStatus.emsg
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error('🚨 Get order status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check order status',
+      error: error.message
+    });
+  }
+};
+
 // Get search suggestions for order history
 export const getOrderSearchSuggestions = async (
   req: AuthenticatedRequest,

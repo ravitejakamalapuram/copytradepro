@@ -378,9 +378,10 @@ const Orders: React.FC = () => {
                   : `No ${activeTab} orders found`
                 }
               </div>
-              <button 
+              <button
                 className="kite-btn kite-btn-primary"
                 style={{ marginTop: '1rem' }}
+                onClick={() => navigate('/trade-setup')}
               >
                 Place Order
               </button>
@@ -416,7 +417,7 @@ const Orders: React.FC = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-neutral)' }}>
-                {orders.filter(o => o.status === 'PENDING').length}
+                {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
               </div>
               <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                 Pending

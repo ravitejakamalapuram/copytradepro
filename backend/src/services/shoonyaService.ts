@@ -284,7 +284,37 @@ export class ShoonyaService {
     }
 
     try {
-      // Get the full order book and find the specific order
+      // First try the SingleOrdStatus endpoint for direct order status check
+      console.log(`📊 Checking single order status for order: ${orderNumber}`);
+
+      const singleOrderResponse = await this.makeAuthenticatedRequest('SingleOrdStatus', {
+        uid: userId,
+        actid: userId,
+        norenordno: orderNumber,
+        exch: 'NSE'  // Add required exchange parameter
+      });
+
+      if (singleOrderResponse && singleOrderResponse.stat === 'Ok') {
+        console.log(`📊 Found order ${orderNumber} status via SingleOrdStatus: ${singleOrderResponse.status}`);
+        return {
+          stat: 'Ok',
+          orderNumber: singleOrderResponse.norenordno,
+          status: singleOrderResponse.status,
+          symbol: singleOrderResponse.tsym,
+          quantity: singleOrderResponse.qty,
+          price: singleOrderResponse.prc,
+          executedQuantity: singleOrderResponse.fillshares || '0',
+          averagePrice: singleOrderResponse.avgprc || '0',
+          rejectionReason: singleOrderResponse.rejreason || '',
+          orderTime: singleOrderResponse.norentm,
+          updateTime: singleOrderResponse.exch_tm,
+          rawOrder: singleOrderResponse
+        };
+      }
+
+      // Fallback to order book search if SingleOrdStatus fails
+      console.log(`⚠️ SingleOrdStatus failed for order ${orderNumber}, falling back to order book search`);
+
       const orderBook = await this.getOrderBook(userId);
 
       if (orderBook.stat === 'Ok' && Array.isArray(orderBook)) {
@@ -292,7 +322,7 @@ export class ShoonyaService {
         const order = orderBook.find((order: any) => order.norenordno === orderNumber);
 
         if (order) {
-          console.log(`📊 Found order ${orderNumber} status: ${order.status}`);
+          console.log(`📊 Found order ${orderNumber} status via order book: ${order.status}`);
           return {
             stat: 'Ok',
             orderNumber: order.norenordno,
