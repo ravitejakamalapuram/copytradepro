@@ -202,33 +202,23 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       }
     }
 
-    // If no broker results, use minimal fallback for testing
+    // If no broker results, return empty (no fallback)
     if (brokerResults.length === 0) {
       if (!userConnections || userConnections.size === 0) {
-        console.log('⚠️ No connected brokers - using minimal fallback for testing');
-
-        // Minimal fallback symbols for testing only
-        const testSymbols = [
-          { symbol: 'RELIANCE', name: 'Reliance Industries Ltd', exchange: 'NSE' },
-          { symbol: 'TCS', name: 'Tata Consultancy Services Ltd', exchange: 'NSE' },
-          { symbol: 'HDFCBANK', name: 'HDFC Bank Ltd', exchange: 'NSE' },
-          { symbol: 'INFY', name: 'Infosys Ltd', exchange: 'NSE' },
-          { symbol: 'ICICIBANK', name: 'ICICI Bank Ltd', exchange: 'NSE' },
-          { symbol: 'SBIN', name: 'State Bank of India', exchange: 'NSE' },
-          { symbol: 'BPCL', name: 'Bharat Petroleum Corporation Ltd', exchange: 'NSE' },
-          { symbol: 'ZOMATO', name: 'Zomato Ltd', exchange: 'NSE' }
-        ];
-
-        brokerResults = testSymbols
-          .filter(stock =>
-            stock.symbol.toLowerCase().includes(query.toLowerCase()) ||
-            stock.name.toLowerCase().includes(query.toLowerCase())
-          )
-          .slice(0, parseInt(limit as string));
-
-        console.log(`📋 Fallback results: ${brokerResults.length} symbols found`);
+        console.log('❌ No connected brokers available for symbol search');
+        return res.status(400).json({
+          success: false,
+          error: 'No connected brokers available. Please connect a broker account to search symbols.',
+          data: {
+            results: [],
+            count: 0,
+            query,
+            source: 'no_brokers'
+          }
+        });
       } else {
-        console.log('❌ No results found from connected brokers');
+        console.log('❌ No results found from connected broker APIs');
+        // Continue with empty results - this is the issue we need to fix
       }
     }
 
@@ -251,7 +241,8 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
       changePercent: prices.get(stock.symbol)?.changePercent || null
     }));
 
-    const source = (!userConnections || userConnections.size === 0) ? 'test_fallback' : 'live_broker_api';
+    // Determine actual source based on what happened
+    const source = 'live_broker_api';
 
     return res.json({
       success: true,
@@ -260,8 +251,7 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
         count: enrichedResults.length,
         query,
         source: source,
-        exchange: exchange,
-        message: source === 'test_fallback' ? 'Using test data - connect a broker for live search' : undefined
+        exchange: exchange
       }
     });
   } catch (error: any) {
