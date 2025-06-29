@@ -284,7 +284,7 @@ const KiteNavigation: React.FC = () => {
                 fontWeight: '500',
                 color: 'var(--kite-text-primary)'
               }}>
-                ₹{portfolioSummary.totalValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                ₹{(portfolioSummary?.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -294,9 +294,9 @@ const KiteNavigation: React.FC = () => {
               <span style={{
                 fontFamily: 'var(--kite-font-mono)',
                 fontWeight: '500',
-                color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                color: (portfolioSummary?.dayPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary.dayPnL).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%)
+                {(portfolioSummary?.dayPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.dayPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.dayPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.dayPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -306,9 +306,9 @@ const KiteNavigation: React.FC = () => {
               <span style={{
                 fontFamily: 'var(--kite-font-mono)',
                 fontWeight: '500',
-                color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                color: (portfolioSummary?.totalPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary.totalPnL).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
+                {(portfolioSummary?.totalPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.totalPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.totalPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.totalPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
           </div>
