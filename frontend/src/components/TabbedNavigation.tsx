@@ -22,7 +22,7 @@ const TabbedNavigation: React.FC<TabbedNavigationProps> = ({
   className = ''
 }) => {
   return (
-    <div className={`tabbed-navigation ${className}`}>
+    <div className={`kite-card tabbed-navigation ${className}`}>
       <div className="tabbed-navigation__container">
         {tabs.map((tab) => (
           <button

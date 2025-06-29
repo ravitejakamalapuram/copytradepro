@@ -1,30 +1,28 @@
 .tabbed-navigation {
-  background: var(--kite-bg-secondary);
-  border: 1px solid var(--kite-border-secondary);
-  border-radius: var(--kite-radius-lg);
-  margin-bottom: 1.5rem;
-  overflow: hidden;
+  /* Inherit kite-card styles */
 }
 
 .tabbed-navigation__container {
   display: flex;
   border-bottom: 1px solid var(--kite-border-secondary);
-  background: var(--kite-bg-primary);
+  margin: calc(-1 * var(--kite-space-lg)) calc(-1 * var(--kite-space-lg)) var(--kite-space-lg);
+  padding: 0 var(--kite-space-lg);
+  background: var(--kite-bg-card);
 }
 
 .tabbed-navigation__tab {
   background: none;
   border: none;
-  padding: 1rem 1.5rem;
+  padding: var(--kite-space-lg) var(--kite-space-lg);
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--kite-text-secondary);
   border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
+  transition: var(--kite-transition);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--kite-space-sm);
   position: relative;
   min-width: 0;
   flex: 1;
@@ -33,7 +31,7 @@
 
 .tabbed-navigation__tab:hover {
   color: var(--kite-text-primary);
-  background: var(--kite-bg-tertiary);
+  background: var(--kite-bg-hover);
 }
 
 .tabbed-navigation__tab--active {

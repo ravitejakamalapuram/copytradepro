@@ -1,8 +1,8 @@
 .portfolio-table {
-  background: var(--kite-bg-secondary);
-  border: 1px solid var(--kite-border-secondary);
-  border-radius: var(--kite-radius-lg);
-  overflow: hidden;
+  /* Inherit kite-card styles */
+  margin: calc(-1 * var(--kite-space-lg));
+  border-radius: 0;
+  border: none;
 }
 
 .portfolio-table__container {
@@ -16,12 +16,12 @@
 }
 
 .portfolio-table__header {
-  background: var(--kite-bg-primary);
+  background: var(--kite-bg-card);
   border-bottom: 1px solid var(--kite-border-secondary);
 }
 
 .portfolio-table__header-cell {
-  padding: 1rem 0.75rem;
+  padding: var(--kite-space-lg) var(--kite-space-md);
   text-align: left;
   font-weight: 600;
   color: var(--kite-text-primary);
@@ -44,16 +44,16 @@
 }
 
 .portfolio-table__body {
-  background: var(--kite-bg-secondary);
+  background: var(--kite-bg-card);
 }
 
 .portfolio-table__row {
-  border-bottom: 1px solid var(--kite-border-tertiary);
-  transition: background-color 0.2s ease;
+  border-bottom: 1px solid var(--kite-border-secondary);
+  transition: var(--kite-transition);
 }
 
 .portfolio-table__row:hover {
-  background: var(--kite-bg-tertiary);
+  background: var(--kite-bg-hover);
 }
 
 .portfolio-table__row:last-child {
@@ -61,7 +61,7 @@
 }
 
 .portfolio-table__cell {
-  padding: 1rem 0.75rem;
+  padding: var(--kite-space-lg) var(--kite-space-md);
   color: var(--kite-text-primary);
   vertical-align: middle;
 }
