@@ -28,6 +28,7 @@ const logger = {
 interface Order {
   id: string;
   user_id: number;
+  account_id: number;
   symbol: string;
   action: string;
   quantity: number;
@@ -35,6 +36,10 @@ interface Order {
   status: string;
   broker_name: string;
   broker_order_id?: string;
+  order_type: string;
+  exchange: string;
+  product_type: string;
+  remarks?: string;
   created_at: string;
   updated_at: string;
   executed_at?: string;
@@ -88,15 +93,9 @@ class OrderStatusService extends EventEmitter {
    */
   private async getPendingOrders(): Promise<Order[]> {
     try {
-      // For now, return empty array since we don't have a direct orders table
-      // In a real implementation, you would query the order_history table
-      // and filter for pending orders
-      const orders = userDatabase.getOrderHistoryByUserIdWithFilters(
-        0, // Get all users for now
-        100, // limit
-        0, // offset
-        { status: 'PLACED' }
-      );
+      // Get all pending orders from all users
+      const orders = userDatabase.getAllOrderHistory()
+        .filter(order => ['PLACED', 'PENDING'].includes(order.status));
 
       // Convert OrderHistory to Order format
       return orders.map(order => ({
@@ -111,7 +110,12 @@ class OrderStatusService extends EventEmitter {
         broker_order_id: order.broker_order_id,
         created_at: order.created_at,
         updated_at: order.created_at,
-        executed_at: order.executed_at
+        executed_at: order.executed_at,
+        account_id: order.account_id,
+        order_type: order.order_type,
+        exchange: order.exchange,
+        product_type: order.product_type,
+        remarks: order.remarks
       }));
     } catch (error) {
       logger.error('Failed to get pending orders:', error);

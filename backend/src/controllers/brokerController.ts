@@ -999,6 +999,7 @@ export const placeOrder = async (
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
             user_id: parseInt(userId),
+            account_id: account.id,
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1006,6 +1007,10 @@ export const placeOrder = async (
             status: 'PLACED',
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno,
+            order_type: orderType,
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
@@ -1072,6 +1077,7 @@ export const placeOrder = async (
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
             user_id: parseInt(userId),
+            account_id: account.id,
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1079,6 +1085,10 @@ export const placeOrder = async (
             status: 'PLACED',
             broker_name: brokerName,
             broker_order_id: orderResponse.id,
+            order_type: orderType,
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };

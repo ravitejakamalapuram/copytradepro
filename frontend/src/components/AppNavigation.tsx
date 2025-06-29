@@ -86,8 +86,8 @@ const AppNavigation: React.FC = () => {
     { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     { path: '/portfolio', label: 'Portfolio', icon: '📈' },
     { path: '/holdings', label: 'Holdings', icon: '📊' },
-    { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/orders', label: 'Orders', icon: '📋' },
+    { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/trade-setup', label: 'Trade', icon: '⚡' },
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
@@ -167,7 +167,6 @@ const AppNavigation: React.FC = () => {
                   color: 'var(--kite-text-secondary)',
                   lineHeight: '1.2'
                 }}>
-                  Y9724
                 </div>
               </div>
               <button

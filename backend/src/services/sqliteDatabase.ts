@@ -877,6 +877,21 @@ export class SQLiteUserDatabase {
     }
   }
 
+  // Get all order history (for monitoring service)
+  getAllOrderHistory(): OrderHistory[] {
+    const getOrders = this.db.prepare(`
+      SELECT * FROM order_history
+      ORDER BY executed_at DESC
+    `);
+
+    try {
+      return getOrders.all() as OrderHistory[];
+    } catch (error) {
+      console.error('Failed to get all order history:', error);
+      return [];
+    }
+  }
+
   // Get order history by ID
   getOrderHistoryById(id: number): OrderHistory | null {
     const selectOrder = this.db.prepare(`
