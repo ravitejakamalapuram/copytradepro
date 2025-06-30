@@ -487,7 +487,7 @@ export const removeConnectedAccount = async (
       const accountIdNum = parseInt(accountId);
 
       // Get account details before deletion for logout
-      const account = userDatabase.getConnectedAccountById(accountIdNum);
+      const account = await userDatabase.getConnectedAccountById(accountIdNum);
       if (!account) {
         res.status(404).json({
           success: false,
@@ -517,7 +517,7 @@ export const removeConnectedAccount = async (
       }
 
       // Delete from database
-      const deleted = userDatabase.deleteConnectedAccount(accountIdNum);
+      const deleted = await userDatabase.deleteConnectedAccount(accountIdNum);
       if (!deleted) {
         res.status(404).json({
           success: false,
@@ -577,7 +577,7 @@ export const activateAccount = async (
     }
 
     // Get decrypted credentials
-    const credentials = userDatabase.getAccountCredentials(accountIdNum);
+    const credentials = await userDatabase.getAccountCredentials(accountIdNum);
     if (!credentials) {
       res.status(500).json({
         success: false,
@@ -764,8 +764,8 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   console.log(`🔄 Re-establishing connection for ${brokerName} user ${userId}`);
 
   // Get all accounts for this user and broker
-  const userAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
-  const brokerAccount = userAccounts.find(account => account.broker_name === brokerName);
+  const userAccounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+  const brokerAccount = userAccounts.find((account: any) => account.broker_name === brokerName);
 
   if (!brokerAccount) {
     console.log(`❌ No ${brokerName} account found for user ${userId}`);
@@ -773,7 +773,7 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   }
 
   // Get decrypted credentials
-  const credentials = userDatabase.getAccountCredentials(brokerAccount.id);
+  const credentials = await userDatabase.getAccountCredentials(typeof brokerAccount.id === 'string' ? parseInt(brokerAccount.id) : brokerAccount.id);
   if (!credentials) {
     console.log(`❌ Failed to retrieve credentials for ${brokerName} account ${brokerAccount.id}`);
     return null;
@@ -868,7 +868,7 @@ export const placeOrder = async (
     }
 
     // Validate that the user owns the specified account
-    const account = userDatabase.getConnectedAccountById(parseInt(accountId));
+    const account = await userDatabase.getConnectedAccountById(parseInt(accountId));
     if (!account || account.user_id !== parseInt(userId)) {
       res.status(404).json({
         success: false,
@@ -991,7 +991,7 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
@@ -1069,7 +1069,7 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.id);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
@@ -1240,7 +1240,7 @@ export const getOrderStatus = async (
     }
 
     // Get the user's connected accounts
-    const accounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+    const accounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
     const brokerAccount = accounts.find((account: any) => account.broker_name === brokerName);
 
     if (!brokerAccount) {
