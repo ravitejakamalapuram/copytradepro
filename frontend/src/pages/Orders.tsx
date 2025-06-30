@@ -41,8 +41,9 @@ const Orders: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(['all']); // Array of selected account IDs
   const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string, mongoId: string}>>([]);
+  const [showAccountFilter, setShowAccountFilter] = useState(false);
 
   // Function to get date range based on filter
   const getDateRange = () => {
@@ -162,23 +163,70 @@ const Orders: React.FC = () => {
     }
   };
 
-  // Function to filter orders by account
+  // Function to filter orders by selected accounts
   const filterOrdersByAccount = (orders: Order[]) => {
-    if (accountFilter === 'all') {
+    // If 'all' is selected, show all orders
+    if (selectedAccounts.includes('all')) {
       return orders;
     }
 
-    console.log('🔍 Filtering orders by account:', accountFilter); // Debug log
+    // If no accounts are selected, show no orders
+    if (selectedAccounts.length === 0) {
+      return [];
+    }
+
+    console.log('🔍 Filtering orders by accounts:', selectedAccounts); // Debug log
     console.log('🔍 Sample order accountInfo:', orders[0]?.accountInfo); // Debug log
 
     return orders.filter(order => {
-      // Match the broker account ID from order's account_info with the selected account filter
+      // Match the broker account ID from order's account_info with any of the selected accounts
       const orderBrokerAccountId = order.accountInfo?.account_id;
 
-      console.log('🔍 Order broker account ID:', orderBrokerAccountId, 'Filter:', accountFilter); // Debug log
+      console.log('🔍 Order broker account ID:', orderBrokerAccountId, 'Selected accounts:', selectedAccounts); // Debug log
 
-      return orderBrokerAccountId === accountFilter;
+      return selectedAccounts.includes(orderBrokerAccountId || '');
     });
+  };
+
+  // Account selection helper functions
+  const handleAccountToggle = (accountId: string) => {
+    if (accountId === 'all') {
+      // If selecting "All", clear other selections
+      setSelectedAccounts(['all']);
+    } else {
+      setSelectedAccounts(prev => {
+        // Remove "all" if it was selected
+        const withoutAll = prev.filter(id => id !== 'all');
+
+        if (withoutAll.includes(accountId)) {
+          // Remove the account if it's already selected
+          const newSelection = withoutAll.filter(id => id !== accountId);
+          // If no accounts are selected, default to "all"
+          return newSelection.length === 0 ? ['all'] : newSelection;
+        } else {
+          // Add the account to selection
+          return [...withoutAll, accountId];
+        }
+      });
+    }
+  };
+
+  const isAccountSelected = (accountId: string) => {
+    return selectedAccounts.includes(accountId);
+  };
+
+  const getSelectedAccountsText = () => {
+    if (selectedAccounts.includes('all')) {
+      return 'All Accounts';
+    }
+    if (selectedAccounts.length === 0) {
+      return 'No Accounts';
+    }
+    if (selectedAccounts.length === 1) {
+      const account = availableAccounts.find(acc => acc.id === selectedAccounts[0]);
+      return account ? account.name : 'Unknown Account';
+    }
+    return `${selectedAccounts.length} Accounts Selected`;
   };
 
 
@@ -189,7 +237,22 @@ const Orders: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [dateFilter, customStartDate, customEndDate, accountFilter]);
+  }, [dateFilter, customStartDate, customEndDate, selectedAccounts]);
+
+  // Close account filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showAccountFilter && !target.closest('[data-account-filter]')) {
+        setShowAccountFilter(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAccountFilter]);
 
   // Apply both status and account filters
   const filteredOrders = filterOrdersByAccount(orders).filter(order => {
@@ -377,29 +440,100 @@ const Orders: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Account Filter Dropdown */}
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {/* Account Filter Checkboxes */}
+                <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Account:</span>
-                  <select
-                    value={accountFilter}
-                    onChange={(e) => setAccountFilter(e.target.value)}
+                  <button
+                    className="kite-btn kite-btn-secondary"
+                    onClick={() => setShowAccountFilter(!showAccountFilter)}
                     style={{
-                      padding: '0.25rem 0.5rem',
-                      border: '1px solid var(--kite-border)',
-                      borderRadius: 'var(--kite-radius-sm)',
                       fontSize: '0.75rem',
-                      backgroundColor: 'var(--kite-bg-primary)',
-                      color: 'var(--kite-text-primary)',
-                      minWidth: '120px'
+                      padding: '0.25rem 0.5rem',
+                      minWidth: '140px',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
                     }}
                   >
-                    <option value="all">All Accounts</option>
-                    {availableAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                      </option>
-                    ))}
-                  </select>
+                    <span>{getSelectedAccountsText()}</span>
+                    <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
+                  </button>
+
+                  {/* Account Filter Dropdown */}
+                  {showAccountFilter && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '4rem',
+                      zIndex: 1000,
+                      backgroundColor: 'var(--kite-bg-primary)',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                      minWidth: '250px',
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      padding: '0.5rem'
+                    }}>
+                      {/* All Accounts Option */}
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem',
+                        cursor: 'pointer',
+                        borderRadius: 'var(--kite-radius-sm)',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        backgroundColor: isAccountSelected('all') ? 'var(--kite-bg-secondary)' : 'transparent'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isAccountSelected('all')}
+                          onChange={() => handleAccountToggle('all')}
+                          style={{ margin: 0 }}
+                        />
+                        <span>All Accounts</span>
+                      </label>
+
+                      {/* Individual Account Options */}
+                      {availableAccounts.map((account) => (
+                        <label
+                          key={account.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--kite-radius-sm)',
+                            fontSize: '0.875rem',
+                            backgroundColor: isAccountSelected(account.id) ? 'var(--kite-bg-secondary)' : 'transparent'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isAccountSelected(account.id)}
+                            onChange={() => handleAccountToggle(account.id)}
+                            style={{ margin: 0 }}
+                          />
+                          <span>{account.name}</span>
+                        </label>
+                      ))}
+
+                      {availableAccounts.length === 0 && (
+                        <div style={{
+                          padding: '0.5rem',
+                          fontSize: '0.875rem',
+                          color: 'var(--kite-text-secondary)',
+                          textAlign: 'center'
+                        }}>
+                          No accounts available
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -471,7 +605,7 @@ const Orders: React.FC = () => {
                   {dateFilter === 'month' && ' • Showing last 30 days'}
                   {dateFilter === 'all' && ' • Showing all orders'}
                   {customStartDate && customEndDate && ` • Custom range: ${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`}
-                  {accountFilter === 'all' ? ' • All accounts' : ` • ${availableAccounts.find(acc => acc.id === accountFilter)?.name || 'Selected account'}`}
+                  {` • ${getSelectedAccountsText()}`}
                 </p>
               )}
               {statusMessage && (
