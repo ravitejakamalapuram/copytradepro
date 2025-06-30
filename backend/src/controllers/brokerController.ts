@@ -11,6 +11,69 @@ import orderStatusService from '../services/orderStatusService';
 type BrokerService = ShoonyaService | FyersService;
 export const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
 
+// Broker Account Cache: Maps broker account IDs to user IDs and broker info
+interface BrokerAccountMapping {
+  userId: string;
+  brokerName: string;
+  accountId: string;
+  userDisplayName: string;
+}
+
+const brokerAccountCache = new Map<string, BrokerAccountMapping>();
+
+// Cache Management Functions
+const addToBrokerAccountCache = (accountId: string, userId: string, brokerName: string, userDisplayName: string) => {
+  brokerAccountCache.set(accountId, {
+    userId,
+    brokerName,
+    accountId,
+    userDisplayName
+  });
+  console.log(`📝 Added to broker cache: ${accountId} -> User ${userId} (${brokerName})`);
+};
+
+const removeFromBrokerAccountCache = (accountId: string) => {
+  const removed = brokerAccountCache.delete(accountId);
+  if (removed) {
+    console.log(`🗑️ Removed from broker cache: ${accountId}`);
+  }
+};
+
+const getBrokerAccountFromCache = (accountId: string): BrokerAccountMapping | null => {
+  return brokerAccountCache.get(accountId) || null;
+};
+
+// Initialize broker account cache from database
+export const initializeBrokerAccountCache = async () => {
+  try {
+    console.log('🔄 Initializing broker account cache from database...');
+
+    // This would need to be implemented in the database layer
+    // For now, we'll populate it as accounts are connected
+    console.log('📝 Broker account cache initialized (will populate as accounts connect)');
+  } catch (error) {
+    console.error('🚨 Failed to initialize broker account cache:', error);
+  }
+};
+
+// Populate cache when user connects (called during login/session restore)
+export const populateCacheForUser = async (userId: string) => {
+  try {
+    const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
+    for (const account of accounts) {
+      addToBrokerAccountCache(
+        account.account_id,
+        userId,
+        account.broker_name,
+        account.user_name
+      );
+    }
+    console.log(`📝 Populated cache for user ${userId}: ${accounts.length} accounts`);
+  } catch (error) {
+    console.error(`🚨 Failed to populate cache for user ${userId}:`, error);
+  }
+};
+
 // Store connected account data per user
 interface ConnectedAccount {
   id: string;
@@ -102,6 +165,14 @@ export const connectBroker = async (
           });
 
           console.log('✅ Account saved to database:', dbAccount.id);
+
+          // Add to broker account cache for fast lookups
+          addToBrokerAccountCache(
+            loginResponse.actid, // broker account ID
+            userId, // user ID
+            brokerName, // broker name
+            loginResponse.uname // user display name
+          );
         } catch (dbError: any) {
           console.error('🚨 Failed to save account to database:', dbError.message);
           // Continue with response even if DB save fails
@@ -525,6 +596,9 @@ export const removeConnectedAccount = async (
         });
         return;
       }
+
+      // Remove from broker account cache
+      removeFromBrokerAccountCache(account.account_id);
 
       res.status(200).json({
         success: true,
@@ -1541,23 +1615,36 @@ export const getQuotes = async (
 const brokerConnectionManagerImpl = {
   getBrokerConnection(brokerAccountId: string, brokerName: string): ShoonyaService | null {
     console.log(`🔍 Looking for broker connection: brokerAccountId=${brokerAccountId}, brokerName=${brokerName}`);
-    console.log(`🔍 Available user connections:`, Array.from(userBrokerConnections.keys()));
 
     try {
-      // For now, we'll search through all user connections to find the right one
-      // This is a temporary solution until we implement proper async support
-      console.warn('getBrokerConnection using temporary synchronous implementation');
+      // Step 1: Check cache for account mapping
+      const accountMapping = getBrokerAccountFromCache(brokerAccountId);
 
-      // Search through all user connections to find one with matching broker
-      for (const [userId, userConnections] of userBrokerConnections.entries()) {
-        const service = userConnections.get(brokerName);
-        if (service instanceof ShoonyaService) {
-          console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
-          return service;
-        }
+      if (!accountMapping) {
+        console.log(`❌ Account ${brokerAccountId} not found in cache`);
+        return null;
       }
 
-      console.log(`❌ No active ${brokerName} connection found for account ${brokerAccountId}`);
+      // Step 2: Verify broker name matches
+      if (accountMapping.brokerName !== brokerName) {
+        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${accountMapping.brokerName}`);
+        return null;
+      }
+
+      // Step 3: Get active connection for the user
+      const userConnections = userBrokerConnections.get(accountMapping.userId);
+      if (!userConnections) {
+        console.log(`❌ No active connections found for user ${accountMapping.userId}`);
+        return null;
+      }
+
+      const service = userConnections.get(brokerName);
+      if (service instanceof ShoonyaService) {
+        console.log(`✅ Found ${brokerName} service for user ${accountMapping.userId} (${accountMapping.userDisplayName})`);
+        return service;
+      }
+
+      console.log(`❌ Service not found or not a ShoonyaService for user ${accountMapping.userId}`);
       return null;
 
     } catch (error) {

@@ -5,6 +5,7 @@ import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { getDatabase } from '../services/databaseFactory';
 import { User } from '../interfaces/IDatabaseAdapter';
+import { populateCacheForUser } from './brokerController';
 
 // Helper function to generate JWT token
 const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
@@ -126,6 +127,9 @@ export const login = async (
       email: user.email,
       name: user.name,
     });
+
+    // Populate broker account cache for this user
+    await populateCacheForUser(user.id.toString());
 
     res.status(200).json({
       success: true,

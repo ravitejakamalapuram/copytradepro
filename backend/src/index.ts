@@ -20,6 +20,7 @@ import { symbolDatabaseService } from './services/symbolDatabaseService';
 import { realTimeDataService } from './services/realTimeDataService';
 import { nseCSVService } from './services/nseCSVService';
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
+import { initializeBrokerAccountCache } from './controllers/brokerController';
 
 // Load environment variables
 dotenv.config();
@@ -169,6 +170,9 @@ async function startServer() {
     console.log('🔧 Initializing database...');
     const database = await getDatabase();
     console.log(`✅ Database initialized: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
+
+    // Initialize broker account cache
+    await initializeBrokerAccountCache();
 
     // Start order status monitoring
     orderStatusService.startMonitoring().catch((error: any) => {
