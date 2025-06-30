@@ -877,6 +877,21 @@ export class SQLiteUserDatabase {
     }
   }
 
+  // Get all order history (for monitoring service)
+  getAllOrderHistory(): OrderHistory[] {
+    const getOrders = this.db.prepare(`
+      SELECT * FROM order_history
+      ORDER BY executed_at DESC
+    `);
+
+    try {
+      return getOrders.all() as OrderHistory[];
+    } catch (error) {
+      console.error('Failed to get all order history:', error);
+      return [];
+    }
+  }
+
   // Get order history by ID
   getOrderHistoryById(id: number): OrderHistory | null {
     const selectOrder = this.db.prepare(`
@@ -989,7 +1004,7 @@ export class SQLiteUserDatabase {
 
   // Get order history with filters and search
   getOrderHistoryByUserIdWithFilters(
-    userId: number,
+    userId: number | string,
     limit: number = 50,
     offset: number = 0,
     filters: {
@@ -1002,11 +1017,13 @@ export class SQLiteUserDatabase {
       search?: string;
     }
   ): OrderHistory[] {
+    // Convert string userId to number for SQLite
+    const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     let query = `
       SELECT * FROM order_history
       WHERE user_id = ?
     `;
-    const params: any[] = [userId];
+    const params: any[] = [numericUserId];
 
     // Add filters
     if (filters.status) {
@@ -1065,7 +1082,7 @@ export class SQLiteUserDatabase {
 
   // Get order count with filters and search
   getOrderCountByUserIdWithFilters(
-    userId: number,
+    userId: number | string,
     filters: {
       status?: string;
       symbol?: string;
@@ -1076,11 +1093,13 @@ export class SQLiteUserDatabase {
       search?: string;
     }
   ): number {
+    // Convert string userId to number for SQLite
+    const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     let query = `
       SELECT COUNT(*) as count FROM order_history
       WHERE user_id = ?
     `;
-    const params: any[] = [userId];
+    const params: any[] = [numericUserId];
 
     // Add same filters as above
     if (filters.status) {

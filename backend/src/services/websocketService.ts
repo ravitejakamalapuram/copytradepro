@@ -31,7 +31,7 @@ class WebSocketService {
 
     this.io = new Server(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:5174",
+        origin: process.env.FRONTEND_URL || ["http://localhost:5173", "http://localhost:5174"],
         methods: ["GET", "POST"],
         credentials: true
       },
@@ -255,6 +255,13 @@ class WebSocketService {
       users: Array.from(this.userSockets.keys()),
       connectedSockets: this.io ? this.io.sockets.sockets.size : 0
     };
+  }
+
+  /**
+   * Get Socket.IO server instance
+   */
+  getIO(): Server | null {
+    return this.io;
   }
 
   /**

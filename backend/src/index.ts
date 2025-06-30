@@ -11,10 +11,16 @@ import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
 import portfolioRoutes from './routes/portfolio';
 import advancedOrdersRoutes from './routes/advancedOrders';
+import marketDataRoutes from './routes/marketData';
 import { errorHandler } from './middleware/errorHandler';
 import { validateEnv } from './utils/validateEnv';
 import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
+import { symbolDatabaseService } from './services/symbolDatabaseService';
+import { realTimeDataService } from './services/realTimeDataService';
+import { nseCSVService } from './services/nseCSVService';
+import { getDatabase, DatabaseFactory } from './services/databaseFactory';
+import { initializeBrokerAccountCache } from './controllers/brokerController';
 
 // Load environment variables
 dotenv.config();
@@ -96,48 +102,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
 app.use('/api/portfolio', portfolioRoutes);
 app.use('/api/advanced-orders', advancedOrdersRoutes);
+app.use('/api/market-data', marketDataRoutes);
 app.use('/api/notifications', require('./routes/notifications').default);
 
-// Demo endpoint to test real-time order status updates
-app.post('/api/demo/update-order-status', (req: express.Request, res: express.Response): void => {
-  const { orderId, newStatus } = req.body;
 
-  if (!orderId || !newStatus) {
-    res.status(400).json({ error: 'orderId and newStatus are required' });
-    return;
-  }
-
-  // Note: Demo endpoint only broadcasts, real database updates happen in orderStatusService
-
-  // Simulate order status update
-  const updateData = {
-    orderId: orderId,
-    oldStatus: 'PLACED',
-    newStatus: newStatus,
-    order: {
-      id: orderId,
-      symbol: 'TCS',
-      action: 'BUY',
-      quantity: 1,
-      price: 0,
-      status: newStatus,
-      broker_name: 'shoonya',
-      executed_at: newStatus === 'EXECUTED' ? new Date().toISOString() : null
-    },
-    timestamp: new Date().toISOString()
-  };
-
-  // Broadcast to all connected clients
-  websocketService.broadcastOrderStatusChange(updateData);
-
-  console.log(`🎯 DEMO: Manually triggered order status update: ${orderId} → ${newStatus}`);
-
-  res.json({
-    success: true,
-    message: `Order ${orderId} status updated to ${newStatus}`,
-    data: updateData
-  });
-});
 
 // Serve static files from frontend build (in production)
 if (process.env.NODE_ENV === 'production') {
@@ -189,39 +157,72 @@ const server = createServer(app);
 // Initialize Socket.IO
 websocketService.initialize(server);
 
-// Start order status monitoring
-orderStatusService.startMonitoring().catch((error: any) => {
-  console.error('Failed to start order status monitoring:', error);
-});
+// Initialize real-time data service
+const io = websocketService.getIO();
+if (io) {
+  realTimeDataService.initialize(io);
+}
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔄 Socket.IO enabled for real-time updates`);
-  console.log(`📊 Order status monitoring active`);
-});
+// Initialize database and start services
+async function startServer() {
+  try {
+    // Initialize database
+    console.log('🔧 Initializing database...');
+    const database = await getDatabase();
+    console.log(`✅ Database initialized: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
+
+    // Initialize broker account cache
+    await initializeBrokerAccountCache();
+
+    // Start order status monitoring
+    orderStatusService.startMonitoring().catch((error: any) => {
+      console.error('Failed to start order status monitoring:', error);
+    });
+
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`💾 Database: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔄 Socket.IO enabled for real-time updates`);
+      console.log(`📊 Order status monitoring active`);
+      console.log(`📈 NSE CSV Database initialized with daily auto-updates at 6:30 AM IST`);
+      console.log(`⚡ Real-time price streaming active`);
+    });
+  } catch (error) {
+    console.error('🚨 Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  websocketService.shutdown();
-  orderStatusService.stopMonitoring();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+async function gracefulShutdown(signal: string) {
+  console.log(`${signal} received, shutting down gracefully`);
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  websocketService.shutdown();
-  orderStatusService.stopMonitoring();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+  try {
+    // Stop services
+    websocketService.shutdown();
+    orderStatusService.stopMonitoring();
+
+    // Close database connection
+    await DatabaseFactory.closeConnection();
+
+    // Close server
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;

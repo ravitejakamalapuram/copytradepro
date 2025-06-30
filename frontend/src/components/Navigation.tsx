@@ -17,8 +17,9 @@ const Navigation: React.FC = () => {
   };
 
   const primaryNavItems = [
-    { path: '/trade-setup', label: 'Trading', icon: '📊' },
-    { path: '/advanced-orders', label: 'Orders', icon: '🎯' },
+    { path: '/market-overview', label: 'Market', icon: '📊' },
+    { path: '/trade-setup', label: 'Trading', icon: '🎯' },
+    { path: '/advanced-orders', label: 'Orders', icon: '📋' },
     { path: '/portfolio', label: 'Portfolio', icon: '📈' },
   ];
 

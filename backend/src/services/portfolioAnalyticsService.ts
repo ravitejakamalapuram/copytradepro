@@ -1,5 +1,7 @@
 import { userDatabase } from './sqliteDatabase';
 import type { OrderHistory } from './sqliteDatabase';
+import { marketDataService } from './marketDataService';
+import type { MarketPrice } from './marketDataService';
 
 export interface PortfolioPosition {
   symbol: string;
@@ -61,7 +63,7 @@ class PortfolioAnalyticsService {
   /**
    * Calculate portfolio positions from order history
    */
-  calculatePortfolioPositions(userId: number): PortfolioPosition[] {
+  async calculatePortfolioPositions(userId: number): Promise<PortfolioPosition[]> {
     const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
 
@@ -76,6 +78,16 @@ class PortfolioAnalyticsService {
     });
 
     const positions: PortfolioPosition[] = [];
+    const symbolsToFetch: string[] = [];
+
+    // First pass: calculate quantities and collect symbols
+    const positionData = new Map<string, {
+      netQuantity: number;
+      averagePrice: number;
+      investedValue: number;
+      lastTradeDate: string;
+      brokerAccounts: string[];
+    }>();
 
     symbolGroups.forEach((orders, symbol) => {
       let totalBuyQuantity = 0;
@@ -107,27 +119,49 @@ class PortfolioAnalyticsService {
         const averagePrice = totalBuyValue / totalBuyQuantity;
         const investedValue = netQuantity * averagePrice;
 
-        // For now, use the last trade price as current price
-        // In a real implementation, you'd fetch current market prices
-        const lastOrder = orders[orders.length - 1];
-        const currentPrice = lastOrder?.price || averagePrice;
-        const currentValue = netQuantity * currentPrice;
-
-        const pnl = currentValue - investedValue;
-        const pnlPercentage = investedValue > 0 ? (pnl / investedValue) * 100 : 0;
-
-        positions.push({
-          symbol,
-          totalQuantity: netQuantity,
+        positionData.set(symbol, {
+          netQuantity,
           averagePrice,
-          currentValue,
           investedValue,
-          pnl,
-          pnlPercentage,
           lastTradeDate,
           brokerAccounts: Array.from(brokerAccounts)
         });
+
+        symbolsToFetch.push(symbol);
       }
+    });
+
+    // Fetch real-time prices for all symbols
+    let marketPrices: Map<string, MarketPrice>;
+    try {
+      marketPrices = await marketDataService.getPrices(symbolsToFetch);
+      console.log(`✅ Fetched live prices for ${marketPrices.size}/${symbolsToFetch.length} symbols`);
+    } catch (error) {
+      console.error('❌ Failed to fetch market prices, using fallback:', error);
+      marketPrices = new Map();
+    }
+
+    // Second pass: calculate positions with real-time prices
+    positionData.forEach((data, symbol) => {
+      const marketPrice = marketPrices.get(symbol);
+
+      // Use real-time price if available, otherwise fallback to average price
+      const currentPrice = marketPrice?.price || data.averagePrice;
+      const currentValue = data.netQuantity * currentPrice;
+      const pnl = currentValue - data.investedValue;
+      const pnlPercentage = data.investedValue > 0 ? (pnl / data.investedValue) * 100 : 0;
+
+      positions.push({
+        symbol,
+        totalQuantity: data.netQuantity,
+        averagePrice: data.averagePrice,
+        currentValue,
+        investedValue: data.investedValue,
+        pnl,
+        pnlPercentage,
+        lastTradeDate: data.lastTradeDate,
+        brokerAccounts: data.brokerAccounts
+      });
     });
 
     return positions.sort((a, b) => b.currentValue - a.currentValue);
@@ -136,9 +170,9 @@ class PortfolioAnalyticsService {
   /**
    * Calculate overall portfolio metrics
    */
-  calculatePortfolioMetrics(userId: number): PortfolioMetrics {
+  async calculatePortfolioMetrics(userId: number): Promise<PortfolioMetrics> {
     const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
-    const positions = this.calculatePortfolioPositions(userId);
+    const positions = await this.calculatePortfolioPositions(userId);
     
     const totalOrders = orders.length;
     const executedOrders = orders.filter(order => order.status === 'EXECUTED').length;
@@ -308,8 +342,8 @@ class PortfolioAnalyticsService {
       const dayPnL = this.calculatePnLFromOrders(dayOrders);
       cumulativePnL += dayPnL;
       
-      // Calculate portfolio value (simplified)
-      const portfolioValue = 100000 + cumulativePnL; // Assuming starting value of 1 lakh
+      // Calculate portfolio value based on actual invested amount
+      const portfolioValue = cumulativePnL;
       
       if (dateStr) {
         performanceData.push({

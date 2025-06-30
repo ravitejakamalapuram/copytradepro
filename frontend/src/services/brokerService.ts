@@ -176,23 +176,7 @@ export const brokerService = {
     }
   },
 
-  async searchSymbol(brokerName: string, exchange: string, symbol: string): Promise<any> {
-    try {
-      const response = await api.get(`/broker/search/${brokerName}/${exchange}/${symbol}`);
-      return response.data;
-    } catch (error: any) {
-      console.error('🚨 Search symbol error:', error);
-      
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
-    }
-  },
+
 
   async getQuotes(brokerName: string, exchange: string, token: string): Promise<any> {
     try {
