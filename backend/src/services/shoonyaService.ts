@@ -426,4 +426,11 @@ export class ShoonyaService {
       return false;
     }
   }
+
+  /**
+   * Get the current user ID (broker account ID)
+   */
+  getUserId(): string | null {
+    return this.userId;
+  }
 }

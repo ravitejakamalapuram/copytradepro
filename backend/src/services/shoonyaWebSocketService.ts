@@ -32,6 +32,7 @@ export class ShoonyaWebSocketService extends EventEmitter {
   private reconnectDelay: number = 5000; // 5 seconds
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private subscribedUsers: Set<string> = new Set();
+  private webSocketEnabled: boolean = true; // Can be disabled if persistent issues
 
   // Shoonya WebSocket endpoint
   private readonly wsUrl = 'wss://api.shoonya.com/NorenWSTP/';
@@ -85,6 +86,11 @@ export class ShoonyaWebSocketService extends EventEmitter {
    * Connect to Shoonya WebSocket
    */
   async connect(sessionToken: string, userId: string): Promise<void> {
+    if (!this.webSocketEnabled) {
+      console.log('⚠️ WebSocket disabled due to persistent connection issues');
+      return;
+    }
+
     if (this.isConnected) {
       console.log('⚠️ Already connected to Shoonya WebSocket');
       return;
@@ -95,8 +101,19 @@ export class ShoonyaWebSocketService extends EventEmitter {
 
     try {
       console.log('🔄 Connecting to Shoonya WebSocket...');
-      
-      this.ws = new WebSocket(this.wsUrl);
+
+      // Create WebSocket with improved options
+      this.ws = new WebSocket(this.wsUrl, {
+        timeout: 60000, // 60 second timeout
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Origin': 'https://shoonya.com',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        },
+        handshakeTimeout: 30000, // 30 second handshake timeout
+        perMessageDeflate: false // Disable compression to avoid issues
+      });
 
       this.ws.on('open', () => {
         console.log('🔗 WebSocket connection opened');
@@ -115,6 +132,16 @@ export class ShoonyaWebSocketService extends EventEmitter {
 
       this.ws.on('error', (error: Error) => {
         console.error('🚨 WebSocket error:', error);
+
+        // Handle specific error types
+        if (error.message.includes('504') || error.message.includes('Gateway Timeout')) {
+          console.log('🔄 Server temporarily unavailable (504), will retry...');
+        } else if (error.message.includes('503') || error.message.includes('Service Unavailable')) {
+          console.log('🔄 Service temporarily unavailable (503), will retry...');
+        } else if (error.message.includes('502') || error.message.includes('Bad Gateway')) {
+          console.log('🔄 Bad gateway (502), will retry...');
+        }
+
         this.emit('error', error);
       });
 
@@ -289,14 +316,21 @@ export class ShoonyaWebSocketService extends EventEmitter {
    */
   private handleReconnection(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('❌ Max reconnection attempts reached, giving up');
+      console.error('❌ Max reconnection attempts reached, disabling WebSocket for this session');
+      console.log('🔄 Falling back to REST API polling for order updates');
+      this.webSocketEnabled = false;
       return;
     }
 
     this.reconnectAttempts++;
-    const delay = this.reconnectDelay * this.reconnectAttempts;
 
-    console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
+    // Exponential backoff with jitter for 504 errors
+    const baseDelay = this.reconnectDelay;
+    const exponentialDelay = baseDelay * Math.pow(2, this.reconnectAttempts - 1);
+    const jitter = Math.random() * 1000; // Add up to 1 second of jitter
+    const delay = Math.min(exponentialDelay + jitter, 60000); // Cap at 60 seconds
+
+    console.log(`🔄 Attempting reconnection ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${Math.round(delay)}ms`);
 
     setTimeout(() => {
       if (this.sessionToken && this.userId) {
@@ -333,13 +367,35 @@ export class ShoonyaWebSocketService extends EventEmitter {
     isAuthenticated: boolean;
     subscribedUsers: number;
     reconnectAttempts: number;
+    webSocketEnabled: boolean;
   } {
     return {
       isConnected: this.isConnected,
       isAuthenticated: this.isAuthenticated,
       subscribedUsers: this.subscribedUsers.size,
-      reconnectAttempts: this.reconnectAttempts
+      reconnectAttempts: this.reconnectAttempts,
+      webSocketEnabled: this.webSocketEnabled
     };
+  }
+
+  /**
+   * Re-enable WebSocket (useful after network issues are resolved)
+   */
+  enableWebSocket(): void {
+    this.webSocketEnabled = true;
+    this.reconnectAttempts = 0;
+    console.log('✅ WebSocket re-enabled');
+  }
+
+  /**
+   * Disable WebSocket (force REST API fallback)
+   */
+  disableWebSocket(): void {
+    this.webSocketEnabled = false;
+    if (this.ws) {
+      this.ws.close();
+    }
+    console.log('⚠️ WebSocket disabled, using REST API fallback');
   }
 }
 

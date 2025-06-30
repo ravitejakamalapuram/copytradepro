@@ -279,17 +279,50 @@ class OrderStatusService extends EventEmitter {
    */
   private async connectWebSocketForAccount(accountInfo: string, orders: Order[]): Promise<void> {
     try {
-      const [userId, brokerName] = accountInfo.split(':');
+      const accountParts = accountInfo.split(':');
+      if (accountParts.length !== 2) {
+        logger.error(`⚠️ Invalid account info format: ${accountInfo}`);
+        return;
+      }
+
+      const userId = accountParts[0];
+      const brokerName = accountParts[1];
+
+      if (!userId || !brokerName) {
+        logger.error(`⚠️ Missing userId or brokerName in account info: ${accountInfo}`);
+        return;
+      }
 
       if (brokerName !== 'shoonya') {
         logger.warn(`⚠️ WebSocket not supported for broker: ${brokerName}`);
         return;
       }
 
-      // TODO: Get broker connection to get session token
-      // For now, skip WebSocket connection since broker connection manager is not available
-      logger.warn(`⚠️ WebSocket connection not implemented yet for account: ${accountInfo}`);
-      return;
+      // Get broker connection to get session token
+      const brokerService = brokerConnectionManager.getBrokerConnection(userId, brokerName);
+
+      if (!brokerService || !brokerService.isLoggedIn()) {
+        logger.warn(`⚠️ No active broker connection for user ${userId} and broker ${brokerName}`);
+        return;
+      }
+
+      const sessionToken = brokerService.getSessionToken();
+      if (!sessionToken) {
+        logger.warn(`⚠️ No session token available for user ${userId}`);
+        return;
+      }
+
+      // Connect to WebSocket if not already connected
+      if (!shoonyaWebSocketService.getStatus().isConnected) {
+        logger.info(`🔄 Connecting to Shoonya WebSocket for user ${userId}...`);
+        await shoonyaWebSocketService.connect(sessionToken, userId);
+      }
+
+      // Subscribe to order updates for this user
+      shoonyaWebSocketService.subscribeToOrderUpdates(userId);
+      this.connectedBrokerAccounts.add(accountInfo);
+
+      logger.info(`✅ WebSocket connected for account: ${accountInfo} (${orders.length} orders)`);
 
     } catch (error: any) {
       logger.error(`🚨 Failed to connect WebSocket for account ${accountInfo}:`, error.message);
@@ -471,7 +504,10 @@ class OrderStatusService extends EventEmitter {
           if (brokerService) {
             logger.debug(`Getting real order status from Shoonya API for order ${order.broker_order_id}`);
 
+            // Try to get order status from broker API
+            logger.debug(`Calling broker API for order status: ${order.broker_order_id}`);
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
+            logger.debug(`Broker API response:`, brokerStatus);
 
             if (brokerStatus && brokerStatus.stat === 'Ok') {
               const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
@@ -518,20 +554,56 @@ class OrderStatusService extends EventEmitter {
     try {
       logger.debug(`Getting broker account ID for order ${order.id}`);
 
-      // Try to get account info from order history table
-      const orderHistory = userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
+      // First, try to get the connected account directly using the order's account_id
+      if (order.account_id) {
+        logger.debug(`Order has account_id: ${order.account_id}`);
+
+        // Get connected account using account_id (handle both MongoDB string and SQLite number)
+        let account = null;
+        try {
+          account = await userDatabase.getConnectedAccountById(order.account_id as any);
+        } catch (error) {
+          logger.debug(`Failed to get connected account by ID ${order.account_id}:`, error);
+        }
+        logger.debug(`Connected account found:`, account ? 'Yes' : 'No');
+
+        if (account) {
+          logger.debug(`Broker account ID: ${account.account_id}`);
+          return account.account_id; // This is the broker account ID (e.g., "FN135006")
+        }
+      }
+
+      // Fallback: Try to get account info from order history table
+      logger.debug(`Fallback: Checking order history for order ${order.id}`);
+      const orderHistory = await userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {
         logger.debug(`Order history account_id: ${orderHistory.account_id}`);
 
         // Get the connected account to find the broker account ID
-        const account = userDatabase.getConnectedAccountById(orderHistory.account_id);
+        const account = await userDatabase.getConnectedAccountById(orderHistory.account_id);
         logger.debug(`Connected account found:`, account ? 'Yes' : 'No');
 
         if (account) {
           logger.debug(`Broker account ID: ${account.account_id}`);
           return account.account_id; // This is the broker account ID (e.g., "FN135006")
+        }
+      }
+
+      // Final fallback: Try to get broker account ID from active broker connections
+      logger.debug(`Final fallback: Checking active broker connections for user ${order.user_id}`);
+      const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
+
+      if (brokerService && brokerService.isLoggedIn()) {
+        // For Shoonya, the broker account ID is the user ID
+        if (order.broker_name === 'shoonya') {
+          const shoonyaService = brokerService as ShoonyaService;
+          const userId = shoonyaService.getUserId();
+          if (userId) {
+            logger.debug(`Found broker account ID from active connection: ${userId}`);
+            return userId; // This is the broker account ID (e.g., "FN135006")
+          }
         }
       }
 

@@ -29,6 +29,8 @@ const Orders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   // Function to fetch orders (for refresh)
   const fetchOrders = async () => {
@@ -128,6 +130,53 @@ const Orders: React.FC = () => {
     }
   };
 
+  const handleCheckOrderStatus = async (orderId: string) => {
+    try {
+      // Add to checking set to show loading state
+      setCheckingStatus(prev => new Set(prev).add(orderId));
+      setStatusMessage(null);
+
+      console.log('🔍 Manually checking status for order:', orderId);
+
+      const response = await brokerService.checkOrderStatus(orderId);
+
+      if (response.success) {
+        const { statusChanged, previousStatus, currentStatus, message } = response.data;
+
+        // Show success message
+        setStatusMessage(message);
+        setTimeout(() => setStatusMessage(null), 5000);
+
+        // Update the specific order in the local state
+        setOrders(prevOrders =>
+          prevOrders.map(order =>
+            order.id === orderId
+              ? { ...order, status: currentStatus.toUpperCase() as any }
+              : order
+          )
+        );
+
+        console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+      } else {
+        setStatusMessage(`Failed to check status: ${response.message}`);
+        setTimeout(() => setStatusMessage(null), 5000);
+        console.error('Failed to check order status:', response.message);
+      }
+
+    } catch (error: any) {
+      console.error('Failed to check order status:', error);
+      setStatusMessage('Failed to check order status. Please try again.');
+      setTimeout(() => setStatusMessage(null), 5000);
+    } finally {
+      // Remove from checking set
+      setCheckingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="kite-theme">
@@ -171,6 +220,12 @@ const Orders: React.FC = () => {
 
   return (
     <div className="kite-theme">
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <AppNavigation />
       
       <div className="kite-main">
@@ -185,6 +240,16 @@ const Orders: React.FC = () => {
                   color: 'var(--kite-text-secondary)'
                 }}>
                   Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
+                </p>
+              )}
+              {statusMessage && (
+                <p style={{
+                  margin: '0.5rem 0 0 0',
+                  fontSize: '0.875rem',
+                  color: statusMessage.includes('Failed') ? 'var(--kite-loss)' : 'var(--kite-profit)',
+                  fontWeight: '500'
+                }}>
+                  {statusMessage}
                 </p>
               )}
             </div>
@@ -319,7 +384,40 @@ const Orders: React.FC = () => {
                         {order.avgPrice ? formatCurrency(order.avgPrice) : '-'}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {/* Check Status button - available for all orders */}
+                          <button
+                            className="kite-btn"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              opacity: checkingStatus.has(order.id) ? 0.6 : 1
+                            }}
+                            onClick={() => handleCheckOrderStatus(order.id)}
+                            disabled={checkingStatus.has(order.id)}
+                            title="Check current order status from broker"
+                          >
+                            {checkingStatus.has(order.id) ? (
+                              <>
+                                <span style={{
+                                  display: 'inline-block',
+                                  width: '0.75rem',
+                                  height: '0.75rem',
+                                  border: '1px solid currentColor',
+                                  borderTop: '1px solid transparent',
+                                  borderRadius: '50%',
+                                  animation: 'spin 1s linear infinite'
+                                }}></span>
+                                Checking...
+                              </>
+                            ) : (
+                              <>🔄 Check</>
+                            )}
+                          </button>
+
                           {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
                               <button
@@ -345,9 +443,9 @@ const Orders: React.FC = () => {
                             </>
                           )}
                           {order.status === 'EXECUTED' && (
-                            <button 
+                            <button
                               className="kite-btn"
-                              style={{ 
+                              style={{
                                 padding: '0.25rem 0.5rem',
                                 fontSize: '0.75rem'
                               }}
