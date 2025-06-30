@@ -51,7 +51,14 @@ export const useRealTimeData = () => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    const newSocket = io('http://localhost:3001', {
+    // Use relative path for Socket.IO connection (will use Vite proxy in development)
+    // In development: connects via Vite proxy to localhost:3001
+    // In production: connects to the same domain as the frontend
+    const socketUrl = '/';
+
+    console.log('🔧 Socket.IO Debug: Using relative path for connection');
+
+    const newSocket = io(socketUrl, {
       auth: {
         token
       },
