@@ -62,17 +62,17 @@ class DatabaseCompatibilityLayer {
     return await db.getConnectedAccountsByUserId(userId);
   }
 
-  async getConnectedAccountById(id: number) {
+  async getConnectedAccountById(id: number | string) {
     const db = await this.getDb();
     return await db.getConnectedAccountById(id);
   }
 
-  async updateConnectedAccount(id: number, accountData: any) {
+  async updateConnectedAccount(id: number | string, accountData: any) {
     const db = await this.getDb();
     return await db.updateConnectedAccount(id, accountData);
   }
 
-  async deleteConnectedAccount(id: number) {
+  async deleteConnectedAccount(id: number | string) {
     const db = await this.getDb();
     return await db.deleteConnectedAccount(id);
   }
@@ -135,7 +135,7 @@ class DatabaseCompatibilityLayer {
   }
 
   // Additional methods that might be needed for compatibility
-  async getAccountCredentials(accountId: number) {
+  async getAccountCredentials(accountId: number | string) {
     const db = await this.getDb();
     const account = await db.getConnectedAccountById(accountId);
     if (!account) return null;

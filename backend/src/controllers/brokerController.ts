@@ -418,10 +418,8 @@ export const checkAccountSessionStatus = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = await userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -555,10 +553,8 @@ export const removeConnectedAccount = async (
 
     // Remove account from database and logout
     try {
-      const accountIdNum = parseInt(accountId);
-
       // Get account details before deletion for logout
-      const account = await userDatabase.getConnectedAccountById(accountIdNum);
+      const account = await userDatabase.getConnectedAccountById(accountId);
       if (!account) {
         res.status(404).json({
           success: false,
@@ -588,7 +584,7 @@ export const removeConnectedAccount = async (
       }
 
       // Delete from database
-      const deleted = await userDatabase.deleteConnectedAccount(accountIdNum);
+      const deleted = await userDatabase.deleteConnectedAccount(accountId);
       if (!deleted) {
         res.status(404).json({
           success: false,
@@ -638,10 +634,8 @@ export const activateAccount = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = await userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -651,7 +645,7 @@ export const activateAccount = async (
     }
 
     // Get decrypted credentials
-    const credentials = await userDatabase.getAccountCredentials(accountIdNum);
+    const credentials = await userDatabase.getAccountCredentials(accountId);
     if (!credentials) {
       res.status(500).json({
         success: false,
@@ -726,10 +720,8 @@ export const deactivateAccount = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = await userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
