@@ -1,10 +1,10 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/databaseCompatibility';
-import { setBrokerConnectionManager } from '../services/orderStatusService';
+// Removed deprecated setBrokerConnectionManager import
 import orderStatusService from '../services/orderStatusService';
 
 // Store broker connections per user (in production, use Redis or database)
@@ -145,9 +145,7 @@ const removeFromBrokerAccountCache = (accountId: string) => {
   }
 };
 
-const getBrokerAccountFromCache = (accountId: string): BrokerAccountMapping | null => {
-  return brokerAccountCache.get(accountId) || null;
-};
+// Removed unused getBrokerAccountFromCache function
 
 // Initialize broker account cache from database
 export const initializeBrokerAccountCache = async () => {
@@ -180,28 +178,13 @@ export const populateCacheForUser = async (userId: string) => {
   }
 };
 
-// Store connected account data per user
-interface ConnectedAccount {
-  id: string;
-  brokerName: string;
-  accountId: string;
-  userId: string;
-  userName: string;
-  email: string;
-  brokerDisplayName: string;
-  exchanges: string[];
-  products: any[];
-  isActive: boolean;
-  createdAt: Date;
-  accessToken?: string;
-}
+// Removed unused ConnectedAccount interface (using the one from IDatabaseAdapter)
 
-const userConnectedAccounts = new Map<string, ConnectedAccount[]>();
+// Removed unused userConnectedAccounts variable
 
 export const connectBroker = async (
   req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction
+  res: Response
 ): Promise<void> => {
   try {
     // Check validation errors
@@ -1931,49 +1914,4 @@ export const getQuotes = async (
   }
 };
 
-// Broker Connection Manager for Order Status Service
-const brokerConnectionManagerImpl = {
-  getBrokerConnection(brokerAccountId: string, brokerName: string): ShoonyaService | null {
-    console.log(`🔍 Looking for broker connection: brokerAccountId=${brokerAccountId}, brokerName=${brokerName}`);
-
-    try {
-      // Step 1: Check cache for account mapping
-      const accountMapping = getBrokerAccountFromCache(brokerAccountId);
-
-      if (!accountMapping) {
-        console.log(`❌ Account ${brokerAccountId} not found in cache`);
-        return null;
-      }
-
-      // Step 2: Verify broker name matches
-      if (accountMapping.brokerName !== brokerName) {
-        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${accountMapping.brokerName}`);
-        return null;
-      }
-
-      // Step 3: Get active connection for the user
-      const userConnections = userBrokerConnections.get(accountMapping.userId);
-      if (!userConnections) {
-        console.log(`❌ No active connections found for user ${accountMapping.userId}`);
-        return null;
-      }
-
-      const connectionKey = `${brokerName}_${accountMapping.accountId}`;
-      const service = userConnections.get(connectionKey);
-      if (service instanceof ShoonyaService) {
-        console.log(`✅ Found ${brokerName} service for user ${accountMapping.userId} (${accountMapping.userDisplayName})`);
-        return service;
-      }
-
-      console.log(`❌ Service not found or not a ShoonyaService for user ${accountMapping.userId}`);
-      return null;
-
-    } catch (error) {
-      console.error(`🚨 Error in getBrokerConnection:`, error);
-      return null;
-    }
-  }
-};
-
-// Set the broker connection manager for the order status service
-setBrokerConnectionManager(brokerConnectionManagerImpl);
+// Note: Broker connection manager functionality is now handled directly in the order status service

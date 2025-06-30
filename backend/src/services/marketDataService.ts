@@ -125,7 +125,7 @@ class MarketDataService {
         }
       }
 
-      // Fallback to Yahoo Finance
+      // Fallback to Yahoo Finance (with graceful error handling)
       const yahooSymbol = this.formatSymbolForYahoo(symbol, exchange);
 
       const response = await axios.get<YahooFinanceResponse>(this.YAHOO_BASE_URL, {
@@ -161,7 +161,12 @@ class MarketDataService {
       return marketPrice;
 
     } catch (error: any) {
-      console.warn(`⚠️ Failed to fetch ${symbol}:`, error.message);
+      // Only log as warning if it's not a 401 error (which is expected for Yahoo Finance)
+      if (error.response?.status === 401) {
+        console.log(`📊 Yahoo Finance API access restricted for ${symbol} (using NSE API only)`);
+      } else {
+        console.warn(`⚠️ Failed to fetch ${symbol}:`, error.message);
+      }
       return null;
     }
   }
@@ -251,7 +256,7 @@ class MarketDataService {
 
 
   /**
-   * Get major Indian market indices from NSE API with Yahoo Finance fallback
+   * Get major Indian market indices from NSE API with graceful fallback
    */
   async getMarketIndices(): Promise<MarketIndex[]> {
     try {
@@ -266,59 +271,17 @@ class MarketDataService {
           lastUpdated: new Date()
         }));
 
-        console.log(`📊 Successfully fetched ${results.length} market indices from NSE`);
+        console.log(`✅ Fetched ${results.length} market indices from NSE`);
         return results;
       }
     } catch (error) {
-      console.warn('⚠️ NSE indices API failed, trying Yahoo Finance:', error);
+      console.warn('⚠️ NSE indices API failed:', error);
     }
 
-    // Fallback to Yahoo Finance
-    const indices = [
-      { symbol: '^NSEI', name: 'NIFTY 50' },
-      { symbol: '^BSESN', name: 'SENSEX' },
-      { symbol: '^NSEBANK', name: 'BANK NIFTY' },
-      { symbol: '^NSEIT', name: 'NIFTY IT' }
-    ];
-
-    const results: MarketIndex[] = [];
-    let successCount = 0;
-
-    for (const index of indices) {
-      try {
-        const response = await axios.get<YahooFinanceResponse>(this.YAHOO_BASE_URL, {
-          params: {
-            symbols: index.symbol,
-            fields: 'regularMarketPrice,regularMarketChange,regularMarketChangePercent'
-          },
-          timeout: 3000, // Reduced timeout
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-
-        const quote = response.data?.quoteResponse?.result?.[0];
-        if (quote) {
-          results.push({
-            name: index.name,
-            value: quote.regularMarketPrice || 0,
-            change: quote.regularMarketChange || 0,
-            changePercent: quote.regularMarketChangePercent || 0,
-            lastUpdated: new Date()
-          });
-          successCount++;
-        }
-
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY));
-
-      } catch (error: any) {
-        console.warn(`⚠️ Failed to fetch ${index.name} from Yahoo Finance:`, error.message);
-      }
-    }
-
-    console.log(`📊 Successfully fetched ${successCount}/${indices.length} market indices from Yahoo Finance`);
-    return results;
+    // If NSE fails, return empty array instead of trying Yahoo Finance
+    // Yahoo Finance API has become unreliable with 401 errors
+    console.log('📊 Using NSE API only for market indices (Yahoo Finance disabled due to API restrictions)');
+    return [];
   }
 
   /**
