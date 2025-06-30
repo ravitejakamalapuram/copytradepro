@@ -12,7 +12,6 @@ const logger = {
 
 interface AuthenticatedSocket extends Socket {
   userId?: string;
-  subscribedToOrders?: boolean;
 }
 
 class WebSocketService {
@@ -93,18 +92,7 @@ class WebSocketService {
     // Join user-specific room
     socket.join(`user:${userId}`);
 
-    // Set up event handlers
-    socket.on('subscribe_orders', () => {
-      this.handleOrderSubscription(socket);
-    });
-
-    socket.on('unsubscribe_orders', () => {
-      this.handleOrderUnsubscription(socket);
-    });
-
-    socket.on('get_monitoring_status', () => {
-      this.sendMonitoringStatus(socket);
-    });
+    // Set up event handlers (order monitoring removed - using manual refresh only)
 
     socket.on('disconnect', (reason: string) => {
       this.handleDisconnection(socket, reason);
@@ -117,9 +105,7 @@ class WebSocketService {
       timestamp: new Date().toISOString()
     });
 
-    // Auto-subscribe to orders and send monitoring status
-    this.handleOrderSubscription(socket);
-    this.sendMonitoringStatus(socket);
+    // WebSocket connected successfully (order monitoring removed)
   }
 
 
@@ -141,89 +127,7 @@ class WebSocketService {
     }
   }
 
-  /**
-   * Handle order subscription
-   */
-  handleOrderSubscription(socket: AuthenticatedSocket): void {
-    const userId = socket.userId;
 
-    if (!userId) return;
-
-    // Join orders room for this user
-    socket.join(`orders:${userId}`);
-    socket.subscribedToOrders = true;
-
-    socket.emit('subscription_confirmed', {
-      subscription: 'orders',
-      message: 'Subscribed to order status updates',
-      timestamp: new Date().toISOString()
-    });
-
-    logger.debug(`User ${userId} subscribed to order updates`);
-  }
-
-  /**
-   * Handle order unsubscription
-   */
-  handleOrderUnsubscription(socket: AuthenticatedSocket): void {
-    const userId = socket.userId;
-
-    if (!userId) return;
-
-    // Leave orders room
-    socket.leave(`orders:${userId}`);
-    socket.subscribedToOrders = false;
-
-    socket.emit('subscription_cancelled', {
-      subscription: 'orders',
-      message: 'Unsubscribed from order status updates',
-      timestamp: new Date().toISOString()
-    });
-
-    logger.debug(`User ${userId} unsubscribed from order updates`);
-  }
-
-  /**
-   * Send monitoring status to client
-   */
-  sendMonitoringStatus(socket: AuthenticatedSocket): void {
-    // Mock monitoring status for now
-    const stats = {
-      isPolling: false,
-      activeBrokers: 0,
-      activeOrders: 0,
-      pollingFrequency: 5000,
-      brokers: []
-    };
-
-    socket.emit('monitoring_status', {
-      data: stats,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  /**
-   * Broadcast order status change to relevant clients
-   */
-  broadcastOrderStatusChange(data: any): void {
-    if (!this.io) return;
-
-    // Broadcast to all users subscribed to orders
-    this.io.emit('order_status_changed', data);
-
-    logger.debug(`Broadcasted order status change`);
-  }
-
-  /**
-   * Broadcast order execution update to relevant clients
-   */
-  broadcastOrderExecutionUpdate(data: any): void {
-    if (!this.io) return;
-
-    this.io.emit('order_execution_updated', data);
-
-    logger.debug(`Broadcasted order execution update`);
-  }
 
   /**
    * Send message to all clients of a specific user
@@ -233,13 +137,7 @@ class WebSocketService {
     this.io.to(`user:${userId}`).emit(event, data);
   }
 
-  /**
-   * Send message to user's order subscription
-   */
-  sendToUserOrders(userId: string, event: string, data: any): void {
-    if (!this.io) return;
-    this.io.to(`orders:${userId}`).emit(event, data);
-  }
+
 
   /**
    * Get connection statistics
