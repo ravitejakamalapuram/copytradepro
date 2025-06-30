@@ -1,180 +1,132 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import Navigation from '../components/Navigation';
-import { brokerService } from '../services/brokerService';
-import type { ShoonyaCredentials, FyersCredentials } from '../services/brokerService';
-import { accountService } from '../services/accountService';
-import type { ConnectedAccount } from '../services/accountService';
-import {
-  Container,
-  PageHeader,
-  Card,
-  CardHeader,
-  CardContent,
-  Button,
-  Input,
-  Select,
-  StatusBadge,
-  Flex,
-  Stack
-} from '../components/ui';
-import './AccountSetup.css';
-
-// Using ConnectedAccount from accountService
+import AppNavigation from '../components/AppNavigation';
+import { brokerService, type ShoonyaCredentials, type FyersCredentials } from '../services/brokerService';
+import { accountService, type ConnectedAccount } from '../services/accountService';
+import '../styles/app-theme.css';
 
 const SUPPORTED_BROKERS = [
-  { id: 'shoonya', name: 'Shoonya', description: 'Reliable trading & investment platform by Finvasia' },
-  { id: 'fyers', name: 'Fyers', description: 'Advanced trading platform with powerful APIs' },
+  { 
+    id: 'shoonya', 
+    name: 'Shoonya', 
+    description: 'Reliable trading & investment platform by Finvasia',
+    logo: '🏦',
+    features: ['Zero brokerage on equity delivery', 'Advanced charting tools', 'API trading support']
+  },
+  { 
+    id: 'fyers', 
+    name: 'Fyers', 
+    description: 'Advanced trading platform with powerful APIs',
+    logo: '🚀',
+    features: ['Professional trading tools', 'Real-time market data', 'Advanced order types']
+  },
 ];
+
+interface FormData {
+  brokerName: string;
+  // Shoonya fields
+  userId: string;
+  password: string;
+  totpKey: string;
+  vendorCode: string;
+  apiSecret: string;
+  imei: string;
+  // Fyers fields
+  clientId: string;
+  secretKey: string;
+  redirectUri: string;
+}
 
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
-  const { } = useAuth();
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [selectedBroker, setSelectedBroker] = useState<string>('');
   const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
-  const [formData, setFormData] = useState({
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FormData>({
     brokerName: '',
-    // Shoonya fields
     userId: '',
     password: '',
-    totpKey: '',  // Changed from twoFA to totpKey
+    totpKey: '',
     vendorCode: '',
     apiSecret: '',
     imei: '',
-    // Fyers fields
     clientId: '',
     secretKey: '',
     redirectUri: '',
   });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [fyersAuthUrl, setFyersAuthUrl] = useState<string>('');
-  const [fyersAuthCode, setFyersAuthCode] = useState<string>('');
-  const [showFyersAuthStep, setShowFyersAuthStep] = useState(false);
 
-  // Load connected accounts on component mount
   useEffect(() => {
-    loadConnectedAccounts();
+    const fetchAccounts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+      } catch (error: any) {
+        console.error('Failed to fetch accounts:', error);
+        setError('Failed to load connected accounts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAccounts();
   }, []);
 
-  const loadConnectedAccounts = async () => {
-    try {
-      const connectedAccounts = await accountService.getConnectedAccounts();
-      setAccounts(connectedAccounts);
-    } catch (error) {
-      console.error('Failed to load connected accounts:', error);
-    }
+  const handleInputChange = (field: keyof FormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+  const handleBrokerSelect = (brokerId: string) => {
+    setSelectedBroker(brokerId);
+    setFormData(prev => ({ ...prev, brokerName: brokerId }));
+    setShowAddForm(true);
   };
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
+  const handleSubmit = async () => {
     if (!formData.brokerName) {
-      newErrors.brokerName = 'Please select a broker';
-    }
-
-    if (formData.brokerName === 'shoonya') {
-      if (!formData.userId.trim()) {
-        newErrors.userId = 'User ID is required';
-      }
-      if (!formData.password.trim()) {
-        newErrors.password = 'Password is required';
-      }
-      if (!formData.totpKey.trim()) {
-        newErrors.totpKey = 'TOTP Key is required';
-      }
-      if (!formData.vendorCode.trim()) {
-        newErrors.vendorCode = 'Vendor Code is required';
-      }
-      if (!formData.apiSecret.trim()) {
-        newErrors.apiSecret = 'API Secret is required';
-      }
-      if (!formData.imei.trim()) {
-        newErrors.imei = 'IMEI is required';
-      }
-    } else if (formData.brokerName === 'fyers') {
-      if (!formData.clientId.trim()) {
-        newErrors.clientId = 'Client ID is required';
-      }
-      if (!formData.secretKey.trim()) {
-        newErrors.secretKey = 'Secret Key is required';
-      }
-      if (!formData.redirectUri.trim()) {
-        newErrors.redirectUri = 'Redirect URI is required';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleAddAccount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
+      setError('Please select a broker');
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      let credentials: ShoonyaCredentials | FyersCredentials;
+      setSubmitting(true);
+      setError(null);
 
+      let result;
       if (formData.brokerName === 'shoonya') {
-        credentials = {
-          userId: formData.userId.trim(),
-          password: formData.password.trim(),
-          totpKey: formData.totpKey.trim(),
-          vendorCode: formData.vendorCode.trim(),
-          apiSecret: formData.apiSecret.trim(),
-          imei: formData.imei.trim(),
-        } as ShoonyaCredentials;
+        const credentials: ShoonyaCredentials = {
+          userId: formData.userId,
+          password: formData.password,
+          totpKey: formData.totpKey,
+          vendorCode: formData.vendorCode,
+          apiSecret: formData.apiSecret,
+          imei: formData.imei,
+        };
+        result = await brokerService.connectBroker('shoonya', credentials);
       } else if (formData.brokerName === 'fyers') {
-        credentials = {
-          clientId: formData.clientId.trim(),
-          secretKey: formData.secretKey.trim(),
-          redirectUri: formData.redirectUri.trim(),
-          totpKey: formData.totpKey?.trim() || undefined,
-        } as FyersCredentials;
+        const credentials: FyersCredentials = {
+          clientId: formData.clientId,
+          secretKey: formData.secretKey,
+          redirectUri: formData.redirectUri,
+        };
+        result = await brokerService.connectBroker('fyers', credentials);
       } else {
         throw new Error('Unsupported broker');
       }
 
-      const response = await brokerService.connectBroker(formData.brokerName, credentials);
-
-      if (response.success && response.data) {
-        // Handle Fyers two-step authentication
-        if (formData.brokerName === 'fyers' && response.data.requiresAuthCode && response.data.authUrl) {
-          setFyersAuthUrl(response.data.authUrl);
-          setShowFyersAuthStep(true);
-          setErrors({});
-          return; // Don't close the form yet
-        }
-
-        // Handle successful connection (Shoonya or completed Fyers)
-        const newAccount = accountService.createAccountFromBrokerResponse(
-          formData.brokerName,
-          response.data,
-          credentials
-        );
-
-        // Save to backend and update local state
-        const savedAccount = await accountService.saveConnectedAccount(newAccount);
-        if (savedAccount) {
-          setAccounts(prev => [...prev, savedAccount]);
-        }
+      if (result.success) {
+        alert('Broker connected successfully!');
+        // Refresh accounts
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+        // Reset form
+        setShowAddForm(false);
+        setSelectedBroker('');
         setFormData({
           brokerName: '',
           userId: '',
@@ -187,596 +139,474 @@ const AccountSetup: React.FC = () => {
           secretKey: '',
           redirectUri: '',
         });
-        setShowAddForm(false);
-        setErrors({});
       } else {
-        setErrors({ general: response.message || 'Failed to connect to broker' });
+        setError(result.message || 'Failed to connect broker');
       }
-    } catch (error: unknown) {
-      console.error('🚨 Add account error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add account. Please try again.';
-      setErrors({ general: errorMessage });
+    } catch (error: any) {
+      console.error('Connection failed:', error);
+      setError(error.message || 'Failed to connect broker');
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
-  const handleFyersAuthCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!fyersAuthCode.trim()) {
-      setErrors({ authCode: 'Auth code is required' });
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrors({});
-
+  const handleActivateAccount = async (accountId: string) => {
     try {
-      const credentials = {
-        clientId: formData.clientId,
-        secretKey: formData.secretKey,
-        redirectUri: formData.redirectUri,
-      } as FyersCredentials;
-
-      const data = await brokerService.validateFyersAuthCode(fyersAuthCode, credentials);
-
-      if (data.success && data.data) {
-        const newAccount = accountService.createAccountFromBrokerResponse(
-          'fyers',
-          data.data,
-          credentials
-        );
-
-        // Save to backend and update local state
-        const savedAccount = await accountService.saveConnectedAccount(newAccount);
-        if (savedAccount) {
-          setAccounts(prev => [...prev, savedAccount]);
-        }
-        setFormData({
-          brokerName: '',
-          userId: '',
-          password: '',
-          totpKey: '',
-          vendorCode: '',
-          apiSecret: '',
-          imei: '',
-          clientId: '',
-          secretKey: '',
-          redirectUri: '',
-        });
-        setShowAddForm(false);
-        setShowFyersAuthStep(false);
-        setFyersAuthUrl('');
-        setFyersAuthCode('');
-      } else {
-        setErrors({ general: data.message || 'Failed to validate auth code' });
-      }
-    } catch (error) {
-      console.error('Error validating Fyers auth code:', error);
-      setErrors({ general: 'Network error. Please try again.' });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleRemoveAccount = async (accountId: string) => {
-    if (window.confirm('Are you sure you want to remove this account?')) {
-      try {
-        const success = await accountService.removeConnectedAccount(accountId);
-        if (success) {
-          setAccounts(prev => prev.filter(account => account.id !== accountId));
-        } else {
-          setErrors({ general: 'Failed to remove account. Please try again.' });
-        }
-      } catch (error) {
-        console.error('Error removing account:', error);
-        setErrors({ general: 'Network error. Please try again.' });
-      }
-    }
-  };
-
-  const handleToggleAccount = async (accountId: string) => {
-    const account = accounts.find(acc => acc.id === accountId);
-    if (!account) return;
-
-    try {
-      let success = false;
-
-      if (account.isActive) {
-        // Deactivate (logout)
-        success = await accountService.deactivateAccount(accountId);
-      } else {
-        // Activate (re-authenticate)
-        success = await accountService.activateAccount(accountId);
-      }
-
-      if (success) {
-        // Update local state only if API call was successful
-        setAccounts(prev =>
-          prev.map(acc =>
-            acc.id === accountId
-              ? { ...acc, isActive: !acc.isActive }
-              : acc
-          )
-        );
-      } else {
-        setErrors({
-          general: `Failed to ${account.isActive ? 'deactivate' : 'activate'} account. Please try again.`
-        });
-      }
-    } catch (error) {
-      console.error('Error toggling account:', error);
-      setErrors({
-        general: `Network error while ${account.isActive ? 'deactivating' : 'activating'} account. Please try again.`
-      });
-    }
-  };
-
-  const handleCheckSessionStatus = async (accountId: string) => {
-    setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-
-    try {
-      const result = await accountService.checkAccountSessionStatus(accountId);
-
-      if (result.success && result.data) {
-        // Update the account status based on real-time check
-        setAccounts(prev =>
-          prev.map(acc =>
-            acc.id === accountId
-              ? { ...acc, isActive: result.data!.isActive }
-              : acc
-          )
-        );
-
-        // Show status message
-        const statusMessage = `Status: ${result.data.sessionInfo.status} - ${result.data.sessionInfo.message}`;
-        setErrors({ general: statusMessage });
-
-        // Clear message after 3 seconds
-        setTimeout(() => setErrors({}), 3000);
-      } else {
-        setErrors({ general: result.message || 'Failed to check session status' });
-      }
-    } catch (error) {
-      console.error('Error checking session status:', error);
-      setErrors({ general: 'Network error while checking session status' });
+      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
+      await accountService.activateAccount(accountId);
+      // Refresh accounts
+      const connectedAccounts = await accountService.getConnectedAccounts();
+      setAccounts(connectedAccounts);
+    } catch (error: any) {
+      console.error('Failed to activate account:', error);
+      alert('Failed to activate account: ' + error.message);
     } finally {
       setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
     }
   };
 
+  const handleDeactivateAccount = async (accountId: string) => {
+    try {
+      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
+      await accountService.deactivateAccount(accountId);
+      // Refresh accounts
+      const connectedAccounts = await accountService.getConnectedAccounts();
+      setAccounts(connectedAccounts);
+    } catch (error: any) {
+      console.error('Failed to deactivate account:', error);
+      alert('Failed to deactivate account: ' + error.message);
+    } finally {
+      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
+
+  const handleRemoveAccount = async (accountId: string) => {
+    if (!confirm('Are you sure you want to remove this account? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
+      await accountService.removeConnectedAccount(accountId);
+      // Refresh accounts
+      const connectedAccounts = await accountService.getConnectedAccounts();
+      setAccounts(connectedAccounts);
+    } catch (error: any) {
+      console.error('Failed to remove account:', error);
+      alert('Failed to remove account: ' + error.message);
+    } finally {
+      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
+    }
+  };
+
+  const getStatusColor = (isActive: boolean): string => {
+    return isActive ? 'var(--kite-profit)' : 'var(--kite-neutral)';
+  };
+
+  const getStatusText = (isActive: boolean): string => {
+    return isActive ? 'Active' : 'Inactive';
+  };
+
+  if (loading) {
+    return (
+      <div className="kite-theme">
+        <AppNavigation />
+        <div className="kite-main">
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '50vh',
+            flexDirection: 'column',
+            gap: '1rem'
+          }}>
+            <div style={{ fontSize: '2rem' }}>🔗</div>
+            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading accounts...</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="enterprise-app">
-      <Navigation />
-
-      <main className="enterprise-main">
-        <Container>
-          <PageHeader
-            title="Broker Account Setup"
-            subtitle="Connect your broker accounts to start copy trading"
-            actions={
-              <Button
-                variant="primary"
-                onClick={() => setShowAddForm(true)}
-                leftIcon="+"
+    <div className="kite-theme">
+      <AppNavigation />
+      
+      <div className="kite-main">
+        {/* Page Header */}
+        <div className="kite-card">
+          <div className="kite-card-header">
+            <h1 className="kite-card-title">Broker Accounts</h1>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button 
+                className="kite-btn"
+                onClick={() => navigate('/trade-setup')}
               >
-                Add Account
-              </Button>
-            }
-          />
+                📈 Start Trading
+              </button>
+              <button 
+                className="kite-btn kite-btn-primary"
+                onClick={() => setShowAddForm(true)}
+              >
+                + Add Broker
+              </button>
+            </div>
+          </div>
+        </div>
 
-          {/* Account List */}
-          <Card>
-            <CardHeader
-              title="Connected Accounts"
-              subtitle={`${accounts.length} account${accounts.length !== 1 ? 's' : ''} connected`}
-            />
-            <CardContent>
-              {accounts.length === 0 ? (
-                <div className="empty-state">
-                  <div className="empty-icon">🔗</div>
-                  <h4>No accounts connected</h4>
-                  <p>Add your first broker account to get started with copy trading</p>
-                  <Button
-                    variant="primary"
-                    onClick={() => setShowAddForm(true)}
-                    leftIcon="+"
-                  >
-                    Add Your First Account
-                  </Button>
+        {/* Connected Accounts */}
+        {accounts.length > 0 && (
+          <div className="kite-card">
+            <div className="kite-card-header">
+              <h2 className="kite-card-title">Connected Accounts ({accounts.length})</h2>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="kite-table">
+                <thead>
+                  <tr>
+                    <th>Broker</th>
+                    <th>User ID</th>
+                    <th>Status</th>
+                    <th>Connected</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {accounts.map((account) => (
+                    <tr key={account.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '1.25rem' }}>
+                            {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.logo || '🏦'}
+                          </span>
+                          <div>
+                            <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                              {account.brokerName.charAt(0).toUpperCase() + account.brokerName.slice(1)}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
+                              {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.description}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ fontFamily: 'var(--kite-font-mono)', fontWeight: '500' }}>
+                        {account.userId}
+                      </td>
+                      <td>
+                        <span style={{
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: 'var(--kite-radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          backgroundColor: account.isActive ? 'var(--kite-bg-success)' : 'var(--kite-bg-neutral)',
+                          color: getStatusColor(account.isActive)
+                        }}>
+                          {getStatusText(account.isActive)}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                        {new Date(account.createdAt).toLocaleDateString('en-IN')}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {account.isActive ? (
+                            <button
+                              className="kite-btn"
+                              onClick={() => handleDeactivateAccount(account.id)}
+                              disabled={checkingStatus[account.id]}
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              {checkingStatus[account.id] ? 'Deactivating...' : 'Deactivate'}
+                            </button>
+                          ) : (
+                            <button
+                              className="kite-btn kite-btn-primary"
+                              onClick={() => handleActivateAccount(account.id)}
+                              disabled={checkingStatus[account.id]}
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                            >
+                              {checkingStatus[account.id] ? 'Activating...' : 'Activate'}
+                            </button>
+                          )}
+                          <button
+                            className="kite-btn kite-btn-danger"
+                            onClick={() => handleRemoveAccount(account.id)}
+                            disabled={checkingStatus[account.id]}
+                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Add Broker Form */}
+        {showAddForm && (
+          <div className="kite-card">
+            <div className="kite-card-header">
+              <h2 className="kite-card-title">
+                {selectedBroker ? `Connect ${SUPPORTED_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
+              </h2>
+              <button
+                className="kite-btn"
+                onClick={() => {
+                  setShowAddForm(false);
+                  setSelectedBroker('');
+                  setError(null);
+                }}
+              >
+                ✕ Cancel
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem' }}>
+              {!selectedBroker ? (
+                /* Broker Selection */
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
+                  {SUPPORTED_BROKERS.map((broker) => (
+                    <div
+                      key={broker.id}
+                      onClick={() => handleBrokerSelect(broker.id)}
+                      style={{
+                        padding: '1.5rem',
+                        border: '2px solid var(--kite-border-secondary)',
+                        borderRadius: 'var(--kite-radius-lg)',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        backgroundColor: 'var(--kite-bg-secondary)'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--kite-brand-primary)';
+                        e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--kite-border-secondary)';
+                        e.currentTarget.style.backgroundColor = 'var(--kite-bg-secondary)';
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
+                        <span style={{ fontSize: '2rem' }}>{broker.logo}</span>
+                        <div>
+                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--kite-text-primary)' }}>
+                            {broker.name}
+                          </h3>
+                          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                            {broker.description}
+                          </p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        {broker.features.map((feature, index) => (
+                          <div key={index} style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                            ✓ {feature}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <Stack gap={4}>
-                  {accounts.map(account => (
-                    <Card key={account.id} variant="outlined" hoverable>
-                      <CardContent>
-                        <Flex justify="between" align="start">
-                          <Stack gap={3}>
-                            <Flex align="center" gap={3}>
-                              <h4 style={{
-                                margin: 0,
-                                fontSize: '1.125rem',
-                                fontWeight: '600',
-                                color: '#0f172a'
-                              }}>
-                                {account.brokerName}
-                              </h4>
-                              <StatusBadge status={account.isActive ? 'active' : 'inactive'} />
-                            </Flex>
+                /* Broker Credentials Form */
+                <div style={{ maxWidth: '500px', margin: '0 auto' }}>
+                  {selectedBroker === 'shoonya' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          User ID *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter your Shoonya User ID"
+                          value={formData.userId}
+                          onChange={(e) => handleInputChange('userId', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
 
-                            <Stack gap={1}>
-                              <div className="account-id">User ID: {account.userId}</div>
-                              <div className="account-id">Account ID: {account.accountId}</div>
-                              <div className="account-meta">User: {account.userName} ({account.email})</div>
-                              <div className="account-meta">Exchanges: {account.exchanges?.join(', ') || 'N/A'}</div>
-                              <div className="account-date">
-                                Added: {new Date(account.createdAt).toLocaleDateString()}
-                              </div>
-                            </Stack>
-                          </Stack>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          Password *
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Enter your trading password"
+                          value={formData.password}
+                          onChange={(e) => handleInputChange('password', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
 
-                          <Flex gap={2}>
-                            <Button
-                              variant={account.isActive ? 'secondary' : 'primary'}
-                              size="sm"
-                              onClick={() => handleToggleAccount(account.id)}
-                            >
-                              {account.isActive ? 'Deactivate' : 'Activate'}
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCheckSessionStatus(account.id)}
-                              disabled={checkingStatus[account.id]}
-                              loading={checkingStatus[account.id]}
-                            >
-                              Check Status
-                            </Button>
-                            <Button
-                              variant="danger"
-                              size="sm"
-                              onClick={() => handleRemoveAccount(account.id)}
-                            >
-                              Remove
-                            </Button>
-                          </Flex>
-                        </Flex>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              )}
-            </CardContent>
-          </Card>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          TOTP Secret Key *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter your TOTP secret key"
+                          value={formData.totpKey}
+                          onChange={(e) => handleInputChange('totpKey', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                        <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
+                          This is used for automatic OTP generation
+                        </div>
+                      </div>
 
-          {/* Add Account Form */}
-          {showAddForm && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <div className="modal-header">
-                <h3>Add Broker Account</h3>
-                <button
-                  className="modal-close"
-                  onClick={() => setShowAddForm(false)}
-                >
-                  ×
-                </button>
-              </div>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          Vendor Code *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., FN135006_U"
+                          value={formData.vendorCode}
+                          onChange={(e) => handleInputChange('vendorCode', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
 
-              <form onSubmit={handleAddAccount} className="modal-body">
-                {errors.general && (
-                  <div className="form-error mb-3">{errors.general}</div>
-                )}
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          API Secret *
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Enter your API secret"
+                          value={formData.apiSecret}
+                          onChange={(e) => handleInputChange('apiSecret', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
 
-                <div className="form-group">
-                  <Select
-                    label="Broker"
-                    name="brokerName"
-                    value={formData.brokerName}
-                    onChange={handleInputChange}
-                    state={errors.brokerName ? 'error' : 'default'}
-                    error={errors.brokerName}
-                    disabled={isSubmitting}
-                    fullWidth
-                    options={[
-                      { value: '', label: 'Select a broker' },
-                      ...SUPPORTED_BROKERS.map(broker => ({
-                        value: broker.id,
-                        label: `${broker.name} - ${broker.description}`
-                      }))
-                    ]}
-                  />
-                </div>
-
-                {/* Conditional form fields based on selected broker */}
-                {formData.brokerName === 'shoonya' && (
-                  <>
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="User ID"
-                        name="userId"
-                        value={formData.userId}
-                        onChange={handleInputChange}
-                        state={errors.userId ? 'error' : 'default'}
-                        error={errors.userId}
-                        placeholder="Enter your Shoonya User ID"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          IMEI *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., abc1234"
+                          value={formData.imei}
+                          onChange={(e) => handleInputChange('imei', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
                     </div>
-                  </>
-                )}
+                  )}
 
-                {formData.brokerName === 'fyers' && (
-                  <>
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="Client ID"
-                        name="clientId"
-                        value={formData.clientId}
-                        onChange={handleInputChange}
-                        state={errors.clientId ? 'error' : 'default'}
-                        error={errors.clientId}
-                        placeholder="Enter your Fyers Client ID"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
+                  {selectedBroker === 'fyers' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          Client ID *
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Enter your Fyers Client ID"
+                          value={formData.clientId}
+                          onChange={(e) => handleInputChange('clientId', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          Secret Key *
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Enter your secret key"
+                          value={formData.secretKey}
+                          onChange={(e) => handleInputChange('secretKey', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
+
+                      <div>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                          Redirect URI *
+                        </label>
+                        <input
+                          type="url"
+                          placeholder="https://your-app.com/callback"
+                          value={formData.redirectUri}
+                          onChange={(e) => handleInputChange('redirectUri', e.target.value)}
+                          className="kite-input"
+                          style={{ fontSize: '1rem' }}
+                        />
+                      </div>
                     </div>
-                  </>
-                )}
+                  )}
 
-                {formData.brokerName === 'shoonya' && (
-                  <>
-                    <div className="form-group">
-                      <Input
-                        type="password"
-                        label="Password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleInputChange}
-                        state={errors.password ? 'error' : 'default'}
-                        error={errors.password}
-                        placeholder="Enter your trading password"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
+                  {/* Error Display */}
+                  {error && (
+                    <div style={{
+                      padding: '0.75rem',
+                      backgroundColor: 'var(--kite-bg-danger)',
+                      border: '1px solid var(--kite-loss)',
+                      borderRadius: 'var(--kite-radius-md)',
+                      color: 'var(--kite-loss)',
+                      fontSize: '0.875rem',
+                      marginTop: '1rem'
+                    }}>
+                      {error}
                     </div>
+                  )}
 
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="TOTP Secret Key"
-                        name="totpKey"
-                        value={formData.totpKey}
-                        onChange={handleInputChange}
-                        state={errors.totpKey ? 'error' : 'default'}
-                        error={errors.totpKey}
-                        placeholder="Enter your TOTP secret key"
-                        disabled={isSubmitting}
-                        helperText="Enter your TOTP secret key. The system will automatically generate the current OTP."
-                        fullWidth
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="Vendor Code"
-                        name="vendorCode"
-                        value={formData.vendorCode}
-                        onChange={handleInputChange}
-                        state={errors.vendorCode ? 'error' : 'default'}
-                        error={errors.vendorCode}
-                        placeholder="Enter vendor code provided by Shoonya"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-                  </>
-                )}
-
-                {formData.brokerName === 'fyers' && (
-                  <>
-                    <div className="form-group">
-                      <Input
-                        type="password"
-                        label="Secret Key"
-                        name="secretKey"
-                        value={formData.secretKey}
-                        onChange={handleInputChange}
-                        state={errors.secretKey ? 'error' : 'default'}
-                        error={errors.secretKey}
-                        placeholder="Enter your Fyers Secret Key"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <Input
-                        type="url"
-                        label="Redirect URI"
-                        name="redirectUri"
-                        value={formData.redirectUri}
-                        onChange={handleInputChange}
-                        state={errors.redirectUri ? 'error' : 'default'}
-                        error={errors.redirectUri}
-                        placeholder="Enter your registered redirect URI"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="TOTP Key (Optional)"
-                        name="totpKey"
-                        value={formData.totpKey}
-                        onChange={handleInputChange}
-                        state={errors.totpKey ? 'error' : 'default'}
-                        error={errors.totpKey}
-                        placeholder="Enter TOTP key for automated authentication"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-                  </>
-                )}
-
-                {formData.brokerName === 'shoonya' && (
-                  <>
-                    <div className="form-group">
-                      <Input
-                        type="password"
-                        label="API Secret"
-                        name="apiSecret"
-                        value={formData.apiSecret}
-                        onChange={handleInputChange}
-                        state={errors.apiSecret ? 'error' : 'default'}
-                        error={errors.apiSecret}
-                        placeholder="Enter your API secret"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <Input
-                        type="text"
-                        label="IMEI"
-                        name="imei"
-                        value={formData.imei}
-                        onChange={handleInputChange}
-                        state={errors.imei ? 'error' : 'default'}
-                        error={errors.imei}
-                        placeholder="Enter device IMEI for identification"
-                        disabled={isSubmitting}
-                        fullWidth
-                      />
-                    </div>
-                  </>
-                )}
-
-                <div className="modal-actions">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowAddForm(false)}
-                    disabled={isSubmitting}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={isSubmitting}
-                    loading={isSubmitting}
-                  >
-                    {isSubmitting ? 'Adding...' : 'Add Account'}
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
-
-        {/* Fyers Auth Code Step */}
-        {showFyersAuthStep && (
-          <div className="modal-overlay">
-            <div className="modal">
-              <div className="modal-header">
-                <h3>Complete Fyers Authentication</h3>
-                <button
-                  className="modal-close"
-                  onClick={() => {
-                    setShowFyersAuthStep(false);
-                    setFyersAuthUrl('');
-                    setFyersAuthCode('');
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-
-              <form onSubmit={handleFyersAuthCode} className="modal-body">
-                {errors.general && (
-                  <div className="form-error mb-3">{errors.general}</div>
-                )}
-
-                <div className="auth-step-info">
-                  <h4>Step 1: Visit Authorization URL</h4>
-                  <p>Click the link below to authorize the application:</p>
-                  <a
-                    href={fyersAuthUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="auth-url-link"
-                  >
-                    Open Fyers Authorization Page
-                  </a>
-                </div>
-
-                <div className="auth-step-info">
-                  <h4>Step 2: Enter Authorization Code</h4>
-                  <p>After authorizing, you'll receive an authorization code. Enter it below:</p>
-                </div>
-
-                <div className="form-group">
-                  <Input
-                    type="text"
-                    label="Authorization Code"
-                    value={fyersAuthCode}
-                    onChange={(e) => setFyersAuthCode(e.target.value)}
-                    state={errors.authCode ? 'error' : 'default'}
-                    error={errors.authCode}
-                    placeholder="Enter the authorization code from Fyers"
-                    disabled={isSubmitting}
-                    fullWidth
-                  />
-                </div>
-
-                <div className="modal-actions">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setShowFyersAuthStep(false);
-                      setFyersAuthUrl('');
-                      setFyersAuthCode('');
+                  {/* Submit Button */}
+                  <button
+                    className="kite-btn kite-btn-primary"
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    style={{
+                      width: '100%',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                      padding: '0.75rem',
+                      marginTop: '2rem'
                     }}
-                    disabled={isSubmitting}
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={isSubmitting || !fyersAuthCode.trim()}
-                    loading={isSubmitting}
-                  >
-                    {isSubmitting ? 'Validating...' : 'Complete Authentication'}
-                  </Button>
+                    {submitting ? 'Connecting...' : `Connect ${SUPPORTED_BROKERS.find(b => b.id === selectedBroker)?.name}`}
+                  </button>
                 </div>
-              </form>
+              )}
             </div>
           </div>
         )}
 
-        {/* Navigation Actions */}
-        {accounts.length > 0 && (
-          <div className="page-actions">
-            <Button
-              variant="primary"
-              onClick={() => navigate('/trade-setup')}
+        {/* Empty State */}
+        {accounts.length === 0 && !showAddForm && (
+          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
+            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
+              No Broker Accounts Connected
+            </div>
+            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+              Connect your broker account to start trading. We support multiple brokers with secure API integration.
+            </div>
+            <button
+              className="kite-btn kite-btn-primary"
+              onClick={() => setShowAddForm(true)}
+              style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
             >
-              Continue to Trade Setup
-            </Button>
+              Connect Your First Broker
+            </button>
           </div>
         )}
-        </Container>
-      </main>
+      </div>
     </div>
   );
 };

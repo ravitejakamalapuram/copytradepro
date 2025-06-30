@@ -1,0 +1,106 @@
+.portfolio-summary {
+  /* Inherit kite-card styles, just add specific overrides */
+}
+
+.portfolio-summary__header {
+  /* Use kite-card-header styles */
+}
+
+.portfolio-summary__title {
+  /* Use kite-card-title styles */
+}
+
+.portfolio-summary__content {
+  padding: 0; /* Remove padding since kite-card already has it */
+}
+
+.portfolio-summary__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--kite-space-lg);
+}
+
+.portfolio-summary__item {
+  text-align: center;
+  padding: var(--kite-space-lg);
+  border-radius: var(--kite-radius-md);
+  background: var(--kite-bg-secondary);
+  border: 1px solid var(--kite-border-secondary);
+  transition: var(--kite-transition);
+}
+
+.portfolio-summary__item:hover {
+  border-color: var(--kite-border-light);
+  transform: translateY(-1px);
+  box-shadow: var(--kite-shadow-md);
+}
+
+.portfolio-summary__item--primary {
+  background: var(--kite-bg-tertiary);
+  border: 2px solid var(--kite-brand-primary);
+}
+
+.portfolio-summary__item--primary:hover {
+  border-color: var(--kite-brand-primary);
+  box-shadow: var(--kite-shadow-lg);
+}
+
+.portfolio-summary__label {
+  font-size: 11px;
+  color: var(--kite-text-secondary);
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.portfolio-summary__icon {
+  font-size: 12px;
+}
+
+.portfolio-summary__value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--kite-text-primary);
+  margin-bottom: 0.125rem;
+  font-family: var(--kite-font-mono);
+}
+
+.portfolio-summary__value--large {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.portfolio-summary__change {
+  font-size: 11px;
+  font-weight: 500;
+  font-family: var(--kite-font-mono);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .portfolio-summary__grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--kite-space-md);
+  }
+
+  .portfolio-summary__item {
+    padding: var(--kite-space-md);
+  }
+
+  .portfolio-summary__value {
+    font-size: 1.125rem;
+  }
+
+  .portfolio-summary__value--large {
+    font-size: 1.375rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .portfolio-summary__grid {
+    grid-template-columns: 1fr;
+  }
+}

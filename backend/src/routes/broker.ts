@@ -12,6 +12,7 @@ import {
   disconnectBroker,
   placeOrder,
   getOrderHistory,
+  getOrderStatus,
   getOrderSearchSuggestions,
   getOrderBook,
   getPositions,
@@ -97,7 +98,7 @@ const placeOrderValidation = [
     .isIn(['NSE', 'BSE', 'NFO', 'MCX', 'CDS'])
     .withMessage('Invalid exchange'),
   body('productType')
-    .isIn(['C', 'M', 'H', 'B'])
+    .isIn(['C', 'M', 'H', 'B', 'CNC', 'MIS', 'NRML', 'BO'])
     .withMessage('Invalid product type'),
 ];
 
@@ -116,6 +117,7 @@ router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAcco
 router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
+router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
 router.get('/order-search-suggestions', authenticateToken, getOrderSearchSuggestions);
 router.get('/orders/:brokerName', authenticateToken, getOrderBook);
 router.get('/positions/:brokerName', authenticateToken, getPositions);

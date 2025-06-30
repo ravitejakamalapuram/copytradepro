@@ -1,0 +1,120 @@
+.tabbed-navigation {
+  /* Inherit kite-card styles */
+}
+
+.tabbed-navigation__container {
+  display: flex;
+  border-bottom: 1px solid var(--kite-border-secondary);
+  margin: calc(-1 * var(--kite-space-lg)) calc(-1 * var(--kite-space-lg)) var(--kite-space-lg);
+  padding: 0 var(--kite-space-lg);
+  background: var(--kite-bg-card);
+}
+
+.tabbed-navigation__tab {
+  background: none;
+  border: none;
+  padding: 12px var(--kite-space-lg);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--kite-text-secondary);
+  border-bottom: 2px solid transparent;
+  transition: var(--kite-transition);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  min-width: 0;
+  flex: 1;
+  justify-content: center;
+}
+
+.tabbed-navigation__tab:hover {
+  color: var(--kite-text-primary);
+  background: var(--kite-bg-hover);
+}
+
+.tabbed-navigation__tab--active {
+  color: var(--kite-brand-primary);
+  border-bottom-color: var(--kite-brand-primary);
+  background: var(--kite-bg-secondary);
+  font-weight: 600;
+}
+
+.tabbed-navigation__tab--active:hover {
+  background: var(--kite-bg-secondary);
+}
+
+.tabbed-navigation__icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.tabbed-navigation__label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tabbed-navigation__count {
+  background: var(--kite-bg-neutral);
+  color: var(--kite-text-secondary);
+  padding: 2px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.tabbed-navigation__count--active {
+  background: var(--kite-brand-primary);
+  color: white;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .tabbed-navigation__tab {
+    padding: 0.875rem 1rem;
+    font-size: 0.8125rem;
+  }
+  
+  .tabbed-navigation__label {
+    display: none;
+  }
+  
+  .tabbed-navigation__icon {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .tabbed-navigation__tab {
+    padding: 0.75rem 0.5rem;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .tabbed-navigation__label {
+    display: block;
+    font-size: 0.75rem;
+  }
+  
+  .tabbed-navigation__icon {
+    font-size: 1rem;
+  }
+  
+  .tabbed-navigation__count {
+    position: absolute;
+    top: 0.25rem;
+    right: 0.25rem;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6875rem;
+  }
+}

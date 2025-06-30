@@ -3,13 +3,76 @@ import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService, FyersCredentials } from '../services/fyersService';
-import { userDatabase } from '../services/sqliteDatabase';
+import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
-const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
+export const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
+
+// Broker Account Cache: Maps broker account IDs to user IDs and broker info
+interface BrokerAccountMapping {
+  userId: string;
+  brokerName: string;
+  accountId: string;
+  userDisplayName: string;
+}
+
+const brokerAccountCache = new Map<string, BrokerAccountMapping>();
+
+// Cache Management Functions
+const addToBrokerAccountCache = (accountId: string, userId: string, brokerName: string, userDisplayName: string) => {
+  brokerAccountCache.set(accountId, {
+    userId,
+    brokerName,
+    accountId,
+    userDisplayName
+  });
+  console.log(`📝 Added to broker cache: ${accountId} -> User ${userId} (${brokerName})`);
+};
+
+const removeFromBrokerAccountCache = (accountId: string) => {
+  const removed = brokerAccountCache.delete(accountId);
+  if (removed) {
+    console.log(`🗑️ Removed from broker cache: ${accountId}`);
+  }
+};
+
+const getBrokerAccountFromCache = (accountId: string): BrokerAccountMapping | null => {
+  return brokerAccountCache.get(accountId) || null;
+};
+
+// Initialize broker account cache from database
+export const initializeBrokerAccountCache = async () => {
+  try {
+    console.log('🔄 Initializing broker account cache from database...');
+
+    // This would need to be implemented in the database layer
+    // For now, we'll populate it as accounts are connected
+    console.log('📝 Broker account cache initialized (will populate as accounts connect)');
+  } catch (error) {
+    console.error('🚨 Failed to initialize broker account cache:', error);
+  }
+};
+
+// Populate cache when user connects (called during login/session restore)
+export const populateCacheForUser = async (userId: string) => {
+  try {
+    const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
+    for (const account of accounts) {
+      addToBrokerAccountCache(
+        account.account_id,
+        userId,
+        account.broker_name,
+        account.user_name
+      );
+    }
+    console.log(`📝 Populated cache for user ${userId}: ${accounts.length} accounts`);
+  } catch (error) {
+    console.error(`🚨 Failed to populate cache for user ${userId}:`, error);
+  }
+};
 
 // Store connected account data per user
 interface ConnectedAccount {
@@ -89,8 +152,8 @@ export const connectBroker = async (
 
         // Save account to database
         try {
-          const dbAccount = userDatabase.createConnectedAccount({
-            user_id: parseInt(userId),
+          const dbAccount = await userDatabase.createConnectedAccount({
+            user_id: userId, // Keep as string for MongoDB ObjectId
             broker_name: brokerName,
             account_id: loginResponse.actid,
             user_name: loginResponse.uname,
@@ -102,6 +165,14 @@ export const connectBroker = async (
           });
 
           console.log('✅ Account saved to database:', dbAccount.id);
+
+          // Add to broker account cache for fast lookups
+          addToBrokerAccountCache(
+            loginResponse.actid, // broker account ID
+            userId, // user ID
+            brokerName, // broker name
+            loginResponse.uname // user display name
+          );
         } catch (dbError: any) {
           console.error('🚨 Failed to save account to database:', dbError.message);
           // Continue with response even if DB save fails
@@ -251,11 +322,11 @@ export const getConnectedAccounts = async (
 
     // Get connected accounts from database (no is_active field - pure real-time validation)
     try {
-      const dbAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+      const dbAccounts = await userDatabase.getConnectedAccountsByUserId(userId);
 
       // Validate session status for each account in real-time
       const accountsWithValidatedStatus = await Promise.all(
-        dbAccounts.map(async (dbAccount) => {
+        dbAccounts.map(async (dbAccount: any) => {
           let isReallyActive = false;
 
           // Check if broker service exists in memory and validate session
@@ -347,10 +418,8 @@ export const checkAccountSessionStatus = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -484,10 +553,8 @@ export const removeConnectedAccount = async (
 
     // Remove account from database and logout
     try {
-      const accountIdNum = parseInt(accountId);
-
       // Get account details before deletion for logout
-      const account = userDatabase.getConnectedAccountById(accountIdNum);
+      const account = await userDatabase.getConnectedAccountById(accountId);
       if (!account) {
         res.status(404).json({
           success: false,
@@ -517,7 +584,7 @@ export const removeConnectedAccount = async (
       }
 
       // Delete from database
-      const deleted = userDatabase.deleteConnectedAccount(accountIdNum);
+      const deleted = await userDatabase.deleteConnectedAccount(accountId);
       if (!deleted) {
         res.status(404).json({
           success: false,
@@ -525,6 +592,9 @@ export const removeConnectedAccount = async (
         });
         return;
       }
+
+      // Remove from broker account cache
+      removeFromBrokerAccountCache(account.account_id);
 
       res.status(200).json({
         success: true,
@@ -564,10 +634,8 @@ export const activateAccount = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -577,7 +645,7 @@ export const activateAccount = async (
     }
 
     // Get decrypted credentials
-    const credentials = userDatabase.getAccountCredentials(accountIdNum);
+    const credentials = await userDatabase.getAccountCredentials(accountId);
     if (!credentials) {
       res.status(500).json({
         success: false,
@@ -603,6 +671,14 @@ export const activateAccount = async (
       if (loginResponse.stat === 'Ok') {
         // Store the connection (status is determined by real-time validation)
         userConnections.set(account.broker_name, brokerService);
+
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          account.account_id, // broker account ID
+          userId, // user ID
+          account.broker_name, // broker name
+          account.user_name // user display name
+        );
 
         res.status(200).json({
           success: true,
@@ -652,10 +728,8 @@ export const deactivateAccount = async (
       return;
     }
 
-    const accountIdNum = parseInt(accountId);
-
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountId);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -764,8 +838,8 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   console.log(`🔄 Re-establishing connection for ${brokerName} user ${userId}`);
 
   // Get all accounts for this user and broker
-  const userAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
-  const brokerAccount = userAccounts.find(account => account.broker_name === brokerName);
+  const userAccounts = await userDatabase.getConnectedAccountsByUserId(userId);
+  const brokerAccount = userAccounts.find((account: any) => account.broker_name === brokerName);
 
   if (!brokerAccount) {
     console.log(`❌ No ${brokerName} account found for user ${userId}`);
@@ -773,7 +847,7 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   }
 
   // Get decrypted credentials
-  const credentials = userDatabase.getAccountCredentials(brokerAccount.id);
+  const credentials = await userDatabase.getAccountCredentials(brokerAccount.id.toString());
   if (!credentials) {
     console.log(`❌ Failed to retrieve credentials for ${brokerName} account ${brokerAccount.id}`);
     return null;
@@ -839,9 +913,23 @@ export const placeOrder = async (
       price,
       triggerPrice,
       exchange,
-      productType,
+      productType: rawProductType,
       remarks
     } = req.body;
+
+    // Convert product type to single character format if needed
+    const productTypeMap: { [key: string]: string } = {
+      'CNC': 'C',
+      'MIS': 'M',
+      'NRML': 'H',
+      'BO': 'B',
+      'C': 'C',
+      'M': 'M',
+      'H': 'H',
+      'B': 'B'
+    };
+
+    const productType = productTypeMap[rawProductType] || rawProductType;
     
     const userId = req.user?.id;
 
@@ -854,8 +942,8 @@ export const placeOrder = async (
     }
 
     // Validate that the user owns the specified account
-    const account = userDatabase.getConnectedAccountById(parseInt(accountId));
-    if (!account || account.user_id !== parseInt(userId)) {
+    const account = await userDatabase.getConnectedAccountById(accountId);
+    if (!account || account.user_id.toString() !== userId.toString()) {
       res.status(404).json({
         success: false,
         message: 'Account not found or access denied',
@@ -961,8 +1049,8 @@ export const placeOrder = async (
         // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
-            user_id: parseInt(userId),
-            account_id: account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno,
             symbol: symbol,
@@ -977,14 +1065,15 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
-            user_id: parseInt(userId),
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Keep as string for MongoDB ObjectId
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -992,6 +1081,10 @@ export const placeOrder = async (
             status: 'PLACED',
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno,
+            order_type: orderType,
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
@@ -1034,8 +1127,8 @@ export const placeOrder = async (
         // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
-            user_id: parseInt(userId),
-            account_id: account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
             broker_name: brokerName,
             broker_order_id: orderResponse.id,
             symbol: symbol,
@@ -1050,14 +1143,15 @@ export const placeOrder = async (
             executed_at: new Date().toISOString(), // This is placement time, not execution time
           };
 
-          const savedOrder = userDatabase.createOrderHistory(orderHistoryData);
+          const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
           console.log('✅ Order placed and saved to history:', orderResponse.id);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
-            user_id: parseInt(userId),
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Keep as string for MongoDB ObjectId
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1065,6 +1159,10 @@ export const placeOrder = async (
             status: 'PLACED',
             broker_name: brokerName,
             broker_order_id: orderResponse.id,
+            order_type: orderType,
+            exchange: exchange || 'NSE',
+            product_type: productType || 'C',
+            remarks: remarks || '',
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           };
@@ -1149,15 +1247,15 @@ export const getOrderHistory = async (
       search: search as string,
     };
 
-    const orderHistory = userDatabase.getOrderHistoryByUserIdWithFilters(
-      parseInt(userId),
+    const orderHistory = await userDatabase.getOrderHistoryByUserIdWithFilters(
+      userId, // Keep as string for MongoDB ObjectId
       parseInt(limit as string),
       parseInt(offset as string),
       filterOptions
     );
 
-    const totalCount = userDatabase.getOrderCountByUserIdWithFilters(
-      parseInt(userId),
+    const totalCount = await userDatabase.getOrderCountByUserIdWithFilters(
+      userId, // Keep as string for MongoDB ObjectId
       filterOptions
     );
 
@@ -1176,6 +1274,118 @@ export const getOrderHistory = async (
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order history',
+    });
+  }
+};
+
+// Check individual order status from broker API
+export const getOrderStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { brokerOrderId } = req.params;
+    const { brokerName } = req.query;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!brokerOrderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Broker order ID is required',
+      });
+      return;
+    }
+
+    if (!brokerName) {
+      res.status(400).json({
+        success: false,
+        message: 'Broker name is required as query parameter',
+      });
+      return;
+    }
+
+    // Get the user's connected accounts
+    const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
+    const brokerAccount = accounts.find((account: any) => account.broker_name === brokerName);
+
+    if (!brokerAccount) {
+      res.status(404).json({
+        success: false,
+        message: `No ${brokerName} account found for user`,
+      });
+      return;
+    }
+
+    // Get the broker connection using the existing pattern
+    const userConnections = userBrokerConnections.get(userId);
+    if (!userConnections || !userConnections.has(brokerName as string)) {
+      res.status(400).json({
+        success: false,
+        message: `${brokerName} broker not connected. Please activate your account first.`,
+      });
+      return;
+    }
+
+    const brokerService = userConnections.get(brokerName as string)!;
+
+    if (!brokerService) {
+      res.status(400).json({
+        success: false,
+        message: `${brokerName} broker not connected. Please activate your account first.`,
+      });
+      return;
+    }
+
+    // Get order status from broker API
+    console.log(`📊 Checking order status for ${brokerOrderId} via API endpoint`);
+    const orderStatus = await (brokerService as any).getOrderStatus(
+      userId,
+      brokerOrderId
+    );
+
+    if (orderStatus.stat === 'Ok') {
+      res.status(200).json({
+        success: true,
+        data: {
+          brokerOrderId,
+          status: orderStatus.status,
+          symbol: orderStatus.symbol,
+          quantity: orderStatus.quantity,
+          price: orderStatus.price,
+          executedQuantity: orderStatus.executedQuantity,
+          averagePrice: orderStatus.averagePrice,
+          rejectionReason: orderStatus.rejectionReason,
+          orderTime: orderStatus.orderTime,
+          updateTime: orderStatus.updateTime,
+          rawResponse: orderStatus.rawOrder
+        }
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: orderStatus.emsg || 'Order not found in broker system',
+        data: {
+          brokerOrderId,
+          status: 'NOT_FOUND',
+          details: orderStatus.emsg
+        }
+      });
+    }
+  } catch (error: any) {
+    console.error('🚨 Get order status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check order status',
+      error: error.message
     });
   }
 };
@@ -1207,9 +1417,8 @@ export const getOrderSearchSuggestions = async (
     }
 
     const suggestions = userDatabase.getOrderSearchSuggestions(
-      parseInt(userId),
-      searchTerm.trim(),
-      parseInt(limit as string)
+      userId, // Keep as string for MongoDB ObjectId
+      searchTerm.trim()
     );
 
     res.status(200).json({
@@ -1406,41 +1615,36 @@ export const getQuotes = async (
 const brokerConnectionManagerImpl = {
   getBrokerConnection(brokerAccountId: string, brokerName: string): ShoonyaService | null {
     console.log(`🔍 Looking for broker connection: brokerAccountId=${brokerAccountId}, brokerName=${brokerName}`);
-    console.log(`🔍 Available user connections:`, Array.from(userBrokerConnections.keys()));
 
     try {
-      // Find which web user has this broker account connected
-      const connectedAccount = userDatabase.getConnectedAccountByAccountId(brokerAccountId);
+      // Step 1: Check cache for account mapping
+      const accountMapping = getBrokerAccountFromCache(brokerAccountId);
 
-      if (!connectedAccount) {
-        console.log(`❌ No connected account found for broker account ID: ${brokerAccountId}`);
+      if (!accountMapping) {
+        console.log(`❌ Account ${brokerAccountId} not found in cache`);
         return null;
       }
 
-      console.log(`🔍 Found connected account for user ${connectedAccount.user_id}, broker: ${connectedAccount.broker_name}`);
-
-      // Check if the broker name matches
-      if (connectedAccount.broker_name !== brokerName) {
-        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${connectedAccount.broker_name}`);
+      // Step 2: Verify broker name matches
+      if (accountMapping.brokerName !== brokerName) {
+        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${accountMapping.brokerName}`);
         return null;
       }
 
-      // Get the broker connection for this web user
-      const userId = connectedAccount.user_id.toString();
-      const userConnections = userBrokerConnections.get(userId);
-
+      // Step 3: Get active connection for the user
+      const userConnections = userBrokerConnections.get(accountMapping.userId);
       if (!userConnections) {
-        console.log(`❌ No active connections found for user ${userId}`);
+        console.log(`❌ No active connections found for user ${accountMapping.userId}`);
         return null;
       }
 
       const service = userConnections.get(brokerName);
       if (service instanceof ShoonyaService) {
-        console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
+        console.log(`✅ Found ${brokerName} service for user ${accountMapping.userId} (${accountMapping.userDisplayName})`);
         return service;
       }
 
-      console.log(`❌ Service not found or not a ShoonyaService for user ${userId}, broker ${brokerName}`);
+      console.log(`❌ Service not found or not a ShoonyaService for user ${accountMapping.userId}`);
       return null;
 
     } catch (error) {

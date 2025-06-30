@@ -27,7 +27,8 @@ const logger = {
 
 interface Order {
   id: string;
-  user_id: number;
+  user_id: number | string; // Support both for MongoDB ObjectId compatibility
+  account_id: number | string; // Support both for MongoDB ObjectId compatibility
   symbol: string;
   action: string;
   quantity: number;
@@ -35,6 +36,10 @@ interface Order {
   status: string;
   broker_name: string;
   broker_order_id?: string;
+  order_type: string;
+  exchange: string;
+  product_type: string;
+  remarks?: string;
   created_at: string;
   updated_at: string;
   executed_at?: string;
@@ -44,7 +49,7 @@ class OrderStatusService extends EventEmitter {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private activeOrders: Map<string, Order> = new Map();
   private isPolling: boolean = false;
-  private pollingFrequency: number = 10000; // 10 seconds for demo
+  private pollingFrequency: number = 30000; // 30 seconds for production
   private maxRetries: number = 3;
 
   constructor() {
@@ -88,15 +93,9 @@ class OrderStatusService extends EventEmitter {
    */
   private async getPendingOrders(): Promise<Order[]> {
     try {
-      // For now, return empty array since we don't have a direct orders table
-      // In a real implementation, you would query the order_history table
-      // and filter for pending orders
-      const orders = userDatabase.getOrderHistoryByUserIdWithFilters(
-        0, // Get all users for now
-        100, // limit
-        0, // offset
-        { status: 'PLACED' }
-      );
+      // Get all pending orders from all users
+      const orders = userDatabase.getAllOrderHistory()
+        .filter(order => ['PLACED', 'PENDING'].includes(order.status));
 
       // Convert OrderHistory to Order format
       return orders.map(order => ({
@@ -111,7 +110,12 @@ class OrderStatusService extends EventEmitter {
         broker_order_id: order.broker_order_id,
         created_at: order.created_at,
         updated_at: order.created_at,
-        executed_at: order.executed_at
+        executed_at: order.executed_at,
+        account_id: order.account_id,
+        order_type: order.order_type,
+        exchange: order.exchange,
+        product_type: order.product_type,
+        remarks: order.remarks
       }));
     } catch (error) {
       logger.error('Failed to get pending orders:', error);
@@ -296,20 +300,7 @@ class OrderStatusService extends EventEmitter {
         }
       }
 
-      // If no real status change detected, fall back to demo simulation
-      if (newStatus === order.status) {
-        const orderAge = Date.now() - new Date(order.created_at).getTime();
-
-        if (orderAge > 15000 && order.status === 'PLACED') { // After 15 seconds
-          if (order.symbol === 'TCS') {
-            newStatus = 'REJECTED';
-            logger.info(`🎯 DEMO: TCS order ${order.id} simulated as REJECTED due to insufficient balance`);
-          } else if (Math.random() < 0.7) {
-            newStatus = 'EXECUTED';
-            logger.info(`✅ DEMO: Order ${order.id} simulated as EXECUTED`);
-          }
-        }
-      }
+      // Status will only change based on real broker API responses
 
       // Update status if changed
       if (newStatus !== order.status) {
@@ -337,7 +328,7 @@ class OrderStatusService extends EventEmitter {
       logger.debug(`Getting broker account ID for order ${order.id}`);
 
       // Try to get account info from order history table
-      const orderHistory = userDatabase.getOrderHistoryById(parseInt(order.id));
+      const orderHistory = userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {
@@ -378,32 +369,7 @@ class OrderStatusService extends EventEmitter {
     return statusMap[shoonyaStatus] || shoonyaStatus;
   }
 
-  /**
-   * Map broker-specific status to standard status
-   */
-  private mapBrokerStatus(brokerStatus: string): string {
-    const statusMap: { [key: string]: string } = {
-      // Shoonya statuses
-      'PENDING': 'PENDING',
-      'OPEN': 'PLACED',
-      'COMPLETE': 'EXECUTED',
-      'CANCELLED': 'CANCELLED',
-      'REJECTED': 'REJECTED',
 
-      // Fyers statuses
-      'PLACED': 'PLACED',
-      'EXECUTED': 'EXECUTED',
-      'CANCELED': 'CANCELLED',
-      'PARTIAL': 'PARTIALLY_FILLED',
-
-      // Generic statuses
-      'FILLED': 'EXECUTED',
-      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
-      'NEW': 'PLACED'
-    };
-
-    return statusMap[brokerStatus] || brokerStatus;
-  }
 
   /**
    * Update order status in database and emit event
