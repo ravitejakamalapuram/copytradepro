@@ -227,7 +227,6 @@ export const brokerService = {
       endDate?: string;
       action?: 'BUY' | 'SELL';
       search?: string;
-      dateFilter?: string;
     }
   ): Promise<{
     success: boolean;

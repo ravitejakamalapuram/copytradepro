@@ -49,9 +49,11 @@ const Orders: React.FC = () => {
 
     switch (dateFilter) {
       case 'today':
-        // Today's orders (default - backend will handle this)
-        startDate = undefined;
-        endDate = undefined;
+        // Today's orders - set start and end of today
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        startDate = startOfDay.toISOString();
+        endDate = endOfDay.toISOString();
         break;
       case 'week':
         // Last 7 days
@@ -66,7 +68,7 @@ const Orders: React.FC = () => {
         endDate = now.toISOString();
         break;
       case 'all':
-        // All orders
+        // All orders - no date filtering
         startDate = undefined;
         endDate = undefined;
         break;
@@ -84,7 +86,7 @@ const Orders: React.FC = () => {
       const { startDate, endDate } = getDateRange();
 
       // Build filters object
-      const filters: any = { dateFilter };
+      const filters: any = {};
       if (startDate) filters.startDate = startDate;
       if (endDate) filters.endDate = endDate;
       if (customStartDate && customEndDate) {
