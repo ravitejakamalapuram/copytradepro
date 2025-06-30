@@ -1426,13 +1426,34 @@ export const getOrderHistory = async (
       return;
     }
 
+    // Default to today's orders if no date range is specified and no explicit "all" request
+    let defaultStartDate = startDate as string;
+    let defaultEndDate = endDate as string;
+
+    // Check if this is an explicit request for all orders (when frontend sends empty filters for "all")
+    const isAllOrdersRequest = req.query.dateFilter === 'all';
+
+    if (!startDate && !endDate && !isAllOrdersRequest) {
+      // Set default to today's orders (start of day to end of day)
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+
+      defaultStartDate = startOfDay.toISOString();
+      defaultEndDate = endOfDay.toISOString();
+
+      console.log(`📅 Defaulting to today's orders: ${startOfDay.toLocaleDateString()} - ${endOfDay.toLocaleDateString()}`);
+    } else if (isAllOrdersRequest) {
+      console.log(`📅 Fetching all orders (no date filter applied)`);
+    }
+
     // Build filter options
     const filterOptions = {
       status: status as string,
       symbol: symbol as string,
       brokerName: brokerName as string,
-      startDate: startDate as string,
-      endDate: endDate as string,
+      startDate: defaultStartDate,
+      endDate: defaultEndDate,
       action: action as 'BUY' | 'SELL',
       search: search as string,
     };

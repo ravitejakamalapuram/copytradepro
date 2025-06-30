@@ -36,6 +36,44 @@ const Orders: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  // Function to get date range based on filter
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    switch (dateFilter) {
+      case 'today':
+        // Today's orders (default - backend will handle this)
+        startDate = undefined;
+        endDate = undefined;
+        break;
+      case 'week':
+        // Last 7 days
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        startDate = weekAgo.toISOString();
+        endDate = now.toISOString();
+        break;
+      case 'month':
+        // Last 30 days
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        startDate = monthAgo.toISOString();
+        endDate = now.toISOString();
+        break;
+      case 'all':
+        // All orders
+        startDate = undefined;
+        endDate = undefined;
+        break;
+    }
+
+    return { startDate, endDate };
+  };
 
   // Function to fetch orders (for refresh)
   const fetchOrders = async () => {
@@ -43,8 +81,19 @@ const Orders: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch orders from broker order history
-      const response = await brokerService.getOrderHistory(100, 0);
+      const { startDate, endDate } = getDateRange();
+
+      // Build filters object
+      const filters: any = { dateFilter };
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
+      if (customStartDate && customEndDate) {
+        filters.startDate = new Date(customStartDate).toISOString();
+        filters.endDate = new Date(customEndDate + 'T23:59:59').toISOString();
+      }
+
+      // Fetch orders from broker order history with filters
+      const response = await brokerService.getOrderHistory(100, 0, filters);
 
       if (response.success && response.data) {
         // Convert backend order format to our interface
@@ -89,7 +138,7 @@ const Orders: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+  }, [dateFilter, customStartDate, customEndDate]);
 
   const filteredOrders = orders.filter(order => {
     if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
@@ -239,13 +288,111 @@ const Orders: React.FC = () => {
           <div className="kite-card-header">
             <div>
               <h2 className="kite-card-title">Orders</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+                {/* Date Filter Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      className={`kite-btn ${dateFilter === filter ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                      onClick={() => {
+                        setDateFilter(filter);
+                        setShowDatePicker(false);
+                        setCustomStartDate('');
+                        setCustomEndDate('');
+                      }}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {filter === 'today' ? 'Today' :
+                       filter === 'week' ? 'Week' :
+                       filter === 'month' ? 'Month' : 'All'}
+                    </button>
+                  ))}
+                  <button
+                    className={`kite-btn ${showDatePicker ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.5rem'
+                    }}
+                  >
+                    📅 Custom
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Date Picker */}
+              {showDatePicker && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--kite-bg-secondary)',
+                  borderRadius: 'var(--kite-radius-sm)',
+                  border: '1px solid var(--kite-border)',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>From:</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>To:</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <button
+                    className="kite-btn kite-btn-primary"
+                    onClick={() => {
+                      if (customStartDate && customEndDate) {
+                        setDateFilter('today'); // Reset to trigger useEffect
+                        fetchOrders();
+                      }
+                    }}
+                    disabled={!customStartDate || !customEndDate}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.5rem'
+                    }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+
               {lastRefresh && (
                 <p style={{
-                  margin: 0,
+                  margin: '0.5rem 0 0 0',
                   fontSize: '0.875rem',
                   color: 'var(--kite-text-secondary)'
                 }}>
                   Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
+                  {dateFilter === 'today' && ' • Showing today\'s orders'}
+                  {dateFilter === 'week' && ' • Showing last 7 days'}
+                  {dateFilter === 'month' && ' • Showing last 30 days'}
+                  {dateFilter === 'all' && ' • Showing all orders'}
+                  {customStartDate && customEndDate && ` • Custom range: ${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`}
                 </p>
               )}
               {statusMessage && (
