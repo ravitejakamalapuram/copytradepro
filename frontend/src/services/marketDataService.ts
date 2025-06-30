@@ -30,7 +30,7 @@ export interface SymbolSearchResult {
 }
 
 class MarketDataService {
-  private baseURL = 'http://localhost:3001/api/market-data';
+  private baseURL = `${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/market-data`;
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const token = authService.getToken();

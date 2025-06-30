@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
+import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 
 interface Order {
@@ -20,6 +21,11 @@ interface Order {
   brokerName?: string;
   brokerOrderId?: string;
   exchange?: string;
+  accountInfo?: {
+    account_id: string;
+    user_name: string;
+    email: string;
+  };
 }
 
 const Orders: React.FC = () => {
@@ -29,6 +35,74 @@ const Orders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>(['all']); // Array of selected account IDs
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string, mongoId: string}>>([]);
+  const [showAccountFilter, setShowAccountFilter] = useState(false);
+
+  // Function to get date range based on filter
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate: string | undefined;
+    let endDate: string | undefined;
+
+    switch (dateFilter) {
+      case 'today':
+        // Today's orders - set start and end of today
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+        startDate = startOfDay.toISOString();
+        endDate = endOfDay.toISOString();
+        break;
+      case 'week':
+        // Last 7 days
+        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        startDate = weekAgo.toISOString();
+        endDate = now.toISOString();
+        break;
+      case 'month':
+        // Last 30 days
+        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        startDate = monthAgo.toISOString();
+        endDate = now.toISOString();
+        break;
+      case 'all':
+        // All orders - no date filtering
+        startDate = undefined;
+        endDate = undefined;
+        break;
+    }
+
+    return { startDate, endDate };
+  };
+
+  // Function to fetch available accounts
+  const fetchAccounts = async () => {
+    try {
+      const response = await accountService.getConnectedAccounts();
+      console.log('🔍 Fetched accounts response:', response); // Debug log
+
+      // The response should be an array of accounts
+      const accounts = Array.isArray(response) ? response : [];
+
+      const accountOptions = accounts.map((account: any) => ({
+        id: account.accountId, // Use the broker account ID (like "FN135006") as the filter value
+        name: `${account.userName || account.accountId || 'Unknown'} (${account.brokerDisplayName || account.brokerName})`,
+        broker: account.brokerName,
+        mongoId: account.id // Keep the MongoDB ObjectId for reference
+      }));
+
+      console.log('🔍 Account options:', accountOptions); // Debug log
+      setAvailableAccounts(accountOptions);
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    }
+  };
 
   // Function to fetch orders (for refresh)
   const fetchOrders = async () => {
@@ -36,8 +110,19 @@ const Orders: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch orders from broker order history
-      const response = await brokerService.getOrderHistory(100, 0);
+      const { startDate, endDate } = getDateRange();
+
+      // Build filters object
+      const filters: any = {};
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
+      if (customStartDate && customEndDate) {
+        filters.startDate = new Date(customStartDate).toISOString();
+        filters.endDate = new Date(customEndDate + 'T23:59:59').toISOString();
+      }
+
+      // Fetch orders from broker order history with filters
+      const response = await brokerService.getOrderHistory(100, 0, filters);
 
       if (response.success && response.data) {
         // Convert backend order format to our interface
@@ -60,7 +145,8 @@ const Orders: React.FC = () => {
           createdAt: order.executed_at || order.created_at,
           brokerName: order.broker_name,
           brokerOrderId: order.broker_order_id,
-          exchange: order.exchange
+          exchange: order.exchange,
+          accountInfo: order.account_info
         }));
 
         setOrders(ordersData);
@@ -77,13 +163,99 @@ const Orders: React.FC = () => {
     }
   };
 
+  // Function to filter orders by selected accounts
+  const filterOrdersByAccount = (orders: Order[]) => {
+    // If 'all' is selected, show all orders
+    if (selectedAccounts.includes('all')) {
+      return orders;
+    }
+
+    // If no accounts are selected, show no orders
+    if (selectedAccounts.length === 0) {
+      return [];
+    }
+
+    console.log('🔍 Filtering orders by accounts:', selectedAccounts); // Debug log
+    console.log('🔍 Sample order accountInfo:', orders[0]?.accountInfo); // Debug log
+
+    return orders.filter(order => {
+      // Match the broker account ID from order's account_info with any of the selected accounts
+      const orderBrokerAccountId = order.accountInfo?.account_id;
+
+      console.log('🔍 Order broker account ID:', orderBrokerAccountId, 'Selected accounts:', selectedAccounts); // Debug log
+
+      return selectedAccounts.includes(orderBrokerAccountId || '');
+    });
+  };
+
+  // Account selection helper functions
+  const handleAccountToggle = (accountId: string) => {
+    if (accountId === 'all') {
+      // If selecting "All", clear other selections
+      setSelectedAccounts(['all']);
+    } else {
+      setSelectedAccounts(prev => {
+        // Remove "all" if it was selected
+        const withoutAll = prev.filter(id => id !== 'all');
+
+        if (withoutAll.includes(accountId)) {
+          // Remove the account if it's already selected
+          const newSelection = withoutAll.filter(id => id !== accountId);
+          // If no accounts are selected, default to "all"
+          return newSelection.length === 0 ? ['all'] : newSelection;
+        } else {
+          // Add the account to selection
+          return [...withoutAll, accountId];
+        }
+      });
+    }
+  };
+
+  const isAccountSelected = (accountId: string) => {
+    return selectedAccounts.includes(accountId);
+  };
+
+  const getSelectedAccountsText = () => {
+    if (selectedAccounts.includes('all')) {
+      return 'All Accounts';
+    }
+    if (selectedAccounts.length === 0) {
+      return 'No Accounts';
+    }
+    if (selectedAccounts.length === 1) {
+      const account = availableAccounts.find(acc => acc.id === selectedAccounts[0]);
+      return account ? account.name : 'Unknown Account';
+    }
+    return `${selectedAccounts.length} Accounts Selected`;
+  };
+
 
 
   useEffect(() => {
-    fetchOrders();
+    fetchAccounts();
   }, []);
 
-  const filteredOrders = orders.filter(order => {
+  useEffect(() => {
+    fetchOrders();
+  }, [dateFilter, customStartDate, customEndDate, selectedAccounts]);
+
+  // Close account filter dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showAccountFilter && !target.closest('[data-account-filter]')) {
+        setShowAccountFilter(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showAccountFilter]);
+
+  // Apply both status and account filters
+  const filteredOrders = filterOrdersByAccount(orders).filter(order => {
     if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
     if (activeTab === 'executed') return order.status === 'EXECUTED';
     return true;
@@ -125,6 +297,53 @@ const Orders: React.FC = () => {
       await fetchOrders();
     } catch (error) {
       console.error('Failed to cancel order:', error);
+    }
+  };
+
+  const handleCheckOrderStatus = async (orderId: string) => {
+    try {
+      // Add to checking set to show loading state
+      setCheckingStatus(prev => new Set(prev).add(orderId));
+      setStatusMessage(null);
+
+      console.log('🔍 Manually checking status for order:', orderId);
+
+      const response = await brokerService.checkOrderStatus(orderId);
+
+      if (response.success) {
+        const { statusChanged, previousStatus, currentStatus, message } = response.data;
+
+        // Show success message
+        setStatusMessage(message);
+        setTimeout(() => setStatusMessage(null), 5000);
+
+        // Update the specific order in the local state
+        setOrders(prevOrders =>
+          prevOrders.map(order =>
+            order.id === orderId
+              ? { ...order, status: currentStatus.toUpperCase() as any }
+              : order
+          )
+        );
+
+        console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+      } else {
+        setStatusMessage(`Failed to check status: ${response.message}`);
+        setTimeout(() => setStatusMessage(null), 5000);
+        console.error('Failed to check order status:', response.message);
+      }
+
+    } catch (error: any) {
+      console.error('Failed to check order status:', error);
+      setStatusMessage('Failed to check order status. Please try again.');
+      setTimeout(() => setStatusMessage(null), 5000);
+    } finally {
+      // Remove from checking set
+      setCheckingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
     }
   };
 
@@ -171,6 +390,12 @@ const Orders: React.FC = () => {
 
   return (
     <div className="kite-theme">
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
       <AppNavigation />
       
       <div className="kite-main">
@@ -178,13 +403,219 @@ const Orders: React.FC = () => {
           <div className="kite-card-header">
             <div>
               <h2 className="kite-card-title">Orders</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+                {/* Date Filter Buttons */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Date:</span>
+                  {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+                    <button
+                      key={filter}
+                      className={`kite-btn ${dateFilter === filter ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                      onClick={() => {
+                        setDateFilter(filter);
+                        setShowDatePicker(false);
+                        setCustomStartDate('');
+                        setCustomEndDate('');
+                      }}
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '0.25rem 0.5rem',
+                        textTransform: 'capitalize'
+                      }}
+                    >
+                      {filter === 'today' ? 'Today' :
+                       filter === 'week' ? 'Week' :
+                       filter === 'month' ? 'Month' : 'All'}
+                    </button>
+                  ))}
+                  <button
+                    className={`kite-btn ${showDatePicker ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                    onClick={() => setShowDatePicker(!showDatePicker)}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.5rem'
+                    }}
+                  >
+                    📅 Custom
+                  </button>
+                </div>
+
+                {/* Account Filter Checkboxes */}
+                <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Account:</span>
+                  <button
+                    className="kite-btn kite-btn-secondary"
+                    onClick={() => setShowAccountFilter(!showAccountFilter)}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.5rem',
+                      minWidth: '140px',
+                      textAlign: 'left',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <span>{getSelectedAccountsText()}</span>
+                    <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
+                  </button>
+
+                  {/* Account Filter Dropdown */}
+                  {showAccountFilter && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: '4rem',
+                      zIndex: 1000,
+                      backgroundColor: 'var(--kite-bg-primary)',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                      minWidth: '250px',
+                      maxHeight: '300px',
+                      overflowY: 'auto',
+                      padding: '0.5rem'
+                    }}>
+                      {/* All Accounts Option */}
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem',
+                        cursor: 'pointer',
+                        borderRadius: 'var(--kite-radius-sm)',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        backgroundColor: isAccountSelected('all') ? 'var(--kite-bg-secondary)' : 'transparent'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isAccountSelected('all')}
+                          onChange={() => handleAccountToggle('all')}
+                          style={{ margin: 0 }}
+                        />
+                        <span>All Accounts</span>
+                      </label>
+
+                      {/* Individual Account Options */}
+                      {availableAccounts.map((account) => (
+                        <label
+                          key={account.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem',
+                            cursor: 'pointer',
+                            borderRadius: 'var(--kite-radius-sm)',
+                            fontSize: '0.875rem',
+                            backgroundColor: isAccountSelected(account.id) ? 'var(--kite-bg-secondary)' : 'transparent'
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isAccountSelected(account.id)}
+                            onChange={() => handleAccountToggle(account.id)}
+                            style={{ margin: 0 }}
+                          />
+                          <span>{account.name}</span>
+                        </label>
+                      ))}
+
+                      {availableAccounts.length === 0 && (
+                        <div style={{
+                          padding: '0.5rem',
+                          fontSize: '0.875rem',
+                          color: 'var(--kite-text-secondary)',
+                          textAlign: 'center'
+                        }}>
+                          No accounts available
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Custom Date Picker */}
+              {showDatePicker && (
+                <div style={{
+                  marginTop: '0.75rem',
+                  padding: '0.75rem',
+                  backgroundColor: 'var(--kite-bg-secondary)',
+                  borderRadius: 'var(--kite-radius-sm)',
+                  border: '1px solid var(--kite-border)',
+                  display: 'flex',
+                  gap: '0.5rem',
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
+                }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>From:</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>To:</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      fontSize: '0.875rem'
+                    }}
+                  />
+                  <button
+                    className="kite-btn kite-btn-primary"
+                    onClick={() => {
+                      if (customStartDate && customEndDate) {
+                        setDateFilter('today'); // Reset to trigger useEffect
+                        fetchOrders();
+                      }
+                    }}
+                    disabled={!customStartDate || !customEndDate}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '0.25rem 0.5rem'
+                    }}
+                  >
+                    Apply
+                  </button>
+                </div>
+              )}
+
               {lastRefresh && (
                 <p style={{
-                  margin: 0,
+                  margin: '0.5rem 0 0 0',
                   fontSize: '0.875rem',
                   color: 'var(--kite-text-secondary)'
                 }}>
                   Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
+                  {dateFilter === 'today' && ' • Showing today\'s orders'}
+                  {dateFilter === 'week' && ' • Showing last 7 days'}
+                  {dateFilter === 'month' && ' • Showing last 30 days'}
+                  {dateFilter === 'all' && ' • Showing all orders'}
+                  {customStartDate && customEndDate && ` • Custom range: ${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`}
+                  {` • ${getSelectedAccountsText()}`}
+                </p>
+              )}
+              {statusMessage && (
+                <p style={{
+                  margin: '0.5rem 0 0 0',
+                  fontSize: '0.875rem',
+                  color: statusMessage.includes('Failed') ? 'var(--kite-loss)' : 'var(--kite-profit)',
+                  fontWeight: '500'
+                }}>
+                  {statusMessage}
                 </p>
               )}
             </div>
@@ -281,6 +712,28 @@ const Orders: React.FC = () => {
                         <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
                           {order.symbol}
                         </div>
+                        {order.accountInfo && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--kite-text-secondary)',
+                            marginTop: '0.125rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <span style={{
+                              fontSize: '0.625rem',
+                              padding: '0.125rem 0.25rem',
+                              backgroundColor: 'var(--kite-bg-secondary)',
+                              borderRadius: '0.25rem',
+                              fontWeight: '500',
+                              color: 'var(--kite-text-primary)'
+                            }}>
+                              {order.accountInfo.account_id}
+                            </span>
+                            <span>{order.accountInfo.user_name}</span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span style={{ 
@@ -319,7 +772,40 @@ const Orders: React.FC = () => {
                         {order.avgPrice ? formatCurrency(order.avgPrice) : '-'}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          {/* Check Status button - available for all orders */}
+                          <button
+                            className="kite-btn"
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              fontSize: '0.75rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem',
+                              opacity: checkingStatus.has(order.id) ? 0.6 : 1
+                            }}
+                            onClick={() => handleCheckOrderStatus(order.id)}
+                            disabled={checkingStatus.has(order.id)}
+                            title="Check current order status from broker"
+                          >
+                            {checkingStatus.has(order.id) ? (
+                              <>
+                                <span style={{
+                                  display: 'inline-block',
+                                  width: '0.75rem',
+                                  height: '0.75rem',
+                                  border: '1px solid currentColor',
+                                  borderTop: '1px solid transparent',
+                                  borderRadius: '50%',
+                                  animation: 'spin 1s linear infinite'
+                                }}></span>
+                                Checking...
+                              </>
+                            ) : (
+                              <>🔄 Check</>
+                            )}
+                          </button>
+
                           {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
                               <button
@@ -345,9 +831,9 @@ const Orders: React.FC = () => {
                             </>
                           )}
                           {order.status === 'EXECUTED' && (
-                            <button 
+                            <button
                               className="kite-btn"
-                              style={{ 
+                              style={{
                                 padding: '0.25rem 0.5rem',
                                 fontSize: '0.75rem'
                               }}

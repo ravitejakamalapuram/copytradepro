@@ -1,20 +1,52 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
-import websocketService from './websocketService';
 import { ShoonyaService } from './shoonyaService';
 import { notificationService, OrderNotificationData } from './notificationService';
 
-// Import broker connections from controller (we'll need to export this)
-// For now, we'll create a simple interface to access broker connections
+// Import broker connections from controller
+import { userBrokerConnections } from '../controllers/brokerController';
+
+// Broker connection manager interface
 interface BrokerConnectionManager {
   getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
 }
 
-// Global broker connection manager - will be set by the broker controller
-let brokerConnectionManager: BrokerConnectionManager | null = null;
+// Create broker connection manager implementation
+const brokerConnectionManager: BrokerConnectionManager = {
+  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
+    const userConnections = userBrokerConnections.get(userId);
+    if (!userConnections) {
+      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+      console.log(`❌ No connections found for user ${userId}`);
+      return null;
+    }
 
+    const brokerService = userConnections.get(brokerName);
+    if (!brokerService) {
+      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+      console.log(`❌ No ${brokerName} connection found for user ${userId}`);
+      return null;
+    }
+
+    if (brokerName === 'shoonya') {
+      const shoonyaService = brokerService as ShoonyaService;
+      if (shoonyaService.isLoggedIn()) {
+        console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
+        return shoonyaService;
+      } else {
+        console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
+        return null;
+      }
+    }
+
+    return null;
+  }
+};
+
+// Legacy function for backward compatibility
 export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
-  brokerConnectionManager = manager;
+  // No longer needed as we use the direct implementation above
+  console.log('⚠️ setBrokerConnectionManager is deprecated - using direct broker connection manager');
 };
 
 // Simple logger
@@ -49,44 +81,43 @@ class OrderStatusService extends EventEmitter {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private activeOrders: Map<string, Order> = new Map();
   private isPolling: boolean = false;
-  private pollingFrequency: number = 30000; // 30 seconds for production
+  private pollingFrequency: number = 30000; // 30 seconds for production (fallback only)
   private maxRetries: number = 3;
 
   constructor() {
     super();
   }
 
+
+
+
+
+
+
   /**
-   * Start monitoring order status for all active orders
+   * Start monitoring order status (manual refresh only)
    */
   async startMonitoring(): Promise<void> {
-    if (this.isPolling) {
-      logger.info('Order status monitoring already running');
-      return;
-    }
-
-    this.isPolling = true;
-    logger.info('Starting real-time order status monitoring');
+    logger.info('Order status monitoring initialized (manual refresh only)');
 
     try {
-      // Get all pending orders from database
+      // Get all pending orders from database for initial count
       const pendingOrders = await this.getPendingOrders();
+      logger.info(`Found ${pendingOrders.length} orders available for manual status checking`);
 
-      logger.info(`Found ${pendingOrders.length} orders to monitor`);
-
-      // Group orders by broker for efficient polling
-      const ordersByBroker = this.groupOrdersByBroker(pendingOrders);
-
-      // Start polling for each broker
-      for (const [brokerName, orders] of ordersByBroker.entries()) {
-        this.startBrokerPolling(brokerName, orders);
-      }
+      this.isPolling = false; // No automatic polling
+      logger.info('Order status monitoring ready - use manual refresh buttons for updates');
 
     } catch (error) {
-      logger.error('Failed to start order monitoring:', error);
-      this.isPolling = false;
+      logger.error('Failed to initialize order monitoring:', error);
     }
   }
+
+
+
+
+
+
 
   /**
    * Get pending orders from SQLite database
@@ -140,24 +171,7 @@ class OrderStatusService extends EventEmitter {
     this.activeOrders.clear();
   }
 
-  /**
-   * Add a new order to monitoring
-   */
-  async addOrderToMonitoring(order: Order): Promise<void> {
-    if (!this.isPolling) {
-      await this.startMonitoring();
-    }
 
-    const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
-    this.activeOrders.set(orderKey, order);
-
-    logger.info(`Added order ${order.id} to monitoring (${orderKey})`);
-
-    // If this is the first order for this broker, start polling
-    if (!this.pollingIntervals.has(order.broker_name)) {
-      this.startBrokerPolling(order.broker_name, [order]);
-    }
-  }
 
   /**
    * Remove order from monitoring
@@ -182,71 +196,9 @@ class OrderStatusService extends EventEmitter {
     }
   }
 
-  /**
-   * Group orders by broker for efficient polling
-   */
-  private groupOrdersByBroker(orders: Order[]): Map<string, Order[]> {
-    const grouped = new Map<string, Order[]>();
 
-    for (const order of orders) {
-      if (!grouped.has(order.broker_name)) {
-        grouped.set(order.broker_name, []);
-      }
-      grouped.get(order.broker_name)!.push(order);
 
-      // Add to active orders tracking
-      const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
-      this.activeOrders.set(orderKey, order);
-    }
 
-    return grouped;
-  }
-
-  /**
-   * Start polling for a specific broker
-   */
-  private startBrokerPolling(brokerName: string, initialOrders: Order[]): void {
-    if (this.pollingIntervals.has(brokerName)) {
-      logger.warn(`Polling already active for broker: ${brokerName}`);
-      return;
-    }
-
-    logger.info(`Starting polling for broker: ${brokerName} with ${initialOrders.length} orders`);
-
-    const intervalId = setInterval(async () => {
-      await this.pollBrokerOrders(brokerName);
-    }, this.pollingFrequency);
-
-    this.pollingIntervals.set(brokerName, intervalId);
-
-    // Do initial poll immediately
-    this.pollBrokerOrders(brokerName);
-  }
-
-  /**
-   * Poll order status for a specific broker
-   */
-  async pollBrokerOrders(brokerName: string): Promise<void> {
-    try {
-      // Get all active orders for this broker
-      const brokerOrders = Array.from(this.activeOrders.values())
-        .filter(order => order.broker_name === brokerName);
-
-      if (brokerOrders.length === 0) {
-        return;
-      }
-
-      logger.debug(`Polling ${brokerOrders.length} orders for broker: ${brokerName}`);
-
-      // Check status for each order
-      for (const order of brokerOrders) {
-        await this.checkOrderStatus(order);
-      }
-
-    } catch (error) {
-      logger.error(`Error polling orders for broker ${brokerName}:`, error);
-    }
-  }
 
   /**
    * Check status of a specific order using real Shoonya API
@@ -280,7 +232,10 @@ class OrderStatusService extends EventEmitter {
           if (brokerService) {
             logger.debug(`Getting real order status from Shoonya API for order ${order.broker_order_id}`);
 
+            // Try to get order status from broker API
+            logger.debug(`Calling broker API for order status: ${order.broker_order_id}`);
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
+            logger.debug(`Broker API response:`, brokerStatus);
 
             if (brokerStatus && brokerStatus.stat === 'Ok') {
               const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
@@ -327,20 +282,56 @@ class OrderStatusService extends EventEmitter {
     try {
       logger.debug(`Getting broker account ID for order ${order.id}`);
 
-      // Try to get account info from order history table
-      const orderHistory = userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
+      // First, try to get the connected account directly using the order's account_id
+      if (order.account_id) {
+        logger.debug(`Order has account_id: ${order.account_id}`);
+
+        // Get connected account using account_id (handle both MongoDB string and SQLite number)
+        let account = null;
+        try {
+          account = await userDatabase.getConnectedAccountById(order.account_id as any);
+        } catch (error) {
+          logger.debug(`Failed to get connected account by ID ${order.account_id}:`, error);
+        }
+        logger.debug(`Connected account found:`, account ? 'Yes' : 'No');
+
+        if (account) {
+          logger.debug(`Broker account ID: ${account.account_id}`);
+          return account.account_id; // This is the broker account ID (e.g., "FN135006")
+        }
+      }
+
+      // Fallback: Try to get account info from order history table
+      logger.debug(`Fallback: Checking order history for order ${order.id}`);
+      const orderHistory = await userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {
         logger.debug(`Order history account_id: ${orderHistory.account_id}`);
 
         // Get the connected account to find the broker account ID
-        const account = userDatabase.getConnectedAccountById(orderHistory.account_id);
+        const account = await userDatabase.getConnectedAccountById(orderHistory.account_id);
         logger.debug(`Connected account found:`, account ? 'Yes' : 'No');
 
         if (account) {
           logger.debug(`Broker account ID: ${account.account_id}`);
           return account.account_id; // This is the broker account ID (e.g., "FN135006")
+        }
+      }
+
+      // Final fallback: Try to get broker account ID from active broker connections
+      logger.debug(`Final fallback: Checking active broker connections for user ${order.user_id}`);
+      const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
+
+      if (brokerService && brokerService.isLoggedIn()) {
+        // For Shoonya, the broker account ID is the user ID
+        if (order.broker_name === 'shoonya') {
+          const shoonyaService = brokerService as ShoonyaService;
+          const userId = shoonyaService.getUserId();
+          if (userId) {
+            logger.debug(`Found broker account ID from active connection: ${userId}`);
+            return userId; // This is the broker account ID (e.g., "FN135006")
+          }
         }
       }
 
@@ -374,7 +365,12 @@ class OrderStatusService extends EventEmitter {
   /**
    * Update order status in database and emit event
    */
-  async updateOrderStatus(order: Order, newStatus: string): Promise<void> {
+  async updateOrderStatus(order: Order, newStatus: string, executionData?: {
+    executedQuantity?: number;
+    averagePrice?: number;
+    rejectionReason?: string;
+    updateTime?: string;
+  }): Promise<void> {
     try {
       const oldStatus = order.status;
       const now = new Date().toISOString();
@@ -407,25 +403,7 @@ class OrderStatusService extends EventEmitter {
 
       logger.info(`Order ${order.id} status updated: ${oldStatus} → ${newStatus}`);
 
-      // Broadcast to all connected clients via Socket.IO
-      const updateData = {
-        orderId: order.id,
-        oldStatus,
-        newStatus,
-        order: {
-          id: order.id,
-          symbol: order.symbol,
-          action: order.action,
-          quantity: order.quantity,
-          price: order.price,
-          status: order.status,
-          broker_name: order.broker_name,
-          executed_at: order.executed_at
-        },
-        timestamp: now
-      };
-
-      websocketService.broadcastOrderStatusChange(updateData);
+      // WebSocket broadcasting removed - using manual refresh only
 
       // Send push notification for order status change
       try {
@@ -458,7 +436,19 @@ class OrderStatusService extends EventEmitter {
     }
   }
 
+  /**
+   * Add a new order to monitoring (manual refresh only)
+   */
+  async addOrderToMonitoring(order: Order): Promise<void> {
+    try {
+      // Add to active orders for manual status checking
+      this.activeOrders.set(order.id, order);
+      logger.info(`📊 Added order ${order.id} to manual monitoring`);
 
+    } catch (error: any) {
+      logger.error(`🚨 Failed to add order ${order.id} to monitoring:`, error.message);
+    }
+  }
 
   /**
    * Get monitoring statistics

@@ -5,6 +5,7 @@ import { brokerService, type PlaceOrderRequest } from '../services/brokerService
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
+import { Checkbox } from '../components/ui/Checkbox';
 import '../styles/app-theme.css';
 
 interface OrderForm {
@@ -17,7 +18,7 @@ interface OrderForm {
   product: 'CNC' | 'MIS' | 'NRML';
   validity: 'DAY' | 'IOC';
   triggerPrice: string;
-  brokerAccount: string;
+  selectedAccounts: string[]; // Changed from single brokerAccount to array of selected account IDs
 }
 
 interface MarginInfo {
@@ -39,7 +40,7 @@ const TradeSetup: React.FC = () => {
     product: 'CNC',
     validity: 'DAY',
     triggerPrice: '',
-    brokerAccount: ''
+    selectedAccounts: [] // Initialize as empty array
   });
   const [marginInfo, setMarginInfo] = useState<MarginInfo>({
     required: 0,
@@ -63,8 +64,12 @@ const TradeSetup: React.FC = () => {
         const activeAccounts = accounts.filter(account => account.isActive);
         setConnectedAccounts(activeAccounts);
 
+        // Auto-select all active accounts by default
         if (activeAccounts.length > 0) {
-          setOrderForm(prev => ({ ...prev, brokerAccount: activeAccounts[0].id }));
+          setOrderForm(prev => ({
+            ...prev,
+            selectedAccounts: activeAccounts.map(account => account.id)
+          }));
         }
 
       } catch (error: any) {
@@ -170,9 +175,26 @@ const TradeSetup: React.FC = () => {
     setShowSearchResults(false);
   };
 
+  const handleAccountSelection = (accountId: string, checked: boolean) => {
+    setOrderForm(prev => ({
+      ...prev,
+      selectedAccounts: checked
+        ? [...prev.selectedAccounts, accountId]
+        : prev.selectedAccounts.filter(id => id !== accountId)
+    }));
+  };
+
+  const handleSelectAllAccounts = () => {
+    const allSelected = orderForm.selectedAccounts.length === connectedAccounts.length;
+    setOrderForm(prev => ({
+      ...prev,
+      selectedAccounts: allSelected ? [] : connectedAccounts.map(account => account.id)
+    }));
+  };
+
   const handlePlaceOrder = async () => {
-    if (!orderForm.symbol || !orderForm.quantity || !orderForm.brokerAccount) {
-      setError('Please fill all required fields');
+    if (!orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0) {
+      setError('Please fill all required fields and select at least one account');
       return;
     }
 
@@ -190,23 +212,50 @@ const TradeSetup: React.FC = () => {
       setSubmitting(true);
       setError(null);
 
-      const orderRequest: PlaceOrderRequest = {
-        brokerName: connectedAccounts.find(acc => acc.id === orderForm.brokerAccount)?.brokerName || 'Unknown',
-        accountId: orderForm.brokerAccount,
-        symbol: orderForm.symbol,
-        action: orderForm.action,
-        quantity: parseInt(orderForm.quantity),
-        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
-        orderType: orderForm.orderType,
-        exchange: orderForm.exchange,
-        productType: orderForm.product,
-        remarks: `${orderForm.validity} order`
-      };
+      // Place orders across all selected accounts
+      const orderPromises = orderForm.selectedAccounts.map(async (accountId) => {
+        const account = connectedAccounts.find(acc => acc.id === accountId);
+        if (!account) {
+          throw new Error(`Account not found: ${accountId}`);
+        }
 
-      const result = await brokerService.placeOrder(orderRequest);
-      
-      if (result.success) {
-        alert(`Order placed successfully! Order ID: ${result.data?.orderId}`);
+        const orderRequest: PlaceOrderRequest = {
+          brokerName: account.brokerName,
+          accountId: accountId,
+          symbol: orderForm.symbol,
+          action: orderForm.action,
+          quantity: parseInt(orderForm.quantity),
+          price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+          orderType: orderForm.orderType,
+          exchange: orderForm.exchange,
+          productType: orderForm.product,
+          remarks: `${orderForm.validity} order`
+        };
+
+        return brokerService.placeOrder(orderRequest);
+      });
+
+      const results = await Promise.allSettled(orderPromises);
+
+      // Process results
+      const successful = results.filter(result =>
+        result.status === 'fulfilled' && result.value.success
+      );
+      const failed = results.filter(result =>
+        result.status === 'rejected' ||
+        (result.status === 'fulfilled' && !result.value.success)
+      );
+
+      if (successful.length > 0) {
+        const successCount = successful.length;
+        const totalCount = orderForm.selectedAccounts.length;
+
+        if (failed.length === 0) {
+          alert(`🎉 All orders placed successfully! (${successCount}/${totalCount} accounts)`);
+        } else {
+          alert(`⚠️ Partial success: ${successCount}/${totalCount} orders placed successfully`);
+        }
+
         // Reset form
         setOrderForm(prev => ({
           ...prev,
@@ -215,15 +264,16 @@ const TradeSetup: React.FC = () => {
           price: '',
           triggerPrice: ''
         }));
+
         // Navigate to orders page
         navigate('/orders');
       } else {
-        setError(result.message || 'Failed to place order');
+        setError(`Failed to place orders on all ${orderForm.selectedAccounts.length} accounts`);
       }
 
     } catch (error: any) {
       console.error('Order placement failed:', error);
-      setError(error.message || 'Failed to place order');
+      setError(error.message || 'Failed to place orders');
     } finally {
       setSubmitting(false);
     }
@@ -496,21 +546,117 @@ const TradeSetup: React.FC = () => {
 
               {/* Broker Account Selection */}
               <div>
-                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                  Broker Account
-                </label>
-                <select
-                  value={orderForm.brokerAccount}
-                  onChange={(e) => setOrderForm(prev => ({ ...prev, brokerAccount: e.target.value }))}
-                  className="kite-input"
-                  style={{ fontSize: '1rem' }}
-                >
-                  {connectedAccounts.map(account => (
-                    <option key={account.id} value={account.id}>
-                      {account.brokerName} - {account.userId}
-                    </option>
-                  ))}
-                </select>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                    Select Trading Accounts ({orderForm.selectedAccounts.length} selected)
+                  </label>
+                  {connectedAccounts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={handleSelectAllAccounts}
+                      style={{
+                        fontSize: '0.75rem',
+                        color: 'var(--kite-primary)',
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+                <div style={{
+                  border: '1px solid var(--kite-border)',
+                  borderRadius: 'var(--kite-radius-md)',
+                  padding: '1rem',
+                  backgroundColor: 'var(--kite-bg-primary)',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
+                }}>
+                  {connectedAccounts.length === 0 ? (
+                    <div style={{
+                      color: 'var(--kite-text-secondary)',
+                      fontSize: '0.875rem',
+                      textAlign: 'center',
+                      padding: '1rem'
+                    }}>
+                      No active accounts found. Please activate at least one broker account.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {connectedAccounts.map(account => (
+                        <div
+                          key={account.id}
+                          style={{
+                            padding: '0.75rem',
+                            border: orderForm.selectedAccounts.includes(account.id)
+                              ? '2px solid var(--kite-primary)'
+                              : '1px solid var(--kite-border)',
+                            borderRadius: 'var(--kite-radius-sm)',
+                            backgroundColor: orderForm.selectedAccounts.includes(account.id)
+                              ? 'var(--kite-bg-primary-light)'
+                              : 'var(--kite-bg-primary)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <Checkbox
+                            checked={orderForm.selectedAccounts.includes(account.id)}
+                            onChange={(checked) => handleAccountSelection(account.id, checked)}
+                            label={
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{
+                                    fontWeight: '600',
+                                    fontSize: '0.875rem',
+                                    color: 'var(--kite-text-primary)'
+                                  }}>
+                                    {account.brokerName.toUpperCase()}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.125rem 0.375rem',
+                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                    color: 'white',
+                                    borderRadius: '0.25rem',
+                                    fontWeight: '500'
+                                  }}>
+                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  color: 'var(--kite-text-primary)'
+                                }}>
+                                  Account: {account.userId}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--kite-text-secondary)'
+                                }}>
+                                  {account.userName} • {account.email}
+                                </span>
+                              </div>
+                            }
+                            size="base"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {orderForm.selectedAccounts.length === 0 && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--kite-loss)',
+                    marginTop: '0.25rem'
+                  }}>
+                    Please select at least one account to place orders
+                  </div>
+                )}
               </div>
 
               {/* Error Display */}
@@ -531,7 +677,7 @@ const TradeSetup: React.FC = () => {
               <button
                 className="kite-btn kite-btn-primary"
                 onClick={handlePlaceOrder}
-                disabled={submitting || !orderForm.symbol || !orderForm.quantity || !orderForm.brokerAccount}
+                disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
                 style={{
                   width: '100%',
                   justifyContent: 'center',
@@ -539,7 +685,10 @@ const TradeSetup: React.FC = () => {
                   padding: '0.75rem'
                 }}
               >
-                {submitting ? 'Placing Order...' : `${orderForm.action} ${orderForm.symbol || 'Stock'}`}
+                {submitting
+                  ? `Placing Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
+                  : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
+                }
               </button>
             </div>
           </div>
