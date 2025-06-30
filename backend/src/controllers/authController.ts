@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
-import { userDatabase, User } from '../services/sqliteDatabase';
+import { getDatabase } from '../services/databaseFactory';
+import { User } from '../interfaces/IDatabaseAdapter';
 
 // Helper function to generate JWT token
 const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
@@ -46,8 +47,9 @@ export const register = async (
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new user using SQLite database
-    const newUser = userDatabase.createUser({
+    // Create new user using database adapter
+    const database = await getDatabase();
+    const newUser = await database.createUser({
       email,
       name,
       password: hashedPassword,
@@ -97,8 +99,9 @@ export const login = async (
 
     const { email, password } = req.body;
 
-    // Find user using SQLite database
-    const user = userDatabase.findUserByEmail(email);
+    // Find user using database adapter
+    const database = await getDatabase();
+    const user = await database.findUserByEmail(email);
     if (!user) {
       res.status(401).json({
         success: false,

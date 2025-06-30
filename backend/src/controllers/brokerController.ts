@@ -3,7 +3,7 @@ import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { ShoonyaService, ShoonyaCredentials } from '../services/shoonyaService';
 import { FyersService, FyersCredentials } from '../services/fyersService';
-import { userDatabase } from '../services/sqliteDatabase';
+import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
 
@@ -89,7 +89,7 @@ export const connectBroker = async (
 
         // Save account to database
         try {
-          const dbAccount = userDatabase.createConnectedAccount({
+          const dbAccount = await userDatabase.createConnectedAccount({
             user_id: parseInt(userId),
             broker_name: brokerName,
             account_id: loginResponse.actid,
@@ -251,11 +251,11 @@ export const getConnectedAccounts = async (
 
     // Get connected accounts from database (no is_active field - pure real-time validation)
     try {
-      const dbAccounts = userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+      const dbAccounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
 
       // Validate session status for each account in real-time
       const accountsWithValidatedStatus = await Promise.all(
-        dbAccounts.map(async (dbAccount) => {
+        dbAccounts.map(async (dbAccount: any) => {
           let isReallyActive = false;
 
           // Check if broker service exists in memory and validate session
@@ -350,7 +350,7 @@ export const checkAccountSessionStatus = async (
     const accountIdNum = parseInt(accountId);
 
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountIdNum);
     if (!account) {
       res.status(404).json({
         success: false,

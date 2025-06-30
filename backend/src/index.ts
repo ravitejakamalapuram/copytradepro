@@ -19,6 +19,7 @@ import orderStatusService from './services/orderStatusService';
 import { symbolDatabaseService } from './services/symbolDatabaseService';
 import { realTimeDataService } from './services/realTimeDataService';
 import { nseCSVService } from './services/nseCSVService';
+import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 
 // Load environment variables
 dotenv.config();
@@ -161,41 +162,63 @@ if (io) {
   realTimeDataService.initialize(io);
 }
 
-// Start order status monitoring
-orderStatusService.startMonitoring().catch((error: any) => {
-  console.error('Failed to start order status monitoring:', error);
-});
+// Initialize database and start services
+async function startServer() {
+  try {
+    // Initialize database
+    console.log('🔧 Initializing database...');
+    const database = await getDatabase();
+    console.log(`✅ Database initialized: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
 
-// Start server
-server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`🔄 Socket.IO enabled for real-time updates`);
-  console.log(`📊 Order status monitoring active`);
-  console.log(`📈 NSE CSV Database initialized with daily auto-updates at 6:30 AM IST`);
-  console.log(`⚡ Real-time price streaming active`);
-});
+    // Start order status monitoring
+    orderStatusService.startMonitoring().catch((error: any) => {
+      console.error('Failed to start order status monitoring:', error);
+    });
+
+    // Start server
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
+      console.log(`💾 Database: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+      console.log(`🔄 Socket.IO enabled for real-time updates`);
+      console.log(`📊 Order status monitoring active`);
+      console.log(`📈 NSE CSV Database initialized with daily auto-updates at 6:30 AM IST`);
+      console.log(`⚡ Real-time price streaming active`);
+    });
+  } catch (error) {
+    console.error('🚨 Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer();
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  websocketService.shutdown();
-  orderStatusService.stopMonitoring();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+async function gracefulShutdown(signal: string) {
+  console.log(`${signal} received, shutting down gracefully`);
 
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  websocketService.shutdown();
-  orderStatusService.stopMonitoring();
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
-  });
-});
+  try {
+    // Stop services
+    websocketService.shutdown();
+    orderStatusService.stopMonitoring();
+
+    // Close database connection
+    await DatabaseFactory.closeConnection();
+
+    // Close server
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 export default app;
