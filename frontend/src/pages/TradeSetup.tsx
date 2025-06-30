@@ -337,29 +337,8 @@ const TradeSetup: React.FC = () => {
       <AppNavigation />
       
       <div className="kite-main">
-        {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Place Order</h1>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
-                onClick={() => navigate('/orders')}
-              >
-                📋 View Orders
-              </button>
-              <button 
-                className="kite-btn"
-                onClick={() => navigate('/positions')}
-              >
-                🎯 Positions
-              </button>
-            </div>
-          </div>
-        </div>
-
         {/* Order Form */}
-        <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
           {/* Main Order Form */}
           <div className="kite-card">
             <div className="kite-card-header">
@@ -599,8 +578,10 @@ const TradeSetup: React.FC = () => {
                             backgroundColor: orderForm.selectedAccounts.includes(account.id)
                               ? 'var(--kite-bg-primary-light)'
                               : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer'
                           }}
+                          onClick={() => handleAccountSelection(account.id, !orderForm.selectedAccounts.includes(account.id))}
                         >
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
@@ -690,6 +671,110 @@ const TradeSetup: React.FC = () => {
                   : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
                 }
               </button>
+            </div>
+          </div>
+
+          {/* Order Summary & Margin Info */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            {/* Order Summary */}
+            <div className="kite-card">
+              <div className="kite-card-header">
+                <h3 className="kite-card-title">Order Summary</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                {orderForm.symbol ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                      }}>
+                        {orderForm.action}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
+                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                        {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
+                      <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
+                    </div>
+                    {orderForm.quantity && orderForm.price && (
+                      <>
+                        <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
+                          <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
+                            ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
+                    <div>Enter order details to see summary</div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Margin Information */}
+            <div className="kite-card">
+              <div className="kite-card-header">
+                <h3 className="kite-card-title">Margin Info</h3>
+              </div>
+              <div style={{ padding: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                      ₹{formatCurrency(marginInfo.required)}
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                      ₹{formatCurrency(marginInfo.available)}
+                    </span>
+                  </div>
+                  {marginInfo.shortfall > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
+                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
+                        ₹{formatCurrency(marginInfo.shortfall)}
+                      </span>
+                    </div>
+                  )}
+
+                  {marginInfo.shortfall > 0 && (
+                    <button
+                      className="kite-btn kite-btn-primary"
+                      onClick={() => navigate('/funds')}
+                      style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+                    >
+                      Add Funds
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         </div>
