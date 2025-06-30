@@ -337,6 +337,27 @@ const TradeSetup: React.FC = () => {
       <AppNavigation />
       
       <div className="kite-main">
+        {/* Page Header */}
+        <div className="kite-card">
+          <div className="kite-card-header">
+            <h1 className="kite-card-title">Place Order</h1>
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+              <button 
+                className="kite-btn"
+                onClick={() => navigate('/orders')}
+              >
+                📋 View Orders
+              </button>
+              <button 
+                className="kite-btn"
+                onClick={() => navigate('/positions')}
+              >
+                🎯 Positions
+              </button>
+            </div>
+          </div>
+        </div>
+
         {/* Order Form */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
           {/* Main Order Form */}
@@ -578,10 +599,8 @@ const TradeSetup: React.FC = () => {
                             backgroundColor: orderForm.selectedAccounts.includes(account.id)
                               ? 'var(--kite-bg-primary-light)'
                               : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease',
-                            cursor: 'pointer'
+                            transition: 'all 0.2s ease'
                           }}
-                          onClick={() => handleAccountSelection(account.id, !orderForm.selectedAccounts.includes(account.id))}
                         >
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
