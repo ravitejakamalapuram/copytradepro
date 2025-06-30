@@ -42,7 +42,7 @@ const Orders: React.FC = () => {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [accountFilter, setAccountFilter] = useState<string>('all');
-  const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string}>>([]);
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string, mongoId: string}>>([]);
 
   // Function to get date range based on filter
   const getDateRange = () => {
@@ -83,12 +83,20 @@ const Orders: React.FC = () => {
   // Function to fetch available accounts
   const fetchAccounts = async () => {
     try {
-      const accounts = await accountService.getConnectedAccounts();
-      const accountOptions = accounts.map(account => ({
-        id: account.id,
-        name: `${account.user_name || account.account_id} (${account.broker_name})`,
-        broker: account.broker_name
+      const response = await accountService.getConnectedAccounts();
+      console.log('🔍 Fetched accounts response:', response); // Debug log
+
+      // The response should be an array of accounts
+      const accounts = Array.isArray(response) ? response : [];
+
+      const accountOptions = accounts.map((account: any) => ({
+        id: account.accountId, // Use the broker account ID (like "FN135006") as the filter value
+        name: `${account.userName || account.accountId || 'Unknown'} (${account.brokerDisplayName || account.brokerName})`,
+        broker: account.brokerName,
+        mongoId: account.id // Keep the MongoDB ObjectId for reference
       }));
+
+      console.log('🔍 Account options:', accountOptions); // Debug log
       setAvailableAccounts(accountOptions);
     } catch (error) {
       console.error('Failed to fetch accounts:', error);
@@ -159,7 +167,18 @@ const Orders: React.FC = () => {
     if (accountFilter === 'all') {
       return orders;
     }
-    return orders.filter(order => order.accountInfo?.account_id === accountFilter);
+
+    console.log('🔍 Filtering orders by account:', accountFilter); // Debug log
+    console.log('🔍 Sample order accountInfo:', orders[0]?.accountInfo); // Debug log
+
+    return orders.filter(order => {
+      // Match the broker account ID from order's account_info with the selected account filter
+      const orderBrokerAccountId = order.accountInfo?.account_id;
+
+      console.log('🔍 Order broker account ID:', orderBrokerAccountId, 'Filter:', accountFilter); // Debug log
+
+      return orderBrokerAccountId === accountFilter;
+    });
   };
 
 
