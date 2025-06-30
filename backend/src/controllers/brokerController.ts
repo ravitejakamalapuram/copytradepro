@@ -11,6 +11,112 @@ import orderStatusService from '../services/orderStatusService';
 type BrokerService = ShoonyaService | FyersService;
 export const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
 
+/**
+ * Auto-reactivate account if session is expired
+ * Returns true if account is active/reactivated, false if reactivation failed
+ */
+async function ensureAccountActive(userId: string, accountId: string): Promise<boolean> {
+  try {
+    console.log(`🔄 Ensuring account ${accountId} is active for user ${userId}`);
+
+    // Get account details from database
+    const account = await userDatabase.getConnectedAccountById(accountId);
+    if (!account) {
+      console.log(`❌ Account ${accountId} not found in database`);
+      return false;
+    }
+
+    // Check if connection exists and is valid
+    const userConnections = userBrokerConnections.get(userId);
+    const connectionKey = `${account.broker_name}_${account.account_id}`;
+    const existingConnection = userConnections?.get(connectionKey);
+
+    if (existingConnection) {
+      // Test if existing connection is still valid
+      try {
+        let isValid = false;
+        if (account.broker_name === 'shoonya') {
+          isValid = await (existingConnection as ShoonyaService).validateSession(account.account_id);
+        } else if (account.broker_name === 'fyers') {
+          isValid = await (existingConnection as FyersService).validateSession();
+        }
+
+        if (isValid) {
+          console.log(`✅ Account ${accountId} session is already valid`);
+          return true;
+        } else {
+          console.log(`⚠️ Account ${accountId} session is invalid, removing connection`);
+          userConnections?.delete(connectionKey);
+        }
+      } catch (error: any) {
+        console.log(`⚠️ Session validation failed for ${accountId}:`, error.message);
+        userConnections?.delete(connectionKey);
+      }
+    }
+
+    // Auto-reactivate the account
+    console.log(`🔄 Auto-reactivating account ${accountId}...`);
+
+    // Get decrypted credentials
+    const credentials = await userDatabase.getAccountCredentials(accountId);
+    if (!credentials) {
+      console.log(`❌ Failed to retrieve credentials for account ${accountId}`);
+      return false;
+    }
+
+    // Initialize user connections if not exists
+    if (!userBrokerConnections.has(userId)) {
+      userBrokerConnections.set(userId, new Map());
+    }
+    const userConnectionsMap = userBrokerConnections.get(userId)!;
+
+    // Try to authenticate with the broker
+    let brokerService: BrokerService;
+    let loginResponse: any;
+
+    if (account.broker_name === 'shoonya') {
+      brokerService = new ShoonyaService();
+      loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
+
+      if (loginResponse.stat === 'Ok') {
+        // Store the connection with account-specific key
+        userConnectionsMap.set(connectionKey, brokerService);
+
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          account.account_id, // broker account ID
+          userId, // user ID
+          account.broker_name, // broker name
+          account.user_name // user display name
+        );
+
+        console.log(`✅ Successfully auto-reactivated Shoonya account ${accountId}`);
+        return true;
+      } else {
+        console.log(`❌ Failed to auto-reactivate Shoonya account ${accountId}:`, loginResponse.emsg);
+        return false;
+      }
+    } else if (account.broker_name === 'fyers') {
+      brokerService = new FyersService();
+      loginResponse = await brokerService.login(credentials as FyersCredentials);
+
+      if (loginResponse.success) {
+        userConnectionsMap.set(connectionKey, brokerService);
+        console.log(`✅ Successfully auto-reactivated Fyers account ${accountId}`);
+        return true;
+      } else {
+        console.log(`❌ Failed to auto-reactivate Fyers account ${accountId}:`, loginResponse.message);
+        return false;
+      }
+    }
+
+    return false;
+  } catch (error: any) {
+    console.error(`🚨 Auto-reactivation failed for account ${accountId}:`, error.message);
+    return false;
+  }
+}
+
 // Broker Account Cache: Maps broker account IDs to user IDs and broker info
 interface BrokerAccountMapping {
   userId: string;
@@ -965,15 +1071,25 @@ export const placeOrder = async (
       return;
     }
 
-    // Get the account-specific broker connection
+    // Ensure account is active (auto-reactivate if needed)
+    const isAccountActive = await ensureAccountActive(userId, accountId);
+    if (!isAccountActive) {
+      res.status(400).json({
+        success: false,
+        message: `Failed to activate ${brokerName} account ${account.account_id}. Please check your credentials and try again.`,
+      });
+      return;
+    }
+
+    // Get the account-specific broker connection (should be available after auto-reactivation)
     const userConnections = userBrokerConnections.get(userId);
     const connectionKey = `${brokerName}_${account.account_id}`;
     const brokerService = userConnections?.get(connectionKey);
 
     if (!brokerService) {
-      res.status(404).json({
+      res.status(500).json({
         success: false,
-        message: `No active connection found for ${brokerName} account ${account.account_id}. Please activate the account first.`,
+        message: `Internal error: Connection not found after activation for ${brokerName} account ${account.account_id}.`,
       });
       return;
     }
@@ -1017,9 +1133,9 @@ export const placeOrder = async (
       try {
         orderResponse = await (brokerService as ShoonyaService).placeOrder(shoonyaOrderData);
       } catch (error: any) {
-        // Check if it's a session expired error
+        // Check if it's a session expired error - try auto-reactivation once
         if (error.message?.includes('Session Expired') || error.message?.includes('Invalid Session Key')) {
-          console.log(`🔄 Session expired for ${account.account_id}. Please reactivate the account.`);
+          console.log(`🔄 Session expired during order placement for ${account.account_id}. Attempting auto-reactivation...`);
 
           // Remove the expired connection
           const userConnections = userBrokerConnections.get(userId);
@@ -1027,7 +1143,23 @@ export const placeOrder = async (
             userConnections.delete(connectionKey);
           }
 
-          throw new Error(`Session expired for account ${account.account_id}. Please reactivate the account and try again.`);
+          // Try auto-reactivation once
+          const reactivated = await ensureAccountActive(userId, accountId);
+          if (reactivated) {
+            console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
+
+            // Get the new connection and retry
+            const newUserConnections = userBrokerConnections.get(userId);
+            const newBrokerService = newUserConnections?.get(connectionKey);
+
+            if (newBrokerService) {
+              orderResponse = await (newBrokerService as ShoonyaService).placeOrder(shoonyaOrderData);
+            } else {
+              throw new Error(`Failed to get connection after reactivation for account ${account.account_id}`);
+            }
+          } else {
+            throw new Error(`Session expired and auto-reactivation failed for account ${account.account_id}. Please check your credentials.`);
+          }
         } else {
           throw error;
         }
@@ -1066,9 +1198,9 @@ export const placeOrder = async (
       try {
         orderResponse = await (brokerService as FyersService).placeOrder(fyersOrderData);
       } catch (error: any) {
-        // Check if it's a session expired error
+        // Check if it's a session expired error - try auto-reactivation once
         if (error.message?.includes('Session Expired') || error.message?.includes('Invalid Session Key')) {
-          console.log(`🔄 Session expired for ${account.account_id}. Please reactivate the account.`);
+          console.log(`🔄 Session expired during order placement for ${account.account_id}. Attempting auto-reactivation...`);
 
           // Remove the expired connection
           const userConnections = userBrokerConnections.get(userId);
@@ -1076,7 +1208,23 @@ export const placeOrder = async (
             userConnections.delete(connectionKey);
           }
 
-          throw new Error(`Session expired for account ${account.account_id}. Please reactivate the account and try again.`);
+          // Try auto-reactivation once
+          const reactivated = await ensureAccountActive(userId, accountId);
+          if (reactivated) {
+            console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
+
+            // Get the new connection and retry
+            const newUserConnections = userBrokerConnections.get(userId);
+            const newBrokerService = newUserConnections?.get(connectionKey);
+
+            if (newBrokerService) {
+              orderResponse = await (newBrokerService as FyersService).placeOrder(fyersOrderData);
+            } else {
+              throw new Error(`Failed to get connection after reactivation for account ${account.account_id}`);
+            }
+          } else {
+            throw new Error(`Session expired and auto-reactivation failed for account ${account.account_id}. Please check your credentials.`);
+          }
         } else {
           throw error;
         }

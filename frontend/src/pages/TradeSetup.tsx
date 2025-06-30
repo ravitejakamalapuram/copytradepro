@@ -61,14 +61,13 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
-        const activeAccounts = accounts.filter(account => account.isActive);
-        setConnectedAccounts(activeAccounts);
+        setConnectedAccounts(accounts);
 
-        // Auto-select all active accounts by default
-        if (activeAccounts.length > 0) {
+        // Auto-select all accounts by default (sessions will be auto-activated during order placement)
+        if (accounts.length > 0) {
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: activeAccounts.map(account => account.id)
+            selectedAccounts: accounts.map(account => account.id)
           }));
         }
 
@@ -315,10 +314,10 @@ const TradeSetup: React.FC = () => {
           <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
             <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem' }}>
-              No Active Broker Accounts
+              No Broker Accounts Connected
             </div>
             <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
-              Connect and activate a broker account to start trading
+              Connect a broker account to start trading. Sessions will be automatically activated during order placement.
             </div>
             <button 
               className="kite-btn kite-btn-primary"
@@ -583,7 +582,7 @@ const TradeSetup: React.FC = () => {
                       textAlign: 'center',
                       padding: '1rem'
                     }}>
-                      No active accounts found. Please activate at least one broker account.
+                      No accounts found. Please connect at least one broker account.
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -599,8 +598,10 @@ const TradeSetup: React.FC = () => {
                             backgroundColor: orderForm.selectedAccounts.includes(account.id)
                               ? 'var(--kite-bg-primary-light)'
                               : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer'
                           }}
+                          onClick={() => handleAccountSelection(account.id, !orderForm.selectedAccounts.includes(account.id))}
                         >
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
@@ -618,12 +619,12 @@ const TradeSetup: React.FC = () => {
                                   <span style={{
                                     fontSize: '0.75rem',
                                     padding: '0.125rem 0.375rem',
-                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-primary)',
                                     color: 'white',
                                     borderRadius: '0.25rem',
                                     fontWeight: '500'
                                   }}>
-                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                    {account.isActive ? 'ACTIVE' : 'AUTO-ACTIVATE'}
                                   </span>
                                 </div>
                                 <span style={{
@@ -655,16 +656,6 @@ const TradeSetup: React.FC = () => {
                     marginTop: '0.25rem'
                   }}>
                     Please select at least one account to place orders
-                  </div>
-                )}
-                {orderForm.selectedAccounts.length > 0 && (
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--kite-text-secondary)',
-                    marginTop: '0.5rem',
-                    textAlign: 'center'
-                  }}>
-                    Orders will be placed simultaneously on {orderForm.selectedAccounts.length} account{orderForm.selectedAccounts.length > 1 ? 's' : ''}
                   </div>
                 )}
               </div>
