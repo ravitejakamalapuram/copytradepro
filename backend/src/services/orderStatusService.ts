@@ -27,8 +27,8 @@ const logger = {
 
 interface Order {
   id: string;
-  user_id: number;
-  account_id: number;
+  user_id: number | string; // Support both for MongoDB ObjectId compatibility
+  account_id: number | string; // Support both for MongoDB ObjectId compatibility
   symbol: string;
   action: string;
   quantity: number;
@@ -328,7 +328,7 @@ class OrderStatusService extends EventEmitter {
       logger.debug(`Getting broker account ID for order ${order.id}`);
 
       // Try to get account info from order history table
-      const orderHistory = userDatabase.getOrderHistoryById(parseInt(order.id));
+      const orderHistory = userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {

@@ -7,10 +7,13 @@ import { IDatabaseAdapter } from '../interfaces/IDatabaseAdapter';
  */
 class DatabaseCompatibilityLayer {
   private database: IDatabaseAdapter | null = null;
+  private dbType: string = 'sqlite'; // Default to sqlite
 
   private async getDb(): Promise<IDatabaseAdapter> {
     if (!this.database) {
       this.database = await getDatabase();
+      // Determine database type based on the adapter instance
+      this.dbType = this.database.constructor.name.toLowerCase().includes('mongo') ? 'mongodb' : 'sqlite';
     }
     return this.database;
   }
@@ -88,12 +91,12 @@ class DatabaseCompatibilityLayer {
     return await db.getOrderHistoryById(id);
   }
 
-  async getOrderHistoryByUserId(userId: number, limit?: number, offset?: number) {
+  async getOrderHistoryByUserId(userId: number | string, limit?: number, offset?: number) {
     const db = await this.getDb();
     return await db.getOrderHistoryByUserId(userId, limit, offset);
   }
 
-  async getOrderHistoryByUserIdWithFilters(userId: number, limit?: number, offset?: number, filters?: any) {
+  async getOrderHistoryByUserIdWithFilters(userId: number | string, limit?: number, offset?: number, filters?: any) {
     const db = await this.getDb();
     return await db.getOrderHistoryByUserIdWithFilters(userId, limit, offset, filters);
   }
@@ -118,7 +121,7 @@ class DatabaseCompatibilityLayer {
     return await db.getAllOrderHistory(limit, offset);
   }
 
-  async getOrderCountByUserIdWithFilters(userId: number, filters?: any) {
+  async getOrderCountByUserIdWithFilters(userId: number | string, filters?: any) {
     const db = await this.getDb();
     return await db.getOrderCountByUserIdWithFilters(userId, filters);
   }
@@ -137,13 +140,27 @@ class DatabaseCompatibilityLayer {
   // Additional methods that might be needed for compatibility
   async getAccountCredentials(accountId: number | string) {
     const db = await this.getDb();
+
+    // For SQLite, use the existing method that returns decrypted credentials
+    if (this.dbType === 'sqlite') {
+      return (db as any).getAccountCredentials(typeof accountId === 'string' ? parseInt(accountId) : accountId);
+    }
+
+    // For MongoDB, get account and decrypt credentials manually
     const account = await db.getConnectedAccountById(accountId);
     if (!account) return null;
 
-    // For now, return a placeholder - this method needs to be implemented properly
-    // based on how credentials are stored and decrypted
-    console.warn('getAccountCredentials called - needs proper implementation');
-    return null;
+    try {
+      // MongoDB stores credentials in encrypted_credentials field
+      if (account.encrypted_credentials) {
+        const decryptedCredentials = (db as any).decryptCredentials(account.encrypted_credentials);
+        return JSON.parse(decryptedCredentials);
+      }
+      return null;
+    } catch (error) {
+      console.error('🚨 Failed to decrypt account credentials:', error);
+      return null;
+    }
   }
 
   async getConnectedAccountByAccountId(accountId: string) {
@@ -153,7 +170,7 @@ class DatabaseCompatibilityLayer {
     return null;
   }
 
-  getOrderSearchSuggestions(userId: number, query: string) {
+  getOrderSearchSuggestions(userId: number | string, query: string) {
     // This method doesn't exist in SQLite, return empty array for now
     console.warn('getOrderSearchSuggestions called - needs proper implementation');
     return [];

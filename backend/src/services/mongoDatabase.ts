@@ -193,6 +193,11 @@ export class MongoDatabase implements IDatabaseAdapter {
     return decrypted;
   }
 
+  // Public method to decrypt credentials for compatibility layer
+  public decryptCredentials(encryptedText: string): string {
+    return this.decrypt(encryptedText);
+  }
+
   // Document to interface converters
   private userDocToInterface(doc: UserDocument): User {
     return {
@@ -460,10 +465,12 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
-  async getOrderHistoryByUserId(userId: string, limit: number = 50, offset: number = 0): Promise<OrderHistory[]> {
+  async getOrderHistoryByUserId(userId: number | string, limit: number = 50, offset: number = 0): Promise<OrderHistory[]> {
     try {
+      // Convert userId to string if it's a number (for compatibility)
+      const userIdStr = typeof userId === 'number' ? userId.toString() : userId;
       const orders = await this.OrderHistoryModel
-        .find({ user_id: new mongoose.Types.ObjectId(userId) })
+        .find({ user_id: new mongoose.Types.ObjectId(userIdStr) })
         .sort({ executed_at: -1, created_at: -1 })
         .limit(limit)
         .skip(offset);
@@ -476,13 +483,15 @@ export class MongoDatabase implements IDatabaseAdapter {
   }
 
   async getOrderHistoryByUserIdWithFilters(
-    userId: string,
+    userId: number | string,
     limit: number = 50,
     offset: number = 0,
     filters: OrderFilters = {}
   ): Promise<OrderHistory[]> {
     try {
-      const query: any = { user_id: new mongoose.Types.ObjectId(userId) };
+      // Convert userId to string if it's a number (for compatibility)
+      const userIdStr = typeof userId === 'number' ? userId.toString() : userId;
+      const query: any = { user_id: new mongoose.Types.ObjectId(userIdStr) };
 
       // Add filters
       if (filters.status) {
@@ -585,9 +594,11 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
-  async getOrderCountByUserIdWithFilters(userId: string, filters: OrderFilters = {}): Promise<number> {
+  async getOrderCountByUserIdWithFilters(userId: number | string, filters: OrderFilters = {}): Promise<number> {
     try {
-      const query: any = { user_id: new mongoose.Types.ObjectId(userId) };
+      // Convert userId to string if it's a number (for compatibility)
+      const userIdStr = typeof userId === 'number' ? userId.toString() : userId;
+      const query: any = { user_id: new mongoose.Types.ObjectId(userIdStr) };
 
       // Add same filters as getOrderHistoryByUserIdWithFilters
       if (filters.status) {

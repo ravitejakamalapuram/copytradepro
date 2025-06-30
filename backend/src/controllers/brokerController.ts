@@ -672,6 +672,14 @@ export const activateAccount = async (
         // Store the connection (status is determined by real-time validation)
         userConnections.set(account.broker_name, brokerService);
 
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          account.account_id, // broker account ID
+          userId, // user ID
+          account.broker_name, // broker name
+          account.user_name // user display name
+        );
+
         res.status(200).json({
           success: true,
           message: `Successfully activated ${account.broker_name} account`,
@@ -839,7 +847,7 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   }
 
   // Get decrypted credentials
-  const credentials = await userDatabase.getAccountCredentials(typeof brokerAccount.id === 'string' ? parseInt(brokerAccount.id) : brokerAccount.id);
+  const credentials = await userDatabase.getAccountCredentials(brokerAccount.id.toString());
   if (!credentials) {
     console.log(`❌ Failed to retrieve credentials for ${brokerName} account ${brokerAccount.id}`);
     return null;
@@ -934,8 +942,8 @@ export const placeOrder = async (
     }
 
     // Validate that the user owns the specified account
-    const account = await userDatabase.getConnectedAccountById(parseInt(accountId));
-    if (!account || account.user_id !== parseInt(userId)) {
+    const account = await userDatabase.getConnectedAccountById(accountId);
+    if (!account || account.user_id.toString() !== userId.toString()) {
       res.status(404).json({
         success: false,
         message: 'Account not found or access denied',
@@ -1041,8 +1049,8 @@ export const placeOrder = async (
         // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
-            user_id: parseInt(userId),
-            account_id: account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno,
             symbol: symbol,
@@ -1064,8 +1072,8 @@ export const placeOrder = async (
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
-            user_id: parseInt(userId),
-            account_id: typeof account.id === 'string' ? parseInt(account.id) : account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Keep as string for MongoDB ObjectId
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1119,8 +1127,8 @@ export const placeOrder = async (
         // not that it was executed. Actual execution depends on market conditions.
         try {
           const orderHistoryData = {
-            user_id: parseInt(userId),
-            account_id: account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
             broker_name: brokerName,
             broker_order_id: orderResponse.id,
             symbol: symbol,
@@ -1142,8 +1150,8 @@ export const placeOrder = async (
           // Add order to real-time monitoring
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
-            user_id: parseInt(userId),
-            account_id: typeof account.id === 'string' ? parseInt(account.id) : account.id,
+            user_id: userId, // Keep as string for MongoDB ObjectId
+            account_id: account.id.toString(), // Keep as string for MongoDB ObjectId
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1239,15 +1247,15 @@ export const getOrderHistory = async (
       search: search as string,
     };
 
-    const orderHistory = userDatabase.getOrderHistoryByUserIdWithFilters(
-      parseInt(userId),
+    const orderHistory = await userDatabase.getOrderHistoryByUserIdWithFilters(
+      userId, // Keep as string for MongoDB ObjectId
       parseInt(limit as string),
       parseInt(offset as string),
       filterOptions
     );
 
-    const totalCount = userDatabase.getOrderCountByUserIdWithFilters(
-      parseInt(userId),
+    const totalCount = await userDatabase.getOrderCountByUserIdWithFilters(
+      userId, // Keep as string for MongoDB ObjectId
       filterOptions
     );
 
@@ -1409,7 +1417,7 @@ export const getOrderSearchSuggestions = async (
     }
 
     const suggestions = userDatabase.getOrderSearchSuggestions(
-      parseInt(userId),
+      userId, // Keep as string for MongoDB ObjectId
       searchTerm.trim()
     );
 
