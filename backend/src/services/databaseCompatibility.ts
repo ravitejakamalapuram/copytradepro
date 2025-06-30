@@ -57,7 +57,7 @@ class DatabaseCompatibilityLayer {
     return await db.createConnectedAccount(accountData);
   }
 
-  async getConnectedAccountsByUserId(userId: number) {
+  async getConnectedAccountsByUserId(userId: number | string) {
     const db = await this.getDb();
     return await db.getConnectedAccountsByUserId(userId);
   }
@@ -139,11 +139,24 @@ class DatabaseCompatibilityLayer {
     const db = await this.getDb();
     const account = await db.getConnectedAccountById(accountId);
     if (!account) return null;
-    
+
     // For now, return a placeholder - this method needs to be implemented properly
     // based on how credentials are stored and decrypted
     console.warn('getAccountCredentials called - needs proper implementation');
     return null;
+  }
+
+  async getConnectedAccountByAccountId(accountId: string) {
+    const db = await this.getDb();
+    // This method doesn't exist in the interface yet, so return null for now
+    console.warn('getConnectedAccountByAccountId called - needs proper implementation');
+    return null;
+  }
+
+  getOrderSearchSuggestions(userId: number, query: string) {
+    // This method doesn't exist in SQLite, return empty array for now
+    console.warn('getOrderSearchSuggestions called - needs proper implementation');
+    return [];
   }
 
   // Close method for compatibility

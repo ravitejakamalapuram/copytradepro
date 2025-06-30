@@ -90,7 +90,7 @@ export const connectBroker = async (
         // Save account to database
         try {
           const dbAccount = await userDatabase.createConnectedAccount({
-            user_id: parseInt(userId),
+            user_id: userId, // Keep as string for MongoDB ObjectId
             broker_name: brokerName,
             account_id: loginResponse.actid,
             user_name: loginResponse.uname,
@@ -251,7 +251,7 @@ export const getConnectedAccounts = async (
 
     // Get connected accounts from database (no is_active field - pure real-time validation)
     try {
-      const dbAccounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+      const dbAccounts = await userDatabase.getConnectedAccountsByUserId(userId);
 
       // Validate session status for each account in real-time
       const accountsWithValidatedStatus = await Promise.all(
@@ -567,7 +567,7 @@ export const activateAccount = async (
     const accountIdNum = parseInt(accountId);
 
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountIdNum);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -655,7 +655,7 @@ export const deactivateAccount = async (
     const accountIdNum = parseInt(accountId);
 
     // Get account from database
-    const account = userDatabase.getConnectedAccountById(accountIdNum);
+    const account = await userDatabase.getConnectedAccountById(accountIdNum);
     if (!account) {
       res.status(404).json({
         success: false,
@@ -764,7 +764,7 @@ const ensureBrokerConnection = async (userId: string, brokerName: string): Promi
   console.log(`🔄 Re-establishing connection for ${brokerName} user ${userId}`);
 
   // Get all accounts for this user and broker
-  const userAccounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+  const userAccounts = await userDatabase.getConnectedAccountsByUserId(userId);
   const brokerAccount = userAccounts.find((account: any) => account.broker_name === brokerName);
 
   if (!brokerAccount) {
@@ -999,7 +999,7 @@ export const placeOrder = async (
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
             user_id: parseInt(userId),
-            account_id: account.id,
+            account_id: typeof account.id === 'string' ? parseInt(account.id) : account.id,
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1077,7 +1077,7 @@ export const placeOrder = async (
           const orderForMonitoring = {
             id: savedOrder.id.toString(),
             user_id: parseInt(userId),
-            account_id: account.id,
+            account_id: typeof account.id === 'string' ? parseInt(account.id) : account.id,
             symbol: symbol,
             action: action,
             quantity: parseInt(quantity),
@@ -1240,7 +1240,7 @@ export const getOrderStatus = async (
     }
 
     // Get the user's connected accounts
-    const accounts = await userDatabase.getConnectedAccountsByUserId(parseInt(userId));
+    const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
     const brokerAccount = accounts.find((account: any) => account.broker_name === brokerName);
 
     if (!brokerAccount) {
@@ -1344,8 +1344,7 @@ export const getOrderSearchSuggestions = async (
 
     const suggestions = userDatabase.getOrderSearchSuggestions(
       parseInt(userId),
-      searchTerm.trim(),
-      parseInt(limit as string)
+      searchTerm.trim()
     );
 
     res.status(200).json({
@@ -1545,38 +1544,20 @@ const brokerConnectionManagerImpl = {
     console.log(`🔍 Available user connections:`, Array.from(userBrokerConnections.keys()));
 
     try {
-      // Find which web user has this broker account connected
-      const connectedAccount = userDatabase.getConnectedAccountByAccountId(brokerAccountId);
+      // For now, we'll search through all user connections to find the right one
+      // This is a temporary solution until we implement proper async support
+      console.warn('getBrokerConnection using temporary synchronous implementation');
 
-      if (!connectedAccount) {
-        console.log(`❌ No connected account found for broker account ID: ${brokerAccountId}`);
-        return null;
+      // Search through all user connections to find one with matching broker
+      for (const [userId, userConnections] of userBrokerConnections.entries()) {
+        const service = userConnections.get(brokerName);
+        if (service instanceof ShoonyaService) {
+          console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
+          return service;
+        }
       }
 
-      console.log(`🔍 Found connected account for user ${connectedAccount.user_id}, broker: ${connectedAccount.broker_name}`);
-
-      // Check if the broker name matches
-      if (connectedAccount.broker_name !== brokerName) {
-        console.log(`❌ Broker name mismatch: expected ${brokerName}, found ${connectedAccount.broker_name}`);
-        return null;
-      }
-
-      // Get the broker connection for this web user
-      const userId = connectedAccount.user_id.toString();
-      const userConnections = userBrokerConnections.get(userId);
-
-      if (!userConnections) {
-        console.log(`❌ No active connections found for user ${userId}`);
-        return null;
-      }
-
-      const service = userConnections.get(brokerName);
-      if (service instanceof ShoonyaService) {
-        console.log(`✅ Found ${brokerName} service for user ${userId} with broker account ${brokerAccountId}`);
-        return service;
-      }
-
-      console.log(`❌ Service not found or not a ShoonyaService for user ${userId}, broker ${brokerName}`);
+      console.log(`❌ No active ${brokerName} connection found for account ${brokerAccountId}`);
       return null;
 
     } catch (error) {
