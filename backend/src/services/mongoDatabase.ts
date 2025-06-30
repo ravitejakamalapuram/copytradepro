@@ -242,10 +242,20 @@ export class MongoDatabase implements IDatabaseAdapter {
   }
 
   private orderHistoryDocToInterface(doc: OrderHistoryDocument): OrderHistory {
+    // Handle populated account data
+    const accountData = (doc as any).account_id;
+    const accountInfo = accountData && typeof accountData === 'object' && accountData.account_id
+      ? {
+          account_id: accountData.account_id,
+          user_name: accountData.user_name,
+          email: accountData.email
+        }
+      : null;
+
     return {
       id: (doc._id as mongoose.Types.ObjectId).toString(),
       user_id: doc.user_id.toString(),
-      account_id: doc.account_id.toString(),
+      account_id: typeof doc.account_id === 'string' ? doc.account_id : doc.account_id.toString(),
       broker_name: doc.broker_name,
       broker_order_id: doc.broker_order_id,
       symbol: doc.symbol,
@@ -258,7 +268,9 @@ export class MongoDatabase implements IDatabaseAdapter {
       product_type: doc.product_type,
       remarks: doc.remarks,
       executed_at: doc.executed_at.toISOString(),
-      created_at: doc.created_at.toISOString()
+      created_at: doc.created_at.toISOString(),
+      // Add account information if populated
+      ...(accountInfo && { account_info: accountInfo })
     };
   }
 
@@ -544,6 +556,7 @@ export class MongoDatabase implements IDatabaseAdapter {
 
       const orders = await this.OrderHistoryModel
         .find(query)
+        .populate('account_id', 'account_id user_name email') // Populate account details
         .sort({ executed_at: -1, created_at: -1 })
         .limit(limit)
         .skip(offset);

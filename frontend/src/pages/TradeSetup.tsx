@@ -570,10 +570,11 @@ const TradeSetup: React.FC = () => {
                 <div style={{
                   border: '1px solid var(--kite-border)',
                   borderRadius: 'var(--kite-radius-md)',
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--kite-bg-secondary)',
-                  maxHeight: '200px',
-                  overflowY: 'auto'
+                  padding: '1rem',
+                  backgroundColor: 'var(--kite-bg-primary)',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
                 }}>
                   {connectedAccounts.length === 0 ? (
                     <div style={{
@@ -585,24 +586,64 @@ const TradeSetup: React.FC = () => {
                       No active accounts found. Please activate at least one broker account.
                     </div>
                   ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                       {connectedAccounts.map(account => (
-                        <Checkbox
+                        <div
                           key={account.id}
-                          checked={orderForm.selectedAccounts.includes(account.id)}
-                          onChange={(checked) => handleAccountSelection(account.id, checked)}
-                          label={
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.125rem' }}>
-                              <span style={{ fontWeight: '500', fontSize: '0.875rem' }}>
-                                {account.brokerName} - {account.userId}
-                              </span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
-                                {account.userName} • {account.email}
-                              </span>
-                            </div>
-                          }
-                          size="base"
-                        />
+                          style={{
+                            padding: '0.75rem',
+                            border: orderForm.selectedAccounts.includes(account.id)
+                              ? '2px solid var(--kite-primary)'
+                              : '1px solid var(--kite-border)',
+                            borderRadius: 'var(--kite-radius-sm)',
+                            backgroundColor: orderForm.selectedAccounts.includes(account.id)
+                              ? 'var(--kite-bg-primary-light)'
+                              : 'var(--kite-bg-primary)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <Checkbox
+                            checked={orderForm.selectedAccounts.includes(account.id)}
+                            onChange={(checked) => handleAccountSelection(account.id, checked)}
+                            label={
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{
+                                    fontWeight: '600',
+                                    fontSize: '0.875rem',
+                                    color: 'var(--kite-text-primary)'
+                                  }}>
+                                    {account.brokerName.toUpperCase()}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.125rem 0.375rem',
+                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                    color: 'white',
+                                    borderRadius: '0.25rem',
+                                    fontWeight: '500'
+                                  }}>
+                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </div>
+                                <span style={{
+                                  fontSize: '0.875rem',
+                                  fontWeight: '500',
+                                  color: 'var(--kite-text-primary)'
+                                }}>
+                                  Account: {account.userId}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  color: 'var(--kite-text-secondary)'
+                                }}>
+                                  {account.userName} • {account.email}
+                                </span>
+                              </div>
+                            }
+                            size="base"
+                          />
+                        </div>
                       ))}
                     </div>
                   )}
@@ -614,6 +655,16 @@ const TradeSetup: React.FC = () => {
                     marginTop: '0.25rem'
                   }}>
                     Please select at least one account to place orders
+                  </div>
+                )}
+                {orderForm.selectedAccounts.length > 0 && (
+                  <div style={{
+                    fontSize: '0.75rem',
+                    color: 'var(--kite-text-secondary)',
+                    marginTop: '0.5rem',
+                    textAlign: 'center'
+                  }}>
+                    Orders will be placed simultaneously on {orderForm.selectedAccounts.length} account{orderForm.selectedAccounts.length > 1 ? 's' : ''}
                   </div>
                 )}
               </div>

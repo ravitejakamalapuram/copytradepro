@@ -20,6 +20,11 @@ interface Order {
   brokerName?: string;
   brokerOrderId?: string;
   exchange?: string;
+  accountInfo?: {
+    account_id: string;
+    user_name: string;
+    email: string;
+  };
 }
 
 const Orders: React.FC = () => {
@@ -62,7 +67,8 @@ const Orders: React.FC = () => {
           createdAt: order.executed_at || order.created_at,
           brokerName: order.broker_name,
           brokerOrderId: order.broker_order_id,
-          exchange: order.exchange
+          exchange: order.exchange,
+          accountInfo: order.account_info
         }));
 
         setOrders(ordersData);
@@ -346,6 +352,28 @@ const Orders: React.FC = () => {
                         <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
                           {order.symbol}
                         </div>
+                        {order.accountInfo && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--kite-text-secondary)',
+                            marginTop: '0.125rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.25rem'
+                          }}>
+                            <span style={{
+                              fontSize: '0.625rem',
+                              padding: '0.125rem 0.25rem',
+                              backgroundColor: 'var(--kite-bg-secondary)',
+                              borderRadius: '0.25rem',
+                              fontWeight: '500',
+                              color: 'var(--kite-text-primary)'
+                            }}>
+                              {order.accountInfo.account_id}
+                            </span>
+                            <span>{order.accountInfo.user_name}</span>
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span style={{ 

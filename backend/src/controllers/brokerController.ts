@@ -965,12 +965,15 @@ export const placeOrder = async (
       return;
     }
 
-    // Ensure broker connection is active (re-establish if needed)
-    const brokerService = await ensureBrokerConnection(userId, brokerName);
+    // Get the account-specific broker connection
+    const userConnections = userBrokerConnections.get(userId);
+    const connectionKey = `${brokerName}_${account.account_id}`;
+    const brokerService = userConnections?.get(connectionKey);
+
     if (!brokerService) {
       res.status(404).json({
         success: false,
-        message: `Failed to establish connection to ${brokerName}. Please check your account and try again.`,
+        message: `No active connection found for ${brokerName} account ${account.account_id}. Please activate the account first.`,
       });
       return;
     }
@@ -1011,7 +1014,24 @@ export const placeOrder = async (
         remarks: remarks || `Order placed via CopyTrade Pro for account ${account.account_id}`,
       };
 
-      orderResponse = await (brokerService as ShoonyaService).placeOrder(shoonyaOrderData);
+      try {
+        orderResponse = await (brokerService as ShoonyaService).placeOrder(shoonyaOrderData);
+      } catch (error: any) {
+        // Check if it's a session expired error
+        if (error.message?.includes('Session Expired') || error.message?.includes('Invalid Session Key')) {
+          console.log(`🔄 Session expired for ${account.account_id}. Please reactivate the account.`);
+
+          // Remove the expired connection
+          const userConnections = userBrokerConnections.get(userId);
+          if (userConnections) {
+            userConnections.delete(connectionKey);
+          }
+
+          throw new Error(`Session expired for account ${account.account_id}. Please reactivate the account and try again.`);
+        } else {
+          throw error;
+        }
+      }
     } else if (brokerName === 'fyers') {
       // Map order type for Fyers
       let fyersOrderType: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M';
@@ -1043,7 +1063,24 @@ export const placeOrder = async (
         validity: 'DAY' as const,
       };
 
-      orderResponse = await (brokerService as FyersService).placeOrder(fyersOrderData);
+      try {
+        orderResponse = await (brokerService as FyersService).placeOrder(fyersOrderData);
+      } catch (error: any) {
+        // Check if it's a session expired error
+        if (error.message?.includes('Session Expired') || error.message?.includes('Invalid Session Key')) {
+          console.log(`🔄 Session expired for ${account.account_id}. Please reactivate the account.`);
+
+          // Remove the expired connection
+          const userConnections = userBrokerConnections.get(userId);
+          if (userConnections) {
+            userConnections.delete(connectionKey);
+          }
+
+          throw new Error(`Session expired for account ${account.account_id}. Please reactivate the account and try again.`);
+        } else {
+          throw error;
+        }
+      }
     }
     
     // Handle response based on broker type

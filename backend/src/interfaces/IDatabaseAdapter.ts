@@ -65,6 +65,11 @@ export interface OrderHistory {
   remarks: string;
   executed_at: string;
   created_at: string;
+  account_info?: {
+    account_id: string;
+    user_name: string;
+    email: string;
+  };
 }
 
 export interface CreateOrderHistoryData {
