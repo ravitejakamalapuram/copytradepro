@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
+import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 
 interface Order {
@@ -40,6 +41,8 @@ const Orders: React.FC = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string}>>([]);
 
   // Function to get date range based on filter
   const getDateRange = () => {
@@ -75,6 +78,21 @@ const Orders: React.FC = () => {
     }
 
     return { startDate, endDate };
+  };
+
+  // Function to fetch available accounts
+  const fetchAccounts = async () => {
+    try {
+      const accounts = await accountService.getConnectedAccounts();
+      const accountOptions = accounts.map(account => ({
+        id: account.id,
+        name: `${account.user_name || account.account_id} (${account.broker_name})`,
+        broker: account.broker_name
+      }));
+      setAvailableAccounts(accountOptions);
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    }
   };
 
   // Function to fetch orders (for refresh)
@@ -136,13 +154,26 @@ const Orders: React.FC = () => {
     }
   };
 
+  // Function to filter orders by account
+  const filterOrdersByAccount = (orders: Order[]) => {
+    if (accountFilter === 'all') {
+      return orders;
+    }
+    return orders.filter(order => order.accountInfo?.account_id === accountFilter);
+  };
+
 
 
   useEffect(() => {
-    fetchOrders();
-  }, [dateFilter, customStartDate, customEndDate]);
+    fetchAccounts();
+  }, []);
 
-  const filteredOrders = orders.filter(order => {
+  useEffect(() => {
+    fetchOrders();
+  }, [dateFilter, customStartDate, customEndDate, accountFilter]);
+
+  // Apply both status and account filters
+  const filteredOrders = filterOrdersByAccount(orders).filter(order => {
     if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
     if (activeTab === 'executed') return order.status === 'EXECUTED';
     return true;
@@ -290,9 +321,10 @@ const Orders: React.FC = () => {
           <div className="kite-card-header">
             <div>
               <h2 className="kite-card-title">Orders</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                 {/* Date Filter Buttons */}
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Date:</span>
                   {(['today', 'week', 'month', 'all'] as const).map((filter) => (
                     <button
                       key={filter}
@@ -324,6 +356,31 @@ const Orders: React.FC = () => {
                   >
                     📅 Custom
                   </button>
+                </div>
+
+                {/* Account Filter Dropdown */}
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Account:</span>
+                  <select
+                    value={accountFilter}
+                    onChange={(e) => setAccountFilter(e.target.value)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      border: '1px solid var(--kite-border)',
+                      borderRadius: 'var(--kite-radius-sm)',
+                      fontSize: '0.75rem',
+                      backgroundColor: 'var(--kite-bg-primary)',
+                      color: 'var(--kite-text-primary)',
+                      minWidth: '120px'
+                    }}
+                  >
+                    <option value="all">All Accounts</option>
+                    {availableAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -395,6 +452,7 @@ const Orders: React.FC = () => {
                   {dateFilter === 'month' && ' • Showing last 30 days'}
                   {dateFilter === 'all' && ' • Showing all orders'}
                   {customStartDate && customEndDate && ` • Custom range: ${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`}
+                  {accountFilter === 'all' ? ' • All accounts' : ` • ${availableAccounts.find(acc => acc.id === accountFilter)?.name || 'Selected account'}`}
                 </p>
               )}
               {statusMessage && (
