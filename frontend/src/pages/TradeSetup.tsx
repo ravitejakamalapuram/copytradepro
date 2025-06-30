@@ -389,10 +389,43 @@ const TradeSetup: React.FC = () => {
             </div>
 
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Exchange Selection */}
+              <div>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  Exchange *
+                </label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    className={`kite-btn ${orderForm.exchange === 'NSE' ? 'kite-btn-primary' : ''}`}
+                    onClick={() => setOrderForm(prev => ({ ...prev, exchange: 'NSE' }))}
+                    style={{
+                      backgroundColor: orderForm.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-bg-secondary)',
+                      color: orderForm.exchange === 'NSE' ? 'white' : 'var(--kite-text-primary)',
+                      border: `1px solid ${orderForm.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-border)'}`,
+                      flex: 1
+                    }}
+                  >
+                    NSE
+                  </button>
+                  <button
+                    className={`kite-btn ${orderForm.exchange === 'BSE' ? 'kite-btn-primary' : ''}`}
+                    onClick={() => setOrderForm(prev => ({ ...prev, exchange: 'BSE' }))}
+                    style={{
+                      backgroundColor: orderForm.exchange === 'BSE' ? 'var(--kite-primary)' : 'var(--kite-bg-secondary)',
+                      color: orderForm.exchange === 'BSE' ? 'white' : 'var(--kite-text-primary)',
+                      border: `1px solid ${orderForm.exchange === 'BSE' ? 'var(--kite-primary)' : 'var(--kite-border)'}`,
+                      flex: 1
+                    }}
+                  >
+                    BSE
+                  </button>
+                </div>
+              </div>
+
               {/* Symbol Search */}
               <div style={{ position: 'relative' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                  Symbol *
+                  Symbol * ({orderForm.exchange})
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -445,8 +478,20 @@ const TradeSetup: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                          {result.symbol}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                            {result.symbol}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            padding: '0.125rem 0.375rem',
+                            backgroundColor: result.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-warning)',
+                            color: 'white',
+                            borderRadius: 'var(--kite-radius-sm)',
+                            fontWeight: '500'
+                          }}>
+                            {result.exchange}
+                          </div>
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                           {result.name}
@@ -599,8 +644,10 @@ const TradeSetup: React.FC = () => {
                             backgroundColor: orderForm.selectedAccounts.includes(account.id)
                               ? 'var(--kite-bg-primary-light)'
                               : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease'
+                            transition: 'all 0.2s ease',
+                            cursor: 'pointer'
                           }}
+                          onClick={() => handleAccountSelection(account.id, !orderForm.selectedAccounts.includes(account.id))}
                         >
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}

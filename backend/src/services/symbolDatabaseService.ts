@@ -1,6 +1,88 @@
 import { nseService, NSESymbol } from './nseService';
 import { nseCSVService, NSESymbolData } from './nseCSVService';
 
+// Unified symbol interface for multi-exchange support
+export interface UnifiedSymbol {
+  symbol: string;           // Display symbol (TCS, AAKASH)
+  tradingSymbol: string;    // Exchange-specific format (TCS-EQ for NSE, TCS for BSE)
+  name: string;
+  exchange: 'NSE' | 'BSE';
+  isin: string;
+  series?: string;          // NSE: EQ, BE, etc.
+  group?: string;           // BSE: A, B, T, M, Z
+  securityCode?: string;    // BSE specific
+  status?: 'Active' | 'Suspended' | 'Delisted';
+}
+
+// BSE Symbol interface
+export interface BSESymbol {
+  symbol: string;
+  name: string;
+  exchange: 'BSE';
+  group: 'A' | 'B' | 'T' | 'M' | 'Z';
+  isin: string;
+  securityCode: string;
+  status: 'Active' | 'Suspended' | 'Delisted';
+}
+
+// Sample BSE symbols data (to be replaced with real data source)
+const BSE_SAMPLE_SYMBOLS: BSESymbol[] = [
+  {
+    symbol: 'TCS',
+    name: 'Tata Consultancy Services Limited',
+    exchange: 'BSE',
+    group: 'A',
+    isin: 'INE467B01029',
+    securityCode: '532540',
+    status: 'Active'
+  },
+  {
+    symbol: 'RELIANCE',
+    name: 'Reliance Industries Limited',
+    exchange: 'BSE',
+    group: 'A',
+    isin: 'INE002A01018',
+    securityCode: '500325',
+    status: 'Active'
+  },
+  {
+    symbol: 'INFY',
+    name: 'Infosys Limited',
+    exchange: 'BSE',
+    group: 'A',
+    isin: 'INE009A01021',
+    securityCode: '500209',
+    status: 'Active'
+  },
+  {
+    symbol: 'HDFCBANK',
+    name: 'HDFC Bank Limited',
+    exchange: 'BSE',
+    group: 'A',
+    isin: 'INE040A01034',
+    securityCode: '500180',
+    status: 'Active'
+  },
+  {
+    symbol: 'ICICIBANK',
+    name: 'ICICI Bank Limited',
+    exchange: 'BSE',
+    group: 'A',
+    isin: 'INE090A01021',
+    securityCode: '532174',
+    status: 'Active'
+  },
+  {
+    symbol: 'AAKASH',
+    name: 'Aakash Exploration Services Limited',
+    exchange: 'BSE',
+    group: 'B',
+    isin: 'INE087Q01018',
+    securityCode: '540683',
+    status: 'Active'
+  }
+];
+
 class SymbolDatabaseService {
   constructor() {
     console.log('🚀 NSE Symbol Database Service initialized');
@@ -9,47 +91,116 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Search symbols using NSE CSV data (faster and more comprehensive)
+   * Search symbols across both NSE and BSE exchanges
    */
-  async searchSymbols(query: string, limit: number = 10): Promise<NSESymbol[]> {
+  async searchSymbols(query: string, limit: number = 10, exchange?: 'NSE' | 'BSE' | 'ALL'): Promise<UnifiedSymbol[]> {
     if (!query || query.length < 1) {
       return [];
     }
 
     try {
-      console.log(`🔍 Searching NSE symbols for: "${query}"`);
+      const searchExchange = exchange || 'ALL';
+      console.log(`🔍 Searching ${searchExchange} symbols for: "${query}"`);
 
-      // Use NSE CSV service for symbol search (faster and offline)
-      const csvResults = nseCSVService.searchSymbols(query, limit);
+      const results: UnifiedSymbol[] = [];
 
-      // Convert NSESymbolData to NSESymbol format
-      const results: NSESymbol[] = csvResults.map(symbol => ({
-        symbol: symbol.symbol,
-        name: symbol.name,
-        exchange: 'NSE',
-        isin: symbol.isin,
-        series: symbol.series
-      }));
+      // Search NSE symbols
+      if (searchExchange === 'NSE' || searchExchange === 'ALL') {
+        const nseResults = await this.searchNSESymbols(query, limit);
+        results.push(...nseResults);
+      }
 
-      console.log(`📊 Found ${results.length} NSE symbols for "${query}" from CSV data`);
-      return results;
+      // Search BSE symbols
+      if (searchExchange === 'BSE' || searchExchange === 'ALL') {
+        const bseResults = await this.searchBSESymbols(query, limit);
+        results.push(...bseResults);
+      }
+
+      // Sort by relevance and limit results
+      const sortedResults = results
+        .sort((a, b) => {
+          // Prioritize exact matches
+          const aExact = a.symbol.toLowerCase() === query.toLowerCase();
+          const bExact = b.symbol.toLowerCase() === query.toLowerCase();
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+
+          // Then prioritize starts with
+          const aStarts = a.symbol.toLowerCase().startsWith(query.toLowerCase());
+          const bStarts = b.symbol.toLowerCase().startsWith(query.toLowerCase());
+          if (aStarts && !bStarts) return -1;
+          if (!aStarts && bStarts) return 1;
+
+          return 0;
+        })
+        .slice(0, limit);
+
+      console.log(`✅ Found ${sortedResults.length} symbols for "${query}" across ${searchExchange}`);
+      return sortedResults;
 
     } catch (error: any) {
-      console.error('❌ NSE CSV search failed, falling back to API:', error.message);
-
-      // Fallback to live API if CSV search fails
-      try {
-        const apiResults = await nseService.searchStocks(query);
-        console.log(`📊 Found ${apiResults.length} NSE stocks from API fallback`);
-        return apiResults.slice(0, limit);
-      } catch (apiError: any) {
-        console.error('❌ NSE API fallback also failed:', apiError.message);
-        return [];
-      }
+      console.error(`❌ Error searching symbols:`, error.message);
+      return [];
     }
   }
 
+  /**
+   * Search NSE symbols using CSV data
+   */
+  private async searchNSESymbols(query: string, limit: number): Promise<UnifiedSymbol[]> {
+    try {
+      // Use NSE CSV service for symbol search (faster and offline)
+      const csvResults = nseCSVService.searchSymbols(query, limit);
 
+      // Convert to unified format with NSE-specific trading symbol format
+      const results: UnifiedSymbol[] = csvResults.map(symbol => ({
+        symbol: symbol.symbol,                           // Display symbol (TCS)
+        tradingSymbol: `${symbol.symbol}-${symbol.series}`, // Trading format (TCS-EQ)
+        name: symbol.name,
+        exchange: 'NSE' as const,
+        isin: symbol.isin,
+        series: symbol.series,
+        status: 'Active'
+      }));
+
+      return results;
+    } catch (error: any) {
+      console.error(`❌ Error searching NSE symbols:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Search BSE symbols using sample data (to be replaced with real data source)
+   */
+  private async searchBSESymbols(query: string, limit: number): Promise<UnifiedSymbol[]> {
+    try {
+      const searchTerm = query.toLowerCase();
+
+      // Filter BSE symbols
+      const filteredSymbols = BSE_SAMPLE_SYMBOLS.filter(symbol =>
+        symbol.symbol.toLowerCase().includes(searchTerm) ||
+        symbol.name.toLowerCase().includes(searchTerm)
+      );
+
+      // Convert to unified format with BSE-specific trading symbol format
+      const results: UnifiedSymbol[] = filteredSymbols.slice(0, limit).map(symbol => ({
+        symbol: symbol.symbol,           // Display symbol (TCS)
+        tradingSymbol: symbol.symbol,    // Trading format (TCS - plain for BSE)
+        name: symbol.name,
+        exchange: 'BSE' as const,
+        isin: symbol.isin,
+        group: symbol.group,
+        securityCode: symbol.securityCode,
+        status: symbol.status
+      }));
+
+      return results;
+    } catch (error: any) {
+      console.error(`❌ Error searching BSE symbols:`, error.message);
+      return [];
+    }
+  }
 
   /**
    * Get service stats
