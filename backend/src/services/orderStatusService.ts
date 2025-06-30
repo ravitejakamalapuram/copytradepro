@@ -3,18 +3,52 @@ import { userDatabase } from './sqliteDatabase';
 import websocketService from './websocketService';
 import { ShoonyaService } from './shoonyaService';
 import { notificationService, OrderNotificationData } from './notificationService';
+import shoonyaWebSocketService, { ShoonyaOrderUpdate } from './shoonyaWebSocketService';
 
-// Import broker connections from controller (we'll need to export this)
-// For now, we'll create a simple interface to access broker connections
+// Import broker connections from controller
+import { userBrokerConnections } from '../controllers/brokerController';
+
+// Broker connection manager interface
 interface BrokerConnectionManager {
   getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
 }
 
-// Global broker connection manager - will be set by the broker controller
-let brokerConnectionManager: BrokerConnectionManager | null = null;
+// Create broker connection manager implementation
+const brokerConnectionManager: BrokerConnectionManager = {
+  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
+    const userConnections = userBrokerConnections.get(userId);
+    if (!userConnections) {
+      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+      console.log(`❌ No connections found for user ${userId}`);
+      return null;
+    }
 
+    const brokerService = userConnections.get(brokerName);
+    if (!brokerService) {
+      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+      console.log(`❌ No ${brokerName} connection found for user ${userId}`);
+      return null;
+    }
+
+    if (brokerName === 'shoonya') {
+      const shoonyaService = brokerService as ShoonyaService;
+      if (shoonyaService.isLoggedIn()) {
+        console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
+        return shoonyaService;
+      } else {
+        console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
+        return null;
+      }
+    }
+
+    return null;
+  }
+};
+
+// Legacy function for backward compatibility
 export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
-  brokerConnectionManager = manager;
+  // No longer needed as we use the direct implementation above
+  console.log('⚠️ setBrokerConnectionManager is deprecated - using direct broker connection manager');
 };
 
 // Simple logger
@@ -49,11 +83,109 @@ class OrderStatusService extends EventEmitter {
   private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
   private activeOrders: Map<string, Order> = new Map();
   private isPolling: boolean = false;
-  private pollingFrequency: number = 30000; // 30 seconds for production
+  private pollingFrequency: number = 30000; // 30 seconds for production (fallback only)
   private maxRetries: number = 3;
+  private useWebSocket: boolean = true; // Prefer WebSocket over polling
+  private connectedBrokerAccounts: Set<string> = new Set(); // Track WebSocket subscriptions
 
   constructor() {
     super();
+    this.setupWebSocketHandlers();
+  }
+
+  /**
+   * Setup WebSocket event handlers for real-time order updates
+   */
+  private setupWebSocketHandlers(): void {
+    // Listen for real-time order updates from Shoonya WebSocket
+    shoonyaWebSocketService.on('order_update', (orderUpdate: ShoonyaOrderUpdate) => {
+      this.handleWebSocketOrderUpdate(orderUpdate);
+    });
+
+    shoonyaWebSocketService.on('connected', () => {
+      logger.info('✅ Shoonya WebSocket connected - real-time order updates enabled');
+    });
+
+    shoonyaWebSocketService.on('disconnected', () => {
+      logger.warn('❌ Shoonya WebSocket disconnected - falling back to polling if needed');
+    });
+
+    shoonyaWebSocketService.on('error', (error: Error) => {
+      logger.error('🚨 Shoonya WebSocket error:', error.message);
+    });
+  }
+
+  /**
+   * Handle real-time order updates from Shoonya WebSocket
+   */
+  private async handleWebSocketOrderUpdate(orderUpdate: ShoonyaOrderUpdate): Promise<void> {
+    try {
+      logger.info(`📊 WebSocket order update: ${orderUpdate.norenordno} -> ${orderUpdate.status}`);
+
+      // Find the order in our database by broker order ID
+      const order = await this.findOrderByBrokerOrderId(orderUpdate.norenordno);
+
+      if (!order) {
+        logger.warn(`⚠️ Order not found in database: ${orderUpdate.norenordno}`);
+        return;
+      }
+
+      // Map Shoonya status to our internal status
+      const newStatus = this.mapShoonyaStatus(orderUpdate.status);
+
+      if (newStatus !== order.status) {
+        logger.info(`📊 WebSocket: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+
+        // Update order in database
+        await this.updateOrderStatus(order, newStatus, {
+          executedQuantity: parseInt(orderUpdate.fillshares) || 0,
+          averagePrice: parseFloat(orderUpdate.avgprc) || 0,
+          rejectionReason: orderUpdate.rejreason || '',
+          updateTime: orderUpdate.exch_tm
+        });
+      }
+
+    } catch (error: any) {
+      logger.error('🚨 Error handling WebSocket order update:', error.message);
+    }
+  }
+
+  /**
+   * Find order by broker order ID
+   */
+  private async findOrderByBrokerOrderId(brokerOrderId: string): Promise<Order | null> {
+    try {
+      const allOrders = userDatabase.getAllOrderHistory();
+      const orderHistory = allOrders.find(order => order.broker_order_id === brokerOrderId);
+
+      if (!orderHistory) {
+        return null;
+      }
+
+      // Convert to Order format
+      return {
+        id: orderHistory.id.toString(),
+        user_id: orderHistory.user_id.toString(),
+        account_id: orderHistory.account_id.toString(),
+        symbol: orderHistory.symbol,
+        action: orderHistory.action,
+        quantity: orderHistory.quantity,
+        price: orderHistory.price,
+        status: orderHistory.status,
+        broker_name: orderHistory.broker_name,
+        broker_order_id: orderHistory.broker_order_id,
+        order_type: orderHistory.order_type,
+        exchange: orderHistory.exchange,
+        product_type: orderHistory.product_type,
+        remarks: orderHistory.remarks || '',
+        created_at: orderHistory.created_at,
+        updated_at: orderHistory.created_at,
+        executed_at: orderHistory.executed_at
+      };
+    } catch (error: any) {
+      logger.error('Error finding order by broker order ID:', error.message);
+      return null;
+    }
   }
 
   /**
@@ -74,17 +206,93 @@ class OrderStatusService extends EventEmitter {
 
       logger.info(`Found ${pendingOrders.length} orders to monitor`);
 
-      // Group orders by broker for efficient polling
-      const ordersByBroker = this.groupOrdersByBroker(pendingOrders);
-
-      // Start polling for each broker
-      for (const [brokerName, orders] of ordersByBroker.entries()) {
-        this.startBrokerPolling(brokerName, orders);
+      if (this.useWebSocket) {
+        // Use WebSocket for real-time updates
+        await this.startWebSocketMonitoring(pendingOrders);
+      } else {
+        // Fallback to polling
+        await this.startPollingMonitoring(pendingOrders);
       }
 
     } catch (error) {
       logger.error('Failed to start order monitoring:', error);
       this.isPolling = false;
+    }
+  }
+
+  /**
+   * Start WebSocket-based monitoring
+   */
+  private async startWebSocketMonitoring(pendingOrders: Order[]): Promise<void> {
+    logger.info('🔄 Starting WebSocket-based order monitoring');
+
+    // Group orders by user/broker account
+    const ordersByAccount = this.groupOrdersByAccount(pendingOrders);
+
+    // Connect to WebSocket for each broker account
+    for (const [accountInfo, orders] of ordersByAccount.entries()) {
+      await this.connectWebSocketForAccount(accountInfo, orders);
+    }
+
+    // Store active orders for tracking
+    for (const order of pendingOrders) {
+      this.activeOrders.set(order.id, order);
+    }
+  }
+
+  /**
+   * Start polling-based monitoring (fallback)
+   */
+  private async startPollingMonitoring(pendingOrders: Order[]): Promise<void> {
+    logger.info('🔄 Starting polling-based order monitoring (fallback)');
+
+    // Group orders by broker for efficient polling
+    const ordersByBroker = this.groupOrdersByBroker(pendingOrders);
+
+    // Start polling for each broker
+    for (const [brokerName, orders] of ordersByBroker.entries()) {
+      this.startBrokerPolling(brokerName, orders);
+    }
+  }
+
+  /**
+   * Group orders by account for WebSocket subscriptions
+   */
+  private groupOrdersByAccount(orders: Order[]): Map<string, Order[]> {
+    const ordersByAccount = new Map<string, Order[]>();
+
+    for (const order of orders) {
+      const accountKey = `${order.user_id}:${order.broker_name}`;
+
+      if (!ordersByAccount.has(accountKey)) {
+        ordersByAccount.set(accountKey, []);
+      }
+
+      ordersByAccount.get(accountKey)!.push(order);
+    }
+
+    return ordersByAccount;
+  }
+
+  /**
+   * Connect WebSocket for a specific broker account
+   */
+  private async connectWebSocketForAccount(accountInfo: string, orders: Order[]): Promise<void> {
+    try {
+      const [userId, brokerName] = accountInfo.split(':');
+
+      if (brokerName !== 'shoonya') {
+        logger.warn(`⚠️ WebSocket not supported for broker: ${brokerName}`);
+        return;
+      }
+
+      // TODO: Get broker connection to get session token
+      // For now, skip WebSocket connection since broker connection manager is not available
+      logger.warn(`⚠️ WebSocket connection not implemented yet for account: ${accountInfo}`);
+      return;
+
+    } catch (error: any) {
+      logger.error(`🚨 Failed to connect WebSocket for account ${accountInfo}:`, error.message);
     }
   }
 
@@ -140,24 +348,7 @@ class OrderStatusService extends EventEmitter {
     this.activeOrders.clear();
   }
 
-  /**
-   * Add a new order to monitoring
-   */
-  async addOrderToMonitoring(order: Order): Promise<void> {
-    if (!this.isPolling) {
-      await this.startMonitoring();
-    }
 
-    const orderKey = `${order.broker_name}_${order.broker_order_id || order.id}`;
-    this.activeOrders.set(orderKey, order);
-
-    logger.info(`Added order ${order.id} to monitoring (${orderKey})`);
-
-    // If this is the first order for this broker, start polling
-    if (!this.pollingIntervals.has(order.broker_name)) {
-      this.startBrokerPolling(order.broker_name, [order]);
-    }
-  }
 
   /**
    * Remove order from monitoring
@@ -374,7 +565,12 @@ class OrderStatusService extends EventEmitter {
   /**
    * Update order status in database and emit event
    */
-  async updateOrderStatus(order: Order, newStatus: string): Promise<void> {
+  async updateOrderStatus(order: Order, newStatus: string, executionData?: {
+    executedQuantity?: number;
+    averagePrice?: number;
+    rejectionReason?: string;
+    updateTime?: string;
+  }): Promise<void> {
     try {
       const oldStatus = order.status;
       const now = new Date().toISOString();
@@ -458,7 +654,34 @@ class OrderStatusService extends EventEmitter {
     }
   }
 
+  /**
+   * Add a new order to monitoring (called when order is placed)
+   */
+  async addOrderToMonitoring(order: Order): Promise<void> {
+    try {
+      // Add to active orders
+      this.activeOrders.set(order.id, order);
 
+      if (this.useWebSocket && order.broker_name === 'shoonya') {
+        // Ensure WebSocket is connected for this user
+        const accountKey = `${order.user_id}:${order.broker_name}`;
+
+        if (!this.connectedBrokerAccounts.has(accountKey)) {
+          await this.connectWebSocketForAccount(accountKey, [order]);
+        }
+
+        logger.info(`📊 Added order ${order.id} to WebSocket monitoring`);
+      } else {
+        // Add to polling if WebSocket not available
+        const brokerOrders = [order];
+        this.startBrokerPolling(order.broker_name, brokerOrders);
+        logger.info(`📊 Added order ${order.id} to polling monitoring`);
+      }
+
+    } catch (error: any) {
+      logger.error(`🚨 Failed to add order ${order.id} to monitoring:`, error.message);
+    }
+  }
 
   /**
    * Get monitoring statistics

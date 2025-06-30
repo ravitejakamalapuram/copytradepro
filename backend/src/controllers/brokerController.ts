@@ -1437,6 +1437,136 @@ export const getOrderSearchSuggestions = async (
   }
 };
 
+/**
+ * Manual order status check - allows users to manually refresh order status
+ */
+export const checkOrderStatus = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Order ID is required',
+      });
+      return;
+    }
+
+    console.log(`🔍 Manual status check requested for order: ${orderId} by user: ${userId}`);
+
+    // Get order from database
+    const order = await userDatabase.getOrderHistoryById(orderId);
+    if (!order) {
+      res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+      return;
+    }
+
+    // Verify order belongs to the requesting user
+    if (order.user_id.toString() !== userId.toString()) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied - order belongs to different user',
+      });
+      return;
+    }
+
+    console.log(`📊 Found order: ${order.symbol} (${order.broker_order_id}) - Current status: ${order.status}`);
+
+    // Use the order status service to check current status
+    const orderForMonitoring = {
+      id: order.id.toString(),
+      user_id: order.user_id.toString(),
+      account_id: order.account_id.toString(),
+      symbol: order.symbol,
+      action: order.action,
+      quantity: order.quantity,
+      price: order.price,
+      status: order.status,
+      broker_name: order.broker_name,
+      broker_order_id: order.broker_order_id,
+      order_type: order.order_type,
+      exchange: order.exchange,
+      product_type: order.product_type,
+      remarks: order.remarks || '',
+      created_at: order.created_at,
+      updated_at: order.created_at,
+    };
+
+    // Import the order status service
+    const orderStatusService = (await import('../services/orderStatusService')).default;
+
+    // Check the order status manually
+    await orderStatusService.checkOrderStatus(orderForMonitoring);
+
+    // Get the updated order from database
+    const updatedOrder = await userDatabase.getOrderHistoryById(orderId);
+
+    if (!updatedOrder) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve updated order status',
+      });
+      return;
+    }
+
+    const statusChanged = updatedOrder.status !== order.status;
+
+    console.log(`✅ Manual status check completed for order ${orderId}: ${order.status} → ${updatedOrder.status}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+
+    res.status(200).json({
+      success: true,
+      message: statusChanged
+        ? `Order status updated from ${order.status} to ${updatedOrder.status}`
+        : `Order status confirmed as ${updatedOrder.status}`,
+      data: {
+        orderId: updatedOrder.id,
+        previousStatus: order.status,
+        currentStatus: updatedOrder.status,
+        statusChanged,
+        order: {
+          id: updatedOrder.id,
+          symbol: updatedOrder.symbol,
+          action: updatedOrder.action,
+          quantity: updatedOrder.quantity,
+          price: updatedOrder.price,
+          order_type: updatedOrder.order_type,
+          status: updatedOrder.status,
+          exchange: updatedOrder.exchange,
+          broker_name: updatedOrder.broker_name,
+          broker_order_id: updatedOrder.broker_order_id,
+          executed_at: updatedOrder.executed_at,
+          created_at: updatedOrder.created_at,
+        },
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+  } catch (error: any) {
+    console.error('🚨 Manual order status check error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to check order status',
+      error: error.message,
+    });
+  }
+};
+
 export const getOrderBook = async (
   req: AuthenticatedRequest,
   res: Response,

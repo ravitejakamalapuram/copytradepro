@@ -284,71 +284,36 @@ export class ShoonyaService {
     }
 
     try {
-      // First try the SingleOrdStatus endpoint for direct order status check
-      console.log(`📊 Checking single order status for order: ${orderNumber}`);
+      console.log(`📊 Checking order status for order: ${orderNumber}`);
 
-      const singleOrderResponse = await this.makeAuthenticatedRequest('SingleOrdStatus', {
+      const response = await this.makeAuthenticatedRequest('SingleOrdStatus', {
         uid: userId,
         actid: userId,
         norenordno: orderNumber,
-        exch: 'NSE'  // Add required exchange parameter
+        exch: 'NSE'
       });
 
-      if (singleOrderResponse && singleOrderResponse.stat === 'Ok') {
-        console.log(`📊 Found order ${orderNumber} status via SingleOrdStatus: ${singleOrderResponse.status}`);
+      if (response && response.stat === 'Ok') {
+        console.log(`📊 Order ${orderNumber} status: ${response.status}`);
         return {
           stat: 'Ok',
-          orderNumber: singleOrderResponse.norenordno,
-          status: singleOrderResponse.status,
-          symbol: singleOrderResponse.tsym,
-          quantity: singleOrderResponse.qty,
-          price: singleOrderResponse.prc,
-          executedQuantity: singleOrderResponse.fillshares || '0',
-          averagePrice: singleOrderResponse.avgprc || '0',
-          rejectionReason: singleOrderResponse.rejreason || '',
-          orderTime: singleOrderResponse.norentm,
-          updateTime: singleOrderResponse.exch_tm,
-          rawOrder: singleOrderResponse
+          orderNumber: response.norenordno,
+          status: response.status,
+          symbol: response.tsym,
+          quantity: response.qty,
+          price: response.prc,
+          executedQuantity: response.fillshares || '0',
+          averagePrice: response.avgprc || '0',
+          rejectionReason: response.rejreason || '',
+          orderTime: response.norentm,
+          updateTime: response.exch_tm,
+          rawOrder: response
         };
-      }
-
-      // Fallback to order book search if SingleOrdStatus fails
-      console.log(`⚠️ SingleOrdStatus failed for order ${orderNumber}, falling back to order book search`);
-
-      const orderBook = await this.getOrderBook(userId);
-
-      if (orderBook.stat === 'Ok' && Array.isArray(orderBook)) {
-        // Find the order by order number
-        const order = orderBook.find((order: any) => order.norenordno === orderNumber);
-
-        if (order) {
-          console.log(`📊 Found order ${orderNumber} status via order book: ${order.status}`);
-          return {
-            stat: 'Ok',
-            orderNumber: order.norenordno,
-            status: order.status,
-            symbol: order.tsym,
-            quantity: order.qty,
-            price: order.prc,
-            executedQuantity: order.fillshares || '0',
-            averagePrice: order.avgprc || '0',
-            rejectionReason: order.rejreason || '',
-            orderTime: order.norentm,
-            updateTime: order.exch_tm,
-            rawOrder: order
-          };
-        } else {
-          console.log(`⚠️ Order ${orderNumber} not found in order book`);
-          return {
-            stat: 'Not_Ok',
-            emsg: 'Order not found'
-          };
-        }
       } else {
-        console.log('⚠️ Failed to get order book or empty response');
+        console.log(`⚠️ Failed to get order status: ${response?.emsg || 'Unknown error'}`);
         return {
           stat: 'Not_Ok',
-          emsg: orderBook.emsg || 'Failed to get order book'
+          emsg: response?.emsg || 'Failed to get order status'
         };
       }
     } catch (error: any) {
