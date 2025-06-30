@@ -150,6 +150,16 @@ export class SQLiteUserDatabase {
     return decrypted;
   }
 
+  private async runMigrations(): Promise<void> {
+    try {
+      const { runMigration } = await import('../migrations/001_allow_multiple_broker_accounts');
+      await runMigration('sqlite', this.db);
+    } catch (error) {
+      console.error('🚨 Migration failed:', error);
+      // Don't throw - allow app to continue with existing schema
+    }
+  }
+
   private initializeDatabase(): void {
     // Create users table with proper constraints
     const createUsersTable = `
@@ -199,7 +209,7 @@ export class SQLiteUserDatabase {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-        UNIQUE(user_id, broker_name) -- One account per broker per user
+        UNIQUE(user_id, broker_name, account_id) -- Prevent duplicate account IDs per user, allow multiple accounts per broker
       )
     `;
 

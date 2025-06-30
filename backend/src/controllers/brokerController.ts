@@ -331,7 +331,8 @@ export const getConnectedAccounts = async (
 
           // Check if broker service exists in memory and validate session
           const userConnections = userBrokerConnections.get(userId);
-          const brokerService = userConnections?.get(dbAccount.broker_name);
+          const connectionKey = `${dbAccount.broker_name}_${dbAccount.account_id}`;
+          const brokerService = userConnections?.get(connectionKey);
 
           if (brokerService) {
             try {
@@ -349,13 +350,13 @@ export const getConnectedAccounts = async (
               } else {
                 console.log(`⚠️ Session expired for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
                 // Remove from memory if session is invalid
-                userConnections?.delete(dbAccount.broker_name);
+                userConnections?.delete(connectionKey);
                 isReallyActive = false;
               }
             } catch (validationError: any) {
               console.error(`🚨 Session validation error for ${dbAccount.broker_name}:`, validationError.message);
               // On validation error, remove from memory and mark as inactive
-              userConnections?.delete(dbAccount.broker_name);
+              userConnections?.delete(connectionKey);
               isReallyActive = false;
             }
           } else {
@@ -437,7 +438,8 @@ export const checkAccountSessionStatus = async (
 
     // Check if broker service exists in memory and validate session
     const userConnections = userBrokerConnections.get(userId);
-    const brokerService = userConnections?.get(account.broker_name);
+    const connectionKey = `${account.broker_name}_${account.account_id}`;
+    const brokerService = userConnections?.get(connectionKey);
 
     if (brokerService) {
       try {
@@ -458,7 +460,7 @@ export const checkAccountSessionStatus = async (
           };
         } else {
           // Remove from memory if session is invalid
-          userConnections?.delete(account.broker_name);
+          userConnections?.delete(connectionKey);
           sessionInfo = {
             lastChecked: new Date().toISOString(),
             status: 'expired',
@@ -468,7 +470,7 @@ export const checkAccountSessionStatus = async (
       } catch (validationError: any) {
         console.error(`🚨 Session validation error for ${account.broker_name}:`, validationError.message);
         // On validation error, remove from memory
-        userConnections?.delete(account.broker_name);
+        userConnections?.delete(connectionKey);
         sessionInfo = {
           lastChecked: new Date().toISOString(),
           status: 'error',
@@ -565,8 +567,9 @@ export const removeConnectedAccount = async (
 
       // Perform actual logout from broker and remove from in-memory connections
       const userConnections = userBrokerConnections.get(userId);
-      if (userConnections && userConnections.has(account.broker_name)) {
-        const brokerService = userConnections.get(account.broker_name);
+      const connectionKey = `${account.broker_name}_${account.account_id}`;
+      if (userConnections && userConnections.has(connectionKey)) {
+        const brokerService = userConnections.get(connectionKey);
 
         try {
           if (account.broker_name === 'shoonya' && brokerService) {
@@ -579,8 +582,8 @@ export const removeConnectedAccount = async (
           console.error('⚠️ Logout error (continuing with removal):', logoutError.message);
         }
 
-        userConnections.delete(account.broker_name);
-        console.log('✅ Removed from in-memory connections:', account.broker_name);
+        userConnections.delete(connectionKey);
+        console.log('✅ Removed from in-memory connections:', connectionKey);
       }
 
       // Delete from database
@@ -669,8 +672,9 @@ export const activateAccount = async (
       loginResponse = await brokerService.login(credentials as ShoonyaCredentials);
 
       if (loginResponse.stat === 'Ok') {
-        // Store the connection (status is determined by real-time validation)
-        userConnections.set(account.broker_name, brokerService);
+        // Store the connection with account-specific key to support multiple accounts per broker
+        const connectionKey = `${account.broker_name}_${account.account_id}`;
+        userConnections.set(connectionKey, brokerService);
 
         // Add to broker account cache for fast lookups
         addToBrokerAccountCache(
@@ -740,8 +744,9 @@ export const deactivateAccount = async (
 
     // Perform actual logout from broker
     const userConnections = userBrokerConnections.get(userId);
-    if (userConnections && userConnections.has(account.broker_name)) {
-      const brokerService = userConnections.get(account.broker_name);
+    const connectionKey = `${account.broker_name}_${account.account_id}`;
+    if (userConnections && userConnections.has(connectionKey)) {
+      const brokerService = userConnections.get(connectionKey);
 
       try {
         if (account.broker_name === 'shoonya' && brokerService) {
@@ -754,9 +759,9 @@ export const deactivateAccount = async (
         console.error('⚠️ Logout error (continuing anyway):', logoutError.message);
       }
 
-      // Remove from in-memory connections
-      userConnections.delete(account.broker_name);
-      console.log('✅ Removed from in-memory connections:', account.broker_name);
+      // Remove from in-memory connections using account-specific key
+      userConnections.delete(connectionKey);
+      console.log('✅ Removed from in-memory connections:', connectionKey);
     }
 
     // Note: No database status update needed - status is determined by real-time validation
@@ -1768,7 +1773,8 @@ const brokerConnectionManagerImpl = {
         return null;
       }
 
-      const service = userConnections.get(brokerName);
+      const connectionKey = `${brokerName}_${accountMapping.accountId}`;
+      const service = userConnections.get(connectionKey);
       if (service instanceof ShoonyaService) {
         console.log(`✅ Found ${brokerName} service for user ${accountMapping.userId} (${accountMapping.userDisplayName})`);
         return service;

@@ -99,7 +99,8 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
 });
 
 // Add compound indexes
-ConnectedAccountSchema.index({ user_id: 1, broker_name: 1 }, { unique: true });
+// Allow multiple accounts per broker, but prevent duplicate account IDs per user
+ConnectedAccountSchema.index({ user_id: 1, broker_name: 1, account_id: 1 }, { unique: true });
 OrderHistorySchema.index({ user_id: 1, created_at: -1 });
 OrderHistorySchema.index({ broker_order_id: 1 });
 
@@ -139,11 +140,24 @@ export class MongoDatabase implements IDatabaseAdapter {
       
       console.log('✅ MongoDB connected successfully');
       console.log('📊 Database:', mongoose.connection.db?.databaseName);
-      
+
+      // Run migrations
+      await this.runMigrations();
+
       this.isInitialized = true;
     } catch (error) {
       console.error('🚨 MongoDB connection failed:', error);
       throw error;
+    }
+  }
+
+  private async runMigrations(): Promise<void> {
+    try {
+      const { runMigration } = await import('../migrations/001_allow_multiple_broker_accounts');
+      await runMigration('mongodb');
+    } catch (error) {
+      console.error('🚨 Migration failed:', error);
+      // Don't throw - allow app to continue with existing schema
     }
   }
 
