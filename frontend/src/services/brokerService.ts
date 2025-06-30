@@ -146,11 +146,31 @@ export const brokerService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Get order book error:', error);
-      
+
       if (error.response?.data) {
         return error.response.data;
       }
-      
+
+      return {
+        success: false,
+        message: 'Network error. Please check your connection and try again.',
+      };
+    }
+  },
+
+  async checkOrderStatus(orderId: string): Promise<any> {
+    try {
+      const response = await api.post('/broker/check-order-status', {
+        orderId
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('🚨 Check order status error:', error);
+
+      if (error.response?.data) {
+        return error.response.data;
+      }
+
       return {
         success: false,
         message: 'Network error. Please check your connection and try again.',

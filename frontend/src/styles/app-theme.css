@@ -18,6 +18,9 @@
   --kite-brand-primary: #387ed1;
   --kite-brand-secondary: #4a90e2;
   --kite-brand-accent: #5ba0f2;
+  --kite-primary: #387ed1;
+  --kite-primary-light: rgba(56, 126, 209, 0.1);
+  --kite-bg-primary-light: rgba(56, 126, 209, 0.05);
   
   /* Trading Colors */
   --kite-profit: #00c896;
@@ -30,6 +33,7 @@
   --kite-border-primary: #404040;
   --kite-border-secondary: #333333;
   --kite-border-light: #555555;
+  --kite-border: #404040;
   
   /* Status Colors */
   --kite-success: #00c896;

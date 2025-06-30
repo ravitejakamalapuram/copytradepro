@@ -13,6 +13,7 @@ import {
   placeOrder,
   getOrderHistory,
   getOrderStatus,
+  checkOrderStatus,
   getOrderSearchSuggestions,
   getOrderBook,
   getPositions,
@@ -118,6 +119,7 @@ router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
 router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
+router.post('/check-order-status', authenticateToken, checkOrderStatus);
 router.get('/order-search-suggestions', authenticateToken, getOrderSearchSuggestions);
 router.get('/orders/:brokerName', authenticateToken, getOrderBook);
 router.get('/positions/:brokerName', authenticateToken, getPositions);
