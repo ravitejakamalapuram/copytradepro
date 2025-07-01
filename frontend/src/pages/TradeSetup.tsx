@@ -61,14 +61,14 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
-        // Show all connected accounts (both active and inactive)
-        setConnectedAccounts(accounts);
+        const activeAccounts = accounts.filter(account => account.isActive);
+        setConnectedAccounts(activeAccounts);
 
-        // Auto-select all accounts by default (auto-reactivation handles inactive ones)
-        if (accounts.length > 0) {
+        // Auto-select all active accounts by default
+        if (activeAccounts.length > 0) {
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: accounts.map(account => account.id)
+            selectedAccounts: activeAccounts.map(account => account.id)
           }));
         }
 
@@ -599,10 +599,8 @@ const TradeSetup: React.FC = () => {
                             backgroundColor: orderForm.selectedAccounts.includes(account.id)
                               ? 'var(--kite-bg-primary-light)'
                               : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease',
-                            cursor: 'pointer'
+                            transition: 'all 0.2s ease'
                           }}
-                          onClick={() => handleAccountSelection(account.id, !orderForm.selectedAccounts.includes(account.id))}
                         >
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
