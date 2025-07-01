@@ -6,6 +6,7 @@ import { FyersService, FyersCredentials } from '../services/fyersService';
 import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
+import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
 
 // Store broker connections per user (in production, use Redis or database)
 type BrokerService = ShoonyaService | FyersService;
@@ -1450,74 +1451,40 @@ export const getOrderStatus = async (
   try {
     const userId = req.user?.id;
     const { brokerOrderId } = req.params;
-    const { brokerName } = req.query;
+    const { brokerName, accountId } = req.query;
 
+    // Validate required parameters
     if (!userId) {
-      res.status(401).json({
-        success: false,
-        message: 'User not authenticated',
-      });
-      return;
+      return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
-    if (!brokerOrderId) {
-      res.status(400).json({
-        success: false,
-        message: 'Broker order ID is required',
-      });
-      return;
+    const missingParams: string[] = [];
+    if (!brokerOrderId) missingParams.push('brokerOrderId');
+    if (!brokerName) missingParams.push('brokerName');
+
+    if (missingParams.length > 0) {
+      return BrokerConnectionHelper.sendMissingParametersError(res, missingParams);
     }
 
-    if (!brokerName) {
-      res.status(400).json({
-        success: false,
-        message: 'Broker name is required as query parameter',
-      });
-      return;
+    // Find broker connection (specific account if provided, or first available)
+    const connectionResult = BrokerConnectionHelper.findBrokerConnection(
+      userId,
+      brokerName as string,
+      accountId as string
+    );
+
+    if (!connectionResult.success) {
+      return BrokerConnectionHelper.sendConnectionNotFoundError(
+        res,
+        brokerName as string,
+        accountId as string
+      );
     }
 
-    // Get the user's connected accounts
-    const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
-    const brokerAccount = accounts.find((account: any) => account.broker_name === brokerName);
-
-    if (!brokerAccount) {
-      res.status(404).json({
-        success: false,
-        message: `No ${brokerName} account found for user`,
-      });
-      return;
-    }
-
-    // TODO: This function needs to be redesigned to support multiple accounts per broker
-    // For now, find the first active connection for this broker
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      res.status(400).json({
-        success: false,
-        message: `No connections found for user`,
-      });
-      return;
-    }
-
-    // Find first connection for this broker
-    let brokerService: BrokerService | undefined;
-    for (const [connectionKey, service] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        brokerService = service;
-        break;
-      }
-    }
-
-    if (!brokerService) {
-      res.status(400).json({
-        success: false,
-        message: `${brokerName} broker not connected. Please activate your account first.`,
-      });
-      return;
-    }
+    const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
 
     // Get order status from broker API
-    console.log(`📊 Checking order status for ${brokerOrderId} via API endpoint`);
+    console.log(`📊 Checking order status for ${brokerOrderId} via ${brokerName} account ${resolvedAccountId}`);
     const orderStatus = await (brokerService as any).getOrderStatus(
       userId,
       brokerOrderId
@@ -1528,6 +1495,8 @@ export const getOrderStatus = async (
         success: true,
         data: {
           brokerOrderId,
+          accountId: resolvedAccountId,
+          brokerName,
           status: orderStatus.status,
           symbol: orderStatus.symbol,
           quantity: orderStatus.quantity,
@@ -1546,6 +1515,8 @@ export const getOrderStatus = async (
         message: orderStatus.emsg || 'Order not found in broker system',
         data: {
           brokerOrderId,
+          accountId: resolvedAccountId,
+          brokerName,
           status: 'NOT_FOUND',
           details: orderStatus.emsg
         }
@@ -1745,49 +1716,84 @@ export const getOrderBook = async (
 ): Promise<void> => {
   try {
     const { brokerName } = req.params;
+    const { accountId } = req.query;
     const userId = req.user?.id;
 
-    if (!userId || !brokerName) {
-      res.status(401).json({
-        success: false,
-        message: 'User not authenticated or broker name missing',
-      });
-      return;
+    // Validate required parameters
+    if (!userId) {
+      return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
-    // TODO: This function needs to be redesigned to support multiple accounts per broker
-    // For now, find the first active connection for this broker
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      res.status(404).json({
-        success: false,
-        message: `No connections found for user`,
-      });
-      return;
+    if (!brokerName) {
+      return BrokerConnectionHelper.sendMissingParametersError(res, ['brokerName']);
     }
 
-    // Find first connection for this broker
-    let brokerService: BrokerService | undefined;
-    for (const [connectionKey, service] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        brokerService = service;
-        break;
+    // If accountId is provided, get orders for specific account
+    if (accountId) {
+      const connectionResult = BrokerConnectionHelper.findBrokerConnection(
+        userId,
+        brokerName,
+        accountId as string
+      );
+
+      if (!connectionResult.success) {
+        return BrokerConnectionHelper.sendConnectionNotFoundError(
+          res,
+          brokerName,
+          accountId as string
+        );
       }
-    }
 
-    if (!brokerService) {
-      res.status(404).json({
-        success: false,
-        message: `Not connected to ${brokerName}`,
+      const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
+      const orderBook = await brokerService!.getOrderBook(userId);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...orderBook,
+          accountId: resolvedAccountId,
+          brokerName
+        },
       });
       return;
     }
 
-    const orderBook = await brokerService.getOrderBook(userId);
+    // If no accountId provided, get orders from all accounts for this broker
+    const connectionsResult = BrokerConnectionHelper.findAllBrokerConnections(userId, brokerName);
+
+    if (!connectionsResult.success) {
+      return BrokerConnectionHelper.sendConnectionNotFoundError(res, brokerName);
+    }
+
+    const { connections } = connectionsResult;
+    const allOrderBooks = await Promise.all(
+      connections!.map(async ({ accountId: accId, connection }) => {
+        try {
+          const orderBook = await connection.getOrderBook(userId);
+          return {
+            accountId: accId,
+            brokerName,
+            ...orderBook
+          };
+        } catch (error) {
+          console.error(`🚨 Failed to get order book for account ${accId}:`, error);
+          return {
+            accountId: accId,
+            brokerName,
+            orders: [],
+            error: 'Failed to fetch orders for this account'
+          };
+        }
+      })
+    );
 
     res.status(200).json({
       success: true,
-      data: orderBook,
+      data: {
+        brokerName,
+        accounts: allOrderBooks,
+        totalAccounts: connections!.length
+      },
     });
   } catch (error: any) {
     console.error('🚨 Get order book error:', error);
@@ -1805,49 +1811,84 @@ export const getPositions = async (
 ): Promise<void> => {
   try {
     const { brokerName } = req.params;
+    const { accountId } = req.query;
     const userId = req.user?.id;
 
-    if (!userId || !brokerName) {
-      res.status(401).json({
-        success: false,
-        message: 'User not authenticated or broker name missing',
-      });
-      return;
+    // Validate required parameters
+    if (!userId) {
+      return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
-    // TODO: This function needs to be redesigned to support multiple accounts per broker
-    // For now, find the first active connection for this broker
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      res.status(404).json({
-        success: false,
-        message: `No connections found for user`,
-      });
-      return;
+    if (!brokerName) {
+      return BrokerConnectionHelper.sendMissingParametersError(res, ['brokerName']);
     }
 
-    // Find first connection for this broker
-    let brokerService: BrokerService | undefined;
-    for (const [connectionKey, service] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        brokerService = service;
-        break;
+    // If accountId is provided, get positions for specific account
+    if (accountId) {
+      const connectionResult = BrokerConnectionHelper.findBrokerConnection(
+        userId,
+        brokerName,
+        accountId as string
+      );
+
+      if (!connectionResult.success) {
+        return BrokerConnectionHelper.sendConnectionNotFoundError(
+          res,
+          brokerName,
+          accountId as string
+        );
       }
-    }
 
-    if (!brokerService) {
-      res.status(404).json({
-        success: false,
-        message: `Not connected to ${brokerName}`,
+      const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
+      const positions = await brokerService!.getPositions(userId);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...positions,
+          accountId: resolvedAccountId,
+          brokerName
+        },
       });
       return;
     }
 
-    const positions = await brokerService.getPositions(userId);
+    // If no accountId provided, get positions from all accounts for this broker
+    const connectionsResult = BrokerConnectionHelper.findAllBrokerConnections(userId, brokerName);
+
+    if (!connectionsResult.success) {
+      return BrokerConnectionHelper.sendConnectionNotFoundError(res, brokerName);
+    }
+
+    const { connections } = connectionsResult;
+    const allPositions = await Promise.all(
+      connections!.map(async ({ accountId: accId, connection }) => {
+        try {
+          const positions = await connection.getPositions(userId);
+          return {
+            accountId: accId,
+            brokerName,
+            ...positions
+          };
+        } catch (error) {
+          console.error(`🚨 Failed to get positions for account ${accId}:`, error);
+          return {
+            accountId: accId,
+            brokerName,
+            positions: [],
+            error: 'Failed to fetch positions for this account'
+          };
+        }
+      })
+    );
 
     res.status(200).json({
       success: true,
-      data: positions,
+      data: {
+        brokerName,
+        accounts: allPositions,
+        totalAccounts: connections!.length
+      },
     });
   } catch (error: any) {
     console.error('🚨 Get positions error:', error);
@@ -1865,49 +1906,54 @@ export const searchSymbol = async (
 ): Promise<void> => {
   try {
     const { brokerName, exchange, symbol } = req.params;
+    const { accountId } = req.query;
     const userId = req.user?.id;
 
-    if (!userId || !brokerName || !exchange || !symbol) {
-      res.status(401).json({
-        success: false,
-        message: 'User not authenticated or missing parameters',
-      });
-      return;
+    // Validate required parameters
+    if (!userId) {
+      return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
-    // TODO: This function needs to be redesigned to support multiple accounts per broker
-    // For now, find the first active connection for this broker
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      res.status(404).json({
-        success: false,
-        message: `No connections found for user`,
-      });
-      return;
+    const missingParams: string[] = [];
+    if (!brokerName) missingParams.push('brokerName');
+    if (!exchange) missingParams.push('exchange');
+    if (!symbol) missingParams.push('symbol');
+
+    if (missingParams.length > 0) {
+      return BrokerConnectionHelper.sendMissingParametersError(res, missingParams);
     }
 
-    // Find first connection for this broker
-    let brokerService: BrokerService | undefined;
-    for (const [connectionKey, service] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        brokerService = service;
-        break;
-      }
+    // Find broker connection (specific account if provided, or first available)
+    // Symbol search is broker-wide, so any account for this broker will work
+    const connectionResult = BrokerConnectionHelper.findBrokerConnection(
+      userId,
+      brokerName,
+      accountId as string
+    );
+
+    if (!connectionResult.success) {
+      return BrokerConnectionHelper.sendConnectionNotFoundError(
+        res,
+        brokerName,
+        accountId as string
+      );
     }
 
-    if (!brokerService) {
-      res.status(404).json({
-        success: false,
-        message: `Not connected to ${brokerName}`,
-      });
-      return;
-    }
+    const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
 
-    const searchResults = await brokerService.searchScrip(exchange, symbol);
+    console.log(`🔍 Searching symbol ${symbol} on ${exchange} via ${brokerName} account ${resolvedAccountId}`);
+    const searchResults = await brokerService!.searchScrip(exchange, symbol);
 
     res.status(200).json({
       success: true,
-      data: searchResults,
+      data: {
+        ...searchResults,
+        searchedVia: {
+          accountId: resolvedAccountId,
+          brokerName,
+          exchange
+        }
+      },
     });
   } catch (error: any) {
     console.error('🚨 Search symbol error:', error);
@@ -1925,43 +1971,42 @@ export const getQuotes = async (
 ): Promise<void> => {
   try {
     const { brokerName, exchange, token } = req.params;
+    const { accountId } = req.query;
     const userId = req.user?.id;
 
-    if (!userId || !brokerName || !exchange || !token) {
-      res.status(401).json({
-        success: false,
-        message: 'User not authenticated or missing parameters',
-      });
-      return;
+    // Validate required parameters
+    if (!userId) {
+      return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
-    // TODO: This function needs to be redesigned to support multiple accounts per broker
-    // For now, find the first active connection for this broker
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      res.status(404).json({
-        success: false,
-        message: `No connections found for user`,
-      });
-      return;
+    const missingParams: string[] = [];
+    if (!brokerName) missingParams.push('brokerName');
+    if (!exchange) missingParams.push('exchange');
+    if (!token) missingParams.push('token');
+
+    if (missingParams.length > 0) {
+      return BrokerConnectionHelper.sendMissingParametersError(res, missingParams);
     }
 
-    // Find first connection for this broker
-    let brokerService: BrokerService | undefined;
-    for (const [connectionKey, service] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        brokerService = service;
-        break;
-      }
+    // Find broker connection (specific account if provided, or first available)
+    // Quotes are broker-wide, so any account for this broker will work
+    const connectionResult = BrokerConnectionHelper.findBrokerConnection(
+      userId,
+      brokerName,
+      accountId as string
+    );
+
+    if (!connectionResult.success) {
+      return BrokerConnectionHelper.sendConnectionNotFoundError(
+        res,
+        brokerName,
+        accountId as string
+      );
     }
 
-    if (!brokerService) {
-      res.status(404).json({
-        success: false,
-        message: `Not connected to ${brokerName}`,
-      });
-      return;
-    }
+    const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
+
+    console.log(`📊 Getting quotes for ${exchange}:${token} via ${brokerName} account ${resolvedAccountId}`);
 
     let quotes: any;
 
@@ -1973,7 +2018,15 @@ export const getQuotes = async (
 
     res.status(200).json({
       success: true,
-      data: quotes,
+      data: {
+        ...quotes,
+        quotedVia: {
+          accountId: resolvedAccountId,
+          brokerName,
+          exchange,
+          token
+        }
+      },
     });
   } catch (error: any) {
     console.error('🚨 Get quotes error:', error);
