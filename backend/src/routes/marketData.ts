@@ -142,21 +142,24 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
     let searchResults: any[] = [];
 
     try {
-      console.log(`🔍 Searching NSE symbols for query: "${query}" on ${exchange}`);
+      console.log(`🔍 Searching symbols for query: "${query}" on ${exchange}`);
 
-      // Search using symbol database service
-      const nseResults = await symbolDatabaseService.searchSymbols(query, parseInt(limit as string));
+      // Search using symbol database service with exchange filter
+      const exchangeFilter = exchange === 'NSE' ? 'NSE' : exchange === 'BSE' ? 'BSE' : 'ALL';
+      const unifiedResults = await symbolDatabaseService.searchSymbols(query, parseInt(limit as string), exchangeFilter);
 
-      searchResults = nseResults.map((result: any) => ({
-        symbol: result.symbol,
+      searchResults = unifiedResults.map((result: any) => ({
+        symbol: result.tradingSymbol,  // Use trading symbol for order placement
+        displaySymbol: result.symbol,  // Original symbol for display
         name: result.name,
         exchange: result.exchange,
         isin: result.isin,
         series: result.series,
-        source: 'nse_official'
+        group: result.group,
+        source: `${result.exchange.toLowerCase()}_official`
       }));
 
-      console.log(`📊 NSE search results: ${searchResults.length} symbols found`);
+      console.log(`📊 Search results: ${searchResults.length} symbols found across ${exchangeFilter}`);
 
     } catch (error: any) {
       console.error('❌ NSE symbol search failed:', error.message);

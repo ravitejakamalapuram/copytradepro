@@ -19,6 +19,7 @@ import orderStatusService from './services/orderStatusService';
 import { symbolDatabaseService } from './services/symbolDatabaseService';
 import { realTimeDataService } from './services/realTimeDataService';
 import { nseCSVService } from './services/nseCSVService';
+import { bseCSVService } from './services/bseCSVService'; // Auto-initializes on import
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 import { initializeBrokerAccountCache } from './controllers/brokerController';
 
@@ -187,7 +188,7 @@ async function startServer() {
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`🔄 Socket.IO enabled for real-time updates`);
       console.log(`📊 Order status monitoring active`);
-      console.log(`📈 NSE CSV Database initialized with daily auto-updates at 6:30 AM IST`);
+      console.log(`📈 NSE & BSE CSV Databases initialized with daily auto-updates`);
       console.log(`⚡ Real-time price streaming active`);
     });
   } catch (error) {
