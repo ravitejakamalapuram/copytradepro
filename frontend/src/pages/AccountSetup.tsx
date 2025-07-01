@@ -204,7 +204,7 @@ const AccountSetup: React.FC = () => {
   };
 
   const getStatusText = (isActive: boolean): string => {
-    return isActive ? 'Active' : 'Auto-Activate';
+    return isActive ? 'Active' : 'Inactive';
   };
 
   if (loading) {
@@ -259,18 +259,6 @@ const AccountSetup: React.FC = () => {
           <div className="kite-card">
             <div className="kite-card-header">
               <h2 className="kite-card-title">Connected Accounts ({accounts.length})</h2>
-              <div style={{
-                fontSize: '0.875rem',
-                color: 'var(--kite-text-secondary)',
-                marginTop: '0.5rem',
-                padding: '0.75rem',
-                backgroundColor: 'var(--kite-bg-secondary)',
-                borderRadius: 'var(--kite-radius-sm)',
-                border: '1px solid var(--kite-border)'
-              }}>
-                💡 <strong>Auto-Activation:</strong> Inactive accounts will be automatically activated during order placement.
-                Manual activation is optional for testing connections.
-              </div>
             </div>
             <div style={{ overflowX: 'auto' }}>
               <table className="kite-table">
@@ -301,8 +289,19 @@ const AccountSetup: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)', fontWeight: '500' }}>
-                        {account.userId}
+                      <td>
+                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                          {account.userId}
+                        </div>
+                        {account.userName && (
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--kite-text-secondary)',
+                            marginTop: '0.125rem'
+                          }}>
+                            {account.userName}
+                          </div>
+                        )}
                       </td>
                       <td>
                         <span style={{
@@ -336,9 +335,8 @@ const AccountSetup: React.FC = () => {
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={checkingStatus[account.id]}
                               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
-                              title="Manually activate session (optional - will auto-activate during order placement)"
                             >
-                              {checkingStatus[account.id] ? 'Activating...' : 'Test Connection'}
+                              {checkingStatus[account.id] ? 'Activating...' : 'Activate'}
                             </button>
                           )}
                           <button

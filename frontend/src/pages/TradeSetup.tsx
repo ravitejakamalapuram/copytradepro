@@ -61,14 +61,13 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
-        const activeAccounts = accounts.filter(account => account.isActive);
-        setConnectedAccounts(activeAccounts);
+        setConnectedAccounts(accounts);
 
         // Auto-select all active accounts by default
-        if (activeAccounts.length > 0) {
+        if (accounts.length > 0) {
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: activeAccounts.map(account => account.id)
+            selectedAccounts: accounts.map(account => account.id)
           }));
         }
 
@@ -198,6 +197,12 @@ const TradeSetup: React.FC = () => {
       return;
     }
 
+    // Validate trigger price for Stop Loss orders
+    if ((orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && !orderForm.triggerPrice) {
+      setError('Trigger price is required for Stop Loss orders');
+      return;
+    }
+
     if (orderForm.orderType !== 'MARKET' && !orderForm.price) {
       setError('Price is required for limit orders');
       return;
@@ -229,6 +234,9 @@ const TradeSetup: React.FC = () => {
           orderType: orderForm.orderType,
           exchange: orderForm.exchange,
           productType: orderForm.product,
+          triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
+            ? parseFloat(orderForm.triggerPrice)
+            : undefined,
           remarks: `${orderForm.validity} order`
         };
 
@@ -708,6 +716,20 @@ const TradeSetup: React.FC = () => {
                       <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
                     </div>
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Exchange:</span>
+                      <span style={{
+                        fontWeight: '500',
+                        fontSize: '0.75rem',
+                        padding: '0.125rem 0.5rem',
+                        backgroundColor: orderForm.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
+                        color: 'white',
+                        borderRadius: '0.25rem',
+                        letterSpacing: '0.5px'
+                      }}>
+                        {orderForm.exchange}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
                       <span style={{
                         fontWeight: '500',
@@ -726,6 +748,14 @@ const TradeSetup: React.FC = () => {
                         {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
                       </span>
                     </div>
+                    {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ color: 'var(--kite-text-secondary)' }}>Trigger Price:</span>
+                        <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                          ₹{orderForm.triggerPrice || '0.00'}
+                        </span>
+                      </div>
+                    )}
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
                       <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
