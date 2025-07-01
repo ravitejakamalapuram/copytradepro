@@ -51,7 +51,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
   const addNotification = (notification: Omit<NotificationItem, 'id' | 'timestamp'>) => {
     const newNotification: NotificationItem = {
       ...notification,
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 11),
       timestamp: new Date(),
       autoClose: notification.autoClose !== false,
       duration: notification.duration || 5000
@@ -94,42 +94,53 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
 
   const getNotificationStyles = (type: NotificationItem['type']) => {
     const baseStyles = {
-      padding: '1rem',
-      borderRadius: '0.5rem',
+      padding: '1rem 1.25rem',
+      borderRadius: '0.75rem',
       border: '1px solid',
       backgroundColor: '#ffffff',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.05)',
       marginBottom: '0.75rem',
-      maxWidth: '400px',
+      maxWidth: '420px',
+      minWidth: '320px',
       position: 'relative' as const,
-      animation: 'slideIn 0.3s ease-out'
+      animation: 'slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+      backdropFilter: 'blur(8px)',
+      borderLeft: '4px solid'
     };
 
     switch (type) {
       case 'success':
         return {
           ...baseStyles,
-          borderColor: '#10b981',
-          backgroundColor: '#f0fdf4'
+          borderColor: '#e5e7eb',
+          borderLeftColor: '#22c55e',
+          backgroundColor: '#f8fffe',
+          background: 'linear-gradient(135deg, #f0fdf4 0%, #f8fffe 100%)'
         };
       case 'error':
         return {
           ...baseStyles,
-          borderColor: '#ef4444',
-          backgroundColor: '#fef2f2'
+          borderColor: '#e5e7eb',
+          borderLeftColor: '#ef4444',
+          backgroundColor: '#fffefe',
+          background: 'linear-gradient(135deg, #fef2f2 0%, #fffefe 100%)'
         };
       case 'warning':
         return {
           ...baseStyles,
-          borderColor: '#f59e0b',
-          backgroundColor: '#fffbeb'
+          borderColor: '#e5e7eb',
+          borderLeftColor: '#f59e0b',
+          backgroundColor: '#fffffe',
+          background: 'linear-gradient(135deg, #fffbeb 0%, #fffffe 100%)'
         };
       case 'info':
       default:
         return {
           ...baseStyles,
-          borderColor: '#3b82f6',
-          backgroundColor: '#eff6ff'
+          borderColor: '#e5e7eb',
+          borderLeftColor: '#3b82f6',
+          backgroundColor: '#fefffe',
+          background: 'linear-gradient(135deg, #eff6ff 0%, #fefffe 100%)'
         };
     }
   };
@@ -173,24 +184,46 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
         {`
           @keyframes slideIn {
             from {
-              transform: translateX(100%);
+              transform: translateX(100%) scale(0.95);
               opacity: 0;
             }
             to {
-              transform: translateX(0);
+              transform: translateX(0) scale(1);
               opacity: 1;
             }
           }
-          
+
           @keyframes slideOut {
             from {
-              transform: translateX(0);
+              transform: translateX(0) scale(1);
               opacity: 1;
             }
             to {
-              transform: translateX(100%);
+              transform: translateX(100%) scale(0.95);
               opacity: 0;
             }
+          }
+
+          .notification-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15), 0 6px 15px rgba(0, 0, 0, 0.08) !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          }
+
+          .notification-close-btn {
+            transition: all 0.2s ease;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.05);
+          }
+
+          .notification-close-btn:hover {
+            background: rgba(0, 0, 0, 0.1);
+            transform: scale(1.1);
           }
         `}
       </style>
@@ -218,6 +251,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
           {notifications.map((notification) => (
             <div
               key={notification.id}
+              className="notification-item"
               style={{
                 ...getNotificationStyles(notification.type),
                 pointerEvents: 'auto'
@@ -266,12 +300,11 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
                 
                 <button
                   onClick={() => removeNotification(notification.id)}
+                  className="notification-close-btn"
                   style={{
-                    background: 'none',
                     border: 'none',
                     cursor: 'pointer',
-                    padding: '0.25rem',
-                    color: '#9ca3af',
+                    color: '#6b7280',
                     fontSize: '1rem',
                     lineHeight: 1,
                     flexShrink: 0
