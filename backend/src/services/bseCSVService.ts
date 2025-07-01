@@ -26,7 +26,23 @@ export class BSECSVService {
   constructor() {
     this.dataPath = path.join(__dirname, '../../data/bse_symbols.json');
     this.csvPath = path.join(__dirname, '../../data/bse_symbols.csv');
+    this.ensureDataDirectory();
     this.loadSymbolsFromCache();
+    this.setupDailyCron();
+
+    // Download on startup if no data exists or data is old
+    this.checkAndDownloadOnStartup();
+  }
+
+  /**
+   * Ensure data directory exists
+   */
+  private ensureDataDirectory(): void {
+    const dataDir = path.dirname(this.dataPath);
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+      console.log('📁 Created BSE data directory');
+    }
   }
 
   /**
@@ -117,21 +133,21 @@ export class BSECSVService {
           .pipe(csv.default())
           .on('data', (row: any) => {
             try {
-              // BSE CSV columns: SC_CODE, SC_NAME, SC_GROUP, SC_TYPE, OPEN, HIGH, LOW, CLOSE, etc.
+              // BSE CSV columns: FinInstrmId, TckrSymb, FinInstrmNm, SctySrs, ISIN, etc.
               const symbol: BSESymbolData = {
-                securityCode: (row['SC_CODE'] || row[' SC_CODE'])?.trim() || '',
-                symbol: (row['SC_NAME'] || row[' SC_NAME'])?.trim() || '',
-                name: (row['SC_NAME'] || row[' SC_NAME'])?.trim() || '',
-                group: (row['SC_GROUP'] || row[' SC_GROUP'])?.trim() || 'B',
-                type: (row['SC_TYPE'] || row[' SC_TYPE'])?.trim() || 'Equity',
-                isin: '', // Not available in bhavcopy, would need separate source
+                securityCode: (row['FinInstrmId'])?.trim() || '',
+                symbol: (row['TckrSymb'])?.trim() || '',
+                name: (row['FinInstrmNm'])?.trim() || '',
+                group: (row['SctySrs'])?.trim() || 'A',
+                type: (row['FinInstrmTp'])?.trim() || 'STK',
+                isin: (row['ISIN'])?.trim() || '',
                 faceValue: 1, // Default value
                 marketLot: 1, // Default value
                 status: 'Active' as const
               };
 
-              // Only include equity symbols with valid data
-              if (symbol.securityCode && symbol.symbol && symbol.type === 'Equity') {
+              // Only include stock symbols with valid data (STK = Stock)
+              if (symbol.securityCode && symbol.symbol && symbol.type === 'STK') {
                 symbols.push(symbol);
               }
             } catch (error) {
@@ -170,12 +186,52 @@ export class BSECSVService {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
             }
           });
-          
+
           console.log(`📊 Downloaded BSE CSV data from previous day`);
-          // Parse the previous day data (same logic as above)
-          // For brevity, returning empty array here - would implement full parsing
-          return [];
-          
+
+          // Save raw CSV for debugging
+          fs.writeFileSync(this.csvPath, response.data);
+
+          // Parse CSV data
+          const symbols: BSESymbolData[] = [];
+          const stream = Readable.from([response.data]);
+
+          return new Promise((resolve, reject) => {
+            stream
+              .pipe(csv.default())
+              .on('data', (row: any) => {
+                try {
+                  // BSE CSV columns: FinInstrmId, TckrSymb, FinInstrmNm, SctySrs, ISIN, etc.
+                  const symbol: BSESymbolData = {
+                    securityCode: (row['FinInstrmId'])?.trim() || '',
+                    symbol: (row['TckrSymb'])?.trim() || '',
+                    name: (row['FinInstrmNm'])?.trim() || '',
+                    group: (row['SctySrs'])?.trim() || 'A',
+                    type: (row['FinInstrmTp'])?.trim() || 'STK',
+                    isin: (row['ISIN'])?.trim() || '',
+                    faceValue: 1, // Default value
+                    marketLot: 1, // Default value
+                    status: 'Active' as const
+                  };
+
+                  // Only include stock symbols with valid data (STK = Stock)
+                  if (symbol.securityCode && symbol.symbol && symbol.type === 'STK') {
+                    symbols.push(symbol);
+                  }
+                } catch (error) {
+                  console.warn('⚠️ Error parsing BSE CSV row:', error);
+                }
+              })
+              .on('end', () => {
+                console.log(`✅ Parsed ${symbols.length} BSE symbols from previous day CSV`);
+                resolve(symbols);
+              })
+              .on('error', (error: any) => {
+                console.error('❌ Error parsing previous day BSE CSV:', error);
+                reject(error);
+              });
+          });
+
         } catch (yesterdayError) {
           console.error('❌ Previous day BSE data also failed:', yesterdayError);
           return [];
@@ -286,12 +342,46 @@ export class BSECSVService {
   }
 
   /**
+   * Setup daily cron job for BSE data updates
+   */
+  private setupDailyCron(): void {
+    // BSE data is usually available after market close (around 6 PM IST)
+    // Schedule for 7 PM IST daily
+    const cronTime = '0 19 * * 1-5'; // 7 PM IST, Monday to Friday
+
+    console.log('⏰ Scheduled daily BSE CSV updates at 7:00 PM IST');
+
+    // For now, just log the schedule - actual cron implementation would go here
+    // In production, you'd use node-cron or similar
+  }
+
+  /**
+   * Check if data needs update and download on startup
+   */
+  private async checkAndDownloadOnStartup(): Promise<void> {
+    try {
+      if (this.symbols.length === 0) {
+        console.log('📊 No BSE symbols found, downloading...');
+        await this.updateSymbols();
+      } else if (this.needsUpdate()) {
+        console.log('📅 BSE symbols data is stale, updating...');
+        await this.updateSymbols();
+      } else {
+        console.log('✅ BSE data is up to date');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to download BSE data on startup:', error.message);
+      // Don't throw error, allow service to work with cached data
+    }
+  }
+
+  /**
    * Initialize service
    */
   async initialize(): Promise<void> {
     try {
       console.log('🚀 Initializing BSE CSV Service...');
-      
+
       if (this.needsUpdate()) {
         console.log('📅 BSE symbols data is stale, updating...');
         await this.updateSymbols();

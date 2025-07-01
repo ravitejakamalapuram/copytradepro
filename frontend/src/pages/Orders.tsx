@@ -709,14 +709,28 @@ const Orders: React.FC = () => {
                         {order.time}
                       </td>
                       <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                          {order.symbol}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                          <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                            {order.symbol?.replace(/-[A-Z]+$/, '') || order.symbol}
+                          </div>
+                          {order.exchange && (
+                            <span style={{
+                              fontSize: '0.625rem',
+                              padding: '0.125rem 0.375rem',
+                              backgroundColor: order.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
+                              color: 'white',
+                              borderRadius: '0.25rem',
+                              fontWeight: '600',
+                              letterSpacing: '0.5px'
+                            }}>
+                              {order.exchange}
+                            </span>
+                          )}
                         </div>
                         {order.accountInfo && (
                           <div style={{
                             fontSize: '0.75rem',
                             color: 'var(--kite-text-secondary)',
-                            marginTop: '0.125rem',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem'

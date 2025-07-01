@@ -19,7 +19,7 @@ import orderStatusService from './services/orderStatusService';
 import { symbolDatabaseService } from './services/symbolDatabaseService';
 import { realTimeDataService } from './services/realTimeDataService';
 import { nseCSVService } from './services/nseCSVService';
-import { bseCSVService } from './services/bseCSVService';
+import { bseCSVService } from './services/bseCSVService'; // Auto-initializes on import
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 import { initializeBrokerAccountCache } from './controllers/brokerController';
 
@@ -174,9 +174,6 @@ async function startServer() {
 
     // Initialize broker account cache
     await initializeBrokerAccountCache();
-
-    // Initialize BSE CSV service
-    await bseCSVService.initialize();
 
     // Start order status monitoring
     orderStatusService.startMonitoring().catch((error: any) => {

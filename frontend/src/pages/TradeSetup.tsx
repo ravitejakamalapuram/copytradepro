@@ -61,14 +61,14 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
-        const activeAccounts = accounts.filter(account => account.isActive);
-        setConnectedAccounts(activeAccounts);
+        // Show all connected accounts (both active and inactive)
+        setConnectedAccounts(accounts);
 
-        // Auto-select all active accounts by default
-        if (activeAccounts.length > 0) {
+        // Auto-select all accounts by default (auto-reactivation handles inactive ones)
+        if (accounts.length > 0) {
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: activeAccounts.map(account => account.id)
+            selectedAccounts: accounts.map(account => account.id)
           }));
         }
 
@@ -607,43 +607,44 @@ const TradeSetup: React.FC = () => {
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
                             onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            size="base"
-                          >
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            label={
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <span style={{
+                                    fontWeight: '600',
+                                    fontSize: '0.875rem',
+                                    color: 'var(--kite-text-primary)'
+                                  }}>
+                                    {account.brokerName.toUpperCase()}
+                                  </span>
+                                  <span style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.125rem 0.375rem',
+                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                    color: 'white',
+                                    borderRadius: '0.25rem',
+                                    fontWeight: '500'
+                                  }}>
+                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                  </span>
+                                </div>
                                 <span style={{
-                                  fontWeight: '600',
                                   fontSize: '0.875rem',
+                                  fontWeight: '500',
                                   color: 'var(--kite-text-primary)'
                                 }}>
-                                  {account.brokerName.toUpperCase()}
+                                  Account: {account.userId}
                                 </span>
                                 <span style={{
                                   fontSize: '0.75rem',
-                                  padding: '0.125rem 0.375rem',
-                                  backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
-                                  color: 'white',
-                                  borderRadius: '0.25rem',
-                                  fontWeight: '500'
+                                  color: 'var(--kite-text-secondary)'
                                 }}>
-                                  {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                  {account.userName} • {account.email}
                                 </span>
                               </div>
-                              <span style={{
-                                fontSize: '0.875rem',
-                                fontWeight: '500',
-                                color: 'var(--kite-text-primary)'
-                              }}>
-                                Account: {account.userId}
-                              </span>
-                              <span style={{
-                                fontSize: '0.75rem',
-                                color: 'var(--kite-text-secondary)'
-                              }}>
-                                {account.userName} • {account.email}
-                              </span>
-                            </div>
-                          </Checkbox>
+                            }
+                            size="base"
+                          />
                         </div>
                       ))}
                     </div>
