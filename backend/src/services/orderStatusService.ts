@@ -2,44 +2,39 @@ import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
 import { ShoonyaService } from './shoonyaService';
 import { notificationService, OrderNotificationData } from './notificationService';
+import { IBrokerService } from '../interfaces/IBrokerService';
 
 // Import broker connections from controller
 import { userBrokerConnections } from '../controllers/brokerController';
 
 // Broker connection manager interface
 interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
 }
 
 // Create broker connection manager implementation
 const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
     const userConnections = userBrokerConnections.get(userId);
     if (!userConnections) {
       console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
       console.log(`❌ No connections found for user ${userId}`);
       return null;
     }
-
     const brokerService = userConnections.get(brokerName);
     if (!brokerService) {
       console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
       console.log(`❌ No ${brokerName} connection found for user ${userId}`);
       return null;
     }
-
-    if (brokerName === 'shoonya') {
-      const shoonyaService = brokerService as ShoonyaService;
-      if (shoonyaService.isLoggedIn()) {
-        console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
-        return shoonyaService;
-      } else {
+    const isLoggedIn = brokerService.isLoggedIn;
+    if (typeof isLoggedIn === 'function') {
+      if (!(isLoggedIn as Function).call(brokerService)) {
         console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
         return null;
       }
     }
-
-    return null;
+    return brokerService;
   }
 };
 
@@ -238,19 +233,22 @@ class OrderStatusService extends EventEmitter {
             logger.debug(`Broker API response:`, brokerStatus);
 
             if (brokerStatus && brokerStatus.stat === 'Ok') {
-              const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
+              let mappedStatus = brokerStatus.status;
+              if (typeof brokerService.mapOrderStatus === 'function') {
+                mappedStatus = brokerService.mapOrderStatus(brokerStatus.status);
+              }
               if (mappedStatus !== order.status) {
                 newStatus = mappedStatus;
                 logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
               }
             } else {
-              logger.warn(`Failed to get order status from Shoonya API: ${brokerStatus?.emsg || 'Unknown error'}`);
+              logger.warn(`Failed to get order status from broker API: ${brokerStatus?.emsg || 'Unknown error'}`);
             }
           } else {
             logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);
           }
         } catch (apiError: any) {
-          logger.error(`Error calling Shoonya API for order ${order.id}:`, apiError.message);
+          logger.error(`Error calling broker API for order ${order.id}:`, apiError.message);
           // Fall back to simulation if API call fails
         }
       }
@@ -342,25 +340,6 @@ class OrderStatusService extends EventEmitter {
       return null;
     }
   }
-
-  /**
-   * Map Shoonya status to our standard status
-   */
-  private mapShoonyaStatus(shoonyaStatus: string): string {
-    const statusMap: { [key: string]: string } = {
-      'PENDING': 'PENDING',
-      'OPEN': 'PLACED',
-      'COMPLETE': 'EXECUTED',
-      'CANCELLED': 'CANCELLED',
-      'REJECTED': 'REJECTED',
-      'TRIGGER_PENDING': 'PENDING',
-      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
-    };
-
-    return statusMap[shoonyaStatus] || shoonyaStatus;
-  }
-
-
 
   /**
    * Update order status in database and emit event

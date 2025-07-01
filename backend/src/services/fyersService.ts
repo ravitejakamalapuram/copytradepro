@@ -1,3 +1,4 @@
+import { IBrokerService } from '../interfaces/IBrokerService';
 const { fyersModel } = require('fyers-api-v3');
 
 export interface FyersCredentials {
@@ -52,7 +53,7 @@ export interface FyersQuote {
   chngPercent: number;
 }
 
-export class FyersService {
+export class FyersService implements IBrokerService {
   private fyers: any;
   private accessToken: string | null = null;
   private appId: string = '';
@@ -108,52 +109,47 @@ export class FyersService {
   }
 
   // Complete login flow - returns auth URL for user to visit
-  async login(credentials: FyersCredentials): Promise<{ success: boolean; authUrl?: string; message: string }> {
+  async login(credentials: FyersCredentials): Promise<{ success: boolean; [key: string]: any }> {
     try {
       const authUrl = this.generateAuthUrl(credentials);
-      
-      return {
-        success: true,
-        authUrl,
-        message: 'Please visit the auth URL to complete authentication',
-      };
+      return { success: true, authUrl, message: 'Please visit the auth URL to complete authentication' };
     } catch (error: any) {
-      console.error('🚨 Fyers login failed:', error);
-      return {
-        success: false,
-        message: error.message || 'Login failed',
-      };
+      return { success: false, message: error.message || 'Login failed' };
     }
   }
 
   // Place order using official API
-  async placeOrder(orderData: PlaceOrderRequest): Promise<FyersOrderResponse> {
+  async placeOrder(orderData: any): Promise<{ success: boolean; [key: string]: any }> {
     if (!this.accessToken) {
-      throw new Error('Not authenticated. Please login first.');
+      return { success: false, message: 'Not authenticated. Please login first.' };
     }
-
     try {
+      // Map generic orderData to Fyers-specific payload
+      let fyersOrderType: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M' = 'MARKET';
+      switch (orderData.orderType) {
+        case 'LIMIT': fyersOrderType = 'LIMIT'; break;
+        case 'MARKET': fyersOrderType = 'MARKET'; break;
+        case 'SL-LIMIT': fyersOrderType = 'SL'; break;
+        case 'SL-MARKET': fyersOrderType = 'SL-M'; break;
+      }
       const payload = {
-        symbol: orderData.symbol,
-        qty: orderData.qty,
-        type: orderData.type === 'MARKET' ? 2 : 1, // 1=LIMIT, 2=MARKET
-        side: orderData.side === 'BUY' ? 1 : -1, // 1=BUY, -1=SELL
-        productType: this.getProductTypeCode(orderData.productType),
-        limitPrice: orderData.limitPrice || 0,
-        stopPrice: orderData.stopPrice || 0,
-        disclosedQty: orderData.disclosedQty || 0,
-        validity: orderData.validity === 'DAY' ? 'DAY' : 'IOC',
-        offlineOrder: orderData.offlineOrder || false,
-        stopLoss: orderData.stopLoss || 0,
-        takeProfit: orderData.takeProfit || 0,
+        symbol: orderData.symbol || `${orderData.exchange}:${orderData.symbol}`,
+        qty: orderData.quantity || orderData.qty,
+        type: fyersOrderType,
+        side: orderData.action || orderData.side,
+        productType: (orderData.productType === 'C' ? 'CNC' : orderData.productType),
+        limitPrice: orderData.price || orderData.limitPrice || 0,
+        stopPrice: orderData.triggerPrice || orderData.stopPrice || 0,
+        validity: 'DAY',
       };
-
       const response = await this.fyers.place_order(payload);
-      console.log('✅ Order placed successfully:', response);
-      return response;
+      if (response.s === 'ok' || response.code === 200) {
+        return { success: true, ...response };
+      } else {
+        return { success: false, message: response.message || 'Order placement failed', ...response };
+      }
     } catch (error: any) {
-      console.error('🚨 Failed to place order:', error);
-      throw new Error(error.message || 'Order placement failed');
+      return { success: false, message: error.message || 'Order placement failed' };
     }
   }
 
@@ -201,11 +197,13 @@ export class FyersService {
   }
 
   // Get quotes using official API
-  async getQuotes(symbols: string[]): Promise<FyersQuote[]> {
+  async getQuotes(exchange: string, token: string): Promise<any> {
     if (!this.accessToken) {
       throw new Error('Not authenticated. Please login first.');
     }
-
+    // Fyers expects an array of symbols in the format 'NSE:RELIANCE', 'BSE:TCS', etc.
+    // Here, 'token' can be a single symbol, or you can split it if needed for multiple
+    const symbols = [token]; // For now, treat token as a single symbol string
     try {
       const response = await this.fyers.getQuotes(symbols);
       return response.d || [];
@@ -297,5 +295,32 @@ export class FyersService {
         message: error.message || 'Logout failed',
       };
     }
+  }
+
+  // Stub for IBrokerService compatibility
+  async getOrderStatus(userId: string, orderNumber: string): Promise<any> {
+    // TODO: Implement order status retrieval for Fyers
+    throw new Error('getOrderStatus not implemented for FyersService');
+  }
+
+  extractAccountInfo(loginResponse: any, credentials: any) {
+    return {
+      accountId: credentials.clientId,
+      userName: credentials.clientId,
+      email: '',
+      brokerDisplayName: 'Fyers',
+      exchanges: [],
+      products: [],
+    };
+  }
+
+  isLoggedIn(): boolean {
+    return !!this.accessToken;
+  }
+
+  extractOrderInfo(orderResponse: any, orderInput: any) {
+    return {
+      brokerOrderId: orderResponse.id,
+    };
   }
 }

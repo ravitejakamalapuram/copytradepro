@@ -5,6 +5,14 @@ export interface AppError extends Error {
   isOperational?: boolean;
 }
 
+/**
+ * Express error handling middleware.
+ * Sends a JSON error response for unhandled errors.
+ * @param err - The error object.
+ * @param req - Express request object.
+ * @param res - Express response object.
+ * @param next - Express next middleware function.
+ */
 export const errorHandler = (
   err: AppError,
   req: Request,

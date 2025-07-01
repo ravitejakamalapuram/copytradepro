@@ -1,0 +1,8 @@
+{
+  "userId": "YOUR_USER_ID",
+  "password": "YOUR_PASSWORD",
+  "totpKey": "YOUR_TOTP_SECRET",
+  "vendorCode": "YOUR_VENDOR_CODE",
+  "apiSecret": "YOUR_API_SECRET",
+  "imei": "YOUR_DEVICE_IMEI"
+} 

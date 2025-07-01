@@ -1,19 +1,11 @@
-export const validateEnv = (): void => {
-  const requiredEnvVars = [
-    'JWT_SECRET',
-    'NODE_ENV',
-  ];
-
-  const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-  if (missingVars.length > 0) {
-    console.error('❌ Missing required environment variables:');
-    missingVars.forEach(varName => {
-      console.error(`   - ${varName}`);
-    });
-    console.error('\n📝 Please create a .env file with the required variables.');
-    process.exit(1);
+/**
+ * Validates required environment variables are set.
+ * Throws an error if any required variable is missing.
+ * @param requiredVars - Array of required environment variable names.
+ */
+export function validateEnv(requiredVars: string[]): void {
+  const missing = requiredVars.filter((v) => !process.env[v]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
-
-  console.log('✅ Environment variables validated successfully');
-};
+}

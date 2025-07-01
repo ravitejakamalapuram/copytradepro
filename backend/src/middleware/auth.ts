@@ -12,6 +12,13 @@ export interface AuthenticatedRequest extends Request {
   query: any;
 }
 
+/**
+ * Express middleware for authenticating JWT tokens.
+ * Adds the authenticated user to the request object.
+ * @param req - Express request object.
+ * @param res - Express response object.
+ * @param next - Express next middleware function.
+ */
 export const authenticateToken = (
   req: AuthenticatedRequest,
   res: Response,

@@ -1,0 +1,6 @@
+{
+  "clientId": "YOUR_CLIENT_ID",
+  "secretKey": "YOUR_SECRET_KEY",
+  "redirectUri": "YOUR_REDIRECT_URI",
+  "totpKey": "YOUR_TOTP_SECRET (optional)"
+} 
