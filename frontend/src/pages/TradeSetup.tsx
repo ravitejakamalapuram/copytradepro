@@ -389,43 +389,10 @@ const TradeSetup: React.FC = () => {
             </div>
 
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Exchange Selection */}
-              <div>
-                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                  Exchange *
-                </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    className={`kite-btn ${orderForm.exchange === 'NSE' ? 'kite-btn-primary' : ''}`}
-                    onClick={() => setOrderForm(prev => ({ ...prev, exchange: 'NSE' }))}
-                    style={{
-                      backgroundColor: orderForm.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-bg-secondary)',
-                      color: orderForm.exchange === 'NSE' ? 'white' : 'var(--kite-text-primary)',
-                      border: `1px solid ${orderForm.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-border)'}`,
-                      flex: 1
-                    }}
-                  >
-                    NSE
-                  </button>
-                  <button
-                    className={`kite-btn ${orderForm.exchange === 'BSE' ? 'kite-btn-primary' : ''}`}
-                    onClick={() => setOrderForm(prev => ({ ...prev, exchange: 'BSE' }))}
-                    style={{
-                      backgroundColor: orderForm.exchange === 'BSE' ? 'var(--kite-primary)' : 'var(--kite-bg-secondary)',
-                      color: orderForm.exchange === 'BSE' ? 'white' : 'var(--kite-text-primary)',
-                      border: `1px solid ${orderForm.exchange === 'BSE' ? 'var(--kite-primary)' : 'var(--kite-border)'}`,
-                      flex: 1
-                    }}
-                  >
-                    BSE
-                  </button>
-                </div>
-              </div>
-
               {/* Symbol Search */}
               <div style={{ position: 'relative' }}>
                 <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                  Symbol * ({orderForm.exchange})
+                  Symbol *
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
@@ -478,20 +445,8 @@ const TradeSetup: React.FC = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                            {result.symbol}
-                          </div>
-                          <div style={{
-                            fontSize: '0.75rem',
-                            padding: '0.125rem 0.375rem',
-                            backgroundColor: result.exchange === 'NSE' ? 'var(--kite-primary)' : 'var(--kite-warning)',
-                            color: 'white',
-                            borderRadius: 'var(--kite-radius-sm)',
-                            fontWeight: '500'
-                          }}>
-                            {result.exchange}
-                          </div>
+                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                          {result.symbol}
                         </div>
                         <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                           {result.name}
@@ -652,44 +607,43 @@ const TradeSetup: React.FC = () => {
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
                             onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            label={
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{
-                                    fontWeight: '600',
-                                    fontSize: '0.875rem',
-                                    color: 'var(--kite-text-primary)'
-                                  }}>
-                                    {account.brokerName.toUpperCase()}
-                                  </span>
-                                  <span style={{
-                                    fontSize: '0.75rem',
-                                    padding: '0.125rem 0.375rem',
-                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
-                                    color: 'white',
-                                    borderRadius: '0.25rem',
-                                    fontWeight: '500'
-                                  }}>
-                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
-                                  </span>
-                                </div>
+                            size="base"
+                          >
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                 <span style={{
+                                  fontWeight: '600',
                                   fontSize: '0.875rem',
-                                  fontWeight: '500',
                                   color: 'var(--kite-text-primary)'
                                 }}>
-                                  Account: {account.userId}
+                                  {account.brokerName.toUpperCase()}
                                 </span>
                                 <span style={{
                                   fontSize: '0.75rem',
-                                  color: 'var(--kite-text-secondary)'
+                                  padding: '0.125rem 0.375rem',
+                                  backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                  color: 'white',
+                                  borderRadius: '0.25rem',
+                                  fontWeight: '500'
                                 }}>
-                                  {account.userName} • {account.email}
+                                  {account.isActive ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
                               </div>
-                            }
-                            size="base"
-                          />
+                              <span style={{
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: 'var(--kite-text-primary)'
+                              }}>
+                                Account: {account.userId}
+                              </span>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--kite-text-secondary)'
+                              }}>
+                                {account.userName} • {account.email}
+                              </span>
+                            </div>
+                          </Checkbox>
                         </div>
                       ))}
                     </div>

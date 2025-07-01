@@ -1,5 +1,6 @@
 import { nseService, NSESymbol } from './nseService';
 import { nseCSVService, NSESymbolData } from './nseCSVService';
+import { bseCSVService, BSESymbolData } from './bseCSVService';
 
 // Unified symbol interface for multi-exchange support
 export interface UnifiedSymbol {
@@ -25,69 +26,13 @@ export interface BSESymbol {
   status: 'Active' | 'Suspended' | 'Delisted';
 }
 
-// Sample BSE symbols data (to be replaced with real data source)
-const BSE_SAMPLE_SYMBOLS: BSESymbol[] = [
-  {
-    symbol: 'TCS',
-    name: 'Tata Consultancy Services Limited',
-    exchange: 'BSE',
-    group: 'A',
-    isin: 'INE467B01029',
-    securityCode: '532540',
-    status: 'Active'
-  },
-  {
-    symbol: 'RELIANCE',
-    name: 'Reliance Industries Limited',
-    exchange: 'BSE',
-    group: 'A',
-    isin: 'INE002A01018',
-    securityCode: '500325',
-    status: 'Active'
-  },
-  {
-    symbol: 'INFY',
-    name: 'Infosys Limited',
-    exchange: 'BSE',
-    group: 'A',
-    isin: 'INE009A01021',
-    securityCode: '500209',
-    status: 'Active'
-  },
-  {
-    symbol: 'HDFCBANK',
-    name: 'HDFC Bank Limited',
-    exchange: 'BSE',
-    group: 'A',
-    isin: 'INE040A01034',
-    securityCode: '500180',
-    status: 'Active'
-  },
-  {
-    symbol: 'ICICIBANK',
-    name: 'ICICI Bank Limited',
-    exchange: 'BSE',
-    group: 'A',
-    isin: 'INE090A01021',
-    securityCode: '532174',
-    status: 'Active'
-  },
-  {
-    symbol: 'AAKASH',
-    name: 'Aakash Exploration Services Limited',
-    exchange: 'BSE',
-    group: 'B',
-    isin: 'INE087Q01018',
-    securityCode: '540683',
-    status: 'Active'
-  }
-];
+
 
 class SymbolDatabaseService {
   constructor() {
-    console.log('🚀 NSE Symbol Database Service initialized');
-    console.log('📊 NSE CSV + Live API integration enabled');
-    console.log('🔗 Using NSE CSV for symbol search and live API for market data');
+    console.log('🚀 Multi-Exchange Symbol Database Service initialized');
+    console.log('📊 NSE CSV + BSE CSV + Live API integration enabled');
+    console.log('🔗 Using NSE/BSE CSV for symbol search and live API for market data');
   }
 
   /**
@@ -171,20 +116,15 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Search BSE symbols using sample data (to be replaced with real data source)
+   * Search BSE symbols using CSV data
    */
   private async searchBSESymbols(query: string, limit: number): Promise<UnifiedSymbol[]> {
     try {
-      const searchTerm = query.toLowerCase();
-
-      // Filter BSE symbols
-      const filteredSymbols = BSE_SAMPLE_SYMBOLS.filter(symbol =>
-        symbol.symbol.toLowerCase().includes(searchTerm) ||
-        symbol.name.toLowerCase().includes(searchTerm)
-      );
+      // Use BSE CSV service for symbol search
+      const csvResults = bseCSVService.searchSymbols(query, limit);
 
       // Convert to unified format with BSE-specific trading symbol format
-      const results: UnifiedSymbol[] = filteredSymbols.slice(0, limit).map(symbol => ({
+      const results: UnifiedSymbol[] = csvResults.map(symbol => ({
         symbol: symbol.symbol,           // Display symbol (TCS)
         tradingSymbol: symbol.symbol,    // Trading format (TCS - plain for BSE)
         name: symbol.name,
@@ -207,12 +147,13 @@ class SymbolDatabaseService {
    */
   getStats(): any {
     return {
-      service: 'NSE CSV + Live API',
+      service: 'Multi-Exchange CSV + Live API',
       status: 'active',
       searchType: 'csv_primary_api_fallback',
-      supportedExchanges: ['NSE'],
+      supportedExchanges: ['NSE', 'BSE'],
       lastCheck: new Date().toISOString(),
-      csvServiceStats: nseCSVService.getStats(),
+      nseCSVServiceStats: nseCSVService.getStats(),
+      bseCSVServiceStats: bseCSVService.getStats(),
       nseServiceStats: nseService.getStats()
     };
   }
