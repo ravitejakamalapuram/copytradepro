@@ -200,7 +200,7 @@ const AccountSetup: React.FC = () => {
   };
 
   const getStatusColor = (isActive: boolean): string => {
-    return isActive ? 'var(--kite-profit)' : 'var(--kite-neutral)';
+    return isActive ? '#10b981' : '#6b7280';
   };
 
   const getStatusText = (isActive: boolean): string => {
@@ -209,9 +209,9 @@ const AccountSetup: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="page-container">
           <div style={{ 
             display: 'flex', 
             justifyContent: 'center', 
@@ -221,7 +221,7 @@ const AccountSetup: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>🔗</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading accounts...</div>
+            <div style={{ color: '#6b7280' }}>Loading accounts...</div>
           </div>
         </div>
       </div>
@@ -229,23 +229,23 @@ const AccountSetup: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="trading-theme">
       <AppNavigation />
       
-      <div className="kite-main">
+      <div className="page-container">
         {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Broker Accounts</h1>
+        <div className="card">
+          <div className="card__header">
+            <h1 className="card__title">Broker Accounts</h1>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
+              <button
+                className="btn btn--outline"
                 onClick={() => navigate('/trade-setup')}
               >
                 📈 Start Trading
               </button>
-              <button 
-                className="kite-btn kite-btn-primary"
+              <button
+                className="btn btn--primary"
                 onClick={() => setShowAddForm(true)}
               >
                 + Add Broker
@@ -256,12 +256,12 @@ const AccountSetup: React.FC = () => {
 
         {/* Connected Accounts */}
         {accounts.length > 0 && (
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">Connected Accounts ({accounts.length})</h2>
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">Connected Accounts ({accounts.length})</h2>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
+              <table className="table">
                 <thead>
                   <tr>
                     <th>Broker</th>
@@ -280,23 +280,23 @@ const AccountSetup: React.FC = () => {
                             {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.logo || '🏦'}
                           </span>
                           <div>
-                            <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                            <div style={{ fontWeight: '500', color: '#111827' }}>
                               {account.brokerName.charAt(0).toUpperCase() + account.brokerName.slice(1)}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
+                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                               {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.description}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                        <div style={{ fontWeight: '500', color: '#111827' }}>
                           {account.userId}
                         </div>
                         {account.userName && (
                           <div style={{
                             fontSize: '0.75rem',
-                            color: 'var(--kite-text-secondary)',
+                            color: '#6b7280',
                             marginTop: '0.125rem'
                           }}>
                             {account.userName}
@@ -306,44 +306,41 @@ const AccountSetup: React.FC = () => {
                       <td>
                         <span style={{
                           padding: '0.25rem 0.5rem',
-                          borderRadius: 'var(--kite-radius-sm)',
+                          borderRadius: '0.375rem',
                           fontSize: '0.75rem',
                           fontWeight: '500',
-                          backgroundColor: account.isActive ? 'var(--kite-bg-success)' : 'var(--kite-bg-neutral)',
+                          backgroundColor: account.isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(107, 114, 128, 0.1)',
                           color: getStatusColor(account.isActive)
                         }}>
                           {getStatusText(account.isActive)}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                      <td style={{ fontSize: '0.875rem', color: '#6b7280' }}>
                         {new Date(account.createdAt).toLocaleDateString('en-IN')}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           {account.isActive ? (
                             <button
-                              className="kite-btn"
+                              className="btn btn--outline btn--sm"
                               onClick={() => handleDeactivateAccount(account.id)}
                               disabled={checkingStatus[account.id]}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
                               {checkingStatus[account.id] ? 'Deactivating...' : 'Deactivate'}
                             </button>
                           ) : (
                             <button
-                              className="kite-btn kite-btn-primary"
+                              className="btn btn--primary btn--sm"
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={checkingStatus[account.id]}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
                               {checkingStatus[account.id] ? 'Activating...' : 'Activate'}
                             </button>
                           )}
                           <button
-                            className="kite-btn kite-btn-danger"
+                            className="btn btn--error btn--sm"
                             onClick={() => handleRemoveAccount(account.id)}
                             disabled={checkingStatus[account.id]}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                           >
                             Remove
                           </button>
@@ -359,13 +356,13 @@ const AccountSetup: React.FC = () => {
 
         {/* Add Broker Form */}
         {showAddForm && (
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">
                 {selectedBroker ? `Connect ${SUPPORTED_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
               </h2>
               <button
-                className="kite-btn"
+                className="btn btn--outline"
                 onClick={() => {
                   setShowAddForm(false);
                   setSelectedBroker('');
@@ -579,11 +576,10 @@ const AccountSetup: React.FC = () => {
 
                   {/* Submit Button */}
                   <button
-                    className="kite-btn kite-btn-primary"
+                    className="btn btn--primary btn--full-width"
                     onClick={handleSubmit}
                     disabled={submitting}
                     style={{
-                      width: '100%',
                       justifyContent: 'center',
                       fontSize: '1rem',
                       padding: '0.75rem',
@@ -600,18 +596,17 @@ const AccountSetup: React.FC = () => {
 
         {/* Empty State */}
         {accounts.length === 0 && !showAddForm && (
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: '#111827' }}>
               No Broker Accounts Connected
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+            <div style={{ color: '#6b7280', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
               Connect your broker account to start trading. We support multiple brokers with secure API integration.
             </div>
             <button
-              className="kite-btn kite-btn-primary"
+              className="btn btn--primary btn--lg"
               onClick={() => setShowAddForm(true)}
-              style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
             >
               Connect Your First Broker
             </button>
