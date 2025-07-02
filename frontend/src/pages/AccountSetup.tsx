@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService, type ShoonyaCredentials, type FyersCredentials } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
-import '../styles/app-theme.css';
+// Styles now imported via main.scss
 
 const SUPPORTED_BROKERS = [
   { 
@@ -232,11 +232,16 @@ const AccountSetup: React.FC = () => {
     <div className="trading-theme">
       <AppNavigation />
       
-      <div className="page-container">
-        {/* Page Header */}
-        <div className="card">
-          <div className="card__header">
-            <h1 className="card__title">Broker Accounts</h1>
+      <div className="account-setup-page">
+        <div className="account-setup-page__header">
+          <h1 className="header-title">Broker Account Management</h1>
+          <p className="header-subtitle">Connect and manage your trading accounts</p>
+        </div>
+
+        <div className="account-setup-page__content">
+          <div className="account-setup-page__main">
+            {/* Quick Actions */}
+            <div style={{ marginBottom: '2rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <button
                 className="btn btn--outline"
@@ -612,7 +617,8 @@ const AccountSetup: React.FC = () => {
             </button>
           </div>
         )}
-      </div>
+          </div>
+        </div>
     </div>
   );
 };

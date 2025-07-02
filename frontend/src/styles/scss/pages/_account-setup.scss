@@ -7,104 +7,115 @@
 
 .account-setup-page {
   min-height: 100vh;
-  background-color: $gray-50;
-
-  &__container {
-    @extend .container;
-    padding-top: $space-6;
-    padding-bottom: $space-6;
-  }
+  background-color: $gray-800;
+  color: $white;
 
   &__header {
-    text-align: center;
-    margin-bottom: $space-8;
+    background-color: $gray-900;
+    border-bottom: 1px solid $gray-700;
+    padding: $space-4 $space-6;
 
     .header-title {
-      font-size: $font-3xl;
+      font-size: $font-2xl;
       font-weight: $font-bold;
-      color: $gray-900;
-      margin-bottom: $space-2;
+      color: $white;
+      margin: 0;
     }
 
     .header-subtitle {
-      font-size: $font-lg;
-      color: $gray-600;
-      margin-bottom: $space-4;
-    }
-
-    .header-description {
-      font-size: $font-base;
-      color: $gray-500;
-      max-width: 600px;
-      margin: 0 auto;
-      line-height: $leading-relaxed;
+      font-size: $font-sm;
+      color: $gray-400;
+      margin-top: $space-1;
     }
   }
 
   &__content {
-    max-width: 800px;
-    margin: 0 auto;
+    display: flex;
+    min-height: calc(100vh - 80px);
+  }
+
+  &__sidebar {
+    width: 320px;
+    background-color: $gray-900;
+    border-right: 1px solid $gray-700;
+    padding: $space-6;
+    overflow-y: auto;
+  }
+
+  &__main {
+    flex: 1;
+    background-color: $gray-800;
+    padding: $space-6;
+    overflow-y: auto;
   }
 }
 
 // =============================================================================
-// BROKER SELECTION
+// SIDEBAR BROKER SELECTION
 // =============================================================================
 
-.broker-selection {
-  margin-bottom: $space-8;
-
+.sidebar-broker-selection {
   &__title {
-    font-size: $font-xl;
+    font-size: $font-lg;
     font-weight: $font-semibold;
-    color: $gray-900;
-    margin-bottom: $space-6;
-    text-align: center;
+    color: $white;
+    margin-bottom: $space-4;
   }
 
-  &__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: $space-4;
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-3;
   }
 
-  &__card {
-    @include card-base;
-    padding: $space-6;
+  &__item {
+    padding: $space-4;
+    background-color: $gray-800;
+    border: 2px solid $gray-700;
+    border-radius: $radius-lg;
     cursor: pointer;
     transition: $transition-all;
-    border: 2px solid transparent;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: $shadow-lg;
+      border-color: $gray-600;
+      background-color: $gray-700;
     }
 
     &.selected {
       border-color: $primary-blue;
-      box-shadow: 0 0 0 1px $primary-blue;
+      background-color: rgba($primary-blue, 0.1);
     }
 
-    .broker-logo {
-      font-size: 3rem;
-      text-align: center;
-      margin-bottom: $space-4;
-    }
-
-    .broker-name {
-      font-size: $font-xl;
-      font-weight: $font-bold;
-      color: $gray-900;
-      text-align: center;
+    .broker-header {
+      @include flex-start;
+      gap: $space-3;
       margin-bottom: $space-2;
+
+      .broker-logo {
+        font-size: $font-2xl;
+      }
+
+      .broker-info {
+        .broker-name {
+          font-size: $font-base;
+          font-weight: $font-semibold;
+          color: $white;
+          margin-bottom: $space-1;
+        }
+
+        .broker-status {
+          font-size: $font-xs;
+          color: $gray-400;
+          text-transform: uppercase;
+        }
+      }
     }
 
     .broker-description {
       font-size: $font-sm;
-      color: $gray-600;
-      text-align: center;
-      margin-bottom: $space-4;
+      color: $gray-300;
       line-height: $leading-relaxed;
+      margin-bottom: $space-3;
     }
 
     .broker-features {
@@ -113,9 +124,9 @@
       margin: 0;
 
       li {
-        font-size: $font-sm;
-        color: $gray-700;
-        margin-bottom: $space-2;
+        font-size: $font-xs;
+        color: $gray-400;
+        margin-bottom: $space-1;
         @include flex-start;
         gap: $space-2;
 
@@ -123,6 +134,7 @@
           content: '✓';
           color: $success;
           font-weight: $font-bold;
+          font-size: $font-xs;
         }
 
         &:last-child {
@@ -134,27 +146,127 @@
 }
 
 // =============================================================================
+// SIDEBAR NAVIGATION
+// =============================================================================
+
+.sidebar-nav {
+  margin-top: $space-8;
+
+  &__title {
+    font-size: $font-base;
+    font-weight: $font-semibold;
+    color: $white;
+    margin-bottom: $space-4;
+  }
+
+  &__list {
+    display: flex;
+    flex-direction: column;
+    gap: $space-2;
+  }
+
+  &__item {
+    padding: $space-3 $space-4;
+    border-radius: $radius-md;
+    cursor: pointer;
+    transition: $transition-all;
+    @include flex-start;
+    gap: $space-3;
+
+    &:hover {
+      background-color: $gray-800;
+    }
+
+    &.active {
+      background-color: rgba($primary-blue, 0.2);
+      color: $primary-blue;
+    }
+
+    .nav-icon {
+      font-size: $font-lg;
+    }
+
+    .nav-text {
+      font-size: $font-sm;
+      color: $gray-300;
+    }
+
+    &.active .nav-text {
+      color: $primary-blue;
+    }
+  }
+}
+
+// =============================================================================
+// MAIN CONTENT AREA
+// =============================================================================
+
+.main-content {
+  &__tabs {
+    margin-bottom: $space-6;
+    border-bottom: 1px solid $gray-700;
+
+    .tab-list {
+      @include flex-start;
+      gap: $space-1;
+    }
+
+    .tab-item {
+      padding: $space-3 $space-4;
+      border-radius: $radius-md $radius-md 0 0;
+      cursor: pointer;
+      transition: $transition-all;
+      font-size: $font-sm;
+      font-weight: $font-medium;
+      color: $gray-400;
+
+      &:hover {
+        color: $gray-300;
+        background-color: $gray-700;
+      }
+
+      &.active {
+        color: $white;
+        background-color: $gray-700;
+        border-bottom: 2px solid $primary-blue;
+      }
+    }
+  }
+
+  &__panel {
+    display: none;
+
+    &.active {
+      display: block;
+    }
+  }
+}
+
+// =============================================================================
 // BROKER FORM
 // =============================================================================
 
 .broker-form {
-  @include card-base;
-  padding: $space-8;
+  background-color: $gray-900;
+  border: 1px solid $gray-700;
+  border-radius: $radius-lg;
+  padding: $space-6;
 
   &__header {
-    text-align: center;
     margin-bottom: $space-6;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $gray-700;
 
     .form-title {
-      font-size: $font-2xl;
+      font-size: $font-xl;
       font-weight: $font-bold;
-      color: $gray-900;
+      color: $white;
       margin-bottom: $space-2;
     }
 
     .form-subtitle {
-      font-size: $font-base;
-      color: $gray-600;
+      font-size: $font-sm;
+      color: $gray-400;
     }
   }
 
@@ -166,12 +278,10 @@
     }
 
     .section-title {
-      font-size: $font-lg;
+      font-size: $font-base;
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
       margin-bottom: $space-4;
-      padding-bottom: $space-2;
-      border-bottom: $border-width solid $gray-200;
     }
   }
 
@@ -191,9 +301,9 @@
   &__actions {
     @include flex-between;
     gap: $space-4;
-    margin-top: $space-8;
-    padding-top: $space-6;
-    border-top: $border-width solid $gray-200;
+    margin-top: $space-6;
+    padding-top: $space-4;
+    border-top: 1px solid $gray-700;
 
     @include mobile-only {
       flex-direction: column;
@@ -222,152 +332,193 @@
 // =============================================================================
 
 .connected-accounts {
-  margin-bottom: $space-8;
+  background-color: $gray-900;
+  border: 1px solid $gray-700;
+  border-radius: $radius-lg;
+  padding: $space-6;
 
   &__header {
     @include flex-between;
     margin-bottom: $space-6;
+    padding-bottom: $space-4;
+    border-bottom: 1px solid $gray-700;
 
     .section-title {
-      font-size: $font-xl;
+      font-size: $font-lg;
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
       margin: 0;
     }
 
     .add-account-btn {
       @extend .btn;
       @extend .btn--primary;
+      @extend .btn--sm;
     }
   }
 
-  &__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: $space-4;
-  }
+  &__table {
+    width: 100%;
+    border-collapse: collapse;
 
-  &__card {
-    @include card-base;
-    padding: $space-6;
-    transition: $transition-all;
+    th {
+      padding: $space-3 $space-4;
+      text-align: left;
+      font-size: $font-sm;
+      font-weight: $font-semibold;
+      color: $gray-400;
+      border-bottom: 1px solid $gray-700;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
 
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: $shadow-lg;
-    }
-
-    .account-header {
-      @include flex-between;
-      margin-bottom: $space-4;
-
-      .broker-info {
-        @include flex-start;
-        gap: $space-3;
-
-        .broker-logo {
-          font-size: $font-2xl;
-        }
-
-        .broker-details {
-          .broker-name {
-            font-size: $font-lg;
-            font-weight: $font-semibold;
-            color: $gray-900;
-            margin-bottom: $space-1;
-          }
-
-          .account-id {
-            font-size: $font-sm;
-            color: $gray-600;
-            font-family: $font-mono;
-          }
-        }
+      &:first-child {
+        padding-left: 0;
       }
 
-      .account-status {
-        padding: $space-1 $space-3;
-        border-radius: $radius-full;
+      &:last-child {
+        padding-right: 0;
+      }
+    }
+
+    td {
+      padding: $space-4 $space-4;
+      border-bottom: 1px solid $gray-800;
+      vertical-align: middle;
+
+      &:first-child {
+        padding-left: 0;
+      }
+
+      &:last-child {
+        padding-right: 0;
+      }
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover {
+      background-color: rgba($gray-700, 0.3);
+    }
+  }
+
+  &__broker-info {
+    @include flex-start;
+    gap: $space-3;
+
+    .broker-logo {
+      font-size: $font-xl;
+    }
+
+    .broker-details {
+      .broker-name {
+        font-size: $font-base;
+        font-weight: $font-semibold;
+        color: $white;
+        margin-bottom: $space-1;
+      }
+
+      .broker-description {
         font-size: $font-xs;
-        font-weight: $font-medium;
-        text-transform: uppercase;
-
-        &--active {
-          background-color: rgba($success, 0.1);
-          color: $success-dark;
-        }
-
-        &--inactive {
-          background-color: rgba($gray-500, 0.1);
-          color: $gray-700;
-        }
+        color: $gray-400;
       }
     }
+  }
 
-    .account-actions {
-      @include flex-start;
-      gap: $space-2;
+  &__user-info {
+    .user-id {
+      font-size: $font-sm;
+      font-weight: $font-medium;
+      color: $white;
+      font-family: $font-mono;
+      margin-bottom: $space-1;
+    }
 
-      .action-btn {
-        @extend .btn;
-        @extend .btn--sm;
+    .user-name {
+      font-size: $font-xs;
+      color: $gray-400;
+    }
+  }
+
+  &__status {
+    padding: $space-1 $space-3;
+    border-radius: $radius-full;
+    font-size: $font-xs;
+    font-weight: $font-medium;
+    text-transform: uppercase;
+
+    &--active {
+      background-color: rgba($success, 0.2);
+      color: $success;
+    }
+
+    &--inactive {
+      background-color: rgba($gray-500, 0.2);
+      color: $gray-400;
+    }
+  }
+
+  &__date {
+    font-size: $font-sm;
+    color: $gray-400;
+    font-family: $font-mono;
+  }
+
+  &__actions {
+    @include flex-start;
+    gap: $space-2;
+
+    .action-btn {
+      @extend .btn;
+      @extend .btn--sm;
+      font-size: $font-xs;
+      padding: $space-1 $space-2;
+
+      &--activate {
+        @extend .btn--success;
+      }
+
+      &--deactivate {
         @extend .btn--outline;
-        font-size: $font-xs;
+        color: $gray-400;
+        border-color: $gray-600;
 
-        &--activate {
-          color: $success;
-          border-color: $success;
-
-          &:hover {
-            background-color: $success;
-            color: $white;
-          }
+        &:hover {
+          background-color: $gray-600;
+          color: $white;
         }
+      }
 
-        &--deactivate {
-          color: $warning;
-          border-color: $warning;
-
-          &:hover {
-            background-color: $warning;
-            color: $white;
-          }
-        }
-
-        &--remove {
-          color: $error;
-          border-color: $error;
-
-          &:hover {
-            background-color: $error;
-            color: $white;
-          }
-        }
+      &--remove {
+        @extend .btn--error;
       }
     }
   }
 
   &__empty {
     text-align: center;
-    padding: $space-16 $space-8;
+    padding: $space-12 $space-8;
 
     .empty-icon {
-      font-size: 4rem;
+      font-size: 3rem;
       margin-bottom: $space-4;
       opacity: 0.5;
+      color: $gray-500;
     }
 
     .empty-title {
       font-size: $font-lg;
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
       margin-bottom: $space-2;
     }
 
     .empty-message {
-      font-size: $font-base;
-      color: $gray-600;
+      font-size: $font-sm;
+      color: $gray-400;
       margin-bottom: $space-6;
+      line-height: $leading-relaxed;
     }
 
     .empty-action {
