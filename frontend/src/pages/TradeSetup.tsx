@@ -417,9 +417,9 @@ const TradeSetup: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="page-container">
           <div style={{ 
             display: 'flex', 
             justifyContent: 'center', 
@@ -429,7 +429,7 @@ const TradeSetup: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>📈</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading trading setup...</div>
+            <div style={{ color: '#9ca3af' }}>Loading trading setup...</div>
           </div>
         </div>
       </div>
@@ -438,19 +438,19 @@ const TradeSetup: React.FC = () => {
 
   if (connectedAccounts.length === 0) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div className="page-container">
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem' }}>
+            <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem', color: '#ffffff' }}>
               No Active Broker Accounts
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
+            <div style={{ color: '#9ca3af', marginBottom: '2rem' }}>
               Connect and activate a broker account to start trading
             </div>
-            <button 
-              className="kite-btn kite-btn-primary"
+            <button
+              className="btn btn--primary"
               onClick={() => navigate('/account-setup')}
             >
               Connect Broker Account
@@ -498,27 +498,19 @@ const TradeSetup: React.FC = () => {
         {/* Order Form */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
           {/* Main Order Form */}
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">Order Details</h2>
+          <div className="card">
+            <div className="card__header">
+              <h2 className="card__title">Order Details</h2>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
-                  className={`kite-btn ${orderForm.action === 'BUY' ? 'kite-btn-primary' : ''}`}
+                  className={`btn ${orderForm.action === 'BUY' ? 'btn--success' : 'btn--outline'}`}
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
-                  style={{
-                    backgroundColor: orderForm.action === 'BUY' ? 'var(--kite-profit)' : undefined,
-                    color: orderForm.action === 'BUY' ? 'white' : undefined
-                  }}
                 >
                   BUY
                 </button>
                 <button
-                  className={`kite-btn ${orderForm.action === 'SELL' ? 'kite-btn-danger' : ''}`}
+                  className={`btn ${orderForm.action === 'SELL' ? 'btn--error' : 'btn--outline'}`}
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
-                  style={{
-                    backgroundColor: orderForm.action === 'SELL' ? 'var(--kite-loss)' : undefined,
-                    color: orderForm.action === 'SELL' ? 'white' : undefined
-                  }}
                 >
                   SELL
                 </button>
@@ -528,7 +520,7 @@ const TradeSetup: React.FC = () => {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Symbol Search */}
               <div style={{ position: 'relative' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: '#ffffff', marginBottom: '0.5rem', display: 'block' }}>
                   Symbol *
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -902,11 +894,10 @@ const TradeSetup: React.FC = () => {
 
               {/* Place Order Button */}
               <button
-                className="kite-btn kite-btn-primary"
+                className="btn btn--primary btn--full-width"
                 onClick={handlePlaceOrder}
                 disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
                 style={{
-                  width: '100%',
                   justifyContent: 'center',
                   fontSize: '1rem',
                   padding: '0.75rem'
@@ -923,9 +914,9 @@ const TradeSetup: React.FC = () => {
           {/* Order Summary & Margin Info */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {/* Order Summary */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Order Summary</h3>
+            <div className="card">
+              <div className="card__header">
+                <h3 className="card__title">Order Summary</h3>
               </div>
               <div style={{ padding: '1rem' }}>
                 {orderForm.symbol ? (
@@ -1005,9 +996,9 @@ const TradeSetup: React.FC = () => {
             </div>
 
             {/* Margin Information */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Margin Info</h3>
+            <div className="card">
+              <div className="card__header">
+                <h3 className="card__title">Margin Info</h3>
               </div>
               <div style={{ padding: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
@@ -1034,9 +1025,9 @@ const TradeSetup: React.FC = () => {
 
                   {marginInfo.shortfall > 0 && (
                     <button
-                      className="kite-btn kite-btn-primary"
+                      className="btn btn--primary btn--full-width"
                       onClick={() => navigate('/funds')}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+                      style={{ justifyContent: 'center', marginTop: '0.5rem' }}
                     >
                       Add Funds
                     </button>
