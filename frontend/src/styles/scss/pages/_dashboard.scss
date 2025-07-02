@@ -1,0 +1,467 @@
+// =============================================================================
+// Dashboard Page Styles
+// =============================================================================
+
+@import '../variables';
+@import '../mixins';
+
+.dashboard-page {
+  min-height: 100vh;
+  background-color: $gray-50;
+
+  &__container {
+    @extend .container;
+    padding-top: $space-6;
+    padding-bottom: $space-6;
+  }
+
+  &__header {
+    @include flex-between;
+    margin-bottom: $space-6;
+    padding: $space-4 $space-6;
+    background-color: $white;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-sm;
+
+    .header-title {
+      font-size: $font-2xl;
+      font-weight: $font-bold;
+      color: $gray-900;
+      margin: 0;
+    }
+
+    .header-actions {
+      @include flex-start;
+      gap: $space-3;
+    }
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-6;
+    margin-bottom: $space-6;
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+      gap: $space-4;
+    }
+  }
+
+  &__content {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: $space-6;
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+      gap: $space-4;
+    }
+  }
+}
+
+// =============================================================================
+// PORTFOLIO SUMMARY CARDS
+// =============================================================================
+
+.portfolio-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: $space-4;
+  margin-bottom: $space-6;
+
+  &__card {
+    @include card-base;
+    padding: $space-6;
+    text-align: center;
+    transition: $transition-all;
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: $shadow-lg;
+    }
+
+    &--positive {
+      border-left: 4px solid $success;
+    }
+
+    &--negative {
+      border-left: 4px solid $error;
+    }
+
+    &--neutral {
+      border-left: 4px solid $info;
+    }
+  }
+
+  &__label {
+    font-size: $font-sm;
+    color: $gray-600;
+    margin-bottom: $space-2;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+
+  &__value {
+    font-size: $font-2xl;
+    font-weight: $font-bold;
+    font-family: $font-mono;
+    margin-bottom: $space-1;
+
+    &--positive {
+      color: $success;
+    }
+
+    &--negative {
+      color: $error;
+    }
+
+    &--neutral {
+      color: $gray-900;
+    }
+  }
+
+  &__change {
+    font-size: $font-sm;
+    font-family: $font-mono;
+    font-weight: $font-medium;
+
+    &--positive {
+      color: $success;
+    }
+
+    &--negative {
+      color: $error;
+    }
+  }
+}
+
+// =============================================================================
+// POSITIONS TABLE
+// =============================================================================
+
+.positions-section {
+  @include card-base;
+  padding: 0;
+  overflow: hidden;
+
+  &__header {
+    @include card-header;
+    @include flex-between;
+
+    .section-title {
+      font-size: $font-lg;
+      font-weight: $font-semibold;
+      color: $gray-900;
+      margin: 0;
+    }
+
+    .view-all-btn {
+      @extend .btn;
+      @extend .btn--outline;
+      @extend .btn--sm;
+    }
+  }
+
+  &__content {
+    @include card-body;
+    padding: 0;
+  }
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  &__header {
+    background-color: $gray-50;
+
+    th {
+      padding: $space-3 $space-4;
+      text-align: left;
+      font-size: $font-sm;
+      font-weight: $font-semibold;
+      color: $gray-700;
+      border-bottom: $border-width solid $gray-200;
+
+      &:first-child {
+        padding-left: $space-6;
+      }
+
+      &:last-child {
+        padding-right: $space-6;
+      }
+    }
+  }
+
+  &__body {
+    tr {
+      border-bottom: $border-width solid $gray-100;
+      transition: $transition-colors;
+
+      &:hover {
+        background-color: $gray-50;
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    td {
+      padding: $space-4 $space-4;
+      font-size: $font-sm;
+      color: $gray-900;
+      vertical-align: middle;
+
+      &:first-child {
+        padding-left: $space-6;
+      }
+
+      &:last-child {
+        padding-right: $space-6;
+      }
+    }
+  }
+
+  // Responsive table
+  @include mobile-only {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+
+    &__header,
+    &__body {
+      display: table;
+      width: 100%;
+    }
+  }
+}
+
+// =============================================================================
+// POSITION CELLS
+// =============================================================================
+
+.position-symbol {
+  font-weight: $font-semibold;
+  color: $gray-900;
+  margin-bottom: $space-1;
+
+  &__exchange {
+    font-size: $font-xs;
+    color: $gray-500;
+    font-weight: $font-normal;
+    text-transform: uppercase;
+  }
+}
+
+.position-quantity {
+  font-family: $font-mono;
+  font-weight: $font-medium;
+
+  &--positive {
+    color: $success;
+  }
+
+  &--negative {
+    color: $error;
+  }
+}
+
+.position-product {
+  font-size: $font-xs;
+  color: $gray-500;
+}
+
+.position-price {
+  font-family: $font-mono;
+  font-weight: $font-medium;
+}
+
+.position-pnl {
+  font-family: $font-mono;
+  font-weight: $font-semibold;
+
+  &--positive {
+    color: $success;
+  }
+
+  &--negative {
+    color: $error;
+  }
+
+  &__percent {
+    font-size: $font-xs;
+    opacity: 0.8;
+  }
+}
+
+// =============================================================================
+// QUICK ACTIONS SIDEBAR
+// =============================================================================
+
+.quick-actions {
+  @include card-base;
+  padding: $space-6;
+
+  &__title {
+    font-size: $font-lg;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin-bottom: $space-4;
+  }
+
+  &__grid {
+    display: grid;
+    gap: $space-3;
+  }
+
+  &__button {
+    @extend .btn;
+    @extend .btn--outline;
+    @include flex-start;
+    gap: $space-3;
+    padding: $space-4;
+    text-align: left;
+    justify-content: flex-start;
+    transition: $transition-all;
+
+    &:hover {
+      background-color: $primary-blue;
+      color: $white;
+      border-color: $primary-blue;
+      transform: translateY(-1px);
+      box-shadow: $shadow-md;
+    }
+
+    .icon {
+      font-size: $font-lg;
+    }
+
+    .content {
+      flex: 1;
+
+      .title {
+        font-weight: $font-semibold;
+        margin-bottom: $space-1;
+      }
+
+      .description {
+        font-size: $font-xs;
+        color: $gray-600;
+        line-height: $leading-normal;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// EMPTY STATES
+// =============================================================================
+
+.dashboard-empty {
+  text-align: center;
+  padding: $space-16 $space-8;
+
+  &__icon {
+    font-size: 4rem;
+    margin-bottom: $space-4;
+    opacity: 0.5;
+  }
+
+  &__title {
+    font-size: $font-lg;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin-bottom: $space-2;
+  }
+
+  &__message {
+    font-size: $font-sm;
+    color: $gray-600;
+    margin-bottom: $space-6;
+  }
+
+  &__action {
+    @extend .btn;
+    @extend .btn--primary;
+  }
+}
+
+// =============================================================================
+// LOADING STATE
+// =============================================================================
+
+.dashboard-loading {
+  text-align: center;
+  padding: $space-16 $space-8;
+
+  &__spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid $gray-200;
+    border-top-color: $primary-blue;
+    border-radius: $radius-full;
+    animation: spin 1s linear infinite;
+    margin: 0 auto $space-4;
+  }
+
+  &__message {
+    font-size: $font-sm;
+    color: $gray-600;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE ADJUSTMENTS
+// =============================================================================
+
+@include mobile-only {
+  .dashboard-page {
+    &__header {
+      flex-direction: column;
+      gap: $space-4;
+      text-align: center;
+
+      .header-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }
+  }
+
+  .portfolio-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-actions {
+    &__button {
+      flex-direction: column;
+      text-align: center;
+
+      .content {
+        .description {
+          display: none;
+        }
+      }
+    }
+  }
+}
+
+// =============================================================================
+// ANIMATIONS
+// =============================================================================
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fade-in {
+  @include fade-in;
+}
+
+.slide-in-up {
+  @include slide-in-up;
+}

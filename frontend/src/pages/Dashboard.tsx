@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
-import '../styles/app-theme.css';
+// Styles now imported via main.scss
 
 
 
@@ -95,19 +95,14 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
-          <div style={{
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            height: '50vh',
-            flexDirection: 'column',
-            gap: '1rem'
-          }}>
-            <div style={{ fontSize: '24px' }}>📊</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading dashboard...</div>
+        <div className="dashboard-page">
+          <div className="dashboard-page__container">
+            <div className="dashboard-loading">
+              <div className="dashboard-loading__spinner"></div>
+              <div className="dashboard-loading__message">Loading dashboard...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -116,18 +111,18 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
+        <div className="dashboard-page">
+          <div className="dashboard-page__container">
+            <div className="dashboard-empty">
+              <div className="dashboard-empty__icon">⚠️</div>
+              <h3 className="dashboard-empty__title">Error Loading Dashboard</h3>
+              <p className="dashboard-empty__message">{error}</p>
+              <button className="dashboard-empty__action" onClick={() => window.location.reload()}>
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -135,137 +130,121 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="trading-theme">
       <AppNavigation />
 
-      <div className="kite-main">
-        {/* Portfolio Overview */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Portfolio Value
+      <div className="dashboard-page">
+        <div className="dashboard-page__container">
+          {/* Portfolio Overview */}
+          <div className="portfolio-summary">
+            <div className={`portfolio-summary__card ${portfolioSummary.totalPnL >= 0 ? 'portfolio-summary__card--positive' : 'portfolio-summary__card--negative'}`}>
+              <div className="portfolio-summary__label">Portfolio Value</div>
+              <div className="portfolio-summary__value portfolio-summary__value--neutral">
+                ₹{formatCurrency(portfolioSummary.totalValue)}
+              </div>
+              <div className={`portfolio-summary__change ${portfolioSummary.totalPnL >= 0 ? 'portfolio-summary__change--positive' : 'portfolio-summary__change--negative'}`}>
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
+              </div>
             </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(portfolioSummary.totalValue)}
+
+            <div className={`portfolio-summary__card ${portfolioSummary.dayPnL >= 0 ? 'portfolio-summary__card--positive' : 'portfolio-summary__card--negative'}`}>
+              <div className="portfolio-summary__label">Day's P&L</div>
+              <div className={`portfolio-summary__value ${portfolioSummary.dayPnL >= 0 ? 'portfolio-summary__value--positive' : 'portfolio-summary__value--negative'}`}>
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
+              </div>
+              <div className={`portfolio-summary__change ${portfolioSummary.dayPnL >= 0 ? 'portfolio-summary__change--positive' : 'portfolio-summary__change--negative'}`}>
+                {portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%
+              </div>
             </div>
-            <div style={{ fontSize: '11px', color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)', marginTop: '2px' }}>
-              {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
+
+            <div className="portfolio-summary__card portfolio-summary__card--neutral">
+              <div className="portfolio-summary__label">Total Invested</div>
+              <div className="portfolio-summary__value portfolio-summary__value--neutral">
+                ₹{formatCurrency(portfolioSummary.totalInvested)}
+              </div>
+              <div className="portfolio-summary__change">
+                Current: ₹{formatCurrency(portfolioSummary.totalValue)}
+              </div>
             </div>
           </div>
 
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Day's P&L
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)' }}>
-              {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
-            </div>
-            <div style={{ fontSize: '11px', color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)', marginTop: '2px' }}>
-              {portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%
-            </div>
-          </div>
-
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Total Invested
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(portfolioSummary.totalInvested)}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginTop: '2px' }}>
-              Current: ₹{formatCurrency(portfolioSummary.totalValue)}
-            </div>
-          </div>
-        </div>
 
 
-
-        {/* Today's Positions */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Recent Positions ({positions.length})</h2>
-            <button
-              className="kite-btn"
-              onClick={() => navigate('/positions')}
-            >
-              View All
-            </button>
-          </div>
-          {positions.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
-                <thead>
-                  <tr>
-                    <th>Instrument</th>
-                    <th>Qty.</th>
-                    <th>Avg. Price</th>
-                    <th>LTP</th>
-                    <th>P&L</th>
-                    <th>Product</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {positions.map((position, index) => (
-                    <tr key={index}>
-                      <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                          {position.symbol}
-                        </div>
-                        <div style={{ fontSize: '10px', color: 'var(--kite-text-secondary)' }}>
-                          {position.exchange}
-                        </div>
-                      </td>
-                      <td style={{
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.qty > 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
-                        fontWeight: '500'
-                      }}>
-                        {position.qty > 0 ? '+' : ''}{position.qty}
-                      </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
-                        {formatCurrency(position.avgPrice)}
-                      </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
-                        {formatCurrency(position.ltp)}
-                      </td>
-                      <td style={{
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.pnl >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                      }}>
-                        {position.pnl >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(position.pnl))}
-                        <div style={{ fontSize: '10px' }}>
-                          {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%
-                        </div>
-                      </td>
-                      <td style={{ fontSize: '11px', color: 'var(--kite-text-secondary)' }}>
-                        {position.product}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem',
-              color: 'var(--kite-text-secondary)'
-            }}>
-              <div style={{ fontSize: '32px', marginBottom: '12px' }}>📊</div>
-              <div style={{ fontSize: '14px', marginBottom: '6px' }}>No positions today</div>
-              <div style={{ fontSize: '11px' }}>Start trading to see your positions here</div>
+          {/* Today's Positions */}
+          <div className="positions-section">
+            <div className="positions-section__header">
+              <h2 className="section-title">Recent Positions ({positions.length})</h2>
               <button
-                className="kite-btn kite-btn-primary"
-                style={{ marginTop: '1rem' }}
-                onClick={() => navigate('/trade-setup')}
+                className="view-all-btn"
+                onClick={() => navigate('/positions')}
               >
-                Place Order
+                View All
               </button>
             </div>
-          )}
+            <div className="positions-section__content">
+              {positions.length > 0 ? (
+                <div className="positions-table-container">
+                  <table className="positions-table">
+                    <thead className="positions-table__header">
+                      <tr>
+                        <th>Instrument</th>
+                        <th>Qty.</th>
+                        <th>Avg. Price</th>
+                        <th>LTP</th>
+                        <th>P&L</th>
+                    <th>Product</th>
+                      </tr>
+                    </thead>
+                    <tbody className="positions-table__body">
+                      {positions.map((position, index) => (
+                        <tr key={index}>
+                          <td>
+                            <div className="position-symbol">
+                              {position.symbol}
+                              <div className="position-symbol__exchange">{position.exchange}</div>
+                            </div>
+                          </td>
+                          <td className={`position-quantity ${position.qty > 0 ? 'position-quantity--positive' : 'position-quantity--negative'}`}>
+                            {position.qty > 0 ? '+' : ''}{position.qty}
+                          </td>
+                          <td className="position-price">
+                            {formatCurrency(position.avgPrice)}
+                          </td>
+                          <td className="position-price">
+                            {formatCurrency(position.ltp)}
+                          </td>
+                          <td className={`position-pnl ${position.pnl >= 0 ? 'position-pnl--positive' : 'position-pnl--negative'}`}>
+                            {position.pnl >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(position.pnl))}
+                            <div className="position-pnl__percent">
+                              {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%
+                            </div>
+                          </td>
+                          <td className="position-product">
+                            {position.product}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="dashboard-empty">
+                  <div className="dashboard-empty__icon">📊</div>
+                  <div className="dashboard-empty__title">No positions today</div>
+                  <div className="dashboard-empty__message">Start trading to see your positions here</div>
+                  <button
+                    className="dashboard-empty__action"
+                    onClick={() => navigate('/trade-setup')}
+                  >
+                    Place Order
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+
         </div>
-
-
       </div>
     </div>
   );

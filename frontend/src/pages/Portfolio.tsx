@@ -7,7 +7,7 @@ import PortfolioTable from '../components/PortfolioTable';
 import SortControls from '../components/SortControls';
 import { portfolioService } from '../services/portfolioService';
 import type { PortfolioItem, SortField, SortOrder } from '../components/PortfolioTable';
-import '../styles/app-theme.css';
+// Styles now imported via main.scss
 
 // PortfolioItem interface is now imported from PortfolioTable component
 
@@ -194,23 +194,14 @@ const Portfolio: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main" style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh'
-        }}>
-          <div style={{ 
-            fontSize: '1.2rem', 
-            color: 'var(--kite-text-secondary)',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <div className="kite-spinner"></div>
-            Loading portfolio...
+        <div className="portfolio-page">
+          <div className="portfolio-page__container">
+            <div className="portfolio-loading">
+              <div className="portfolio-loading__spinner"></div>
+              <div className="portfolio-loading__message">Loading portfolio...</div>
+            </div>
           </div>
         </div>
       </div>
@@ -219,23 +210,21 @@ const Portfolio: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="trading-theme">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
-              Failed to Load Portfolio
+        <div className="portfolio-page">
+          <div className="portfolio-page__container">
+            <div className="portfolio-empty">
+              <div className="portfolio-empty__icon">⚠️</div>
+              <h3 className="portfolio-empty__title">Failed to Load Portfolio</h3>
+              <p className="portfolio-empty__message">{error}</p>
+              <button
+                className="portfolio-empty__action"
+                onClick={fetchPortfolioData}
+              >
+                Retry
+              </button>
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
-              {error}
-            </div>
-            <button 
-              className="kite-btn kite-btn-primary"
-              onClick={fetchPortfolioData}
-            >
-              Retry
-            </button>
           </div>
         </div>
       </div>
@@ -243,64 +232,56 @@ const Portfolio: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="trading-theme">
       <AppNavigation />
-      <div className="kite-main">
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1.5rem'
-        }}>
-          <h1 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: 'var(--kite-text-primary)',
-            margin: 0
-          }}>
-            Portfolio
-          </h1>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              className="kite-btn kite-btn-primary"
-              onClick={() => navigate('/trade-setup')}
-              style={{ fontSize: '11px', padding: '6px 12px' }}
-            >
-              + Buy/Sell
-            </button>
-            <button
-              className="kite-btn"
-              onClick={fetchPortfolioData}
-              style={{ fontSize: '11px', padding: '6px 12px' }}
-            >
-              🔄 Refresh
-            </button>
+      <div className="portfolio-page">
+        <div className="portfolio-page__container">
+          {/* Header */}
+          <div className="portfolio-page__header">
+            <h1 className="header-title">
+              Portfolio
+            </h1>
+            <div className="header-actions">
+              <button
+                className="btn btn--primary"
+                onClick={() => navigate('/trade-setup')}
+              >
+                + Buy/Sell
+              </button>
+              <button
+                className="btn btn--outline"
+                onClick={fetchPortfolioData}
+              >
+                🔄 Refresh
+              </button>
+            </div>
           </div>
-        </div>
 
-        {/* Portfolio Summary */}
-        <PortfolioSummary data={portfolioSummary} />
+          <div className="portfolio-page__content">
 
-        {/* View Mode Tabs */}
-        <TabbedNavigation
-          tabs={[
-            { key: 'all', label: 'All', icon: '📋', count: portfolioItems.length },
-            { key: 'holdings', label: 'Holdings', icon: '📊', count: portfolioItems.filter(i => i.type === 'holding').length },
-            { key: 'positions', label: 'Positions', icon: '⚡', count: portfolioItems.filter(i => i.type === 'position').length }
-          ]}
-          activeTab={viewMode}
-          onTabChange={(tabKey) => setViewMode(tabKey as ViewMode)}
-        />
+            {/* Portfolio Summary */}
+            <PortfolioSummary data={portfolioSummary} />
 
-        {/* Portfolio Items Table */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">
-              {viewMode === 'all' ? 'All Items' :
-               viewMode === 'holdings' ? 'Holdings' : 'Positions'}
-              ({filteredItems.length})
-            </h2>
+            {/* View Mode Tabs */}
+            <TabbedNavigation
+              tabs={[
+                { key: 'all', label: 'All', icon: '📋', count: portfolioItems.length },
+                { key: 'holdings', label: 'Holdings', icon: '📊', count: portfolioItems.filter(i => i.type === 'holding').length },
+                { key: 'positions', label: 'Positions', icon: '⚡', count: portfolioItems.filter(i => i.type === 'position').length }
+              ]}
+              activeTab={viewMode}
+              onTabChange={(tabKey) => setViewMode(tabKey as ViewMode)}
+            />
+
+            {/* Portfolio Items Table */}
+            <div className="portfolio-tabs">
+              <div className="portfolio-tabs__header">
+                <h2 className="tabs-title">
+                  {viewMode === 'all' ? 'All Items' :
+                   viewMode === 'holdings' ? 'Holdings' : 'Positions'}
+                  ({filteredItems.length})
+                </h2>
+                <div className="tabs-controls">
             <SortControls
               sortOptions={[
                 { value: 'currentValue', label: 'Value' },
@@ -333,8 +314,11 @@ const Portfolio: React.FC = () => {
               onAction: () => navigate('/trade-setup')
             }}
           />
+            </div>
+          </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };
