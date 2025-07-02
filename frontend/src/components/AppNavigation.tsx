@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
 import useRealTimeData from '../hooks/useRealTimeData';
-import '../styles/app-theme.css';
+// Styles now imported via main.scss
 
 interface PortfolioSummary {
   totalValue: number;
@@ -101,82 +101,51 @@ const AppNavigation: React.FC = () => {
   }));
 
   return (
-    <div className="kite-theme">
+    <div className="trading-theme">
       {/* Top Navigation */}
-      <nav className="kite-nav">
-        <div className="kite-nav-content">
+      <nav className="app-navigation">
+        <div className="nav-container">
           {/* Logo */}
-          <div className="kite-logo">
-            <span style={{ color: '#387ed1' }}>📈</span>
+          <div className="nav-brand">
+            <span>📈</span>
             <span>CopyTrade Pro</span>
           </div>
 
           {/* Main Navigation */}
-          <div className="kite-nav-links">
+          <ul className="nav-menu">
             {navItems.map((item) => (
-              <button
-                key={item.path}
-                className={`kite-nav-link ${location.pathname === item.path ? 'active' : ''}`}
-                onClick={() => navigate(item.path)}
-              >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
-              </button>
+              <li key={item.path} className="nav-item">
+                <button
+                  className={`nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                  onClick={() => navigate(item.path)}
+                >
+                  <span>{item.icon}</span>
+                  <span>{item.label}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
 
           {/* User Menu */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="nav-user-section">
             {/* Market Status */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.75rem',
-              color: 'var(--kite-text-secondary)'
-            }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}></div>
-              {marketStatus?.status || 'Market Status Unknown'}
+            <div className="market-status">
+              <div className={`market-status__indicator ${marketStatus?.isOpen ? 'open' : 'closed'}`}></div>
+              <span className="market-status__text">
+                {marketStatus?.status || 'Market Status Unknown'}
+              </span>
             </div>
 
             {/* User Info */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px',
-              borderRadius: 'var(--kite-radius-md)',
-              backgroundColor: 'var(--kite-bg-tertiary)'
-            }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  color: 'var(--kite-text-primary)',
-                  lineHeight: '1.2'
-                }}>
+            <div className="user-info">
+              <div className="user-info__details">
+                <div className="user-info__name">
                   {user?.name || 'Kamalapuram'}
-                </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'var(--kite-text-secondary)',
-                  lineHeight: '1.2'
-                }}>
                 </div>
               </div>
               <button
-                className="kite-btn"
+                className="btn btn--ghost btn--sm"
                 onClick={handleLogout}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '10px',
-                  minHeight: 'auto'
-                }}
               >
                 Logout
               </button>

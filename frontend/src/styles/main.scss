@@ -34,6 +34,8 @@
   }
 
   .nav-brand {
+    @include flex-start;
+    gap: $space-2;
     font-size: $font-xl;
     font-weight: $font-bold;
     color: $primary-blue;
@@ -57,11 +59,16 @@
     }
 
     .nav-link {
+      @include flex-start;
+      gap: $space-2;
       color: $gray-600;
       font-weight: $font-medium;
       padding: $space-2 $space-3;
       border-radius: $radius-md;
       transition: $transition-colors;
+      background: none;
+      border: none;
+      cursor: pointer;
 
       &:hover {
         color: $gray-900;
@@ -73,6 +80,55 @@
         color: $primary-blue;
         background-color: rgba($primary-blue, 0.1);
       }
+    }
+  }
+
+  .nav-user-section {
+    @include flex-start;
+    gap: $space-4;
+  }
+
+  .market-status {
+    @include flex-start;
+    gap: $space-2;
+    font-size: $font-xs;
+    color: $gray-500;
+
+    &__indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: $radius-full;
+
+      &.open {
+        background-color: $success;
+      }
+
+      &.closed {
+        background-color: $error;
+      }
+    }
+
+    &__text {
+      font-size: $font-xs;
+    }
+  }
+
+  .user-info {
+    @include flex-start;
+    gap: $space-2;
+    padding: $space-1 $space-2;
+    border-radius: $radius-md;
+    background-color: $gray-50;
+
+    &__details {
+      text-align: right;
+    }
+
+    &__name {
+      font-size: $font-xs;
+      font-weight: $font-medium;
+      color: $gray-900;
+      line-height: 1.2;
     }
   }
 
