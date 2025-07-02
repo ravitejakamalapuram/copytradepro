@@ -20,7 +20,7 @@
 .form-label {
   display: block;
   font-weight: $font-medium;
-  color: $gray-700;
+  color: $gray-200;
   margin-bottom: $space-2;
   font-size: $font-sm;
 
@@ -31,14 +31,14 @@
 
   &--optional::after {
     content: ' (optional)';
-    color: $gray-500;
+    color: $gray-400;
     font-weight: $font-normal;
   }
 }
 
 .form-help {
   font-size: $font-xs;
-  color: $gray-500;
+  color: $gray-400;
   margin-top: $space-1;
   line-height: $leading-normal;
 }
@@ -48,6 +48,11 @@
   color: $error;
   margin-top: $space-1;
   line-height: $leading-normal;
+  font-weight: $font-medium;
+  background-color: rgba($error, 0.1);
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  border-left: 3px solid $error;
   display: flex;
   align-items: center;
   gap: $space-1;

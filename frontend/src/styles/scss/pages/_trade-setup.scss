@@ -8,6 +8,18 @@
     margin-left: 0; // Remove margin on mobile when sidebar is hidden
   }
 
+  @media (max-width: 768px) {
+    padding: 1rem;
+  }
+}
+
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  padding: 2rem;
+
   &__header {
     background-color: $gray-800;
     border-bottom: 1px solid $gray-700;
@@ -54,9 +66,14 @@
   grid-template-columns: 2fr 1fr;
   gap: 2rem;
 
-  @media (max-width: 768px) {
+  @media (max-width: 1200px) {
     grid-template-columns: 1fr;
     gap: 1.5rem;
+  }
+
+  @media (max-width: 768px) {
+    gap: 1rem;
+    padding: 0;
   }
 }
 
@@ -133,6 +150,21 @@
   }
 }
 
+.form-error {
+  font-size: 0.75rem;
+  color: $error;
+  margin-top: 0.25rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
+  &::before {
+    content: '⚠';
+    font-size: 0.875rem;
+  }
+}
+
 .form-select {
   width: 100%;
   padding: 0.75rem;
@@ -175,10 +207,11 @@
   background-color: $gray-900;
   border: 1px solid $gray-700;
   border-radius: $radius-md;
-  z-index: 1000;
+  z-index: 9999;
   max-height: 200px;
   overflow-y: auto;
-  box-shadow: $shadow-lg;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  margin-top: 2px;
 }
 
 .search-result {

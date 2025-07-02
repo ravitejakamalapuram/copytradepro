@@ -71,35 +71,35 @@
 }
 
 .enterprise-button--secondary {
-  background-color: #f1f5f9;
-  color: #334155;
-  border: 1px solid #e2e8f0;
+  background-color: #374151;
+  color: #ffffff;
+  border: 1px solid #4b5563;
 }
 
 .enterprise-button--secondary:hover:not(:disabled) {
-  background-color: #e2e8f0;
-  border-color: #cbd5e1;
+  background-color: #4b5563;
+  border-color: #6b7280;
 }
 
 .enterprise-button--outline {
   background-color: transparent;
   color: #3b82f6;
-  border: 1px solid #bfdbfe;
+  border: 1px solid #3b82f6;
 }
 
 .enterprise-button--outline:hover:not(:disabled) {
-  background-color: #eff6ff;
-  border-color: #93c5fd;
+  background-color: rgba(59, 130, 246, 0.1);
+  border-color: #60a5fa;
 }
 
 .enterprise-button--ghost {
   background-color: transparent;
-  color: #64748b;
+  color: #d1d5db;
 }
 
 .enterprise-button--ghost:hover:not(:disabled) {
-  background-color: #f1f5f9;
-  color: #334155;
+  background-color: #374151;
+  color: #ffffff;
 }
 
 .enterprise-button--danger {

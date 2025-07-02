@@ -23,6 +23,8 @@ export type { BadgeProps, StatusBadgeProps } from './Badge';
 export { default as Checkbox } from './Checkbox';
 export type { CheckboxProps } from './Checkbox';
 
+export { default as LoadingSpinner } from './LoadingSpinner';
+
 export { 
   default as Table, 
   TableHeader, 

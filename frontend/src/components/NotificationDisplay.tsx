@@ -112,35 +112,39 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
       case 'success':
         return {
           ...baseStyles,
-          borderColor: '#e5e7eb',
-          borderLeftColor: '#22c55e',
-          backgroundColor: '#f8fffe',
-          background: 'linear-gradient(135deg, #f0fdf4 0%, #f8fffe 100%)'
+          borderColor: '#374151',
+          borderLeftColor: '#10b981',
+          backgroundColor: '#1f2937',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, #1f2937 100%)',
+          color: '#ffffff'
         };
       case 'error':
         return {
           ...baseStyles,
-          borderColor: '#e5e7eb',
+          borderColor: '#374151',
           borderLeftColor: '#ef4444',
-          backgroundColor: '#fffefe',
-          background: 'linear-gradient(135deg, #fef2f2 0%, #fffefe 100%)'
+          backgroundColor: '#1f2937',
+          background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, #1f2937 100%)',
+          color: '#ffffff'
         };
       case 'warning':
         return {
           ...baseStyles,
-          borderColor: '#e5e7eb',
+          borderColor: '#374151',
           borderLeftColor: '#f59e0b',
-          backgroundColor: '#fffffe',
-          background: 'linear-gradient(135deg, #fffbeb 0%, #fffffe 100%)'
+          backgroundColor: '#1f2937',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.1) 0%, #1f2937 100%)',
+          color: '#ffffff'
         };
       case 'info':
       default:
         return {
           ...baseStyles,
-          borderColor: '#e5e7eb',
+          borderColor: '#374151',
           borderLeftColor: '#3b82f6',
-          backgroundColor: '#fefffe',
-          background: 'linear-gradient(135deg, #eff6ff 0%, #fefffe 100%)'
+          backgroundColor: '#1f2937',
+          background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, #1f2937 100%)',
+          color: '#ffffff'
         };
     }
   };

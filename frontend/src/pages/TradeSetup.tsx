@@ -6,6 +6,7 @@ import { accountService, type ConnectedAccount } from '../services/accountServic
 // import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
 import { Checkbox } from '../components/ui/Checkbox';
+import { LoadingSpinner } from '../components/ui';
 import { useToast } from '../hooks/useToast';
 
 interface OrderForm {
@@ -286,6 +287,11 @@ const TradeSetup: React.FC = () => {
       <div className="trade-setup-page">
         <div className="trade-setup-page__content">
           <div className="trade-setup-page__main">
+            {loading ? (
+              <div className="loading-container">
+                <LoadingSpinner size="lg" text="Loading broker accounts..." />
+              </div>
+            ) : (
             <div className="order-form-grid">
               {/* Main Order Form */}
               <div className="order-form-section">
@@ -625,6 +631,7 @@ const TradeSetup: React.FC = () => {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>
