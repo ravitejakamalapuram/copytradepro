@@ -526,108 +526,108 @@ const TradeSetup: React.FC = () => {
                     </button>
                   </div>
                 </div>
+              </div>
 
-                {/* Order Summary & Margin Info Sidebar */}
-                <div className="order-summary-section">
-                  {/* Order Summary */}
-                  <div className="card">
-                    <div className="card__header">
-                      <h3 className="card__title">Order Summary</h3>
-                    </div>
-                    <div className="card__content">
-                      {orderForm.symbol ? (
-                        <div className="summary-details">
-                          <div className="summary-row">
-                            <span className="summary-label">Symbol:</span>
-                            <span className="summary-value">{orderForm.symbol}</span>
-                          </div>
-                          <div className="summary-row">
-                            <span className="summary-label">Exchange:</span>
-                            <span className={`summary-value exchange-badge ${orderForm.exchange.toLowerCase()}`}>
-                              {orderForm.exchange}
-                            </span>
-                          </div>
-                          <div className="summary-row">
-                            <span className="summary-label">Action:</span>
-                            <span className={`summary-value action-badge ${orderForm.action.toLowerCase()}`}>
-                              {orderForm.action}
-                            </span>
-                          </div>
-                          <div className="summary-row">
-                            <span className="summary-label">Quantity:</span>
-                            <span className="summary-value">{orderForm.quantity || '0'}</span>
-                          </div>
-                          <div className="summary-row">
-                            <span className="summary-label">Price:</span>
-                            <span className="summary-value">
-                              {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
-                            </span>
-                          </div>
-                          {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
-                            <div className="summary-row">
-                              <span className="summary-label">Trigger Price:</span>
-                              <span className="summary-value">₹{orderForm.triggerPrice || '0.00'}</span>
-                            </div>
-                          )}
-                          <div className="summary-row">
-                            <span className="summary-label">Type:</span>
-                            <span className="summary-value">{orderForm.orderType}</span>
-                          </div>
-                          <div className="summary-row">
-                            <span className="summary-label">Product:</span>
-                            <span className="summary-value">{orderForm.product}</span>
-                          </div>
-                          {orderForm.quantity && orderForm.price && (
-                            <>
-                              <div className="summary-divider"></div>
-                              <div className="summary-row summary-total">
-                                <span className="summary-label">Total Value:</span>
-                                <span className="summary-value">
-                                  ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
-                                </span>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="empty-summary">
-                          <div className="empty-summary__icon">📋</div>
-                          <div className="empty-summary__text">Enter order details to see summary</div>
-                        </div>
-                      )}
-                    </div>
+              {/* Order Summary & Margin Info Sidebar */}
+              <div className="order-summary-section">
+                {/* Order Summary */}
+                <div className="card">
+                  <div className="card__header">
+                    <h3 className="card__title">Order Summary</h3>
                   </div>
-
-                  {/* Margin Information */}
-                  <div className="card">
-                    <div className="card__header">
-                      <h3 className="card__title">Margin Info</h3>
-                    </div>
-                    <div className="card__content">
-                      <div className="margin-details">
-                        <div className="margin-row">
-                          <span className="margin-label">Required:</span>
-                          <span className="margin-value">₹{formatCurrency(marginInfo.required)}</span>
+                  <div className="card__content">
+                    {orderForm.symbol ? (
+                      <div className="summary-details">
+                        <div className="summary-row">
+                          <span className="summary-label">Symbol:</span>
+                          <span className="summary-value">{orderForm.symbol}</span>
                         </div>
-                        <div className="margin-row">
-                          <span className="margin-label">Available:</span>
-                          <span className="margin-value">₹{formatCurrency(marginInfo.available)}</span>
+                        <div className="summary-row">
+                          <span className="summary-label">Exchange:</span>
+                          <span className={`summary-value exchange-badge ${orderForm.exchange.toLowerCase()}`}>
+                            {orderForm.exchange}
+                          </span>
                         </div>
-                        {marginInfo.shortfall > 0 && (
+                        <div className="summary-row">
+                          <span className="summary-label">Action:</span>
+                          <span className={`summary-value action-badge ${orderForm.action.toLowerCase()}`}>
+                            {orderForm.action}
+                          </span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Quantity:</span>
+                          <span className="summary-value">{orderForm.quantity || '0'}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Price:</span>
+                          <span className="summary-value">
+                            {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
+                          </span>
+                        </div>
+                        {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                          <div className="summary-row">
+                            <span className="summary-label">Trigger Price:</span>
+                            <span className="summary-value">₹{orderForm.triggerPrice || '0.00'}</span>
+                          </div>
+                        )}
+                        <div className="summary-row">
+                          <span className="summary-label">Type:</span>
+                          <span className="summary-value">{orderForm.orderType}</span>
+                        </div>
+                        <div className="summary-row">
+                          <span className="summary-label">Product:</span>
+                          <span className="summary-value">{orderForm.product}</span>
+                        </div>
+                        {orderForm.quantity && orderForm.price && (
                           <>
-                            <div className="margin-row margin-shortfall">
-                              <span className="margin-label">Shortfall:</span>
-                              <span className="margin-value">₹{formatCurrency(marginInfo.shortfall)}</span>
+                            <div className="summary-divider"></div>
+                            <div className="summary-row summary-total">
+                              <span className="summary-label">Total Value:</span>
+                              <span className="summary-value">
+                                ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
+                              </span>
                             </div>
-                            <button
-                              className="btn btn--primary btn--full-width btn--small"
-                              onClick={() => navigate('/funds')}
-                            >
-                              Add Funds
-                            </button>
                           </>
                         )}
                       </div>
+                    ) : (
+                      <div className="empty-summary">
+                        <div className="empty-summary__icon">📋</div>
+                        <div className="empty-summary__text">Enter order details to see summary</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Margin Information */}
+                <div className="card">
+                  <div className="card__header">
+                    <h3 className="card__title">Margin Info</h3>
+                  </div>
+                  <div className="card__content">
+                    <div className="margin-details">
+                      <div className="margin-row">
+                        <span className="margin-label">Required:</span>
+                        <span className="margin-value">₹{formatCurrency(marginInfo.required)}</span>
+                      </div>
+                      <div className="margin-row">
+                        <span className="margin-label">Available:</span>
+                        <span className="margin-value">₹{formatCurrency(marginInfo.available)}</span>
+                      </div>
+                      {marginInfo.shortfall > 0 && (
+                        <>
+                          <div className="margin-row margin-shortfall">
+                            <span className="margin-label">Shortfall:</span>
+                            <span className="margin-value">₹{formatCurrency(marginInfo.shortfall)}</span>
+                          </div>
+                          <button
+                            className="btn btn--primary btn--full-width btn--small"
+                            onClick={() => navigate('/funds')}
+                          >
+                            Add Funds
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
