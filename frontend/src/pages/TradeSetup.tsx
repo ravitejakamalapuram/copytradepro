@@ -292,15 +292,9 @@ const TradeSetup: React.FC = () => {
     }
   };
 
-  const getFieldStyle = (fieldName: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+  const getFieldClassName = (fieldName: string, baseClassName: string = ''): string => {
     const hasError = validationErrors[fieldName] && touchedFields[fieldName];
-    return {
-      ...baseStyle,
-      ...(hasError && {
-        borderColor: '#ef4444',
-        boxShadow: '0 0 0 1px #ef4444'
-      })
-    };
+    return `${baseClassName} ${hasError ? 'validation-error' : ''}`.trim();
   };
 
   const handlePlaceOrder = async () => {
@@ -452,6 +446,18 @@ const TradeSetup: React.FC = () => {
 
   return (
     <div className="kite-theme">
+      <style>
+        {`
+          .validation-error {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 1px #ef4444 !important;
+          }
+          .validation-error:focus {
+            border-color: #ef4444 !important;
+            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
+          }
+        `}
+      </style>
       <AppNavigation />
       
       <div className="kite-main">
@@ -523,11 +529,10 @@ const TradeSetup: React.FC = () => {
                       handleSymbolSearch(e.target.value);
                     }}
                     onBlur={() => handleFieldBlur('symbol')}
-                    className="kite-input"
+                    className={getFieldClassName('symbol', 'kite-input')}
                     style={{
                       fontSize: '1rem',
-                      paddingRight: searchLoading ? '2.5rem' : '1rem',
-                      ...getFieldStyle('symbol')
+                      paddingRight: searchLoading ? '2.5rem' : '1rem'
                     }}
                   />
                   {validationErrors.symbol && touchedFields.symbol && (
@@ -605,10 +610,9 @@ const TradeSetup: React.FC = () => {
                       handleFieldChange('quantity', e.target.value);
                     }}
                     onBlur={() => handleFieldBlur('quantity')}
-                    className="kite-input"
+                    className={getFieldClassName('quantity', 'kite-input')}
                     style={{
-                      fontSize: '1rem',
-                      ...getFieldStyle('quantity')
+                      fontSize: '1rem'
                     }}
                   />
                   {validationErrors.quantity && touchedFields.quantity && (
@@ -636,10 +640,9 @@ const TradeSetup: React.FC = () => {
                       handleFieldChange('price', e.target.value);
                     }}
                     onBlur={() => handleFieldBlur('price')}
-                    className="kite-input"
+                    className={getFieldClassName('price', 'kite-input')}
                     style={{
-                      fontSize: '1rem',
-                      ...getFieldStyle('price')
+                      fontSize: '1rem'
                     }}
                     disabled={orderForm.orderType === 'MARKET'}
                   />
@@ -707,10 +710,9 @@ const TradeSetup: React.FC = () => {
                       handleFieldChange('triggerPrice', e.target.value);
                     }}
                     onBlur={() => handleFieldBlur('triggerPrice')}
-                    className="kite-input"
+                    className={getFieldClassName('triggerPrice', 'kite-input')}
                     style={{
-                      fontSize: '1rem',
-                      ...getFieldStyle('triggerPrice')
+                      fontSize: '1rem'
                     }}
                   />
                   {validationErrors.triggerPrice && touchedFields.triggerPrice && (
@@ -748,16 +750,17 @@ const TradeSetup: React.FC = () => {
                     </button>
                   )}
                 </div>
-                <div style={{
-                  border: '1px solid var(--kite-border)',
-                  borderRadius: 'var(--kite-radius-md)',
-                  padding: '1rem',
-                  backgroundColor: 'var(--kite-bg-primary)',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)',
-                  ...getFieldStyle('selectedAccounts')
-                }}>
+                <div
+                  className={getFieldClassName('selectedAccounts')}
+                  style={{
+                    border: '1px solid var(--kite-border)',
+                    borderRadius: 'var(--kite-radius-md)',
+                    padding: '1rem',
+                    backgroundColor: 'var(--kite-bg-primary)',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
+                  }}>
                   {connectedAccounts.length === 0 ? (
                     <div style={{
                       color: 'var(--kite-text-secondary)',
@@ -784,12 +787,48 @@ const TradeSetup: React.FC = () => {
                             transition: 'all 0.2s ease'
                           }}
                         >
-                          <Checkbox
-                            checked={orderForm.selectedAccounts.includes(account.id)}
-                            onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            label={`${account.brokerName.toUpperCase()} - ${account.userId}`}
-                            size="base"
-                          />
+                          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                            <Checkbox
+                              checked={orderForm.selectedAccounts.includes(account.id)}
+                              onChange={(checked) => handleAccountSelection(account.id, checked)}
+                              label=""
+                              size="base"
+                            />
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <span style={{
+                                  fontWeight: '600',
+                                  fontSize: '0.875rem',
+                                  color: 'var(--kite-text-primary)'
+                                }}>
+                                  {account.brokerName.toUpperCase()}
+                                </span>
+                                <span style={{
+                                  fontSize: '0.75rem',
+                                  padding: '0.125rem 0.375rem',
+                                  backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
+                                  color: 'white',
+                                  borderRadius: '0.25rem',
+                                  fontWeight: '500'
+                                }}>
+                                  {account.isActive ? 'ACTIVE' : 'INACTIVE'}
+                                </span>
+                              </div>
+                              <span style={{
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                color: 'var(--kite-text-primary)'
+                              }}>
+                                Account: {account.userId}
+                              </span>
+                              <span style={{
+                                fontSize: '0.75rem',
+                                color: 'var(--kite-text-secondary)'
+                              }}>
+                                {account.userName} • {account.email}
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
