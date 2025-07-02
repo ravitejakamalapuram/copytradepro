@@ -55,6 +55,8 @@ const TradeSetup: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [touchedFields, setTouchedFields] = useState<{[key: string]: boolean}>({});
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -177,12 +179,21 @@ const TradeSetup: React.FC = () => {
   };
 
   const handleAccountSelection = (accountId: string, checked: boolean) => {
+    const newSelectedAccounts = checked
+      ? [...orderForm.selectedAccounts, accountId]
+      : orderForm.selectedAccounts.filter(id => id !== accountId);
+
     setOrderForm(prev => ({
       ...prev,
-      selectedAccounts: checked
-        ? [...prev.selectedAccounts, accountId]
-        : prev.selectedAccounts.filter(id => id !== accountId)
+      selectedAccounts: newSelectedAccounts
     }));
+
+    handleFieldChange('selectedAccounts', newSelectedAccounts);
+
+    // Validate immediately for account selection
+    setTimeout(() => {
+      handleFieldBlur('selectedAccounts');
+    }, 100);
   };
 
   const handleSelectAllAccounts = () => {
@@ -193,20 +204,114 @@ const TradeSetup: React.FC = () => {
     }));
   };
 
+  // Validation functions
+  const validateField = (fieldName: string, value: any): string | null => {
+    switch (fieldName) {
+      case 'symbol':
+        if (!value || value.trim() === '') {
+          return 'Symbol is required';
+        }
+        break;
+      case 'quantity':
+        if (!value || value.trim() === '') {
+          return 'Quantity is required';
+        }
+        if (isNaN(Number(value)) || Number(value) <= 0) {
+          return 'Quantity must be a positive number';
+        }
+        break;
+      case 'price':
+        if (orderForm.orderType !== 'MARKET') {
+          if (!value || value.trim() === '') {
+            return 'Price is required for limit orders';
+          }
+          if (isNaN(Number(value)) || Number(value) <= 0) {
+            return 'Price must be a positive number';
+          }
+        }
+        break;
+      case 'triggerPrice':
+        if (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') {
+          if (!value || value.trim() === '') {
+            return 'Trigger price is required for Stop Loss orders';
+          }
+          if (isNaN(Number(value)) || Number(value) <= 0) {
+            return 'Trigger price must be a positive number';
+          }
+        }
+        break;
+      case 'selectedAccounts':
+        if (!value || value.length === 0) {
+          return 'Please select at least one account';
+        }
+        break;
+    }
+    return null;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+    const touched: {[key: string]: boolean} = {};
+
+    // Validate all required fields
+    const fieldsToValidate = ['symbol', 'quantity', 'price', 'triggerPrice', 'selectedAccounts'];
+
+    fieldsToValidate.forEach(field => {
+      touched[field] = true;
+      const value = field === 'selectedAccounts' ? orderForm.selectedAccounts : orderForm[field as keyof typeof orderForm];
+      const error = validateField(field, value);
+      if (error) {
+        errors[field] = error;
+      }
+    });
+
+    setValidationErrors(errors);
+    setTouchedFields(touched);
+
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleFieldBlur = (fieldName: string) => {
+    setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
+    const value = fieldName === 'selectedAccounts' ? orderForm.selectedAccounts : orderForm[fieldName as keyof typeof orderForm];
+    const error = validateField(fieldName, value);
+
+    setValidationErrors(prev => ({
+      ...prev,
+      [fieldName]: error || ''
+    }));
+  };
+
+  const handleFieldChange = (fieldName: string, _value: any) => {
+    // Clear error when user starts typing
+    if (validationErrors[fieldName]) {
+      setValidationErrors(prev => ({
+        ...prev,
+        [fieldName]: ''
+      }));
+    }
+  };
+
+  const getFieldStyle = (fieldName: string, baseStyle: React.CSSProperties = {}): React.CSSProperties => {
+    const hasError = validationErrors[fieldName] && touchedFields[fieldName];
+    return {
+      ...baseStyle,
+      ...(hasError && {
+        borderColor: '#ef4444',
+        boxShadow: '0 0 0 1px #ef4444'
+      })
+    };
+  };
+
   const handlePlaceOrder = async () => {
-    if (!orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0) {
-      validationError('Please fill all required fields and select at least one account');
-      return;
-    }
-
-    // Validate trigger price for Stop Loss orders
-    if ((orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && !orderForm.triggerPrice) {
-      validationError('Trigger price is required for Stop Loss orders');
-      return;
-    }
-
-    if (orderForm.orderType !== 'MARKET' && !orderForm.price) {
-      validationError('Price is required for limit orders');
+    // Validate form and highlight errors
+    if (!validateForm()) {
+      const errorMessages = Object.values(validationErrors).filter(msg => msg);
+      if (errorMessages.length === 1) {
+        validationError(errorMessages[0]);
+      } else {
+        validationError(`Please fix ${errorMessages.length} validation errors in the form`);
+      }
       return;
     }
 
@@ -414,11 +519,26 @@ const TradeSetup: React.FC = () => {
                     value={orderForm.symbol}
                     onChange={(e) => {
                       setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
+                      handleFieldChange('symbol', e.target.value);
                       handleSymbolSearch(e.target.value);
                     }}
+                    onBlur={() => handleFieldBlur('symbol')}
                     className="kite-input"
-                    style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
+                    style={{
+                      fontSize: '1rem',
+                      paddingRight: searchLoading ? '2.5rem' : '1rem',
+                      ...getFieldStyle('symbol')
+                    }}
                   />
+                  {validationErrors.symbol && touchedFields.symbol && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#ef4444',
+                      marginTop: '0.25rem'
+                    }}>
+                      {validationErrors.symbol}
+                    </div>
+                  )}
                   {searchLoading && (
                     <div style={{
                       position: 'absolute',
@@ -480,10 +600,26 @@ const TradeSetup: React.FC = () => {
                     type="number"
                     placeholder="0"
                     value={orderForm.quantity}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
+                    onChange={(e) => {
+                      setOrderForm(prev => ({ ...prev, quantity: e.target.value }));
+                      handleFieldChange('quantity', e.target.value);
+                    }}
+                    onBlur={() => handleFieldBlur('quantity')}
                     className="kite-input"
-                    style={{ fontSize: '1rem' }}
+                    style={{
+                      fontSize: '1rem',
+                      ...getFieldStyle('quantity')
+                    }}
                   />
+                  {validationErrors.quantity && touchedFields.quantity && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#ef4444',
+                      marginTop: '0.25rem'
+                    }}>
+                      {validationErrors.quantity}
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -495,11 +631,27 @@ const TradeSetup: React.FC = () => {
                     step="0.05"
                     placeholder="0.00"
                     value={orderForm.price}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
+                    onChange={(e) => {
+                      setOrderForm(prev => ({ ...prev, price: e.target.value }));
+                      handleFieldChange('price', e.target.value);
+                    }}
+                    onBlur={() => handleFieldBlur('price')}
                     className="kite-input"
-                    style={{ fontSize: '1rem' }}
+                    style={{
+                      fontSize: '1rem',
+                      ...getFieldStyle('price')
+                    }}
                     disabled={orderForm.orderType === 'MARKET'}
                   />
+                  {validationErrors.price && touchedFields.price && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#ef4444',
+                      marginTop: '0.25rem'
+                    }}>
+                      {validationErrors.price}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -550,10 +702,26 @@ const TradeSetup: React.FC = () => {
                     step="0.05"
                     placeholder="0.00"
                     value={orderForm.triggerPrice}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }))}
+                    onChange={(e) => {
+                      setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }));
+                      handleFieldChange('triggerPrice', e.target.value);
+                    }}
+                    onBlur={() => handleFieldBlur('triggerPrice')}
                     className="kite-input"
-                    style={{ fontSize: '1rem' }}
+                    style={{
+                      fontSize: '1rem',
+                      ...getFieldStyle('triggerPrice')
+                    }}
                   />
+                  {validationErrors.triggerPrice && touchedFields.triggerPrice && (
+                    <div style={{
+                      fontSize: '0.75rem',
+                      color: '#ef4444',
+                      marginTop: '0.25rem'
+                    }}>
+                      {validationErrors.triggerPrice}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -587,7 +755,8 @@ const TradeSetup: React.FC = () => {
                   backgroundColor: 'var(--kite-bg-primary)',
                   maxHeight: '300px',
                   overflowY: 'auto',
-                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
+                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)',
+                  ...getFieldStyle('selectedAccounts')
                 }}>
                   {connectedAccounts.length === 0 ? (
                     <div style={{
@@ -626,13 +795,13 @@ const TradeSetup: React.FC = () => {
                     </div>
                   )}
                 </div>
-                {orderForm.selectedAccounts.length === 0 && (
+                {validationErrors.selectedAccounts && touchedFields.selectedAccounts && (
                   <div style={{
                     fontSize: '0.75rem',
-                    color: 'var(--kite-loss)',
+                    color: '#ef4444',
                     marginTop: '0.25rem'
                   }}>
-                    Please select at least one account to place orders
+                    {validationErrors.selectedAccounts}
                   </div>
                 )}
               </div>
