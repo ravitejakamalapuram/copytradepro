@@ -205,43 +205,51 @@ const TradeSetup: React.FC = () => {
   };
 
   // Validation functions
-  const validateField = (fieldName: string, value: any): string | null => {
+  const validateField = (fieldName: string, value: any, currentOrderType?: string): string | null => {
+    const orderType = currentOrderType || orderForm.orderType;
+
     switch (fieldName) {
       case 'symbol':
-        if (!value || value.trim() === '') {
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
           return 'Symbol is required';
         }
         break;
       case 'quantity':
-        if (!value || value.trim() === '') {
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
           return 'Quantity is required';
         }
-        if (isNaN(Number(value)) || Number(value) <= 0) {
+        const quantityNum = Number(value);
+        if (isNaN(quantityNum) || quantityNum <= 0) {
           return 'Quantity must be a positive number';
+        }
+        if (!Number.isInteger(quantityNum)) {
+          return 'Quantity must be a whole number';
         }
         break;
       case 'price':
-        if (orderForm.orderType !== 'MARKET') {
-          if (!value || value.trim() === '') {
+        if (orderType !== 'MARKET') {
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
             return 'Price is required for limit orders';
           }
-          if (isNaN(Number(value)) || Number(value) <= 0) {
+          const priceNum = Number(value);
+          if (isNaN(priceNum) || priceNum <= 0) {
             return 'Price must be a positive number';
           }
         }
         break;
       case 'triggerPrice':
-        if (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') {
-          if (!value || value.trim() === '') {
+        if (orderType === 'SL-LIMIT' || orderType === 'SL-MARKET') {
+          if (!value || (typeof value === 'string' && value.trim() === '')) {
             return 'Trigger price is required for Stop Loss orders';
           }
-          if (isNaN(Number(value)) || Number(value) <= 0) {
+          const triggerPriceNum = Number(value);
+          if (isNaN(triggerPriceNum) || triggerPriceNum <= 0) {
             return 'Trigger price must be a positive number';
           }
         }
         break;
       case 'selectedAccounts':
-        if (!value || value.length === 0) {
+        if (!value || !Array.isArray(value) || value.length === 0) {
           return 'Please select at least one account';
         }
         break;
@@ -259,7 +267,7 @@ const TradeSetup: React.FC = () => {
     fieldsToValidate.forEach(field => {
       touched[field] = true;
       const value = field === 'selectedAccounts' ? orderForm.selectedAccounts : orderForm[field as keyof typeof orderForm];
-      const error = validateField(field, value);
+      const error = validateField(field, value, orderForm.orderType);
       if (error) {
         errors[field] = error;
       }
@@ -274,7 +282,7 @@ const TradeSetup: React.FC = () => {
   const handleFieldBlur = (fieldName: string) => {
     setTouchedFields(prev => ({ ...prev, [fieldName]: true }));
     const value = fieldName === 'selectedAccounts' ? orderForm.selectedAccounts : orderForm[fieldName as keyof typeof orderForm];
-    const error = validateField(fieldName, value);
+    const error = validateField(fieldName, value, orderForm.orderType);
 
     setValidationErrors(prev => ({
       ...prev,
@@ -294,6 +302,10 @@ const TradeSetup: React.FC = () => {
 
   const getFieldClassName = (fieldName: string, baseClassName: string = ''): string => {
     const hasError = validationErrors[fieldName] && touchedFields[fieldName];
+    // Debug logging
+    if (hasError) {
+      console.log(`Field ${fieldName} has error: "${validationErrors[fieldName]}" (touched: ${touchedFields[fieldName]})`);
+    }
     return `${baseClassName} ${hasError ? 'validation-error' : ''}`.trim();
   };
 
@@ -666,7 +678,35 @@ const TradeSetup: React.FC = () => {
                   </label>
                   <select
                     value={orderForm.orderType}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as any }))}
+                    onChange={(e) => {
+                      const newOrderType = e.target.value as any;
+                      setOrderForm(prev => ({ ...prev, orderType: newOrderType }));
+
+                      // Clear validation errors for price and triggerPrice when order type changes
+                      setValidationErrors(prev => ({
+                        ...prev,
+                        price: '',
+                        triggerPrice: ''
+                      }));
+
+                      // Revalidate price and triggerPrice with new order type after a short delay
+                      setTimeout(() => {
+                        if (touchedFields.price) {
+                          const priceError = validateField('price', orderForm.price, newOrderType);
+                          setValidationErrors(prev => ({
+                            ...prev,
+                            price: priceError || ''
+                          }));
+                        }
+                        if (touchedFields.triggerPrice) {
+                          const triggerPriceError = validateField('triggerPrice', orderForm.triggerPrice, newOrderType);
+                          setValidationErrors(prev => ({
+                            ...prev,
+                            triggerPrice: triggerPriceError || ''
+                          }));
+                        }
+                      }, 100);
+                    }}
                     className="kite-input"
                     style={{ fontSize: '1rem' }}
                   >
