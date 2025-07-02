@@ -1,0 +1,471 @@
+// =============================================================================
+// Orders Page Styles
+// =============================================================================
+
+@import '../variables';
+@import '../mixins';
+
+.orders-page {
+  min-height: 100vh;
+  background-color: $gray-50;
+
+  &__container {
+    @extend .container;
+    padding-top: $space-6;
+    padding-bottom: $space-6;
+  }
+
+  &__header {
+    @include flex-between;
+    margin-bottom: $space-6;
+    padding: $space-4 $space-6;
+    background-color: $white;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-sm;
+
+    .header-title {
+      font-size: $font-2xl;
+      font-weight: $font-bold;
+      color: $gray-900;
+      margin: 0;
+    }
+
+    .header-actions {
+      @include flex-start;
+      gap: $space-3;
+    }
+  }
+
+  &__content {
+    @include card-base;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
+// =============================================================================
+// FILTERS SECTION
+// =============================================================================
+
+.orders-filters {
+  padding: $space-6;
+  border-bottom: $border-width solid $gray-200;
+  background-color: $gray-50;
+
+  &__row {
+    @include flex-between;
+    gap: $space-4;
+    margin-bottom: $space-4;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    @include mobile-only {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  &__group {
+    @include flex-start;
+    gap: $space-3;
+
+    @include mobile-only {
+      flex-direction: column;
+      gap: $space-2;
+    }
+  }
+
+  &__label {
+    font-size: $font-sm;
+    font-weight: $font-medium;
+    color: $gray-700;
+    margin-bottom: $space-1;
+  }
+}
+
+// Tab filters
+.tab-filters {
+  @include flex-start;
+  gap: $space-1;
+  background-color: $gray-100;
+  border-radius: $radius-lg;
+  padding: $space-1;
+
+  .tab-filter {
+    @extend .btn;
+    @extend .btn--ghost;
+    padding: $space-2 $space-4;
+    border-radius: $radius-md;
+    font-size: $font-sm;
+    transition: $transition-all;
+
+    &.active {
+      background-color: $white;
+      color: $primary-blue;
+      box-shadow: $shadow-sm;
+    }
+  }
+}
+
+// Date filters
+.date-filters {
+  @include flex-start;
+  gap: $space-2;
+
+  .date-filter {
+    @extend .btn;
+    @extend .btn--outline;
+    padding: $space-2 $space-3;
+    font-size: $font-sm;
+
+    &.active {
+      @extend .btn--primary;
+    }
+  }
+}
+
+// Account filters
+.account-filters {
+  position: relative;
+
+  &__toggle {
+    @extend .btn;
+    @extend .btn--outline;
+    @include flex-start;
+    gap: $space-2;
+    padding: $space-2 $space-3;
+    font-size: $font-sm;
+  }
+
+  &__dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: $z-dropdown;
+    background-color: $white;
+    border: $border-width solid $gray-200;
+    border-radius: $radius-md;
+    box-shadow: $shadow-lg;
+    padding: $space-3;
+    margin-top: $space-1;
+    min-width: 250px;
+
+    @include mobile-only {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 90vw;
+      max-width: 400px;
+    }
+  }
+
+  &__option {
+    @extend .form-checkbox;
+    margin-bottom: $space-2;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+// =============================================================================
+// ORDERS TABLE
+// =============================================================================
+
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  &__header {
+    background-color: $gray-50;
+    border-bottom: $border-width solid $gray-200;
+
+    th {
+      padding: $space-4 $space-6;
+      text-align: left;
+      font-size: $font-sm;
+      font-weight: $font-semibold;
+      color: $gray-700;
+      border-bottom: $border-width solid $gray-200;
+
+      &:first-child {
+        padding-left: $space-6;
+      }
+
+      &:last-child {
+        padding-right: $space-6;
+      }
+    }
+  }
+
+  &__body {
+    tr {
+      border-bottom: $border-width solid $gray-100;
+      transition: $transition-colors;
+
+      &:hover {
+        background-color: $gray-50;
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    td {
+      padding: $space-4 $space-6;
+      font-size: $font-sm;
+      color: $gray-900;
+      vertical-align: middle;
+
+      &:first-child {
+        padding-left: $space-6;
+      }
+
+      &:last-child {
+        padding-right: $space-6;
+      }
+    }
+  }
+
+  // Responsive table
+  @include mobile-only {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+
+    &__header,
+    &__body {
+      display: table;
+      width: 100%;
+    }
+  }
+}
+
+// =============================================================================
+// ORDER STATUS BADGES
+// =============================================================================
+
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  gap: $space-1;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  font-size: $font-xs;
+  font-weight: $font-medium;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+
+  &--placed {
+    background-color: rgba($info, 0.1);
+    color: $info-dark;
+  }
+
+  &--pending {
+    background-color: rgba($warning, 0.1);
+    color: $warning-dark;
+  }
+
+  &--executed {
+    background-color: rgba($success, 0.1);
+    color: $success-dark;
+  }
+
+  &--cancelled {
+    background-color: rgba($gray-500, 0.1);
+    color: $gray-700;
+  }
+
+  &--rejected {
+    background-color: rgba($error, 0.1);
+    color: $error-dark;
+  }
+
+  &--partially-filled {
+    background-color: rgba($warning, 0.1);
+    color: $warning-dark;
+  }
+}
+
+// =============================================================================
+// ORDER TYPE BADGES
+// =============================================================================
+
+.order-type {
+  display: inline-flex;
+  align-items: center;
+  padding: $space-1 $space-2;
+  border-radius: $radius-sm;
+  font-size: $font-xs;
+  font-weight: $font-medium;
+  text-transform: uppercase;
+
+  &--buy {
+    background-color: rgba($success, 0.1);
+    color: $success-dark;
+  }
+
+  &--sell {
+    background-color: rgba($error, 0.1);
+    color: $error-dark;
+  }
+}
+
+// =============================================================================
+// ORDER ACTIONS
+// =============================================================================
+
+.order-actions {
+  @include flex-start;
+  gap: $space-2;
+
+  .action-btn {
+    @extend .btn;
+    @extend .btn--sm;
+    @extend .btn--ghost;
+    padding: $space-1 $space-2;
+    font-size: $font-xs;
+
+    &--check {
+      color: $info;
+
+      &:hover {
+        background-color: rgba($info, 0.1);
+      }
+
+      &.loading {
+        @extend .btn--loading;
+      }
+    }
+
+    &--cancel {
+      color: $error;
+
+      &:hover {
+        background-color: rgba($error, 0.1);
+      }
+    }
+  }
+}
+
+// =============================================================================
+// EMPTY STATE
+// =============================================================================
+
+.orders-empty {
+  text-align: center;
+  padding: $space-16 $space-8;
+
+  &__icon {
+    font-size: 4rem;
+    margin-bottom: $space-4;
+    opacity: 0.5;
+  }
+
+  &__title {
+    font-size: $font-lg;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin-bottom: $space-2;
+  }
+
+  &__message {
+    font-size: $font-sm;
+    color: $gray-600;
+    margin-bottom: $space-6;
+  }
+
+  &__action {
+    @extend .btn;
+    @extend .btn--primary;
+  }
+}
+
+// =============================================================================
+// LOADING STATE
+// =============================================================================
+
+.orders-loading {
+  text-align: center;
+  padding: $space-16 $space-8;
+
+  &__spinner {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid $gray-200;
+    border-top-color: $primary-blue;
+    border-radius: $radius-full;
+    animation: spin 1s linear infinite;
+    margin: 0 auto $space-4;
+  }
+
+  &__message {
+    font-size: $font-sm;
+    color: $gray-600;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE ADJUSTMENTS
+// =============================================================================
+
+@include mobile-only {
+  .orders-page {
+    &__header {
+      flex-direction: column;
+      gap: $space-4;
+      text-align: center;
+
+      .header-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }
+  }
+
+  .orders-filters {
+    padding: $space-4;
+
+    &__row {
+      flex-direction: column;
+      gap: $space-3;
+    }
+
+    &__group {
+      flex-direction: column;
+      gap: $space-2;
+    }
+  }
+
+  .tab-filters {
+    flex-wrap: wrap;
+  }
+
+  .date-filters {
+    flex-wrap: wrap;
+  }
+}
+
+// =============================================================================
+// ANIMATIONS
+// =============================================================================
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fade-in {
+  @include fade-in;
+}
+
+.slide-in-up {
+  @include slide-in-up;
+}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
-import '../styles/app-theme.css';
+// Styles now imported via main.scss
 
 interface Order {
   id: string;
@@ -389,56 +389,62 @@ const Orders: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
+    <div className="trading-theme">
       <AppNavigation />
-      
-      <div className="kite-main">
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <div>
-              <h2 className="kite-card-title">Orders</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                {/* Date Filter Buttons */}
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Date:</span>
-                  {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+
+      <div className="orders-page">
+        <div className="orders-page__container">
+          <div className="orders-page__header">
+            <h1 className="header-title">Orders</h1>
+            <div className="header-actions">
+              <button
+                className="btn btn--secondary"
+                onClick={() => navigate('/trade-setup')}
+              >
+                📈 Place Order
+              </button>
+              <button
+                className="btn btn--outline"
+                onClick={fetchOrders}
+                disabled={loading}
+              >
+                🔄 Refresh
+              </button>
+            </div>
+          </div>
+
+          <div className="orders-page__content">
+            <div className="orders-filters">
+              <div className="orders-filters__row">
+                <div className="orders-filters__group">
+                  <div className="orders-filters__label">Date:</div>
+                  <div className="date-filters">
+                    {(['today', 'week', 'month', 'all'] as const).map((filter) => (
+                      <button
+                        key={filter}
+                        className={`date-filter ${dateFilter === filter ? 'active' : ''}`}
+                        onClick={() => {
+                          setDateFilter(filter);
+                          setShowDatePicker(false);
+                          setCustomStartDate('');
+                          setCustomEndDate('');
+                        }}
+                      >
+                        {filter === 'today' ? 'Today' :
+                         filter === 'week' ? 'Week' :
+                         filter === 'month' ? 'Month' : 'All'}
+                      </button>
+                    ))}
                     <button
-                      key={filter}
-                      className={`kite-btn ${dateFilter === filter ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
-                      onClick={() => {
-                        setDateFilter(filter);
-                        setShowDatePicker(false);
-                        setCustomStartDate('');
-                        setCustomEndDate('');
-                      }}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        textTransform: 'capitalize'
-                      }}
+                      className={`date-filter ${showDatePicker ? 'active' : ''}`}
+                      onClick={() => setShowDatePicker(!showDatePicker)}
                     >
-                      {filter === 'today' ? 'Today' :
-                       filter === 'week' ? 'Week' :
-                       filter === 'month' ? 'Month' : 'All'}
+                      📅 Custom
                     </button>
-                  ))}
-                  <button
-                    className={`kite-btn ${showDatePicker ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
-                    onClick={() => setShowDatePicker(!showDatePicker)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem'
-                    }}
-                  >
-                    📅 Custom
-                  </button>
+                  </div>
                 </div>
+
+                <div className="orders-filters__group">
 
                 {/* Account Filter Checkboxes */}
                 <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
@@ -934,6 +940,7 @@ const Orders: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };
