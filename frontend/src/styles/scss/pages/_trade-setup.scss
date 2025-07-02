@@ -54,7 +54,7 @@
   grid-template-columns: 2fr 1fr;
   gap: 2rem;
 
-  @media (max-width: 1024px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
     gap: 1.5rem;
   }
@@ -335,6 +335,137 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+// Summary Details
+.summary-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid $gray-700;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &.summary-total {
+    border-top: 1px solid $gray-600;
+    padding-top: 0.75rem;
+    margin-top: 0.5rem;
+    font-weight: 600;
+  }
+}
+
+.summary-label {
+  font-size: 0.875rem;
+  color: $gray-300;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 0.875rem;
+  color: $white;
+  font-weight: 500;
+  font-family: $font-mono;
+}
+
+.summary-divider {
+  height: 1px;
+  background-color: $gray-600;
+  margin: 0.5rem 0;
+}
+
+// Exchange and Action Badges
+.exchange-badge {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  &.nse {
+    background-color: rgba($primary-blue, 0.2);
+    color: $primary-blue;
+  }
+
+  &.bse {
+    background-color: rgba($warning, 0.2);
+    color: $warning;
+  }
+}
+
+.action-badge {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  &.buy {
+    background-color: rgba($success, 0.2);
+    color: $success;
+  }
+
+  &.sell {
+    background-color: rgba($error, 0.2);
+    color: $error;
+  }
+}
+
+// Empty Summary
+.empty-summary {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: $gray-400;
+
+  &__icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.5;
+  }
+
+  &__text {
+    font-size: 0.875rem;
+  }
+}
+
+// Margin Details
+.margin-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.margin-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+
+  &.margin-shortfall {
+    color: $error;
+    font-weight: 600;
+  }
+}
+
+.margin-label {
+  font-size: 0.875rem;
+  color: $gray-300;
+  font-weight: 500;
+}
+
+.margin-value {
+  font-size: 0.875rem;
+  color: $white;
+  font-weight: 600;
+  font-family: $font-mono;
 }
 
 // Loading and Empty States
