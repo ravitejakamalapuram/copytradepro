@@ -96,8 +96,8 @@ const TradeSetup: React.FC = () => {
 
     try {
       const response = await marketDataService.searchSymbols(query);
-      if (response.success && Array.isArray(response.data)) {
-        setSearchResults(response.data.slice(0, 10));
+      if (response.success && response.data && Array.isArray(response.data.results)) {
+        setSearchResults(response.data.results.slice(0, 10));
         setShowSearchResults(true);
       } else {
         setSearchResults([]);
@@ -329,7 +329,7 @@ const TradeSetup: React.FC = () => {
                                 className="search-result"
                                 onClick={() => handleSymbolSelect(result)}
                               >
-                                <div className="search-result__symbol">{result.symbol}</div>
+                                <div className="search-result__symbol">{result.displaySymbol || result.symbol}</div>
                                 <div className="search-result__name">{result.name}</div>
                                 <div className="search-result__exchange">{result.exchange}</div>
                               </div>
