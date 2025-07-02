@@ -30,7 +30,7 @@ interface MarginInfo {
 
 const TradeSetup: React.FC = () => {
   const navigate = useNavigate();
-  const { orderSuccess, orderError, orderPartialSuccess, validationError } = useToast();
+  const { orderSuccess, orderError, orderPartialSuccess } = useToast();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
   const [orderForm, setOrderForm] = useState<OrderForm>({
     symbol: '',
@@ -77,7 +77,7 @@ const TradeSetup: React.FC = () => {
 
       } catch (error: any) {
         console.error('Failed to fetch accounts:', error);
-        validationError('Failed to load broker accounts');
+        // Account loading errors will be handled by the UI showing "No accounts" state
       } finally {
         setLoading(false);
       }
@@ -302,27 +302,18 @@ const TradeSetup: React.FC = () => {
 
   const getFieldClassName = (fieldName: string, baseClassName: string = ''): string => {
     const hasError = validationErrors[fieldName] && touchedFields[fieldName];
-    // Debug logging
-    if (hasError) {
-      console.log(`Field ${fieldName} has error: "${validationErrors[fieldName]}" (touched: ${touchedFields[fieldName]})`);
-    }
     return `${baseClassName} ${hasError ? 'validation-error' : ''}`.trim();
   };
 
   const handlePlaceOrder = async () => {
     // Validate form and highlight errors
     if (!validateForm()) {
-      const errorMessages = Object.values(validationErrors).filter(msg => msg);
-      if (errorMessages.length === 1) {
-        validationError(errorMessages[0]);
-      } else {
-        validationError(`Please fix ${errorMessages.length} validation errors in the form`);
-      }
+      // Just return - the red highlighting and field error messages will show the issues
       return;
     }
 
     if (marginInfo.shortfall > 0) {
-      validationError(`Insufficient margin. Shortfall: ₹${marginInfo.shortfall.toLocaleString()}`);
+      // Margin shortfall will be shown in the UI, no need for toast notification
       return;
     }
 
