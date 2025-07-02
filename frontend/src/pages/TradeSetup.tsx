@@ -7,7 +7,6 @@ import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
 import { Checkbox } from '../components/ui/Checkbox';
 import { useToast } from '../hooks/useToast';
-import '../styles/app-theme.css';
 
 interface OrderForm {
   symbol: string;
@@ -268,10 +267,14 @@ const TradeSetup: React.FC = () => {
       touched[field] = true;
       const value = field === 'selectedAccounts' ? orderForm.selectedAccounts : orderForm[field as keyof typeof orderForm];
       const error = validateField(field, value, orderForm.orderType);
+      console.log(`Validating ${field}: value="${JSON.stringify(value)}", error="${error}"`);
       if (error) {
         errors[field] = error;
       }
     });
+
+    console.log('Final validation errors:', errors);
+    console.log('Final touched fields:', touched);
 
     setValidationErrors(errors);
     setTouchedFields(touched);
@@ -302,15 +305,26 @@ const TradeSetup: React.FC = () => {
 
   const getFieldClassName = (fieldName: string, baseClassName: string = ''): string => {
     const hasError = validationErrors[fieldName] && touchedFields[fieldName];
+    console.log(`Field ${fieldName}: error="${validationErrors[fieldName]}", touched="${touchedFields[fieldName]}", hasError="${hasError}"`);
     return `${baseClassName} ${hasError ? 'validation-error' : ''}`.trim();
   };
 
   const handlePlaceOrder = async () => {
+    console.log('Place Order clicked - starting validation...');
+    console.log('Current form state:', orderForm);
+
     // Validate form and highlight errors
-    if (!validateForm()) {
+    const isValid = validateForm();
+    console.log('Validation result:', isValid);
+
+    if (!isValid) {
+      console.log('Validation failed - stopping order placement');
+      alert('Validation failed! Check console and red highlighting on fields.');
       // Just return - the red highlighting and field error messages will show the issues
       return;
     }
+
+    console.log('Validation passed - proceeding with order placement');
 
     if (marginInfo.shortfall > 0) {
       // Margin shortfall will be shown in the UI, no need for toast notification
@@ -448,42 +462,38 @@ const TradeSetup: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
-      <style>
-        {`
-          .validation-error {
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 0 1px #ef4444 !important;
-          }
-          .validation-error:focus {
-            border-color: #ef4444 !important;
-            box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2) !important;
-          }
-        `}
-      </style>
+    <div className="trading-theme">
       <AppNavigation />
       
-      <div className="kite-main">
-        {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Place Order</h1>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
+      <div className="trade-setup">
+        <div className="trade-setup__container">
+          {/* Page Header */}
+          <div className="trade-setup__header">
+            <h1 className="header-title">Place Order</h1>
+            <div className="header-actions">
+              <button
+                className="btn btn--secondary"
                 onClick={() => navigate('/orders')}
               >
                 📋 View Orders
               </button>
-              <button 
-                className="kite-btn"
+              <button
+                className="btn btn--secondary"
                 onClick={() => navigate('/positions')}
               >
                 🎯 Positions
               </button>
+              <button
+                className="btn btn--error"
+                onClick={() => {
+                  console.log('Test validation button clicked');
+                  validateForm();
+                }}
+              >
+                🧪 Test Validation
+              </button>
             </div>
           </div>
-        </div>
 
         {/* Order Form */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
@@ -1037,6 +1047,7 @@ const TradeSetup: React.FC = () => {
           </div>
         </div>
       </div>
+    </div>
     </div>
   );
 };

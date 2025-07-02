@@ -1,0 +1,426 @@
+// =============================================================================
+// Form Components
+// =============================================================================
+
+@import '../variables';
+@import '../mixins';
+
+// =============================================================================
+// BASE FORM STYLES
+// =============================================================================
+
+.form-group {
+  margin-bottom: $space-4;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.form-label {
+  display: block;
+  font-weight: $font-medium;
+  color: $gray-700;
+  margin-bottom: $space-2;
+  font-size: $font-sm;
+
+  &--required::after {
+    content: ' *';
+    color: $error;
+  }
+
+  &--optional::after {
+    content: ' (optional)';
+    color: $gray-500;
+    font-weight: $font-normal;
+  }
+}
+
+.form-help {
+  font-size: $font-xs;
+  color: $gray-500;
+  margin-top: $space-1;
+  line-height: $leading-normal;
+}
+
+.form-error {
+  font-size: $font-xs;
+  color: $error;
+  margin-top: $space-1;
+  line-height: $leading-normal;
+  display: flex;
+  align-items: center;
+  gap: $space-1;
+
+  &::before {
+    content: '⚠';
+    font-size: $font-sm;
+  }
+}
+
+// =============================================================================
+// INPUT STYLES
+// =============================================================================
+
+.form-input {
+  @include input-base;
+
+  &--sm {
+    padding: $space-2 $space-3;
+    font-size: $font-xs;
+    height: $input-height-sm;
+  }
+
+  &--lg {
+    padding: $space-4 $space-5;
+    font-size: $font-base;
+    height: $input-height-lg;
+  }
+
+  &--error {
+    @include input-error;
+  }
+
+  &--success {
+    border-color: $success;
+    box-shadow: 0 0 0 1px $success;
+
+    &:focus {
+      border-color: $success;
+      box-shadow: 0 0 0 2px rgba($success, 0.2);
+    }
+  }
+
+  // Input with icon
+  &--with-icon {
+    padding-left: 2.5rem;
+  }
+
+  &--with-icon-right {
+    padding-right: 2.5rem;
+  }
+}
+
+// Input group for icons
+.input-group {
+  position: relative;
+
+  .input-icon {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: $gray-400;
+    pointer-events: none;
+    z-index: 1;
+
+    &--left {
+      left: $space-3;
+    }
+
+    &--right {
+      right: $space-3;
+    }
+  }
+
+  .form-input {
+    position: relative;
+    z-index: 0;
+  }
+}
+
+// =============================================================================
+// TEXTAREA STYLES
+// =============================================================================
+
+.form-textarea {
+  @include input-base;
+  min-height: 6rem;
+  resize: vertical;
+  line-height: $leading-relaxed;
+
+  &--error {
+    @include input-error;
+  }
+}
+
+// =============================================================================
+// SELECT STYLES
+// =============================================================================
+
+.form-select {
+  @include input-base;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right $space-3 center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+  padding-right: 2.5rem;
+  cursor: pointer;
+
+  &--error {
+    @include input-error;
+  }
+
+  &:focus {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23387ed1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  }
+}
+
+// =============================================================================
+// CHECKBOX STYLES
+// =============================================================================
+
+.form-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  cursor: pointer;
+
+  &__input {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: $border-width-2 solid $gray-300;
+    border-radius: $radius-sm;
+    background-color: $white;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 0.125rem; // Align with first line of text
+    transition: $transition-colors;
+
+    &:checked {
+      background-color: $primary-blue;
+      border-color: $primary-blue;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 1px;
+        left: 4px;
+        width: 4px;
+        height: 8px;
+        border: 2px solid $white;
+        border-top: 0;
+        border-left: 0;
+        transform: rotate(45deg);
+      }
+    }
+
+    &:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba($primary-blue, 0.2);
+    }
+
+    &:disabled {
+      background-color: $gray-100;
+      border-color: $gray-200;
+      cursor: not-allowed;
+    }
+  }
+
+  &__label {
+    font-size: $font-sm;
+    color: $gray-700;
+    line-height: $leading-normal;
+    cursor: pointer;
+    flex: 1;
+  }
+
+  &--error {
+    .form-checkbox__input {
+      border-color: $error;
+    }
+  }
+}
+
+// =============================================================================
+// RADIO STYLES
+// =============================================================================
+
+.form-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: $space-3;
+  cursor: pointer;
+
+  &__input {
+    appearance: none;
+    width: 1rem;
+    height: 1rem;
+    border: $border-width-2 solid $gray-300;
+    border-radius: $radius-full;
+    background-color: $white;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    margin-top: 0.125rem;
+    transition: $transition-colors;
+
+    &:checked {
+      background-color: $primary-blue;
+      border-color: $primary-blue;
+
+      &::after {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 8px;
+        height: 8px;
+        background-color: $white;
+        border-radius: $radius-full;
+      }
+    }
+
+    &:focus {
+      outline: none;
+      box-shadow: 0 0 0 2px rgba($primary-blue, 0.2);
+    }
+
+    &:disabled {
+      background-color: $gray-100;
+      border-color: $gray-200;
+      cursor: not-allowed;
+    }
+  }
+
+  &__label {
+    font-size: $font-sm;
+    color: $gray-700;
+    line-height: $leading-normal;
+    cursor: pointer;
+    flex: 1;
+  }
+}
+
+// =============================================================================
+// FORM LAYOUTS
+// =============================================================================
+
+.form-row {
+  display: flex;
+  gap: $space-4;
+  margin-bottom: $space-4;
+
+  .form-group {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
+  @include mobile-only {
+    flex-direction: column;
+    gap: 0;
+
+    .form-group {
+      margin-bottom: $space-4;
+    }
+  }
+}
+
+.form-grid {
+  display: grid;
+  gap: $space-4;
+  margin-bottom: $space-4;
+
+  &--2-col {
+    grid-template-columns: repeat(2, 1fr);
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--3-col {
+    grid-template-columns: repeat(3, 1fr);
+
+    @include tablet-up {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+// =============================================================================
+// LEGACY KITE FORM COMPATIBILITY
+// =============================================================================
+
+.kite-input {
+  @extend .form-input;
+
+  &.validation-error {
+    @extend .form-input--error;
+  }
+}
+
+.kite-select {
+  @extend .form-select;
+}
+
+.kite-textarea {
+  @extend .form-textarea;
+}
+
+// =============================================================================
+// TRADING SPECIFIC FORMS
+// =============================================================================
+
+.trade-form {
+  .form-group {
+    margin-bottom: $space-6;
+  }
+
+  .price-input-group {
+    display: flex;
+    align-items: center;
+    gap: $space-2;
+
+    .currency-symbol {
+      font-weight: $font-medium;
+      color: $gray-600;
+      font-size: $font-sm;
+    }
+  }
+
+  .quantity-input {
+    text-align: right;
+    font-family: $font-mono;
+    font-weight: $font-medium;
+  }
+
+  .account-selection {
+    border: $border-width solid $gray-300;
+    border-radius: $radius-lg;
+    padding: $space-4;
+    background-color: $white;
+    max-height: 300px;
+    overflow-y: auto;
+
+    &.validation-error {
+      @include input-error;
+    }
+
+    .account-item {
+      padding: $space-3;
+      border: $border-width solid $gray-200;
+      border-radius: $radius-md;
+      margin-bottom: $space-3;
+      transition: $transition-all;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+
+      &:hover {
+        background-color: $gray-50;
+      }
+
+      &.selected {
+        border-color: $primary-blue;
+        background-color: rgba($primary-blue, 0.05);
+      }
+    }
+  }
+}

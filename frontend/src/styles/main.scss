@@ -1,0 +1,430 @@
+// =============================================================================
+// Main SCSS Entry Point
+// =============================================================================
+
+// Base styles (variables, mixins, reset, typography)
+@import 'scss/variables';
+@import 'scss/mixins';
+@import 'scss/base';
+
+// Component styles
+@import 'scss/components/buttons';
+@import 'scss/components/forms';
+
+// Page styles
+@import 'scss/pages/trade-setup';
+
+// =============================================================================
+// LAYOUT COMPONENTS
+// =============================================================================
+
+// Navigation
+.app-navigation {
+  background-color: $white;
+  border-bottom: $border-width solid $gray-200;
+  box-shadow: $shadow-sm;
+  position: sticky;
+  top: 0;
+  z-index: $z-sticky;
+
+  .nav-container {
+    @extend .container;
+    @include flex-between;
+    height: $nav-height;
+  }
+
+  .nav-brand {
+    font-size: $font-xl;
+    font-weight: $font-bold;
+    color: $primary-blue;
+    text-decoration: none;
+
+    &:hover {
+      color: $primary-blue-dark;
+      text-decoration: none;
+    }
+  }
+
+  .nav-menu {
+    @include flex-start;
+    gap: $space-6;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+
+    .nav-item {
+      margin: 0;
+    }
+
+    .nav-link {
+      color: $gray-600;
+      font-weight: $font-medium;
+      padding: $space-2 $space-3;
+      border-radius: $radius-md;
+      transition: $transition-colors;
+
+      &:hover {
+        color: $gray-900;
+        background-color: $gray-100;
+        text-decoration: none;
+      }
+
+      &.active {
+        color: $primary-blue;
+        background-color: rgba($primary-blue, 0.1);
+      }
+    }
+  }
+
+  @include mobile-only {
+    .nav-menu {
+      display: none; // Mobile menu implementation needed
+    }
+  }
+}
+
+// =============================================================================
+// CARD COMPONENTS
+// =============================================================================
+
+.card {
+  @include card-base;
+
+  &__header {
+    @include card-header;
+
+    .card__title {
+      font-size: $font-lg;
+      font-weight: $font-semibold;
+      color: $gray-900;
+      margin: 0;
+    }
+
+    .card__subtitle {
+      font-size: $font-sm;
+      color: $gray-600;
+      margin: 0;
+      margin-top: $space-1;
+    }
+  }
+
+  &__body {
+    @include card-body;
+  }
+
+  &__footer {
+    @include card-footer;
+  }
+
+  // Card variants
+  &--elevated {
+    box-shadow: $shadow-lg;
+  }
+
+  &--bordered {
+    border-width: $border-width-2;
+  }
+
+  &--success {
+    border-left: 4px solid $success;
+  }
+
+  &--error {
+    border-left: 4px solid $error;
+  }
+
+  &--warning {
+    border-left: 4px solid $warning;
+  }
+
+  &--info {
+    border-left: 4px solid $info;
+  }
+}
+
+// =============================================================================
+// NOTIFICATION COMPONENTS
+// =============================================================================
+
+.notification-container {
+  position: fixed;
+  top: $space-4;
+  right: $space-4;
+  z-index: $z-toast;
+  max-width: 420px;
+  width: 100%;
+  pointer-events: none;
+
+  @include mobile-only {
+    top: $space-2;
+    right: $space-2;
+    left: $space-2;
+    max-width: none;
+  }
+}
+
+.notification {
+  background: linear-gradient(135deg, $white 0%, $gray-50 100%);
+  border: $border-width solid $gray-200;
+  border-left: 4px solid $info;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-xl;
+  margin-bottom: $space-3;
+  padding: $space-4 $space-5;
+  pointer-events: auto;
+  position: relative;
+  backdrop-filter: blur(8px);
+  animation: slideInRight $transition-normal ease-out;
+
+  &--success {
+    border-left-color: $success;
+    background: linear-gradient(135deg, $success-bg 0%, $white 100%);
+  }
+
+  &--error {
+    border-left-color: $error;
+    background: linear-gradient(135deg, $error-bg 0%, $white 100%);
+  }
+
+  &--warning {
+    border-left-color: $warning;
+    background: linear-gradient(135deg, $warning-bg 0%, $white 100%);
+  }
+
+  &__header {
+    @include flex-between;
+    margin-bottom: $space-2;
+  }
+
+  &__title {
+    font-size: $font-sm;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin: 0;
+  }
+
+  &__close {
+    @include button-ghost;
+    padding: $space-1;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: $radius-full;
+    color: $gray-500;
+    font-size: $font-lg;
+    line-height: 1;
+
+    &:hover {
+      background-color: rgba($gray-500, 0.1);
+      transform: scale(1.1);
+    }
+  }
+
+  &__message {
+    color: $gray-700;
+    font-size: $font-sm;
+    line-height: $leading-normal;
+    margin: 0;
+  }
+
+  &__actions {
+    @include flex-start;
+    gap: $space-2;
+    margin-top: $space-3;
+
+    .btn {
+      font-size: $font-xs;
+      padding: $space-1 $space-3;
+    }
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: $shadow-2xl;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+// =============================================================================
+// TRADING SPECIFIC COMPONENTS
+// =============================================================================
+
+.trading-theme {
+  // Override base theme for trading interface
+  --primary-color: #{$primary-blue};
+  --success-color: #{$success};
+  --error-color: #{$error};
+  --profit-color: #{$profit};
+  --loss-color: #{$loss};
+
+  .profit {
+    color: var(--profit-color);
+  }
+
+  .loss {
+    color: var(--loss-color);
+  }
+
+  .price-display {
+    font-family: $font-mono;
+    font-weight: $font-medium;
+    font-size: $font-lg;
+  }
+
+  .order-summary {
+    @include card-base;
+    padding: $space-4;
+    margin-bottom: $space-4;
+
+    .summary-row {
+      @include flex-between;
+      padding: $space-2 0;
+      border-bottom: $border-width solid $gray-100;
+
+      &:last-child {
+        border-bottom: none;
+        font-weight: $font-semibold;
+      }
+    }
+
+    .summary-label {
+      color: $gray-600;
+      font-size: $font-sm;
+    }
+
+    .summary-value {
+      color: $gray-900;
+      font-weight: $font-medium;
+      font-family: $font-mono;
+    }
+  }
+
+  .account-card {
+    @include card-base;
+    padding: $space-4;
+    margin-bottom: $space-3;
+    cursor: pointer;
+    transition: $transition-all;
+
+    &:hover {
+      box-shadow: $shadow-lg;
+      transform: translateY(-1px);
+    }
+
+    &.selected {
+      border-color: $primary-blue;
+      box-shadow: 0 0 0 1px $primary-blue;
+    }
+
+    .account-header {
+      @include flex-between;
+      margin-bottom: $space-2;
+    }
+
+    .account-name {
+      font-weight: $font-semibold;
+      color: $gray-900;
+    }
+
+    .account-status {
+      padding: $space-1 $space-2;
+      border-radius: $radius-sm;
+      font-size: $font-xs;
+      font-weight: $font-medium;
+      text-transform: uppercase;
+
+      &--active {
+        background-color: $success-bg;
+        color: $success-dark;
+      }
+
+      &--inactive {
+        background-color: $gray-100;
+        color: $gray-600;
+      }
+    }
+
+    .account-details {
+      font-size: $font-sm;
+      color: $gray-600;
+      line-height: $leading-normal;
+    }
+  }
+}
+
+// =============================================================================
+// LEGACY THEME COMPATIBILITY
+// =============================================================================
+
+.kite-theme {
+  @extend .trading-theme;
+
+  // Legacy CSS custom properties
+  --kite-primary: #{$primary-blue};
+  --kite-profit: #{$profit};
+  --kite-loss: #{$loss};
+  --kite-bg-primary: #{$white};
+  --kite-bg-primary-light: #{$gray-50};
+  --kite-text-primary: #{$gray-900};
+  --kite-text-secondary: #{$gray-600};
+  --kite-border: #{$gray-200};
+  --kite-radius-sm: #{$radius-sm};
+  --kite-radius-md: #{$radius-md};
+  --kite-radius-lg: #{$radius-lg};
+}
+
+// =============================================================================
+// UTILITY ANIMATIONS
+// =============================================================================
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// =============================================================================
+// RESPONSIVE UTILITIES
+// =============================================================================
+
+@include mobile-only {
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+@include tablet-up {
+  .hide-tablet-up {
+    display: none !important;
+  }
+}
+
+@include desktop-up {
+  .hide-desktop-up {
+    display: none !important;
+  }
+}

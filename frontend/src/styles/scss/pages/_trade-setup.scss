@@ -1,0 +1,521 @@
+// =============================================================================
+// Trade Setup Page Styles
+// =============================================================================
+
+@import '../variables';
+@import '../mixins';
+
+.trade-setup {
+  min-height: 100vh;
+  background-color: $gray-50;
+
+  &__container {
+    @extend .container;
+    padding-top: $space-6;
+    padding-bottom: $space-6;
+  }
+
+  &__header {
+    @include flex-between;
+    margin-bottom: $space-6;
+    padding: $space-4 $space-6;
+    background-color: $white;
+    border-radius: $radius-lg;
+    box-shadow: $shadow-sm;
+
+    .header-title {
+      font-size: $font-2xl;
+      font-weight: $font-bold;
+      color: $gray-900;
+      margin: 0;
+    }
+
+    .header-actions {
+      @include flex-start;
+      gap: $space-3;
+    }
+  }
+
+  &__content {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: $space-6;
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+      gap: $space-4;
+    }
+  }
+
+  &__main-form {
+    @include card-base;
+    padding: $space-6;
+  }
+
+  &__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+}
+
+// =============================================================================
+// TRADE FORM SECTIONS
+// =============================================================================
+
+.trade-form-section {
+  margin-bottom: $space-8;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &__title {
+    font-size: $font-lg;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin-bottom: $space-4;
+    padding-bottom: $space-2;
+    border-bottom: $border-width solid $gray-200;
+  }
+
+  &__content {
+    display: flex;
+    flex-direction: column;
+    gap: $space-4;
+  }
+}
+
+// =============================================================================
+// ACTION BUTTONS SECTION
+// =============================================================================
+
+.action-buttons {
+  @include flex-center;
+  gap: $space-3;
+  margin-bottom: $space-6;
+
+  .action-btn {
+    flex: 1;
+    max-width: 120px;
+    height: 3rem;
+    font-weight: $font-bold;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+    border-radius: $radius-lg;
+    transition: $transition-all;
+
+    &--buy {
+      background-color: $success;
+      color: $white;
+      border: 2px solid $success;
+
+      &:hover:not(:disabled) {
+        background-color: $success-dark;
+        border-color: $success-dark;
+        transform: translateY(-1px);
+        box-shadow: $shadow-lg;
+      }
+
+      &.active {
+        background-color: $success-dark;
+        border-color: $success-dark;
+        box-shadow: $shadow-md;
+      }
+    }
+
+    &--sell {
+      background-color: $error;
+      color: $white;
+      border: 2px solid $error;
+
+      &:hover:not(:disabled) {
+        background-color: $error-dark;
+        border-color: $error-dark;
+        transform: translateY(-1px);
+        box-shadow: $shadow-lg;
+      }
+
+      &.active {
+        background-color: $error-dark;
+        border-color: $error-dark;
+        box-shadow: $shadow-md;
+      }
+    }
+
+    &:not(.active) {
+      background-color: $white;
+      color: $gray-600;
+      border-color: $gray-300;
+
+      &:hover {
+        background-color: $gray-50;
+        border-color: $gray-400;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// SYMBOL SEARCH
+// =============================================================================
+
+.symbol-search {
+  position: relative;
+
+  &__input {
+    @extend .form-input;
+    padding-right: 2.5rem;
+    font-size: $font-base;
+  }
+
+  &__loading {
+    position: absolute;
+    right: $space-3;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid $gray-300;
+    border-top-color: $primary-blue;
+    border-radius: $radius-full;
+    animation: spin 1s linear infinite;
+  }
+
+  &__results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: $z-dropdown;
+    background-color: $white;
+    border: $border-width solid $gray-200;
+    border-top: none;
+    border-radius: 0 0 $radius-md $radius-md;
+    box-shadow: $shadow-lg;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  &__result-item {
+    padding: $space-3 $space-4;
+    cursor: pointer;
+    border-bottom: $border-width solid $gray-100;
+    transition: $transition-colors;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background-color: $gray-50;
+    }
+
+    .symbol-name {
+      font-weight: $font-semibold;
+      color: $gray-900;
+      margin-bottom: $space-1;
+    }
+
+    .symbol-details {
+      font-size: $font-sm;
+      color: $gray-600;
+      @include flex-between;
+    }
+
+    .exchange-badge {
+      padding: $space-1 $space-2;
+      background-color: $primary-blue;
+      color: $white;
+      border-radius: $radius-sm;
+      font-size: $font-xs;
+      font-weight: $font-medium;
+    }
+  }
+}
+
+// =============================================================================
+// FORM GRID LAYOUT
+// =============================================================================
+
+.form-grid {
+  display: grid;
+  gap: $space-4;
+
+  &--2-col {
+    grid-template-columns: repeat(2, 1fr);
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &--3-col {
+    grid-template-columns: repeat(3, 1fr);
+
+    @include tablet-up {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    @include mobile-only {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+// =============================================================================
+// ORDER TYPE SELECTOR
+// =============================================================================
+
+.order-type-selector {
+  @extend .order-type-selector; // From main.scss
+
+  .order-type-option {
+    position: relative;
+
+    &.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  }
+}
+
+// =============================================================================
+// ACCOUNT SELECTION
+// =============================================================================
+
+.account-selection {
+  &__header {
+    @include flex-between;
+    margin-bottom: $space-4;
+
+    .select-all-btn {
+      @extend .btn;
+      @extend .btn--ghost;
+      font-size: $font-sm;
+      padding: $space-1 $space-3;
+    }
+  }
+
+  &__container {
+    border: $border-width solid $gray-300;
+    border-radius: $radius-lg;
+    padding: $space-4;
+    background-color: $white;
+    max-height: 300px;
+    overflow-y: auto;
+    transition: $transition-colors;
+
+    &.validation-error {
+      @include input-error;
+    }
+  }
+
+  &__item {
+    @extend .account-card; // From main.scss
+    margin-bottom: $space-3;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+
+    .checkbox-container {
+      @include flex-start;
+      gap: $space-3;
+    }
+
+    .account-info {
+      flex: 1;
+
+      .account-primary {
+        @include flex-between;
+        margin-bottom: $space-2;
+
+        .broker-name {
+          font-weight: $font-semibold;
+          font-size: $font-sm;
+          color: $gray-900;
+          text-transform: uppercase;
+        }
+
+        .status-badge {
+          @extend .account-status;
+          
+          &.active {
+            @extend .account-status--active;
+          }
+
+          &.inactive {
+            @extend .account-status--inactive;
+          }
+        }
+      }
+
+      .account-id {
+        font-weight: $font-medium;
+        color: $gray-900;
+        margin-bottom: $space-1;
+      }
+
+      .account-details {
+        font-size: $font-xs;
+        color: $gray-500;
+      }
+    }
+  }
+
+  &__error {
+    @extend .form-error;
+    margin-top: $space-2;
+  }
+}
+
+// =============================================================================
+// MARGIN INFO SIDEBAR
+// =============================================================================
+
+.margin-info {
+  @include card-base;
+  padding: $space-4;
+
+  &__title {
+    font-size: $font-base;
+    font-weight: $font-semibold;
+    color: $gray-900;
+    margin-bottom: $space-3;
+  }
+
+  &__row {
+    @include flex-between;
+    padding: $space-2 0;
+    border-bottom: $border-width solid $gray-100;
+
+    &:last-child {
+      border-bottom: none;
+      font-weight: $font-semibold;
+      padding-top: $space-3;
+      margin-top: $space-2;
+      border-top: $border-width solid $gray-200;
+    }
+
+    .label {
+      color: $gray-600;
+      font-size: $font-sm;
+    }
+
+    .value {
+      color: $gray-900;
+      font-weight: $font-medium;
+      font-family: $font-mono;
+
+      &.positive {
+        color: $success;
+      }
+
+      &.negative {
+        color: $error;
+      }
+    }
+  }
+}
+
+// =============================================================================
+// PLACE ORDER BUTTON
+// =============================================================================
+
+.place-order-section {
+  margin-top: $space-8;
+  padding-top: $space-6;
+  border-top: $border-width solid $gray-200;
+
+  .place-order-btn {
+    @extend .btn;
+    @extend .btn--primary;
+    @extend .btn--full-width;
+    height: 3.5rem;
+    font-size: $font-lg;
+    font-weight: $font-bold;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    &.loading {
+      @extend .btn--loading;
+    }
+  }
+}
+
+// =============================================================================
+// RESPONSIVE ADJUSTMENTS
+// =============================================================================
+
+@include mobile-only {
+  .trade-setup {
+    &__header {
+      flex-direction: column;
+      gap: $space-4;
+      text-align: center;
+
+      .header-actions {
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+    }
+
+    &__main-form {
+      padding: $space-4;
+    }
+  }
+
+  .action-buttons {
+    flex-direction: column;
+
+    .action-btn {
+      max-width: none;
+      width: 100%;
+    }
+  }
+
+  .form-grid {
+    &--2-col,
+    &--3-col {
+      grid-template-columns: 1fr;
+    }
+  }
+}
+
+// =============================================================================
+// VALIDATION STYLES
+// =============================================================================
+
+.validation-error {
+  @include input-error;
+}
+
+// Field-specific validation styles
+.form-input.validation-error,
+.form-select.validation-error {
+  @include input-error;
+}
+
+// =============================================================================
+// ANIMATIONS
+// =============================================================================
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.fade-in {
+  @include fade-in;
+}
+
+.slide-in-up {
+  @include slide-in-up;
+}
