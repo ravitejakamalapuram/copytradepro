@@ -30,8 +30,8 @@ body {
   font-size: $font-base;
   font-weight: $font-normal;
   line-height: $leading-normal;
-  color: $gray-900;
-  background-color: $gray-50;
+  color: $white;
+  background-color: $gray-900;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -43,7 +43,7 @@ body {
 h1, h2, h3, h4, h5, h6 {
   font-weight: $font-semibold;
   line-height: $leading-tight;
-  color: $gray-900;
+  color: $white;
   margin-bottom: $space-2;
 }
 
@@ -85,21 +85,21 @@ em, i {
 
 small {
   font-size: $font-sm;
-  color: $gray-600;
+  color: $gray-400;
 }
 
 code {
   font-family: $font-mono;
   font-size: 0.875em;
-  background-color: $gray-100;
+  background-color: $gray-800;
   padding: $space-1 $space-2;
   border-radius: $radius-sm;
-  color: $gray-800;
+  color: $gray-200;
 }
 
 pre {
   font-family: $font-mono;
-  background-color: $gray-900;
+  background-color: $gray-800;
   color: $gray-100;
   padding: $space-4;
   border-radius: $radius-md;
@@ -139,13 +139,13 @@ table {
 th, td {
   padding: $space-3 $space-4;
   text-align: left;
-  border-bottom: $border-width solid $gray-200;
+  border-bottom: $border-width solid $gray-700;
 }
 
 th {
   font-weight: $font-semibold;
-  color: $gray-700;
-  background-color: $gray-50;
+  color: $gray-200;
+  background-color: $gray-800;
 }
 
 // =============================================================================
@@ -185,7 +185,7 @@ legend {
 label {
   display: block;
   font-weight: $font-medium;
-  color: $gray-700;
+  color: $gray-200;
   margin-bottom: $space-1;
 }
 
@@ -242,6 +242,10 @@ img {
 .text-gray-600 { color: $gray-600; }
 .text-gray-700 { color: $gray-700; }
 .text-gray-900 { color: $gray-900; }
+.text-white { color: $white; }
+.text-gray-100 { color: $gray-100; }
+.text-gray-200 { color: $gray-200; }
+.text-gray-300 { color: $gray-300; }
 
 .text-primary { color: $primary-blue; }
 .text-success { color: $success; }
@@ -299,11 +303,11 @@ img {
 .mt-6 { margin-top: $space-6; }
 
 // Border utilities
-.border { border: $border-width solid $gray-200; }
-.border-t { border-top: $border-width solid $gray-200; }
-.border-b { border-bottom: $border-width solid $gray-200; }
-.border-l { border-left: $border-width solid $gray-200; }
-.border-r { border-right: $border-width solid $gray-200; }
+.border { border: $border-width solid $gray-700; }
+.border-t { border-top: $border-width solid $gray-700; }
+.border-b { border-bottom: $border-width solid $gray-700; }
+.border-l { border-left: $border-width solid $gray-700; }
+.border-r { border-right: $border-width solid $gray-700; }
 
 .rounded { border-radius: $radius-md; }
 .rounded-sm { border-radius: $radius-sm; }
@@ -315,6 +319,8 @@ img {
 .bg-white { background-color: $white; }
 .bg-gray-50 { background-color: $gray-50; }
 .bg-gray-100 { background-color: $gray-100; }
+.bg-gray-800 { background-color: $gray-800; }
+.bg-gray-900 { background-color: $gray-900; }
 .bg-primary { background-color: $primary-blue; }
 .bg-success { background-color: $success; }
 .bg-error { background-color: $error; }

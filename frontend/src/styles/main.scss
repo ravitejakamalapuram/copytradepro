@@ -26,8 +26,8 @@
 
 // Navigation
 .app-navigation {
-  background-color: $white;
-  border-bottom: $border-width solid $gray-200;
+  background-color: $gray-800;
+  border-bottom: $border-width solid $gray-700;
   box-shadow: $shadow-sm;
   position: sticky;
   top: 0;
@@ -67,7 +67,7 @@
     .nav-link {
       @include flex-start;
       gap: $space-2;
-      color: $gray-600;
+      color: $gray-300;
       font-weight: $font-medium;
       padding: $space-2 $space-3;
       border-radius: $radius-md;
@@ -77,14 +77,14 @@
       cursor: pointer;
 
       &:hover {
-        color: $gray-900;
-        background-color: $gray-100;
+        color: $white;
+        background-color: $gray-700;
         text-decoration: none;
       }
 
       &.active {
         color: $primary-blue;
-        background-color: rgba($primary-blue, 0.1);
+        background-color: rgba($primary-blue, 0.2);
       }
     }
   }
@@ -98,7 +98,7 @@
     @include flex-start;
     gap: $space-2;
     font-size: $font-xs;
-    color: $gray-500;
+    color: $gray-400;
 
     &__indicator {
       width: 8px;
@@ -124,7 +124,7 @@
     gap: $space-2;
     padding: $space-1 $space-2;
     border-radius: $radius-md;
-    background-color: $gray-50;
+    background-color: $gray-700;
 
     &__details {
       text-align: right;
@@ -133,7 +133,7 @@
     &__name {
       font-size: $font-xs;
       font-weight: $font-medium;
-      color: $gray-900;
+      color: $white;
       line-height: 1.2;
     }
   }
@@ -158,13 +158,13 @@
     .card__title {
       font-size: $font-lg;
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
       margin: 0;
     }
 
     .card__subtitle {
       font-size: $font-sm;
-      color: $gray-600;
+      color: $gray-300;
       margin: 0;
       margin-top: $space-1;
     }
@@ -226,8 +226,8 @@
 }
 
 .notification {
-  background: linear-gradient(135deg, $white 0%, $gray-50 100%);
-  border: $border-width solid $gray-200;
+  background: linear-gradient(135deg, $gray-800 0%, $gray-700 100%);
+  border: $border-width solid $gray-600;
   border-left: 4px solid $info;
   border-radius: $radius-xl;
   box-shadow: $shadow-xl;
@@ -240,17 +240,17 @@
 
   &--success {
     border-left-color: $success;
-    background: linear-gradient(135deg, $success-bg 0%, $white 100%);
+    background: linear-gradient(135deg, rgba($success, 0.1) 0%, $gray-800 100%);
   }
 
   &--error {
     border-left-color: $error;
-    background: linear-gradient(135deg, $error-bg 0%, $white 100%);
+    background: linear-gradient(135deg, rgba($error, 0.1) 0%, $gray-800 100%);
   }
 
   &--warning {
     border-left-color: $warning;
-    background: linear-gradient(135deg, $warning-bg 0%, $white 100%);
+    background: linear-gradient(135deg, rgba($warning, 0.1) 0%, $gray-800 100%);
   }
 
   &__header {
@@ -261,7 +261,7 @@
   &__title {
     font-size: $font-sm;
     font-weight: $font-semibold;
-    color: $gray-900;
+    color: $white;
     margin: 0;
   }
 
@@ -271,18 +271,18 @@
     width: 1.5rem;
     height: 1.5rem;
     border-radius: $radius-full;
-    color: $gray-500;
+    color: $gray-400;
     font-size: $font-lg;
     line-height: 1;
 
     &:hover {
-      background-color: rgba($gray-500, 0.1);
+      background-color: rgba($gray-400, 0.1);
       transform: scale(1.1);
     }
   }
 
   &__message {
-    color: $gray-700;
+    color: $gray-200;
     font-size: $font-sm;
     line-height: $leading-normal;
     margin: 0;
@@ -340,7 +340,7 @@
     .summary-row {
       @include flex-between;
       padding: $space-2 0;
-      border-bottom: $border-width solid $gray-100;
+      border-bottom: $border-width solid $gray-700;
 
       &:last-child {
         border-bottom: none;
@@ -349,12 +349,12 @@
     }
 
     .summary-label {
-      color: $gray-600;
+      color: $gray-300;
       font-size: $font-sm;
     }
 
     .summary-value {
-      color: $gray-900;
+      color: $white;
       font-weight: $font-medium;
       font-family: $font-mono;
     }
@@ -384,7 +384,7 @@
 
     .account-name {
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
     }
 
     .account-status {
@@ -395,19 +395,19 @@
       text-transform: uppercase;
 
       &--active {
-        background-color: $success-bg;
-        color: $success-dark;
+        background-color: rgba($success, 0.2);
+        color: $success;
       }
 
       &--inactive {
-        background-color: $gray-100;
-        color: $gray-600;
+        background-color: $gray-700;
+        color: $gray-300;
       }
     }
 
     .account-details {
       font-size: $font-sm;
-      color: $gray-600;
+      color: $gray-300;
       line-height: $leading-normal;
     }
   }
@@ -424,11 +424,11 @@
   --kite-primary: #{$primary-blue};
   --kite-profit: #{$profit};
   --kite-loss: #{$loss};
-  --kite-bg-primary: #{$white};
-  --kite-bg-primary-light: #{$gray-50};
-  --kite-text-primary: #{$gray-900};
-  --kite-text-secondary: #{$gray-600};
-  --kite-border: #{$gray-200};
+  --kite-bg-primary: #{$gray-800};
+  --kite-bg-primary-light: #{$gray-900};
+  --kite-text-primary: #{$white};
+  --kite-text-secondary: #{$gray-300};
+  --kite-border: #{$gray-700};
   --kite-radius-sm: #{$radius-sm};
   --kite-radius-md: #{$radius-md};
   --kite-radius-lg: #{$radius-lg};

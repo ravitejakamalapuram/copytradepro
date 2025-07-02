@@ -127,13 +127,13 @@
 
 @mixin button-secondary {
   @include button-base;
-  background-color: $gray-100;
-  color: $gray-700;
-  border-color: $gray-300;
+  background-color: $gray-700;
+  color: $white;
+  border-color: $gray-600;
 
   &:hover:not(:disabled) {
-    background-color: $gray-200;
-    border-color: $gray-400;
+    background-color: $gray-600;
+    border-color: $gray-500;
   }
 }
 
@@ -152,12 +152,12 @@
 @mixin button-ghost {
   @include button-base;
   background-color: transparent;
-  color: $gray-600;
+  color: $gray-300;
   border-color: transparent;
 
   &:hover:not(:disabled) {
-    background-color: $gray-100;
-    color: $gray-700;
+    background-color: $gray-700;
+    color: $white;
   }
 }
 
@@ -165,13 +165,13 @@
 @mixin input-base {
   width: 100%;
   padding: $space-3 $space-4;
-  background-color: $white;
-  border: $border-width solid $gray-300;
+  background-color: $gray-800;
+  border: $border-width solid $gray-600;
   border-radius: $radius-md;
   font-family: $font-primary;
   font-size: $font-sm;
   line-height: $leading-normal;
-  color: $gray-900;
+  color: $white;
   transition: $transition-colors;
 
   &::placeholder {
@@ -185,7 +185,7 @@
   }
 
   &:disabled {
-    background-color: $gray-50;
+    background-color: $gray-700;
     color: $gray-500;
     cursor: not-allowed;
   }
@@ -203,8 +203,8 @@
 
 // Card styles
 @mixin card-base {
-  background-color: $white;
-  border: $border-width solid $gray-200;
+  background-color: $gray-800;
+  border: $border-width solid $gray-700;
   border-radius: $card-radius;
   box-shadow: $card-shadow;
   overflow: hidden;
@@ -212,8 +212,8 @@
 
 @mixin card-header {
   padding: $space-4 $space-6;
-  border-bottom: $border-width solid $gray-200;
-  background-color: $gray-50;
+  border-bottom: $border-width solid $gray-700;
+  background-color: $gray-900;
 }
 
 @mixin card-body {
@@ -222,8 +222,8 @@
 
 @mixin card-footer {
   padding: $space-4 $space-6;
-  border-top: $border-width solid $gray-200;
-  background-color: $gray-50;
+  border-top: $border-width solid $gray-700;
+  background-color: $gray-900;
 }
 
 // =============================================================================
