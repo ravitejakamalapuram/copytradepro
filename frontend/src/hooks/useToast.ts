@@ -42,19 +42,7 @@ const defaultDurations = {
   info: 4000
 };
 
-const getToastIcon = (type: ToastType): string => {
-  switch (type) {
-    case 'success':
-      return '✅';
-    case 'error':
-      return '❌';
-    case 'warning':
-      return '⚠️';
-    case 'info':
-    default:
-      return 'ℹ️';
-  }
-};
+// Removed unused getToastIcon function - icons are handled by NotificationDisplay component
 
 // Removed unused getToastColors function
 
@@ -77,8 +65,7 @@ export const useToast = (): UseToastReturn => {
       type,
       duration,
       autoClose,
-      actions,
-      icon: getToastIcon(type)
+      actions
     };
 
     showNotification(notification);
