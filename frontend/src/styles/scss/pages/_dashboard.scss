@@ -7,7 +7,12 @@
 
 .dashboard-page {
   min-height: 100vh;
-  background-color: $gray-50;
+  background-color: $gray-900;
+  margin-left: 280px; // Account for fixed sidebar width
+
+  @media (max-width: 1024px) {
+    margin-left: 0; // Remove margin on mobile when sidebar is hidden
+  }
 
   &__container {
     @extend .container;
@@ -19,14 +24,14 @@
     @include flex-between;
     margin-bottom: $space-6;
     padding: $space-4 $space-6;
-    background-color: $white;
+    background-color: $gray-800;
     border-radius: $radius-lg;
     box-shadow: $shadow-sm;
 
     .header-title {
       font-size: $font-2xl;
       font-weight: $font-bold;
-      color: $gray-900;
+      color: $white;
       margin: 0;
     }
 
@@ -96,7 +101,7 @@
 
   &__label {
     font-size: $font-sm;
-    color: $gray-600;
+    color: $gray-300;
     margin-bottom: $space-2;
     text-transform: uppercase;
     letter-spacing: 0.025em;
@@ -117,7 +122,7 @@
     }
 
     &--neutral {
-      color: $gray-900;
+      color: $white;
     }
   }
 
@@ -152,7 +157,7 @@
     .section-title {
       font-size: $font-lg;
       font-weight: $font-semibold;
-      color: $gray-900;
+      color: $white;
       margin: 0;
     }
 
@@ -174,15 +179,15 @@
   border-collapse: collapse;
 
   &__header {
-    background-color: $gray-50;
+    background-color: $gray-800;
 
     th {
       padding: $space-3 $space-4;
       text-align: left;
       font-size: $font-sm;
       font-weight: $font-semibold;
-      color: $gray-700;
-      border-bottom: $border-width solid $gray-200;
+      color: $gray-200;
+      border-bottom: $border-width solid $gray-700;
 
       &:first-child {
         padding-left: $space-6;
@@ -196,11 +201,11 @@
 
   &__body {
     tr {
-      border-bottom: $border-width solid $gray-100;
+      border-bottom: $border-width solid $gray-700;
       transition: $transition-colors;
 
       &:hover {
-        background-color: $gray-50;
+        background-color: $gray-700;
       }
 
       &:last-child {
@@ -211,7 +216,7 @@
     td {
       padding: $space-4 $space-4;
       font-size: $font-sm;
-      color: $gray-900;
+      color: $white;
       vertical-align: middle;
 
       &:first-child {
@@ -244,12 +249,12 @@
 
 .position-symbol {
   font-weight: $font-semibold;
-  color: $gray-900;
+  color: $white;
   margin-bottom: $space-1;
 
   &__exchange {
     font-size: $font-xs;
-    color: $gray-500;
+    color: $gray-400;
     font-weight: $font-normal;
     text-transform: uppercase;
   }
@@ -270,7 +275,7 @@
 
 .position-product {
   font-size: $font-xs;
-  color: $gray-500;
+  color: $gray-400;
 }
 
 .position-price {
@@ -307,7 +312,7 @@
   &__title {
     font-size: $font-lg;
     font-weight: $font-semibold;
-    color: $gray-900;
+    color: $white;
     margin-bottom: $space-4;
   }
 
@@ -348,7 +353,7 @@
 
       .description {
         font-size: $font-xs;
-        color: $gray-600;
+        color: $gray-300;
         line-height: $leading-normal;
       }
     }
@@ -372,13 +377,13 @@
   &__title {
     font-size: $font-lg;
     font-weight: $font-semibold;
-    color: $gray-900;
+    color: $white;
     margin-bottom: $space-2;
   }
 
   &__message {
     font-size: $font-sm;
-    color: $gray-600;
+    color: $gray-300;
     margin-bottom: $space-6;
   }
 
@@ -399,7 +404,7 @@
   &__spinner {
     width: 2rem;
     height: 2rem;
-    border: 3px solid $gray-200;
+    border: 3px solid $gray-700;
     border-top-color: $primary-blue;
     border-radius: $radius-full;
     animation: spin 1s linear infinite;
@@ -408,7 +413,7 @@
 
   &__message {
     font-size: $font-sm;
-    color: $gray-600;
+    color: $gray-300;
   }
 }
 

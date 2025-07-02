@@ -1,12 +1,17 @@
 // Trade Setup Page Styles
 .trade-setup-page {
   min-height: 100vh;
-  background-color: $gray-800;
+  background-color: $gray-900;
+  margin-left: 280px; // Account for fixed sidebar width
+
+  @media (max-width: 1024px) {
+    margin-left: 0; // Remove margin on mobile when sidebar is hidden
+  }
 
   &__header {
-    background-color: $gray-900;
+    background-color: $gray-800;
     border-bottom: 1px solid $gray-700;
-    padding: 2rem 0;
+    padding: 2rem;
 
     .header-title {
       font-size: 2rem;
@@ -16,7 +21,7 @@
     }
 
     .header-subtitle {
-      color: $gray-400;
+      color: $gray-300;
       font-size: 1rem;
       margin: 0 0 1.5rem 0;
     }
@@ -34,13 +39,12 @@
   }
 
   &__content {
-    padding: 2rem 0;
+    padding: 2rem;
   }
 
   &__main {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 1rem;
   }
 }
 
