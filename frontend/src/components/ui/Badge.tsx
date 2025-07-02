@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import './Badge.css';
+// Styles now imported via main.scss
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   /** Badge variant */
@@ -34,15 +34,21 @@ const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
     ref
   ) => {
     const badgeClasses = [
-      'enterprise-badge',
-      `enterprise-badge--${size}`,
-      `enterprise-badge--${variant}`,
+      'badge',
+      size === 'sm' && 'badge--sm',
+      size === 'lg' && 'badge--lg',
+      variant === 'primary' && 'badge--primary',
+      variant === 'success' && 'badge--success',
+      variant === 'error' && 'badge--error',
+      variant === 'warning' && 'badge--warning',
+      variant === 'info' && 'badge--info',
+      variant === 'default' && 'badge--neutral',
       className
     ].filter(Boolean).join(' ');
 
     return (
       <span ref={ref} className={badgeClasses} {...props}>
-        {dot && <span className="enterprise-status-badge-icon" />}
+        {dot && <span className="badge-dot" />}
         {leftIcon && leftIcon}
         {children}
         {rightIcon && rightIcon}

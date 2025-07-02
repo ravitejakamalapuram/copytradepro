@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import './Button.css';
+// Styles now imported via main.scss
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   /** Button variant */
@@ -38,10 +38,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref
   ) => {
     const buttonClasses = [
-      'enterprise-button',
-      `enterprise-button--${variant}`,
-      `enterprise-button--${size}`,
-      fullWidth && 'enterprise-button--full-width',
+      'btn',
+      variant === 'primary' && 'btn--primary',
+      variant === 'secondary' && 'btn--secondary',
+      variant === 'outline' && 'btn--outline',
+      variant === 'ghost' && 'btn--ghost',
+      variant === 'danger' && 'btn--error',
+      size === 'sm' && 'btn--sm',
+      size === 'lg' && 'btn--lg',
+      fullWidth && 'btn--full-width',
+      loading && 'btn--loading',
       className
     ].filter(Boolean).join(' ');
 

@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import './Input.css';
+// Styles now imported via main.scss
 
 export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'size'> {
   /** Input size */
@@ -48,27 +48,28 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
     const actualState = error ? 'error' : state;
 
     const containerClasses = [
-      'enterprise-input-container',
-      fullWidth && 'enterprise-input-container--full-width',
+      'form-group',
+      fullWidth && 'form-group--full-width',
       className
     ].filter(Boolean).join(' ');
 
     const labelClasses = [
-      'enterprise-input-label',
-      required && 'enterprise-input-label--required'
+      'form-label',
+      required && 'form-label--required'
     ].filter(Boolean).join(' ');
 
     const inputClasses = [
-      'enterprise-input',
-      `enterprise-input--${size}`,
-      `enterprise-input--${actualState}`,
-      leftIcon && 'enterprise-input--with-left-icon',
-      rightIcon && 'enterprise-input--with-right-icon'
+      'form-input',
+      size === 'sm' && 'form-input--sm',
+      size === 'lg' && 'form-input--lg',
+      actualState === 'error' && 'form-input--error',
+      actualState === 'success' && 'form-input--success',
+      leftIcon && 'form-input--with-icon',
+      rightIcon && 'form-input--with-icon-right'
     ].filter(Boolean).join(' ');
 
     const helperClasses = [
-      'enterprise-input-helper',
-      actualState === 'error' && 'enterprise-input-helper--error'
+      actualState === 'error' ? 'form-error' : 'form-help'
     ].filter(Boolean).join(' ');
 
     return (

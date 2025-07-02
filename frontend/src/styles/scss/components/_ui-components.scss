@@ -1,0 +1,455 @@
+// =============================================================================
+// UI Components - Comprehensive component library
+// =============================================================================
+
+@import '../variables';
+@import '../mixins';
+
+// =============================================================================
+// BADGE COMPONENT
+// =============================================================================
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: $space-1 $space-2;
+  border-radius: $radius-full;
+  font-size: $font-xs;
+  font-weight: $font-medium;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  line-height: 1;
+
+  // Size variants
+  &--sm {
+    padding: $space-1 $space-2;
+    font-size: $font-xs;
+  }
+
+  &--lg {
+    padding: $space-2 $space-3;
+    font-size: $font-sm;
+  }
+
+  // Color variants
+  &--primary {
+    background-color: rgba($primary-blue, 0.1);
+    color: $primary-blue-dark;
+  }
+
+  &--success {
+    background-color: rgba($success, 0.1);
+    color: $success-dark;
+  }
+
+  &--error {
+    background-color: rgba($error, 0.1);
+    color: $error-dark;
+  }
+
+  &--warning {
+    background-color: rgba($warning, 0.1);
+    color: $warning-dark;
+  }
+
+  &--info {
+    background-color: rgba($info, 0.1);
+    color: $info-dark;
+  }
+
+  &--neutral {
+    background-color: $gray-100;
+    color: $gray-700;
+  }
+
+  // Trading specific
+  &--profit {
+    background-color: rgba($profit, 0.1);
+    color: $success-dark;
+  }
+
+  &--loss {
+    background-color: rgba($loss, 0.1);
+    color: $error-dark;
+  }
+}
+
+// =============================================================================
+// LOADING SPINNER
+// =============================================================================
+
+.loading-spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid $gray-200;
+  border-top-color: $primary-blue;
+  border-radius: $radius-full;
+  animation: spin 1s linear infinite;
+
+  &--sm {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-width: 1px;
+  }
+
+  &--lg {
+    width: 1.5rem;
+    height: 1.5rem;
+    border-width: 3px;
+  }
+
+  &--xl {
+    width: 2rem;
+    height: 2rem;
+    border-width: 3px;
+  }
+
+  // Color variants
+  &--white {
+    border-color: rgba($white, 0.3);
+    border-top-color: $white;
+  }
+
+  &--success {
+    border-color: rgba($success, 0.3);
+    border-top-color: $success;
+  }
+
+  &--error {
+    border-color: rgba($error, 0.3);
+    border-top-color: $error;
+  }
+}
+
+// =============================================================================
+// SKELETON LOADER
+// =============================================================================
+
+.skeleton {
+  background: linear-gradient(90deg, $gray-200 25%, $gray-100 50%, $gray-200 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: $radius-sm;
+
+  &--text {
+    height: 1rem;
+    margin-bottom: $space-2;
+
+    &:last-child {
+      margin-bottom: 0;
+    }
+  }
+
+  &--title {
+    height: 1.5rem;
+    width: 60%;
+    margin-bottom: $space-3;
+  }
+
+  &--paragraph {
+    height: 1rem;
+    margin-bottom: $space-2;
+
+    &:nth-child(odd) {
+      width: 100%;
+    }
+
+    &:nth-child(even) {
+      width: 80%;
+    }
+
+    &:last-child {
+      width: 60%;
+      margin-bottom: 0;
+    }
+  }
+
+  &--circle {
+    border-radius: $radius-full;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  &--button {
+    height: 2.5rem;
+    width: 6rem;
+    border-radius: $radius-md;
+  }
+
+  &--card {
+    height: 8rem;
+    border-radius: $radius-lg;
+  }
+}
+
+// =============================================================================
+// STATUS BADGE
+// =============================================================================
+
+.status-badge {
+  @extend .badge;
+  @include flex-start;
+  gap: $space-1;
+
+  &::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: $radius-full;
+    background-color: currentColor;
+  }
+
+  // Status variants
+  &--active {
+    @extend .badge--success;
+  }
+
+  &--inactive {
+    @extend .badge--neutral;
+  }
+
+  &--pending {
+    @extend .badge--warning;
+  }
+
+  &--error {
+    @extend .badge--error;
+  }
+
+  &--processing {
+    @extend .badge--info;
+
+    &::before {
+      animation: pulse 2s infinite;
+    }
+  }
+}
+
+// =============================================================================
+// PRICE DISPLAY
+// =============================================================================
+
+.price-display {
+  font-family: $font-mono;
+  font-weight: $font-medium;
+  font-variant-numeric: tabular-nums;
+
+  &--sm {
+    font-size: $font-sm;
+  }
+
+  &--base {
+    font-size: $font-base;
+  }
+
+  &--lg {
+    font-size: $font-lg;
+  }
+
+  &--xl {
+    font-size: $font-xl;
+  }
+
+  &--positive {
+    color: $profit;
+  }
+
+  &--negative {
+    color: $loss;
+  }
+
+  &--neutral {
+    color: $gray-900;
+  }
+
+  .currency-symbol {
+    font-weight: $font-normal;
+    opacity: 0.8;
+  }
+
+  .change-indicator {
+    font-size: 0.875em;
+    margin-left: $space-1;
+
+    &::before {
+      content: '';
+      display: inline-block;
+      width: 0;
+      height: 0;
+      margin-right: $space-1;
+      vertical-align: middle;
+    }
+
+    &.positive::before {
+      border-left: 0.25rem solid transparent;
+      border-right: 0.25rem solid transparent;
+      border-bottom: 0.375rem solid $profit;
+    }
+
+    &.negative::before {
+      border-left: 0.25rem solid transparent;
+      border-right: 0.25rem solid transparent;
+      border-top: 0.375rem solid $loss;
+    }
+  }
+}
+
+// =============================================================================
+// ANIMATED PRICE
+// =============================================================================
+
+.animated-price {
+  @extend .price-display;
+  transition: all 0.3s ease;
+  position: relative;
+
+  &.flash-green {
+    background-color: rgba($profit, 0.2);
+    animation: flash-fade 0.6s ease-out;
+  }
+
+  &.flash-red {
+    background-color: rgba($loss, 0.2);
+    animation: flash-fade 0.6s ease-out;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+}
+
+// =============================================================================
+// ERROR DISPLAY
+// =============================================================================
+
+.error-display {
+  @include card-base;
+  padding: $space-4;
+  border-left: 4px solid $error;
+  background-color: rgba($error, 0.05);
+
+  &__icon {
+    font-size: $font-2xl;
+    color: $error;
+    margin-bottom: $space-2;
+    text-align: center;
+  }
+
+  &__title {
+    font-size: $font-lg;
+    font-weight: $font-semibold;
+    color: $error-dark;
+    margin-bottom: $space-2;
+    text-align: center;
+  }
+
+  &__message {
+    color: $gray-700;
+    text-align: center;
+    margin-bottom: $space-4;
+    line-height: $leading-relaxed;
+  }
+
+  &__actions {
+    @include flex-center;
+    gap: $space-3;
+  }
+
+  // Variants
+  &--inline {
+    padding: $space-3;
+    border-radius: $radius-md;
+    border-left-width: 3px;
+
+    .error-display__icon {
+      font-size: $font-lg;
+      margin-bottom: $space-1;
+    }
+
+    .error-display__title {
+      font-size: $font-base;
+      margin-bottom: $space-1;
+    }
+
+    .error-display__message {
+      font-size: $font-sm;
+      margin-bottom: $space-2;
+    }
+  }
+
+  &--warning {
+    border-left-color: $warning;
+    background-color: rgba($warning, 0.05);
+
+    .error-display__icon,
+    .error-display__title {
+      color: $warning-dark;
+    }
+  }
+
+  &--info {
+    border-left-color: $info;
+    background-color: rgba($info, 0.05);
+
+    .error-display__icon,
+    .error-display__title {
+      color: $info-dark;
+    }
+  }
+}
+
+// =============================================================================
+// ANIMATIONS
+// =============================================================================
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes flash-fade {
+  0% {
+    background-color: inherit;
+  }
+  50% {
+    background-color: inherit;
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.fade-in {
+  @include fade-in;
+}
+
+.slide-in-up {
+  @include slide-in-up;
+}
