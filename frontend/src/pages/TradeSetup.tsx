@@ -95,12 +95,18 @@ const TradeSetup: React.FC = () => {
     }
 
     try {
-      const results = await marketDataService.searchSymbols(query);
-      setSearchResults(results.slice(0, 10));
-      setShowSearchResults(true);
+      const response = await marketDataService.searchSymbols(query);
+      if (response.success && Array.isArray(response.data)) {
+        setSearchResults(response.data.slice(0, 10));
+        setShowSearchResults(true);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
     } catch (error) {
       console.error('Symbol search failed:', error);
       setSearchResults([]);
+      setShowSearchResults(false);
     }
   };
 
@@ -278,34 +284,6 @@ const TradeSetup: React.FC = () => {
       <AppNavigation />
 
       <div className="trade-setup-page">
-        <div className="trade-setup-page__header">
-          <h1 className="header-title">Place Order</h1>
-          <p className="header-subtitle">Execute trades across multiple broker accounts</p>
-          <div className="header-actions">
-            <button
-              className="btn btn--outline"
-              onClick={() => navigate('/orders')}
-            >
-              📋 View Orders
-            </button>
-            <button
-              className="btn btn--outline"
-              onClick={() => navigate('/portfolio')}
-            >
-              📊 Positions
-            </button>
-            <button
-              className="btn btn--error"
-              onClick={() => {
-                console.log('Test validation button clicked');
-                validateForm();
-              }}
-            >
-              🧪 Test Validation
-            </button>
-          </div>
-        </div>
-
         <div className="trade-setup-page__content">
           <div className="trade-setup-page__main">
             <div className="order-form-grid">
@@ -534,6 +512,20 @@ const TradeSetup: React.FC = () => {
                 <div className="card">
                   <div className="card__header">
                     <h3 className="card__title">Order Summary</h3>
+                    <div className="header-actions">
+                      <button
+                        className="btn btn--outline btn--small"
+                        onClick={() => navigate('/orders')}
+                      >
+                        📋 View Orders
+                      </button>
+                      <button
+                        className="btn btn--outline btn--small"
+                        onClick={() => navigate('/positions')}
+                      >
+                        📊 Positions
+                      </button>
+                    </div>
                   </div>
                   <div className="card__content">
                     {orderForm.symbol ? (
