@@ -1,0 +1,20 @@
+{
+  "name": "unified-trading-api-examples",
+  "version": "1.0.0",
+  "description": "Examples for Unified Trading API Library",
+  "private": true,
+  "scripts": {
+    "basic": "ts-node basic-usage.ts",
+    "build": "tsc",
+    "dev": "ts-node --watch basic-usage.ts"
+  },
+  "dependencies": {
+    "@copytradepro/unified-trading-api": "file:../",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
