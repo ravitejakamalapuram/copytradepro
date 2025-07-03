@@ -371,6 +371,8 @@ export const validateFyersAuthCode = async (
     const { authCode, credentials } = req.body;
     const userId = req.user?.id;
 
+    console.log('🔐 Validating Fyers auth code for user:', userId);
+
     if (!userId) {
       res.status(401).json({
         success: false,
@@ -379,50 +381,102 @@ export const validateFyersAuthCode = async (
       return;
     }
 
-    if (!authCode) {
+    if (!authCode || !credentials) {
       res.status(400).json({
         success: false,
-        message: 'Auth code is required',
+        message: 'Auth code and credentials are required',
       });
       return;
     }
 
-    // Get the existing Fyers service instance
-    const userConnections = userBrokerConnections.get(userId);
-    const fyersService = userConnections?.get('fyers') as FyersService;
+    // Initialize user connections if not exists
+    if (!userBrokerConnections.has(userId)) {
+      userBrokerConnections.set(userId, new Map());
+    }
+    const userConnections = userBrokerConnections.get(userId)!;
 
+    // Find the temporary Fyers service instance or create a new one
+    let fyersService: FyersService | null = null;
+
+    // Look for temporary connection
+    for (const [key, service] of userConnections.entries()) {
+      if (key.startsWith('fyers_temp_') && service instanceof FyersService) {
+        fyersService = service;
+        userConnections.delete(key); // Remove temporary connection
+        break;
+      }
+    }
+
+    // If no temporary connection found, create a new service
     if (!fyersService) {
-      res.status(400).json({
-        success: false,
-        message: 'No pending Fyers authentication found. Please start the connection process again.',
-      });
-      return;
+      fyersService = new FyersService();
     }
 
-    // Generate access token using the auth code
-    const tokenResponse = await fyersService.generateAccessToken(authCode, credentials);
+    // Complete authentication with auth code
+    const authResult = await fyersService.completeAuthentication(authCode, credentials);
 
-    if (tokenResponse.success) {
+    if (authResult.success && authResult.accessToken) {
+      // Store the connection with account-specific key
+      const accountId = authResult.clientId || credentials.clientId;
+      const connectionKey = `fyers_${accountId}`;
+      userConnections.set(connectionKey, fyersService);
+
+      // Save account to database
+      try {
+        const dbAccount = await userDatabase.createConnectedAccount({
+          user_id: userId,
+          broker_name: 'fyers',
+          account_id: accountId,
+          user_name: authResult.userName || accountId,
+          email: authResult.email || '',
+          broker_display_name: 'Fyers',
+          exchanges: authResult.exchanges || ['NSE', 'BSE'], // Save as array, not JSON string
+          products: authResult.products || ['CNC', 'INTRADAY', 'MARGIN'], // Save as array, not JSON string
+          credentials: credentials, // Use 'credentials' not 'encrypted_credentials'
+        });
+
+        console.log('✅ Fyers account saved to database successfully:', dbAccount.id);
+
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          accountId, // broker account ID
+          userId, // user ID
+          'fyers', // broker name
+          authResult.userName || accountId // user display name
+        );
+
+        console.log('✅ Fyers account added to cache successfully');
+      } catch (dbError: any) {
+        console.error('⚠️ Failed to save Fyers account to database:', dbError);
+        // Continue with success response as the connection is working
+      }
+
       res.status(200).json({
         success: true,
         message: 'Successfully connected to Fyers',
         data: {
           brokerName: 'fyers',
-          accessToken: tokenResponse.accessToken,
-          message: tokenResponse.message,
+          accountId: accountId,
+          userName: authResult.userName,
+          email: authResult.email,
+          brokerDisplayName: 'Fyers',
+          exchanges: authResult.exchanges,
+          products: authResult.products,
+          accessToken: authResult.accessToken,
+          message: authResult.message,
         },
       });
     } else {
       res.status(401).json({
         success: false,
-        message: tokenResponse.message || 'Failed to validate auth code',
+        message: authResult.message || 'Failed to validate auth code',
       });
     }
   } catch (error: any) {
     console.error('🚨 Validate Fyers auth code error:', error);
     res.status(500).json({
       success: false,
-      message: 'Internal server error',
+      message: error.message || 'Internal server error',
     });
   }
 };
@@ -497,8 +551,8 @@ export const getConnectedAccounts = async (
             userName: dbAccount.user_name,
             email: dbAccount.email,
             brokerDisplayName: dbAccount.broker_display_name,
-            exchanges: JSON.parse(dbAccount.exchanges),
-            products: JSON.parse(dbAccount.products),
+            exchanges: Array.isArray(dbAccount.exchanges) ? dbAccount.exchanges : JSON.parse(dbAccount.exchanges || '[]'),
+            products: Array.isArray(dbAccount.products) ? dbAccount.products : JSON.parse(dbAccount.products || '[]'),
             isActive: isReallyActive, // Pure real-time validated status
             createdAt: dbAccount.created_at,
           };
@@ -823,6 +877,56 @@ export const activateAccount = async (
           message: loginResponse.emsg || 'Failed to authenticate with broker',
         });
       }
+    } else if (account.broker_name === 'fyers') {
+      // For Fyers, we need to check if we have a valid access token
+      // If not, we need to redirect to auth flow
+      brokerService = new FyersService();
+
+      // Check if credentials contain access token
+      if (credentials.accessToken) {
+        brokerService.setAccessToken(credentials.accessToken);
+
+        // Validate the session
+        const isValid = await brokerService.validateSession();
+        if (isValid) {
+          // Store the connection
+          const connectionKey = `${account.broker_name}_${account.account_id}`;
+          userConnections.set(connectionKey, brokerService);
+
+          // Add to broker account cache for fast lookups
+          addToBrokerAccountCache(
+            account.account_id, // broker account ID
+            userId, // user ID
+            account.broker_name, // broker name
+            account.user_name // user display name
+          );
+
+          res.status(200).json({
+            success: true,
+            message: `Successfully activated ${account.broker_name} account`,
+            data: {
+              accountId: account.id,
+              brokerName: account.broker_name,
+              isActive: true,
+            },
+          });
+        } else {
+          res.status(400).json({
+            success: false,
+            message: 'Fyers session expired. Please re-authenticate.',
+            requiresReauth: true,
+          });
+        }
+      } else {
+        // No access token, need to start auth flow
+        const authResult = await brokerService.login(credentials as FyersCredentials);
+        res.status(200).json({
+          success: false,
+          message: 'Fyers authentication required',
+          requiresAuth: true,
+          authUrl: authResult.authUrl,
+        });
+      }
     } else {
       res.status(400).json({
         success: false,
@@ -1139,34 +1243,21 @@ export const placeOrder = async (
         }
       }
     } else if (brokerName === 'fyers') {
-      // Map order type for Fyers
-      let fyersOrderType: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M';
-      switch (orderType) {
-        case 'LIMIT':
-          fyersOrderType = 'LIMIT';
-          break;
-        case 'MARKET':
-          fyersOrderType = 'MARKET';
-          break;
-        case 'SL-LIMIT':
-          fyersOrderType = 'SL';
-          break;
-        case 'SL-MARKET':
-          fyersOrderType = 'SL-M';
-          break;
-        default:
-          fyersOrderType = 'MARKET';
-      }
-
+      // Create Fyers order data using the same interface as Shoonya
       const fyersOrderData = {
-        symbol: `${exchange}:${symbol}`,
-        qty: parseInt(quantity),
-        type: fyersOrderType,
-        side: action as 'BUY' | 'SELL',
-        productType: (productType === 'C' ? 'CNC' : productType) as 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO',
-        limitPrice: price ? parseFloat(price) : 0,
-        stopPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
-        validity: 'DAY' as const,
+        userId: account.account_id,
+        buyOrSell: (action === 'BUY' ? 'B' : 'S') as 'B' | 'S',
+        productType: productType === 'C' ? 'CNC' : productType,
+        exchange: exchange,
+        tradingSymbol: symbol,
+        quantity: parseInt(quantity),
+        discloseQty: 0,
+        priceType: orderType as 'LMT' | 'MKT' | 'SL-LMT' | 'SL-MKT',
+        price: price ? parseFloat(price) : 0,
+        triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
+        retention: 'DAY' as const,
+        amo: 'NO' as const,
+        remarks: remarks || '',
       };
 
       try {

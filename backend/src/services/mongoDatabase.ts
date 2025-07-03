@@ -363,6 +363,14 @@ export class MongoDatabase implements IDatabaseAdapter {
   // Connected Accounts Management
   async createConnectedAccount(accountData: CreateConnectedAccountData): Promise<ConnectedAccount> {
     try {
+      console.log('💾 Creating connected account in MongoDB:', {
+        broker_name: accountData.broker_name,
+        account_id: accountData.account_id,
+        user_name: accountData.user_name,
+        exchanges: accountData.exchanges,
+        products: accountData.products
+      });
+
       const encryptedCredentials = this.encrypt(JSON.stringify(accountData.credentials));
 
       const accountDoc = new this.ConnectedAccountModel({
@@ -391,11 +399,24 @@ export class MongoDatabase implements IDatabaseAdapter {
 
   async getConnectedAccountsByUserId(userId: string): Promise<ConnectedAccount[]> {
     try {
+      console.log('🔍 Fetching connected accounts for user:', userId);
+
       const accounts = await this.ConnectedAccountModel.find({
         user_id: new mongoose.Types.ObjectId(userId)
       }).sort({ created_at: -1 });
 
-      return accounts.map(account => this.connectedAccountDocToInterface(account));
+      console.log(`📊 Found ${accounts.length} connected accounts in database`);
+
+      const transformedAccounts = accounts.map(account => this.connectedAccountDocToInterface(account));
+
+      console.log('🔄 Transformed accounts:', transformedAccounts.map(acc => ({
+        id: acc.id,
+        broker_name: acc.broker_name,
+        account_id: acc.account_id,
+        user_name: acc.user_name
+      })));
+
+      return transformedAccounts;
     } catch (error) {
       console.error('🚨 Failed to get connected accounts:', error);
       return [];
