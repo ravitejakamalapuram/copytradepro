@@ -71,13 +71,38 @@ export const accountService = {
   },
 
   // Activate account (re-authenticate)
-  async activateAccount(accountId: string): Promise<boolean> {
+  async activateAccount(accountId: string): Promise<{ success: boolean; requiresAuth?: boolean; authUrl?: string; message?: string }> {
     try {
-      const response = await api.post<AccountResponse>(`/broker/accounts/${accountId}/activate`);
-      return response.data.success;
-    } catch (error) {
+      const response = await api.post<any>(`/broker/accounts/${accountId}/activate`);
+
+      // Handle OAuth redirect response
+      if (response.data.requiresAuth && response.data.authUrl) {
+        return {
+          success: false,
+          requiresAuth: true,
+          authUrl: response.data.authUrl,
+          message: response.data.message || 'Authentication required'
+        };
+      }
+
+      return { success: response.data.success };
+    } catch (error: any) {
       console.error('Failed to activate account:', error);
-      return false;
+
+      // Check if error response contains OAuth redirect
+      if (error.response?.data?.requiresAuth && error.response?.data?.authUrl) {
+        return {
+          success: false,
+          requiresAuth: true,
+          authUrl: error.response.data.authUrl,
+          message: error.response.data.message || 'Authentication required'
+        };
+      }
+
+      return {
+        success: false,
+        message: error.response?.data?.message || error.message || 'Failed to activate account'
+      };
     }
   },
 

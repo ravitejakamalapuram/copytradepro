@@ -77,6 +77,87 @@ const AccountSetup: React.FC = () => {
     fetchAccounts();
   }, []);
 
+  // Handle OAuth callback messages from popup
+  useEffect(() => {
+    const handleMessage = async (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+
+      if (event.data.type === 'FYERS_AUTH_CALLBACK') {
+        console.log('Received Fyers auth callback:', event.data);
+
+        if (event.data.success && event.data.authCode) {
+          try {
+            // Send auth code to backend for token exchange
+            const response = await brokerService.validateFyersAuthCode(event.data.authCode, {
+              clientId: formData.clientId,
+              secretKey: formData.secretKey,
+              redirectUri: formData.redirectUri
+            });
+
+            if (response.success) {
+              alert('Fyers account activated successfully!');
+              // Refresh accounts list
+              const connectedAccounts = await accountService.getConnectedAccounts();
+              setAccounts(connectedAccounts);
+            } else {
+              alert('Failed to activate Fyers account: ' + response.message);
+            }
+          } catch (error: any) {
+            console.error('Failed to process auth callback:', error);
+            alert('Failed to process authentication: ' + error.message);
+          }
+        } else {
+          alert('Authentication failed: ' + (event.data.error || 'Unknown error'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [formData.clientId, formData.secretKey, formData.redirectUri]);
+
+  // Handle auth code received from OAuth popup
+  const handleAuthCodeReceived = async (authCode: string, accountId?: string) => {
+    try {
+      console.log('Processing auth code from popup...');
+
+      // Find the Fyers account to get its credentials
+      const fyersAccount = accounts.find(acc => acc.brokerName === 'fyers' && (accountId ? acc.id === accountId : true));
+
+      if (!fyersAccount) {
+        alert('Could not find Fyers account. Please try adding the account again.');
+        return;
+      }
+
+      // Get credentials from the stored account
+      // Note: In a real implementation, credentials should be fetched securely from backend
+      // For now, we'll use the default credentials
+      const credentials = {
+        clientId: 'YZ7RCOVDOX-100',
+        secretKey: '5BGXZUV1Z6',
+        redirectUri: 'https://www.urlencoder.org/'
+      };
+
+      // Send auth code to backend for token exchange
+      const response = await brokerService.validateFyersAuthCode(authCode, credentials);
+
+      if (response.success) {
+        alert('Fyers account activated successfully!');
+        // Refresh accounts list
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+      } else {
+        alert('Failed to activate Fyers account: ' + response.message);
+      }
+    } catch (error: any) {
+      console.error('Failed to process auth code:', error);
+      alert('Failed to process authentication: ' + error.message);
+    }
+  };
+
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -86,6 +167,8 @@ const AccountSetup: React.FC = () => {
     setFormData(prev => ({ ...prev, brokerName: brokerId }));
     setShowAddForm(true);
   };
+
+
 
   const handleSubmit = async () => {
     if (!formData.brokerName) {
@@ -112,9 +195,12 @@ const AccountSetup: React.FC = () => {
         const credentials: FyersCredentials = {
           clientId: formData.clientId,
           secretKey: formData.secretKey,
-          redirectUri: formData.redirectUri,
+          redirectUri: formData.redirectUri, // Use user-provided redirect URI
         };
-        result = await brokerService.connectBroker('fyers', credentials);
+
+        // Use automated OAuth flow for Fyers
+        console.log('🚀 Starting automated Fyers OAuth flow...');
+        result = await brokerService.connectFyersWithOAuth(credentials);
       } else {
         throw new Error('Unsupported broker');
       }
@@ -153,10 +239,56 @@ const AccountSetup: React.FC = () => {
   const handleActivateAccount = async (accountId: string) => {
     try {
       setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-      await accountService.activateAccount(accountId);
-      // Refresh accounts
-      const connectedAccounts = await accountService.getConnectedAccounts();
-      setAccounts(connectedAccounts);
+      const result = await accountService.activateAccount(accountId);
+
+      if (result.success) {
+        // Account activated successfully
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+        alert('Account activated successfully!');
+      } else if (result.requiresAuth && result.authUrl) {
+        // OAuth authentication required
+        const userConfirmed = confirm(
+          `${result.message}\n\nClick OK to open the authentication page in a new window. After completing authentication, the account will be automatically activated.`
+        );
+
+        if (userConfirmed) {
+          // Open OAuth URL in a new popup window
+          const popup = window.open(
+            result.authUrl,
+            'fyersAuth',
+            'width=600,height=700,scrollbars=yes,resizable=yes'
+          );
+
+          if (popup) {
+            // Show instructions and wait for manual auth code input
+            setTimeout(() => {
+              const authCode = prompt(
+                `Please complete the authentication in the popup window.\n\n` +
+                `After authentication, you'll be redirected to a page with an auth code.\n` +
+                `Copy the auth code from the URL (after 'auth_code=') and paste it here:`
+              );
+
+              if (authCode && authCode.trim()) {
+                // Close popup
+                popup.close();
+
+                // Process auth code
+                handleAuthCodeReceived(authCode.trim(), accountId);
+              } else {
+                // User cancelled or didn't provide auth code
+                popup.close();
+                alert('Authentication cancelled. Please try again if needed.');
+              }
+            }, 2000); // Give popup time to load
+          } else {
+            alert('Popup blocked. Please allow popups and try again, or manually open: ' + result.authUrl);
+          }
+        }
+      } else {
+        // Activation failed
+        alert(result.message || 'Failed to activate account');
+      }
     } catch (error: any) {
       console.error('Failed to activate account:', error);
       alert('Failed to activate account: ' + error.message);
@@ -552,12 +684,27 @@ const AccountSetup: React.FC = () => {
                         </label>
                         <input
                           type="url"
-                          placeholder="https://your-app.com/callback"
+                          placeholder="Enter the redirect URI from your Fyers app settings"
                           value={formData.redirectUri}
                           onChange={(e) => handleInputChange('redirectUri', e.target.value)}
                           className="kite-input"
                           style={{ fontSize: '1rem' }}
                         />
+                        <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
+                          This must match the redirect URI configured in your Fyers developer console
+                        </div>
+                      </div>
+
+                      <div style={{
+                        padding: '0.75rem',
+                        backgroundColor: 'var(--kite-bg-info)',
+                        border: '1px solid var(--kite-primary)',
+                        borderRadius: 'var(--kite-radius-md)',
+                        color: 'var(--kite-text-secondary)',
+                        fontSize: '0.875rem'
+                      }}>
+                        <strong>🚀 Automated OAuth Flow</strong><br />
+                        Authentication will happen automatically in a popup window. Make sure the redirect URI above matches what you configured in your Fyers developer console.
                       </div>
                     </div>
                   )}

@@ -99,16 +99,54 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
       }
     } else if (account.broker_name === 'fyers') {
       brokerService = new FyersService();
-      loginResponse = await brokerService.login(credentials as FyersCredentials);
 
-      if (loginResponse.success) {
-        userConnectionsMap.set(connectionKey, brokerService);
-        console.log(`✅ Successfully auto-reactivated Fyers account ${accountId}`);
-        return true;
-      } else {
-        console.log(`❌ Failed to auto-reactivate Fyers account ${accountId}:`, loginResponse.message);
-        return false;
+      // For Fyers, try to restore session using stored tokens
+      if (credentials.accessToken) {
+        console.log('🔑 Found stored Fyers access token, attempting to restore session...');
+        brokerService.setAccessToken(credentials.accessToken);
+
+        // Test if token is still valid
+        try {
+          await brokerService.getProfile();
+          console.log('✅ Fyers session restored successfully with existing token');
+          userConnectionsMap.set(connectionKey, brokerService);
+          return true;
+        } catch (error) {
+          console.log('🔄 Fyers access token expired, attempting refresh...');
+
+          // Try to refresh token if refresh token is available
+          if (credentials.refreshToken) {
+            console.log('🔄 Using refresh token to get new access token...');
+            const refreshResult = await brokerService.refreshAccessToken(credentials.refreshToken, credentials);
+
+            if (refreshResult.success && refreshResult.accessToken) {
+              // Update stored credentials with new tokens
+              const updatedCredentials = {
+                ...credentials,
+                accessToken: refreshResult.accessToken,
+                refreshToken: refreshResult.refreshToken || credentials.refreshToken,
+                tokenGeneratedAt: new Date().toISOString()
+              };
+
+              await userDatabase.updateConnectedAccount(accountId, {
+                credentials: updatedCredentials
+              });
+
+              console.log('✅ Fyers token refreshed and stored successfully');
+              userConnectionsMap.set(connectionKey, brokerService);
+              return true;
+            } else {
+              console.log('❌ Fyers token refresh failed:', refreshResult.message);
+            }
+          } else {
+            console.log('⚠️ No refresh token available for Fyers account');
+          }
+        }
       }
+
+      // If token restoration/refresh failed, fall back to generating new auth URL
+      console.log('⚠️ Fyers token restoration failed, needs re-authentication');
+      return false;
     }
 
     return false;
@@ -421,21 +459,58 @@ export const validateFyersAuthCode = async (
       const connectionKey = `fyers_${accountId}`;
       userConnections.set(connectionKey, fyersService);
 
-      // Save account to database
+      // Save account to database with tokens
       try {
-        const dbAccount = await userDatabase.createConnectedAccount({
-          user_id: userId,
-          broker_name: 'fyers',
-          account_id: accountId,
-          user_name: authResult.userName || accountId,
-          email: authResult.email || '',
-          broker_display_name: 'Fyers',
-          exchanges: authResult.exchanges || ['NSE', 'BSE'], // Save as array, not JSON string
-          products: authResult.products || ['CNC', 'INTRADAY', 'MARGIN'], // Save as array, not JSON string
-          credentials: credentials, // Use 'credentials' not 'encrypted_credentials'
-        });
+        // Store credentials with access token, refresh token, and auth code
+        const credentialsWithTokens = {
+          ...credentials,
+          accessToken: authResult.accessToken,
+          refreshToken: authResult.refreshToken,
+          authCode: authCode, // Store auth code for refresh token flow
+          tokenGeneratedAt: new Date().toISOString()
+        };
 
-        console.log('✅ Fyers account saved to database successfully:', dbAccount.id);
+        try {
+          const dbAccount = await userDatabase.createConnectedAccount({
+            user_id: userId,
+            broker_name: 'fyers',
+            account_id: accountId,
+            user_name: authResult.userName || accountId,
+            email: authResult.email || '',
+            broker_display_name: 'Fyers',
+            exchanges: authResult.exchanges || ['NSE', 'BSE'], // Save as array, not JSON string
+            products: authResult.products || ['CNC', 'INTRADAY', 'MARGIN'], // Save as array, not JSON string
+            credentials: credentialsWithTokens, // Store credentials with tokens
+          });
+
+          console.log('✅ Fyers account created in database successfully:', dbAccount.id);
+        } catch (createError: any) {
+          if (createError.message.includes('Account already exists')) {
+            console.log('🔄 Account exists, updating with new tokens...');
+
+            // Find the existing account and update it with new tokens
+            const existingAccounts = await userDatabase.getConnectedAccountsByUserId(userId);
+            const existingAccount = existingAccounts.find((acc: any) =>
+              acc.broker_name === 'fyers' && acc.account_id === accountId
+            );
+
+            if (existingAccount) {
+              await userDatabase.updateConnectedAccount(existingAccount.id.toString(), {
+                credentials: credentialsWithTokens,
+                user_name: authResult.userName || accountId,
+                email: authResult.email || '',
+                exchanges: authResult.exchanges || ['NSE', 'BSE'],
+                products: authResult.products || ['CNC', 'INTRADAY', 'MARGIN']
+              });
+
+              console.log('✅ Fyers account updated with new tokens successfully:', existingAccount.id);
+            } else {
+              console.error('❌ Could not find existing Fyers account to update');
+            }
+          } else {
+            console.error('❌ Failed to save Fyers account to database:', createError);
+          }
+        }
 
         // Add to broker account cache for fast lookups
         addToBrokerAccountCache(
@@ -878,17 +953,20 @@ export const activateAccount = async (
         });
       }
     } else if (account.broker_name === 'fyers') {
-      // For Fyers, we need to check if we have a valid access token
-      // If not, we need to redirect to auth flow
+      // Enhanced Fyers activation with smart authentication flow
       brokerService = new FyersService();
+      console.log('🔄 Starting Fyers account activation for:', account.account_id);
 
-      // Check if credentials contain access token
+      // Step 1: Try to restore session with existing access token
       if (credentials.accessToken) {
+        console.log('🔑 Found stored access token, attempting session restoration...');
         brokerService.setAccessToken(credentials.accessToken);
 
-        // Validate the session
-        const isValid = await brokerService.validateSession();
-        if (isValid) {
+        try {
+          // Test if token is still valid
+          await brokerService.getProfile();
+          console.log('✅ Fyers session restored successfully with existing token');
+
           // Store the connection
           const connectionKey = `${account.broker_name}_${account.account_id}`;
           userConnections.set(connectionKey, brokerService);
@@ -903,28 +981,137 @@ export const activateAccount = async (
 
           res.status(200).json({
             success: true,
-            message: `Successfully activated ${account.broker_name} account`,
+            message: `Successfully activated ${account.broker_name} account using stored token`,
             data: {
               accountId: account.id,
               brokerName: account.broker_name,
               isActive: true,
+              method: 'token_restoration'
             },
+          });
+          return;
+        } catch (error) {
+          console.log('🔄 Access token expired, attempting refresh...');
+
+          // Step 2: Try to refresh token if refresh token is available
+          if (credentials.refreshToken) {
+            console.log('🔄 Using refresh token to get new access token...');
+            try {
+              const refreshResult = await brokerService.refreshAccessToken(credentials.refreshToken, credentials);
+
+              if (refreshResult.success && refreshResult.accessToken) {
+                // Update stored credentials with new tokens
+                const updatedCredentials = {
+                  ...credentials,
+                  accessToken: refreshResult.accessToken,
+                  refreshToken: refreshResult.refreshToken || credentials.refreshToken,
+                  tokenGeneratedAt: new Date().toISOString()
+                };
+
+                await userDatabase.updateConnectedAccount(accountId, {
+                  credentials: updatedCredentials
+                });
+
+                console.log('✅ Fyers token refreshed successfully');
+
+                // Store the connection
+                const connectionKey = `${account.broker_name}_${account.account_id}`;
+                userConnections.set(connectionKey, brokerService);
+
+                // Add to broker account cache for fast lookups
+                addToBrokerAccountCache(
+                  account.account_id, // broker account ID
+                  userId, // user ID
+                  account.broker_name, // broker name
+                  account.user_name // user display name
+                );
+
+                res.status(200).json({
+                  success: true,
+                  message: `Successfully activated ${account.broker_name} account using refresh token`,
+                  data: {
+                    accountId: account.id,
+                    brokerName: account.broker_name,
+                    isActive: true,
+                    method: 'token_refresh'
+                  },
+                });
+                return;
+              } else {
+                console.log('❌ Token refresh failed:', refreshResult.message);
+
+                // Clear expired auth code since refresh failed
+                if (credentials.authCode) {
+                  console.log('🔄 Clearing expired auth code after refresh failure...');
+                  const updatedCredentials = { ...credentials };
+                  delete updatedCredentials.authCode;
+
+                  try {
+                    await userDatabase.updateConnectedAccount(accountId, {
+                      credentials: updatedCredentials
+                    });
+                    console.log('✅ Cleared expired auth code - will use fresh OAuth');
+                  } catch (clearError: any) {
+                    console.error('⚠️ Failed to clear auth code:', clearError.message);
+                  }
+                }
+              }
+            } catch (refreshError: any) {
+              console.log('❌ Token refresh error:', refreshError.message);
+
+              // Clear expired auth code since refresh failed
+              if (credentials.authCode) {
+                console.log('🔄 Clearing expired auth code after refresh error...');
+                const updatedCredentials = { ...credentials };
+                delete updatedCredentials.authCode;
+
+                try {
+                  await userDatabase.updateConnectedAccount(accountId, {
+                    credentials: updatedCredentials
+                  });
+                  console.log('✅ Cleared expired auth code - will use fresh OAuth');
+                } catch (clearError: any) {
+                  console.error('⚠️ Failed to clear auth code:', clearError.message);
+                }
+              }
+            }
+          } else {
+            console.log('⚠️ No refresh token available');
+          }
+        }
+      }
+
+      // Step 3: Fall back to auth code flow using saved credentials
+      console.log('🔐 Starting auth code flow with saved credentials...');
+      try {
+        const authResult = await brokerService.login(credentials as FyersCredentials);
+
+        if (authResult.success && authResult.authUrl) {
+          res.status(200).json({
+            success: false,
+            message: 'Fyers authentication required - please complete OAuth flow',
+            requiresAuth: true,
+            authUrl: authResult.authUrl,
+            data: {
+              accountId: account.id,
+              brokerName: account.broker_name,
+              method: 'oauth_flow',
+              instructions: 'Click the auth URL to complete authentication, then the system will automatically store your tokens'
+            }
           });
         } else {
           res.status(400).json({
             success: false,
-            message: 'Fyers session expired. Please re-authenticate.',
-            requiresReauth: true,
+            message: authResult.message || 'Failed to generate Fyers auth URL',
+            error: 'auth_url_generation_failed'
           });
         }
-      } else {
-        // No access token, need to start auth flow
-        const authResult = await brokerService.login(credentials as FyersCredentials);
-        res.status(200).json({
+      } catch (authError: any) {
+        console.error('❌ Auth URL generation failed:', authError.message);
+        res.status(500).json({
           success: false,
-          message: 'Fyers authentication required',
-          requiresAuth: true,
-          authUrl: authResult.authUrl,
+          message: 'Failed to generate Fyers authentication URL',
+          error: authError.message
         });
       }
     } else {
@@ -990,6 +1177,29 @@ export const deactivateAccount = async (
       // Remove from in-memory connections using account-specific key
       userConnections.delete(connectionKey);
       console.log('✅ Removed from in-memory connections:', connectionKey);
+    }
+
+    // For Fyers accounts, clear the auth code from database to force fresh OAuth on next activation
+    // Auth codes are single-use and expire quickly, so we shouldn't try to reuse them
+    if (account.broker_name === 'fyers') {
+      try {
+        const credentials = await userDatabase.getAccountCredentials(accountId);
+        if (credentials && credentials.authCode) {
+          console.log('🔄 Clearing expired auth code for Fyers account...');
+
+          // Remove auth code but keep other credentials
+          const updatedCredentials = { ...credentials };
+          delete updatedCredentials.authCode;
+
+          await userDatabase.updateConnectedAccount(accountId, {
+            credentials: updatedCredentials
+          });
+
+          console.log('✅ Cleared auth code from Fyers account - next activation will use fresh OAuth');
+        }
+      } catch (clearError: any) {
+        console.error('⚠️ Failed to clear auth code (continuing anyway):', clearError.message);
+      }
     }
 
     // Note: No database status update needed - status is determined by real-time validation
@@ -1376,7 +1586,10 @@ export const placeOrder = async (
         });
       }
     } else if (brokerName === 'fyers') {
-      if (orderResponse.s === 'ok') {
+      // Enhanced Fyers response handling
+      console.log('🔍 Processing Fyers order response:', JSON.stringify(orderResponse, null, 2));
+
+      if (orderResponse.stat === 'Ok') {
         // Save order to history with PLACED status
         // Note: Status is 'PLACED' because broker API success only means order was submitted,
         // not that it was executed. Actual execution depends on market conditions.
@@ -1385,7 +1598,7 @@ export const placeOrder = async (
             user_id: userId, // Keep as string for MongoDB ObjectId
             account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
             broker_name: brokerName,
-            broker_order_id: orderResponse.id,
+            broker_order_id: orderResponse.norenordno, // Use standardized field name
             symbol: symbol,
             action: action as 'BUY' | 'SELL',
             quantity: parseInt(quantity),
@@ -1399,7 +1612,7 @@ export const placeOrder = async (
           };
 
           const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
-          console.log('✅ Order placed and saved to history:', orderResponse.id);
+          console.log('✅ Fyers order placed and saved to history:', orderResponse.norenordno);
           console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
           // Add order to real-time monitoring
@@ -1413,7 +1626,7 @@ export const placeOrder = async (
             price: price ? parseFloat(price) : 0,
             status: 'PLACED',
             broker_name: brokerName,
-            broker_order_id: orderResponse.id,
+            broker_order_id: orderResponse.norenordno, // Use standardized field name
             order_type: orderType,
             exchange: exchange || 'NSE',
             product_type: productType || 'C',
@@ -1423,7 +1636,7 @@ export const placeOrder = async (
           };
 
           await orderStatusService.addOrderToMonitoring(orderForMonitoring);
-          console.log('📊 Order added to real-time monitoring:', orderResponse.id);
+          console.log('📊 Fyers order added to real-time monitoring:', orderResponse.norenordno);
         } catch (historyError: any) {
           console.error('⚠️ Failed to save order history:', historyError.message);
           // Don't fail the order response if history saving fails
@@ -1431,9 +1644,9 @@ export const placeOrder = async (
 
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully (awaiting execution)',
+          message: orderResponse.message || 'Order placed successfully (awaiting execution)',
           data: {
-            orderId: orderResponse.id,
+            orderId: orderResponse.norenordno,
             brokerName,
             symbol,
             action,
@@ -1445,12 +1658,23 @@ export const placeOrder = async (
             status: 'PLACED',
             timestamp: new Date().toISOString(),
             note: 'Order has been submitted to the exchange and is awaiting execution',
+            rawResponse: orderResponse.rawResponse // Include raw response for debugging
           },
         });
       } else {
+        // Enhanced error handling for Fyers
+        console.error('❌ Fyers order placement failed:', {
+          stat: orderResponse.stat,
+          emsg: orderResponse.emsg,
+          errorCode: orderResponse.errorCode,
+          rawResponse: orderResponse.rawResponse
+        });
+
         res.status(400).json({
           success: false,
-          message: orderResponse.message || 'Failed to place order',
+          message: orderResponse.emsg || 'Failed to place order',
+          errorCode: orderResponse.errorCode,
+          details: orderResponse.rawResponse
         });
       }
     }

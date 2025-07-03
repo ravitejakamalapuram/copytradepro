@@ -65,6 +65,7 @@ export interface FyersLoginResponse {
   success: boolean;
   authUrl?: string;
   accessToken?: string;
+  refreshToken?: string;
   message: string;
   requiresAuthCode?: boolean;
   // Profile data after successful authentication
@@ -82,10 +83,11 @@ export class FyersService {
   private clientId: string = '';
 
   constructor() {
-    // Initialize the official Fyers API client
+    // Initialize the official Fyers API client with minimal config
+    // App ID will be set when credentials are provided
     this.fyers = new fyersModel({
       path: process.cwd() + '/logs',
-      enableLogging: true
+      enableLogging: false // Disable to avoid log file errors
     });
   }
 
@@ -113,19 +115,48 @@ export class FyersService {
   }
 
   // Generate access token from auth code
-  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; message: string; profile?: any }> {
+  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; message: string; profile?: any }> {
     try {
       console.log('🔐 Generating Fyers access token...');
+      console.log('🔍 Request payload:', {
+        client_id: credentials.clientId,
+        secret_key: credentials.secretKey ? '***' : 'missing',
+        auth_code: authCode ? '***' : 'missing',
+        redirect_uri: credentials.redirectUri
+      });
 
-      const response = await this.fyers.generate_access_token({
+      // Validate App ID format
+      if (!credentials.clientId.match(/^[A-Z0-9]+-\d+$/)) {
+        throw new Error(`Invalid App ID format: ${credentials.clientId}. Expected format: ABC12345-100`);
+      }
+
+      // Create a fresh Fyers client instance for this authentication
+      // This ensures clean state and proper initialization
+      const fyersClient = new fyersModel({
+        path: process.cwd() + '/logs',
+        enableLogging: false
+      });
+
+      // Set App ID on the fresh client
+      fyersClient.setAppId(credentials.clientId);
+      console.log('🔧 Fresh Fyers client created with App ID:', credentials.clientId);
+      console.log('🔍 App ID format validation passed');
+
+      const response = await fyersClient.generate_access_token({
         client_id: credentials.clientId,
         secret_key: credentials.secretKey,
-        auth_code: authCode
+        auth_code: authCode,
+        redirect_uri: credentials.redirectUri
       });
+
+      console.log('📊 Raw Fyers token response:', JSON.stringify(response, null, 2));
 
       if (response.s === 'ok' && response.access_token) {
         this.accessToken = response.access_token;
         this.clientId = credentials.clientId;
+
+        // Update the main client instance with successful authentication
+        this.fyers = fyersClient; // Use the successful client instance
         this.fyers.setAccessToken(response.access_token);
 
         // Get user profile after successful authentication
@@ -137,9 +168,12 @@ export class FyersService {
         }
 
         console.log('✅ Fyers access token generated successfully');
+        console.log('🔄 Response contains refresh_token:', !!response.refresh_token);
+
         return {
           success: true,
           accessToken: response.access_token,
+          refreshToken: response.refresh_token, // Store refresh token
           message: 'Access token generated successfully',
           profile
         };
@@ -148,6 +182,62 @@ export class FyersService {
       }
     } catch (error: any) {
       console.error('🚨 Failed to generate access token:', error);
+      return {
+        success: false,
+        message: FyersErrorHandler.transformError(error).message,
+      };
+    }
+  }
+
+  // Refresh access token using refresh token + auth code (Fyers specific requirement)
+  async refreshAccessToken(refreshToken: string, credentials: FyersCredentials & { authCode?: string }): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; message: string }> {
+    try {
+      console.log('🔄 Refreshing Fyers access token using refresh token...');
+
+      // Fyers API requires auth code even for refresh token flow (non-standard OAuth2)
+      if (!credentials.authCode) {
+        throw new Error('auth code is required for Fyers refresh token flow');
+      }
+
+      console.log('🔍 Refresh token request payload:', {
+        client_id: credentials.clientId,
+        secret_key: credentials.secretKey ? '***' : 'missing',
+        authorization_code: credentials.authCode ? '***' : 'missing',
+        refresh_token: refreshToken ? '***' : 'missing',
+        grant_type: 'refresh_token'
+      });
+
+      const response = await this.fyers.generate_access_token({
+        client_id: credentials.clientId,
+        secret_key: credentials.secretKey,
+        authorization_code: credentials.authCode,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token'
+      });
+
+      console.log('📊 Raw Fyers refresh token response:', JSON.stringify(response, null, 2));
+
+      if (response.s === 'ok' && response.access_token) {
+        this.accessToken = response.access_token;
+        this.clientId = credentials.clientId;
+
+        // Set both App ID and Access Token before making API calls
+        this.fyers.setAppId(credentials.clientId);
+        this.fyers.setAccessToken(response.access_token);
+
+        console.log('✅ Fyers access token refreshed successfully');
+
+        return {
+          success: true,
+          accessToken: response.access_token,
+          refreshToken: response.refresh_token || refreshToken, // Use new refresh token if provided, otherwise keep the old one
+          message: 'Access token refreshed successfully'
+        };
+      } else {
+        throw new Error(response.message || 'Failed to refresh access token');
+      }
+    } catch (error: any) {
+      console.error('🚨 Failed to refresh access token:', error);
       return {
         success: false,
         message: FyersErrorHandler.transformError(error).message,
@@ -198,20 +288,100 @@ export class FyersService {
 
       const response = await this.fyers.place_order(fyersOrderData);
 
-      if (response.s === 'ok') {
-        console.log('✅ Fyers order placed successfully:', response.id);
+      console.log('📊 Raw Fyers API response:', JSON.stringify(response, null, 2));
+
+      // Enhanced response handling
+      if (response && typeof response === 'object') {
+        // Check for success response
+        if (response.s === 'ok' || response.status === 'success' || response.code === 200) {
+          const orderId = response.id || response.order_id || response.orderNumber || response.data?.id;
+          console.log('✅ Fyers order placed successfully:', orderId);
+
+          return {
+            stat: 'Ok',
+            norenordno: orderId,
+            message: response.message || 'Order placed successfully',
+            rawResponse: response
+          };
+        }
+
+        // Check for error response
+        if (response.s === 'error' || response.status === 'error' || response.code !== 200) {
+          const errorMessage = response.message || response.error || response.data?.message || 'Order placement failed';
+          const errorCode = response.code || response.error_code || 'UNKNOWN';
+
+          console.error('❌ Fyers order placement failed:', {
+            code: errorCode,
+            message: errorMessage,
+            response: response
+          });
+
+          // Return error in Shoonya-compatible format
+          return {
+            stat: 'Not_Ok',
+            emsg: errorMessage,
+            errorCode: errorCode,
+            rawResponse: response
+          };
+        }
+
+        // Handle unexpected response format
+        console.warn('⚠️ Unexpected Fyers response format:', response);
+
+        // If response exists but format is unclear, try to extract order ID
+        const possibleOrderId = response.id || response.order_id || response.orderNumber ||
+                               response.data?.id || response.data?.order_id;
+
+        if (possibleOrderId) {
+          console.log('✅ Fyers order possibly placed (unusual response format):', possibleOrderId);
+          return {
+            stat: 'Ok',
+            norenordno: possibleOrderId,
+            message: 'Order placed (response format unclear)',
+            rawResponse: response
+          };
+        }
+
+        // No clear success or error indication
         return {
-          stat: 'Ok',
-          norenordno: response.id,
-          message: response.message || 'Order placed successfully'
+          stat: 'Not_Ok',
+          emsg: 'Unclear response from Fyers API',
+          rawResponse: response
         };
-      } else {
-        console.error('❌ Fyers order placement failed:', response.message);
-        throw new Error(response.message || 'Order placement failed');
       }
+
+      // Handle null or non-object response
+      console.error('❌ Invalid response from Fyers API:', response);
+      return {
+        stat: 'Not_Ok',
+        emsg: 'Invalid response from Fyers API',
+        rawResponse: response
+      };
+
     } catch (error: any) {
       console.error('🚨 Fyers place order error:', error);
-      throw FyersErrorHandler.transformError(error);
+
+      // Enhanced error parsing
+      let errorMessage = 'Order placement failed';
+      let errorCode = 'UNKNOWN';
+
+      if (error.response && error.response.data) {
+        const fyersError = error.response.data;
+        errorMessage = fyersError.message || fyersError.error || fyersError.data?.message || errorMessage;
+        errorCode = fyersError.code || fyersError.error_code || fyersError.status || errorCode;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      console.error('🔍 Parsed error details:', { errorCode, errorMessage });
+
+      // Return error in Shoonya-compatible format instead of throwing
+      return {
+        stat: 'Not_Ok',
+        emsg: errorMessage,
+        errorCode: errorCode,
+        rawError: error
+      };
     }
   }
 
@@ -361,6 +531,12 @@ export class FyersService {
 
     try {
       console.log('👤 Fetching Fyers profile...');
+
+      // Ensure App ID is set before making API calls
+      if (this.clientId) {
+        this.fyers.setAppId(this.clientId);
+      }
+
       const response = await this.fyers.get_profile();
 
       if (response.s === 'ok') {
@@ -474,7 +650,7 @@ export class FyersService {
         // Get profile information
         const profile = tokenResult.profile || await this.getProfile();
 
-        return {
+        const result: FyersLoginResponse = {
           success: true,
           accessToken: tokenResult.accessToken,
           message: 'Authentication completed successfully',
@@ -484,6 +660,12 @@ export class FyersService {
           exchanges: profile?.exchanges || ['NSE', 'BSE'],
           products: profile?.products || ['CNC', 'INTRADAY', 'MARGIN']
         };
+
+        if (tokenResult.refreshToken) {
+          result.refreshToken = tokenResult.refreshToken;
+        }
+
+        return result;
       } else {
         return {
           success: false,
