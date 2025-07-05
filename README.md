@@ -34,18 +34,14 @@ A professional multi-broker trading platform for copy trading and portfolio mana
 - Node.js 18.0.0 or higher
 - npm 8.0.0 or higher
 
-### ⚡ Super Simple Setup
+### ⚡ Simple Setup
 
 ```bash
 git clone https://github.com/ravitejakamalapuram/copytradepro.git
 cd copyTradeV2
-npm run setup
+npm run install:all
+npm run build
 ```
-
-That's it! This single command will:
-- ✅ Install backend and frontend dependencies
-- ✅ Build both backend and frontend
-- ✅ Copy frontend to backend/public
 
 ### 🔥 Start Development
 
@@ -73,11 +69,10 @@ npm start
 
 | Command | Description |
 |---------|-------------|
-| `npm run setup` | 🎯 Complete setup (install + build + config) |
-| `npm run dev` | 🔥 Start development servers with smart logging |
+| `npm run install:all` | 📦 Install all dependencies |
+| `npm run dev` | 🔥 Start development servers |
 | `npm run build` | 🏗️ Build for production |
 | `npm start` | 🚀 Start production server |
-| `npm run install` | 📦 Install all dependencies |
 | `npm run clean` | 🧹 Clean all build files |
 
 ### 🔧 Configuration
@@ -104,7 +99,7 @@ FYERS_REDIRECT_URI=your_redirect_uri
 **Dependencies Issues:**
 ```bash
 npm run clean
-npm run install
+npm run install:all
 ```
 
 **Build Issues:**
@@ -115,7 +110,6 @@ npm run build
 
 **Manual Setup (if scripts fail):**
 ```bash
-npm install
 cd backend && npm install && npm run build
 cd ../frontend && npm install && npm run build
 cd .. && mkdir -p backend/public && cp -r frontend/dist/* backend/public/
@@ -123,7 +117,7 @@ cd .. && mkdir -p backend/public && cp -r frontend/dist/* backend/public/
 
 ### 🎯 Development Workflow
 
-1. **First time:** `npm run setup`
+1. **First time:** `npm run install:all && npm run build`
 2. **Daily dev:** `npm run dev`
 3. **Before deploy:** `npm run build`
 

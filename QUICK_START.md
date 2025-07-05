@@ -2,13 +2,13 @@
 
 ## ⚡ Super Simple Setup & Development
 
-### 🎯 One-Command Setup
+### 🎯 Simple Setup
 ```bash
-npm run setup
+npm run install:all
+npm run build
 ```
 This will:
-- ✅ Install backend dependencies
-- ✅ Install frontend dependencies
+- ✅ Install backend and frontend dependencies
 - ✅ Build both backend and frontend
 - ✅ Copy frontend to backend/public
 
@@ -41,11 +41,10 @@ npm start
 
 | Command | Description |
 |---------|-------------|
-| `npm run setup` | 🎯 Complete setup (install + build + config) |
-| `npm run dev` | 🔥 Start development servers with smart logging |
+| `npm run install:all` | 📦 Install all dependencies |
+| `npm run dev` | 🔥 Start development servers |
 | `npm run build` | 🏗️ Build for production |
 | `npm start` | 🚀 Start production server |
-| `npm run install` | 📦 Install all dependencies |
 | `npm run clean` | 🧹 Clean all build files |
 
 ### 🔧 Advanced Commands
@@ -66,7 +65,8 @@ npm start
 ```bash
 git clone <repository>
 cd copyTradeV2
-npm run setup
+npm run install:all
+npm run build
 ```
 
 ### Daily Development:

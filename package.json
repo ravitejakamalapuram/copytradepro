@@ -4,6 +4,7 @@
   "description": "Professional trading application with multi-broker support",
   "private": true,
   "scripts": {
+    "clean": "rm -rf backend/dist frontend/dist backend/public node_modules backend/node_modules frontend/node_modules",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
     "build": "npm run build:backend && npm run build:frontend && npm run copy:frontend",
     "build:backend": "cd backend && npm run build",
@@ -12,9 +13,7 @@
     "start": "cd backend && npm start",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "clean": "rm -rf backend/dist frontend/dist backend/public node_modules backend/node_modules frontend/node_modules",
-    "setup": "npm run install:all && npm run build"
+    "dev:frontend": "cd frontend && npm run dev"
   },
   "keywords": [
     "trading",
