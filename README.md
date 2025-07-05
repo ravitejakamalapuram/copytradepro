@@ -28,109 +28,109 @@ A professional multi-broker trading platform for copy trading and portfolio mana
 - Comprehensive security middleware (helmet, cors, rate limiting)
 - Morgan for logging
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js 20.15.1 or higher
-- npm or yarn
+- Node.js 18.0.0 or higher
+- npm 8.0.0 or higher
 
-### Installation
+### ⚡ Super Simple Setup
 
-#### Option 1: Automated Setup (Recommended)
-
-Run the setup script for your operating system:
-
-**Linux/macOS:**
 ```bash
-git clone <repository-url>
-cd copytradepro
-chmod +x setup.sh
-./setup.sh
+git clone https://github.com/ravitejakamalapuram/copytradepro.git
+cd copyTradeV2
+npm run setup
 ```
 
-**Windows (Command Prompt):**
-```cmd
-git clone <repository-url>
-cd copytradepro
-setup.bat
+That's it! This single command will:
+- ✅ Install all dependencies
+- ✅ Build backend and frontend
+- ✅ Create sample configuration
+- ✅ Set up everything for you
+
+### 🔥 Start Development
+
+```bash
+npm run dev
 ```
 
-**Windows (PowerShell):**
-```powershell
-git clone <repository-url>
-cd copytradepro
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-.\setup.ps1
+This will start both servers with smart logging:
+- 🌐 Frontend: http://localhost:5173
+- 🌐 Backend: http://localhost:3001
+
+### 🏗️ Build for Production
+
+```bash
+npm run build
 ```
 
-The setup script will:
-- ✅ Check Node.js and npm versions
-- ✅ Create environment files with default configurations
-- ✅ Install all dependencies for both backend and frontend
-- ✅ Build the backend
-- ✅ Create startup scripts for development and production
+### 🚀 Start Production
 
-#### Option 2: Manual Setup
+```bash
+npm start
+```
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd copytradepro
-   ```
+### 📋 All Available Commands
 
-2. **Install backend dependencies**
-   ```bash
-   cd backend
-   npm install
-   ```
+| Command | Description |
+|---------|-------------|
+| `npm run setup` | 🎯 Complete setup (install + build + config) |
+| `npm run dev` | 🔥 Start development servers with smart logging |
+| `npm run build` | 🏗️ Build for production |
+| `npm start` | 🚀 Start production server |
+| `npm run install` | 📦 Install all dependencies |
+| `npm run clean` | 🧹 Clean all build files |
 
-3. **Install frontend dependencies**
-   ```bash
-   cd ../frontend
-   npm install
-   ```
+### 🔧 Configuration
 
-4. **Set up environment variables**
+After running `npm run setup`, edit `backend/.env` with your broker credentials:
 
-   Backend (.env):
-   ```bash
-   cd ../backend
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+```env
+# Shoonya Broker
+SHOONYA_USER_ID=your_user_id
+SHOONYA_PASSWORD=your_password
+SHOONYA_VENDOR_CODE=your_vendor_code
+SHOONYA_API_KEY=your_api_key
+SHOONYA_IMEI=your_imei
+SHOONYA_TOTP_SECRET=your_totp_secret
 
-   Frontend (.env):
-   ```bash
-   cd ../frontend
-   # .env is already configured for development
-   ```
+# Fyers Broker
+FYERS_CLIENT_ID=your_client_id
+FYERS_SECRET_KEY=your_secret_key
+FYERS_REDIRECT_URI=your_redirect_uri
+```
 
-### Development
+### 🆘 Troubleshooting
 
-#### Quick Start (After Setup)
+**Dependencies Issues:**
+```bash
+npm run clean
+npm run install
+```
 
-**Using startup scripts:**
-- Linux/macOS: `./start-dev.sh`
-- Windows: `start-dev.bat` or `.\start-dev.ps1`
+**Build Issues:**
+```bash
+npm run clean
+npm run build
+```
 
-**Manual start:**
+**Manual Setup (if scripts fail):**
+```bash
+npm install
+cd backend && npm install && npm run build
+cd ../frontend && npm install && npm run build
+cd .. && mkdir -p backend/public && cp -r frontend/dist/* backend/public/
+```
 
-1. **Start the backend server**
-   ```bash
-   cd backend
-   npm run dev
-   ```
-   Server runs on http://localhost:3001
+### 🎯 Development Workflow
 
-2. **Start the frontend development server**
-   ```bash
-   cd frontend
-   npm run dev
-   ```
-   Frontend runs on http://localhost:5173
+1. **First time:** `npm run setup`
+2. **Daily dev:** `npm run dev`
+3. **Before deploy:** `npm run build`
 
-3. **Open your browser**
-   Navigate to http://localhost:5173
+**Development URLs:**
+- Frontend: http://localhost:5173
+- Backend: http://localhost:3001
 
 ## Project Structure
 
