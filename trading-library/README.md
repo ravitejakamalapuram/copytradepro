@@ -20,33 +20,44 @@
 - **🔌 Plug & Play** - Easy integration for any trading application
 - **📈 Production-Ready** - Built for high-frequency trading applications
 
-## 🏗️ **Architecture**
+## 🏗️ **Plugin-Based Architecture**
 
 ```
 Your Application
        ↓
-Unified Trading API
+Unified Trading API Core
        ↓
-Broker Abstraction Layer
+Plugin Manager
        ↓
-[Shoonya] [Fyers] [Zerodha] [Angel] [Upstox]
+[Shoonya Plugin] [Fyers Plugin] [Zerodha Plugin] [Angel Plugin]
+       ↓              ↓              ↓              ↓
+   Adapter        Adapter        Adapter        Adapter
 ```
+
+### **🔌 Modular Plugin System**
+- **Core Library**: `@copytradepro/unified-trading-api`
+- **Broker Plugins**: `@copytradepro/broker-{name}`
+- **Plugin Manager**: Handles loading, lifecycle, and health monitoring
+- **Hot-Pluggable**: Install/uninstall brokers at runtime
 
 ## 🚀 **Quick Start**
 
 ### **Installation**
 
 ```bash
+# Core library
 npm install @copytradepro/unified-trading-api
+
+# Broker plugins (install only what you need)
+npm install @copytradepro/broker-shoonya
+npm install @copytradepro/broker-fyers
 ```
 
-### **Basic Usage**
+### **Plugin-Based Usage**
 
 ```typescript
-import { 
-  createUnifiedTradingAPI, 
-  createShoonyaCredentials,
-  createFyersCredentials,
+import {
+  createUnifiedTradingAPI,
   BrokerType,
   OrderType,
   OrderSide,
@@ -54,13 +65,42 @@ import {
   Exchange
 } from '@copytradepro/unified-trading-api';
 
+// Import only the broker plugins you need
+import ShoonyaPlugin from '@copytradepro/broker-shoonya';
+import FyersPlugin from '@copytradepro/broker-fyers';
+
 // Create API instance
 const tradingAPI = createUnifiedTradingAPI({
   enableLogging: true,
   logLevel: 'info'
 });
 
+// Install broker plugins
+async function setupBrokers() {
+  // Install Shoonya plugin
+  const shoonyaPlugin = new ShoonyaPlugin({
+    enabled: true,
+    autoStart: true,
+    logLevel: 'info'
+  });
+  await tradingAPI.installPlugin(shoonyaPlugin);
+
+  // Install Fyers plugin
+  const fyersPlugin = new FyersPlugin({
+    enabled: true,
+    autoStart: true,
+    logLevel: 'info'
+  });
+  await tradingAPI.installPlugin(fyersPlugin);
+
+  console.log('✅ Plugins installed successfully');
+}
+
 // Set up event listeners
+tradingAPI.on('pluginLoaded', ({ plugin, metadata }) => {
+  console.log(`🔌 Plugin loaded: ${metadata.name}`);
+});
+
 tradingAPI.on('brokerAuthenticated', ({ broker, profile }) => {
   console.log(`✅ ${broker} authenticated:`, profile);
 });
@@ -69,29 +109,28 @@ tradingAPI.on('orderPlaced', ({ broker, order }) => {
   console.log(`📈 Order placed on ${broker}:`, order);
 });
 
-// Authenticate with multiple brokers
+// Authenticate with brokers
 async function authenticateBrokers() {
-  // Shoonya authentication
-  const shoonyaCredentials = createShoonyaCredentials(
-    'your_user_id',
-    'your_password',
-    'your_vendor_code',
-    'your_api_key',
-    'your_imei',
-    'your_totp_secret'
-  );
-
-  // Fyers authentication
-  const fyersCredentials = createFyersCredentials(
-    'your_client_id',
-    'your_secret_key',
-    'your_redirect_uri'
-  );
-
-  // Authenticate with both brokers
   const results = await tradingAPI.authenticateMultipleBrokers([
-    { broker: BrokerType.SHOONYA, credentials: shoonyaCredentials },
-    { broker: BrokerType.FYERS, credentials: fyersCredentials }
+    {
+      broker: BrokerType.SHOONYA,
+      credentials: {
+        userId: 'your_user_id',
+        password: 'your_password',
+        vendorCode: 'your_vendor_code',
+        apiKey: 'your_api_key',
+        imei: 'your_imei',
+        totpSecret: 'your_totp_secret'
+      }
+    },
+    {
+      broker: BrokerType.FYERS,
+      credentials: {
+        clientId: 'your_client_id',
+        secretKey: 'your_secret_key',
+        redirectUri: 'your_redirect_uri'
+      }
+    }
   ]);
 
   console.log('Authentication results:', results);

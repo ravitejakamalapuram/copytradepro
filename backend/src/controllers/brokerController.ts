@@ -144,8 +144,40 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
         }
       }
 
-      // If token restoration/refresh failed, fall back to generating new auth URL
-      console.log('⚠️ Fyers token restoration failed, needs re-authentication');
+      // If token restoration/refresh failed, try to use stored auth code for fresh token generation
+      console.log('⚠️ Fyers token restoration failed, trying fresh token generation...');
+
+      if (credentials.authCode) {
+        console.log('🔑 Found stored auth code, attempting fresh token generation...');
+        try {
+          const tokenResult = await brokerService.generateAccessToken(credentials.authCode, credentials);
+
+          if (tokenResult.success && tokenResult.accessToken) {
+            // Update stored credentials with new tokens
+            const updatedCredentials = {
+              ...credentials,
+              accessToken: tokenResult.accessToken,
+              refreshToken: tokenResult.refreshToken || credentials.refreshToken,
+              tokenGeneratedAt: new Date().toISOString()
+            };
+
+            await userDatabase.updateConnectedAccount(accountId, {
+              credentials: updatedCredentials
+            });
+
+            console.log('✅ Fyers fresh token generated and stored successfully');
+            userConnectionsMap.set(connectionKey, brokerService);
+            return true;
+          } else {
+            console.log('❌ Fyers fresh token generation failed:', tokenResult.message);
+          }
+        } catch (error: any) {
+          console.log('❌ Fyers fresh token generation error:', error.message);
+        }
+      }
+
+      // If all token attempts failed, the account needs re-authentication
+      console.log('⚠️ Fyers account needs re-authentication - all token attempts failed');
       return false;
     }
 
@@ -1362,9 +1394,20 @@ export const placeOrder = async (
     // Ensure account is active (auto-reactivate if needed)
     const isAccountActive = await ensureAccountActive(userId, accountId);
     if (!isAccountActive) {
+      // Provide broker-specific error messages
+      let errorMessage = `Failed to activate ${brokerName} account ${account.account_id}.`;
+
+      if (brokerName === 'fyers') {
+        errorMessage += ' The stored tokens have expired and need re-authentication. Please go to Account Setup and click the Activate button to complete OAuth authentication.';
+      } else {
+        errorMessage += ' Please check your credentials and try again.';
+      }
+
       res.status(400).json({
         success: false,
-        message: `Failed to activate ${brokerName} account ${account.account_id}. Please check your credentials and try again.`,
+        message: errorMessage,
+        requiresAuth: brokerName === 'fyers', // Indicate that OAuth is needed
+        brokerName: brokerName
       });
       return;
     }

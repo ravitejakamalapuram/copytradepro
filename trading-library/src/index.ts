@@ -5,13 +5,16 @@
 
 // Core exports
 export { UnifiedTradingAPI } from './core/UnifiedTradingAPI';
+export { PluginManager } from './core/PluginManager';
+export { BaseBrokerPlugin } from './core/BaseBrokerPlugin';
 
 // Interface exports
 export { IBrokerAdapter } from './interfaces/IBrokerAdapter';
+export { IBrokerPlugin, IBrokerPluginFactory, IPluginRegistry } from './interfaces/IBrokerPlugin';
 
-// Adapter exports
-export { ShoonyaAdapter } from './adapters/ShoonyaAdapter';
-export { FyersAdapter } from './adapters/FyersAdapter';
+// Note: Adapters are now available as separate plugins:
+// - @copytradepro/broker-shoonya
+// - @copytradepro/broker-fyers
 
 // Type exports
 export * from './types';
@@ -21,8 +24,6 @@ export { Logger } from './utils/Logger';
 
 // Factory function for easy setup
 import { UnifiedTradingAPI } from './core/UnifiedTradingAPI';
-import { ShoonyaAdapter } from './adapters/ShoonyaAdapter';
-import { FyersAdapter } from './adapters/FyersAdapter';
 import {
   UnifiedTradingConfig,
   BrokerType,
@@ -33,6 +34,7 @@ import {
 
 /**
  * Factory function to create a pre-configured UnifiedTradingAPI instance
+ * Note: Plugins must be installed separately using api.installPlugin()
  */
 export function createUnifiedTradingAPI(config?: Partial<UnifiedTradingConfig>): UnifiedTradingAPI {
   const defaultConfig: UnifiedTradingConfig = {
@@ -46,9 +48,9 @@ export function createUnifiedTradingAPI(config?: Partial<UnifiedTradingConfig>):
   const finalConfig = { ...defaultConfig, ...config };
   const api = new UnifiedTradingAPI(finalConfig);
 
-  // Register default adapters
-  api.registerBroker(new ShoonyaAdapter());
-  api.registerBroker(new FyersAdapter());
+  // Note: Plugins are now installed separately:
+  // await api.installPlugin(new ShoonyaPlugin());
+  // await api.installPlugin(new FyersPlugin());
 
   return api;
 }

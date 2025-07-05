@@ -73,8 +73,14 @@ const connectBrokerValidation = [
   body('credentials.redirectUri')
     .if(body('brokerName').equals('fyers'))
     .trim()
-    .isURL()
-    .withMessage('Valid Redirect URI is required for Fyers'),
+    .custom((value) => {
+      // Allow localhost URLs for development and standard URLs for production
+      const urlPattern = /^https?:\/\/(localhost|127\.0\.0\.1|[\w.-]+)(:\d+)?(\/.*)?$/;
+      if (!urlPattern.test(value)) {
+        throw new Error('Valid Redirect URI is required for Fyers (http/https URLs allowed)');
+      }
+      return true;
+    }),
 ];
 
 // Validation rules for placing orders

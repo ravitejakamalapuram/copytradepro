@@ -20,6 +20,8 @@ import {
   UnifiedTradingError
 } from '../types';
 import { IBrokerAdapter } from '../interfaces/IBrokerAdapter';
+import { IBrokerPlugin } from '../interfaces/IBrokerPlugin';
+import { PluginManager } from './PluginManager';
 import { Logger } from '../utils/Logger';
 
 export class UnifiedTradingAPI extends EventEmitter {
@@ -27,42 +29,72 @@ export class UnifiedTradingAPI extends EventEmitter {
   private activeBrokers: Set<BrokerType> = new Set();
   private config: UnifiedTradingConfig;
   private logger: Logger;
+  private pluginManager: PluginManager;
 
   constructor(config: UnifiedTradingConfig) {
     super();
     this.config = config;
     this.logger = new Logger(config.logLevel, config.enableLogging);
-    this.logger.info('UnifiedTradingAPI initialized');
+    this.pluginManager = new PluginManager(this.logger);
+    this.setupPluginEventListeners();
+    this.logger.info('UnifiedTradingAPI initialized with plugin system');
   }
 
   // ============================================================================
-  // BROKER MANAGEMENT
+  // PLUGIN MANAGEMENT
   // ============================================================================
 
   /**
-   * Register a broker adapter
+   * Install a broker plugin
+   */
+  async installPlugin(plugin: IBrokerPlugin): Promise<void> {
+    await this.pluginManager.installPlugin(plugin);
+
+    // Register the adapter from the plugin
+    const adapter = plugin.getAdapter();
+    const brokerType = adapter.getBrokerType();
+    this.brokers.set(brokerType, adapter);
+
+    this.setupAdapterEventListeners(adapter, brokerType);
+    this.logger.info(`Plugin installed and adapter registered: ${adapter.getBrokerName()}`);
+  }
+
+  /**
+   * Uninstall a broker plugin
+   */
+  async uninstallPlugin(brokerType: BrokerType): Promise<void> {
+    await this.pluginManager.uninstallPlugin(brokerType);
+    this.brokers.delete(brokerType);
+    this.activeBrokers.delete(brokerType);
+    this.logger.info(`Plugin uninstalled: ${brokerType}`);
+  }
+
+  /**
+   * Get plugin status
+   */
+  getPluginStatus(brokerType: BrokerType) {
+    return this.pluginManager.getPluginStatus(brokerType);
+  }
+
+  /**
+   * Get plugin capabilities
+   */
+  getPluginCapabilities(brokerType: BrokerType) {
+    return this.pluginManager.getPluginCapabilities(brokerType);
+  }
+
+  // ============================================================================
+  // BROKER MANAGEMENT (Legacy - for backward compatibility)
+  // ============================================================================
+
+  /**
+   * Register a broker adapter (Legacy method)
+   * @deprecated Use installPlugin instead
    */
   registerBroker(adapter: IBrokerAdapter): void {
     const brokerType = adapter.getBrokerType();
     this.brokers.set(brokerType, adapter);
-    
-    // Set up event listeners
-    adapter.onError((error) => {
-      this.emit('brokerError', { broker: brokerType, error });
-    });
-    
-    adapter.onConnectionStatusChange((status) => {
-      this.emit('connectionStatusChange', { broker: brokerType, status });
-    });
-    
-    adapter.onQuoteUpdate((quote) => {
-      this.emit('quoteUpdate', { broker: brokerType, quote });
-    });
-    
-    adapter.onOrderUpdate((order) => {
-      this.emit('orderUpdate', { broker: brokerType, order });
-    });
-
+    this.setupAdapterEventListeners(adapter, brokerType);
     this.logger.info(`Broker registered: ${adapter.getBrokerName()}`);
   }
 
@@ -358,6 +390,48 @@ export class UnifiedTradingAPI extends EventEmitter {
     return adapter.cancelOrder(orderId);
   }
 
+  // ============================================================================
+  // EVENT HANDLING HELPERS
+  // ============================================================================
+
+  /**
+   * Set up plugin event listeners
+   */
+  private setupPluginEventListeners(): void {
+    this.pluginManager.on('plugin:loaded', ({ plugin, metadata }) => {
+      this.emit('pluginLoaded', { plugin, metadata });
+    });
+
+    this.pluginManager.on('plugin:error', ({ plugin, error }) => {
+      this.emit('pluginError', { plugin, error });
+    });
+
+    this.pluginManager.on('plugin:health-check', ({ plugin, isHealthy }) => {
+      this.emit('pluginHealthCheck', { plugin, isHealthy });
+    });
+  }
+
+  /**
+   * Set up adapter event listeners
+   */
+  private setupAdapterEventListeners(adapter: IBrokerAdapter, brokerType: BrokerType): void {
+    adapter.onError((error) => {
+      this.emit('brokerError', { broker: brokerType, error });
+    });
+
+    adapter.onConnectionStatusChange((status) => {
+      this.emit('connectionStatusChange', { broker: brokerType, status });
+    });
+
+    adapter.onQuoteUpdate((quote) => {
+      this.emit('quoteUpdate', { broker: brokerType, quote });
+    });
+
+    adapter.onOrderUpdate((order) => {
+      this.emit('orderUpdate', { broker: brokerType, order });
+    });
+  }
+
   /**
    * Get library version and info
    */
@@ -366,12 +440,26 @@ export class UnifiedTradingAPI extends EventEmitter {
     version: string;
     registeredBrokers: string[];
     activeBrokers: string[];
+    pluginSystem: boolean;
+    pluginStats: any;
   } {
     return {
       name: '@copytradepro/unified-trading-api',
       version: '1.0.0',
       registeredBrokers: Array.from(this.brokers.keys()),
-      activeBrokers: Array.from(this.activeBrokers)
+      activeBrokers: Array.from(this.activeBrokers),
+      pluginSystem: true,
+      pluginStats: this.pluginManager.getStatistics()
     };
+  }
+
+  /**
+   * Cleanup and destroy API instance
+   */
+  async destroy(): Promise<void> {
+    await this.pluginManager.destroy();
+    this.brokers.clear();
+    this.activeBrokers.clear();
+    this.removeAllListeners();
   }
 }

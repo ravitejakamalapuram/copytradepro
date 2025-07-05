@@ -1,13 +1,13 @@
 /**
- * Fyers Broker Adapter
- * Implements the unified trading interface for Fyers broker
+ * Shoonya Broker Adapter - Plugin Implementation
+ * Implements the unified trading interface for Shoonya broker
  */
 
 import { EventEmitter } from 'events';
 import {
   BrokerType,
   BrokerCredentials,
-  FyersCredentials,
+  ShoonyaCredentials,
   AuthResult,
   UserProfile,
   OrderRequest,
@@ -21,27 +21,33 @@ import {
   OrderSide,
   ProductType,
   OrderStatus,
-  Exchange
-} from '../types';
-import { IBrokerAdapter } from '../interfaces/IBrokerAdapter';
+  Exchange,
+  IBrokerAdapter
+} from './types';
+import { ShoonyaService } from './services/ShoonyaService';
 
-export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
+export class ShoonyaAdapter extends EventEmitter implements IBrokerAdapter {
   private accessToken: string | null = null;
-  private refreshToken: string | null = null;
-  private clientId: string = '';
+  private userId: string = '';
   private isConnected: boolean = false;
-  private credentials: FyersCredentials | null = null;
+  private credentials: ShoonyaCredentials | null = null;
+  private shoonyaService: ShoonyaService;
+
+  constructor() {
+    super();
+    this.shoonyaService = new ShoonyaService();
+  }
 
   // ============================================================================
   // BROKER IDENTIFICATION
   // ============================================================================
 
   getBrokerType(): BrokerType {
-    return BrokerType.FYERS;
+    return BrokerType.SHOONYA;
   }
 
   getBrokerName(): string {
-    return 'Fyers Securities';
+    return 'Finvasia Shoonya';
   }
 
   isAuthenticated(): boolean {
@@ -54,22 +60,20 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
 
   async authenticate(credentials: BrokerCredentials): Promise<AuthResult> {
     try {
-      const fyersCredentials = credentials as FyersCredentials;
-      this.credentials = fyersCredentials;
+      const shoonyaCredentials = credentials as ShoonyaCredentials;
+      this.credentials = shoonyaCredentials;
 
-      // Check if auth code is provided for token exchange
-      if (fyersCredentials.authCode) {
-        return this.exchangeAuthCodeForTokens(fyersCredentials);
-      } else {
-        // Return OAuth URL for user to complete authentication
-        const authUrl = this.generateAuthUrl(fyersCredentials);
-        return {
-          success: false,
-          requiresAuth: true,
-          authUrl,
-          message: 'OAuth authentication required'
-        };
+      // Integrate with actual Shoonya service
+      const authResult = await this.performShoonyaAuth(shoonyaCredentials);
+
+      if (authResult.success) {
+        this.accessToken = authResult.accessToken!;
+        this.userId = shoonyaCredentials.userId;
+        this.isConnected = true;
+        this.emit('connectionStatusChange', 'connected');
       }
+
+      return authResult;
     } catch (error: any) {
       this.emit('error', error);
       return {
@@ -80,39 +84,20 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   }
 
   async refreshAuth(): Promise<AuthResult> {
-    if (!this.refreshToken || !this.credentials) {
+    if (!this.credentials) {
       return {
         success: false,
-        message: 'No refresh token available'
+        message: 'No credentials available for refresh'
       };
     }
 
-    try {
-      // Implement Fyers token refresh logic
-      const refreshResult = await this.performTokenRefresh();
-      
-      if (refreshResult.success) {
-        this.accessToken = refreshResult.accessToken!;
-        this.isConnected = true;
-        this.emit('connectionStatusChange', 'connected');
-      }
-
-      return refreshResult;
-    } catch (error: any) {
-      this.emit('error', error);
-      return {
-        success: false,
-        message: error.message || 'Token refresh failed'
-      };
-    }
+    return this.authenticate(this.credentials);
   }
 
   async logout(): Promise<ApiResponse> {
     try {
-      // Implement Fyers logout logic
       this.accessToken = null;
-      this.refreshToken = null;
-      this.clientId = '';
+      this.userId = '';
       this.isConnected = false;
       this.emit('connectionStatusChange', 'disconnected');
 
@@ -140,12 +125,11 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
     }
 
     try {
-      // Implement Fyers profile fetching logic
       const profile: UserProfile = {
-        userId: this.clientId,
-        userName: 'Fyers User', // Get from API
-        email: '', // Get from API
-        broker: BrokerType.FYERS,
+        userId: this.userId,
+        userName: 'Shoonya User',
+        email: '',
+        broker: BrokerType.SHOONYA,
         exchanges: [Exchange.NSE, Exchange.BSE, Exchange.NFO],
         products: [ProductType.DELIVERY, ProductType.INTRADAY, ProductType.MARGIN],
         isActive: true
@@ -180,11 +164,8 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
     }
 
     try {
-      // Convert unified order request to Fyers format
-      const fyersOrder = this.convertToFyersOrder(orderRequest);
-      
-      // Implement Fyers order placement logic
-      const orderId = await this.placeFyersOrder(fyersOrder);
+      const shoonyaOrder = this.convertToShoonyaOrder(orderRequest);
+      const orderId = await this.placeShoonyaOrder(shoonyaOrder);
 
       const order: Order = {
         orderId,
@@ -198,7 +179,7 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
         status: OrderStatus.PENDING,
         filledQuantity: 0,
         timestamp: new Date(),
-        broker: BrokerType.FYERS
+        broker: BrokerType.SHOONYA
       };
 
       this.emit('orderUpdate', order);
@@ -219,7 +200,6 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   }
 
   async modifyOrder(orderId: string, modifications: Partial<OrderRequest>): Promise<ApiResponse<Order>> {
-    // Implement order modification logic
     throw new Error('Method not implemented');
   }
 
@@ -233,9 +213,7 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
     }
 
     try {
-      // Implement Fyers order cancellation logic
-      await this.cancelFyersOrder(orderId);
-
+      await this.cancelShoonyaOrder(orderId);
       return {
         success: true,
         message: 'Order cancelled successfully',
@@ -251,7 +229,6 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   }
 
   async getOrder(orderId: string): Promise<ApiResponse<Order>> {
-    // Implement get order logic
     throw new Error('Method not implemented');
   }
 
@@ -265,9 +242,7 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
     }
 
     try {
-      // Implement get orders logic
       const orders: Order[] = [];
-
       return {
         success: true,
         data: orders,
@@ -288,17 +263,14 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   // ============================================================================
 
   async getPositions(): Promise<ApiResponse<Position[]>> {
-    // Implement positions logic
     throw new Error('Method not implemented');
   }
 
   async getHoldings(): Promise<ApiResponse<Holding[]>> {
-    // Implement holdings logic
     throw new Error('Method not implemented');
   }
 
   async getAccountBalance(): Promise<ApiResponse<any>> {
-    // Implement balance logic
     throw new Error('Method not implemented');
   }
 
@@ -307,22 +279,18 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   // ============================================================================
 
   async getQuote(symbol: string, exchange: string): Promise<ApiResponse<Quote>> {
-    // Implement quote logic
     throw new Error('Method not implemented');
   }
 
   async getQuotes(symbols: Array<{ symbol: string; exchange: string }>): Promise<ApiResponse<Quote[]>> {
-    // Implement quotes logic
     throw new Error('Method not implemented');
   }
 
   async getMarketDepth(symbol: string, exchange: string): Promise<ApiResponse<MarketDepth>> {
-    // Implement market depth logic
     throw new Error('Method not implemented');
   }
 
   async searchSymbols(query: string, exchange?: string): Promise<ApiResponse<any[]>> {
-    // Implement symbol search logic
     throw new Error('Method not implemented');
   }
 
@@ -355,7 +323,6 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   // ============================================================================
 
   async validateOrder(orderRequest: OrderRequest): Promise<ApiResponse<any>> {
-    // Implement order validation logic
     throw new Error('Method not implemented');
   }
 
@@ -366,12 +333,12 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
         supportsMarketData: true,
         supportsOptions: true,
         supportsCommodities: false,
-        supportsRefreshToken: true
+        supportsRefreshToken: false
       },
       limits: {
-        maxOrdersPerSecond: 5,
-        maxPositions: 500,
-        maxOrderValue: 5000000
+        maxOrdersPerSecond: 10,
+        maxPositions: 1000,
+        maxOrderValue: 10000000
       }
     };
   }
@@ -382,7 +349,7 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
       data: {
         isOnline: this.isConnected,
         lastHeartbeat: new Date(),
-        latency: 75,
+        latency: 50,
         marketStatus: 'OPEN' as const
       },
       message: 'Status fetched successfully',
@@ -402,66 +369,85 @@ export class FyersAdapter extends EventEmitter implements IBrokerAdapter {
   // PRIVATE HELPER METHODS
   // ============================================================================
 
-  private generateAuthUrl(credentials: FyersCredentials): string {
-    // Generate Fyers OAuth URL
-    const baseUrl = 'https://api.fyers.in/api/v2/generate-authcode';
-    const params = new URLSearchParams({
-      client_id: credentials.clientId,
-      redirect_uri: credentials.redirectUri,
-      response_type: 'code',
-      state: 'sample_state'
-    });
-    
-    return `${baseUrl}?${params.toString()}`;
-  }
-
-  private async exchangeAuthCodeForTokens(credentials: FyersCredentials): Promise<AuthResult> {
+  private async performShoonyaAuth(credentials: ShoonyaCredentials): Promise<AuthResult> {
     try {
-      // Implement actual Fyers token exchange
-      // This would integrate with your existing Fyers service
-      
-      this.accessToken = 'mock_fyers_access_token';
-      this.refreshToken = 'mock_fyers_refresh_token';
-      this.clientId = credentials.clientId;
-      this.isConnected = true;
-      this.emit('connectionStatusChange', 'connected');
+      const loginResponse = await this.shoonyaService.login({
+        userId: credentials.userId,
+        password: credentials.password,
+        totpKey: credentials.totpSecret || '',
+        vendorCode: credentials.vendorCode,
+        apiSecret: credentials.apiKey,
+        imei: credentials.imei
+      });
 
-      return {
-        success: true,
-        accessToken: this.accessToken,
-        refreshToken: this.refreshToken,
-        message: 'Authentication successful'
-      };
+      if (loginResponse.stat === 'Ok' && loginResponse.susertoken) {
+        return {
+          success: true,
+          accessToken: loginResponse.susertoken,
+          message: 'Authentication successful'
+        };
+      } else {
+        return {
+          success: false,
+          message: loginResponse.emsg || 'Authentication failed'
+        };
+      }
     } catch (error: any) {
       return {
         success: false,
-        message: error.message || 'Token exchange failed'
+        message: error.message || 'Authentication failed'
       };
     }
   }
 
-  private async performTokenRefresh(): Promise<AuthResult> {
-    // Implement Fyers token refresh logic
+  private convertToShoonyaOrder(orderRequest: OrderRequest): any {
+    // Map unified order request to Shoonya format
     return {
-      success: true,
-      accessToken: 'refreshed_access_token',
-      message: 'Token refreshed successfully'
+      userId: this.userId,
+      buyOrSell: orderRequest.side === OrderSide.BUY ? 'B' : 'S',
+      productType: this.mapProductType(orderRequest.productType),
+      exchange: orderRequest.exchange,
+      tradingSymbol: orderRequest.symbol,
+      quantity: orderRequest.quantity,
+      discloseQty: 0,
+      priceType: this.mapOrderType(orderRequest.orderType),
+      price: orderRequest.price || 0,
+      triggerPrice: orderRequest.triggerPrice || 0,
+      retention: 'DAY'
     };
   }
 
-  private convertToFyersOrder(orderRequest: OrderRequest): any {
-    // Convert unified order format to Fyers-specific format
-    return {
-      // Fyers-specific order fields
-    };
+  private async placeShoonyaOrder(shoonyaOrder: any): Promise<string> {
+    const response = await this.shoonyaService.placeOrder(shoonyaOrder);
+    if (response.stat === 'Ok' && response.norenordno) {
+      return response.norenordno;
+    } else {
+      throw new Error(response.emsg || 'Order placement failed');
+    }
   }
 
-  private async placeFyersOrder(fyersOrder: any): Promise<string> {
-    // Implement actual Fyers order placement
-    return 'mock_fyers_order_id';
+  private mapProductType(productType: ProductType): string {
+    switch (productType) {
+      case ProductType.DELIVERY: return 'C';
+      case ProductType.INTRADAY: return 'I';
+      case ProductType.MARGIN: return 'M';
+      default: return 'I';
+    }
   }
 
-  private async cancelFyersOrder(orderId: string): Promise<void> {
-    // Implement actual Fyers order cancellation
+  private mapOrderType(orderType: OrderType): string {
+    switch (orderType) {
+      case OrderType.MARKET: return 'MKT';
+      case OrderType.LIMIT: return 'LMT';
+      case OrderType.STOP_LOSS: return 'SL-LMT';
+      case OrderType.STOP_LOSS_MARKET: return 'SL-MKT';
+      default: return 'MKT';
+    }
+  }
+
+  private async cancelShoonyaOrder(orderId: string): Promise<void> {
+    // Note: Shoonya service doesn't have a direct cancel method in the current implementation
+    // This would need to be added to the ShoonyaService class
+    throw new Error('Order cancellation not yet implemented in ShoonyaService');
   }
 }
