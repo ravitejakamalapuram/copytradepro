@@ -43,10 +43,9 @@ npm run setup
 ```
 
 That's it! This single command will:
-- ✅ Install all dependencies
-- ✅ Build backend and frontend
-- ✅ Create sample configuration
-- ✅ Set up everything for you
+- ✅ Install backend and frontend dependencies
+- ✅ Build both backend and frontend
+- ✅ Copy frontend to backend/public
 
 ### 🔥 Start Development
 
@@ -54,7 +53,7 @@ That's it! This single command will:
 npm run dev
 ```
 
-This will start both servers with smart logging:
+This will start both servers:
 - 🌐 Frontend: http://localhost:5173
 - 🌐 Backend: http://localhost:3001
 

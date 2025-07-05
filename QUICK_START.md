@@ -7,19 +7,18 @@
 npm run setup
 ```
 This will:
-- ✅ Install all dependencies
-- ✅ Build backend and frontend
-- ✅ Create sample .env file
-- ✅ Set up everything for you
+- ✅ Install backend dependencies
+- ✅ Install frontend dependencies
+- ✅ Build both backend and frontend
+- ✅ Copy frontend to backend/public
 
-### 🔥 Start Development (Easy Mode)
+### 🔥 Start Development
 ```bash
 npm run dev
 ```
 This will:
 - ✅ Start backend server on http://localhost:3001
 - ✅ Start frontend server on http://localhost:5173
-- ✅ Show colored logs for both servers
 - ✅ Auto-restart on file changes
 
 ### 🏗️ Build for Production
@@ -30,7 +29,6 @@ This will:
 - ✅ Build backend TypeScript to JavaScript
 - ✅ Build frontend React app
 - ✅ Copy frontend to backend/public
-- ✅ Create production package.json
 
 ### 🚀 Start Production Server
 ```bash
