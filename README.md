@@ -62,7 +62,7 @@ npm run build
 ### 🚀 Start Production
 
 ```bash
-npm start
+cd backend && npm start
 ```
 
 ### 📋 All Available Commands
@@ -72,7 +72,6 @@ npm start
 | `npm run install:all` | 📦 Install all dependencies |
 | `npm run dev` | 🔥 Start development servers |
 | `npm run build` | 🏗️ Build for production |
-| `npm start` | 🚀 Start production server |
 | `npm run clean` | 🧹 Clean all build files |
 
 ### 🔧 Configuration
@@ -120,6 +119,14 @@ cd .. && mkdir -p backend/public && cp -r frontend/dist/* backend/public/
 1. **First time:** `npm run install:all && npm run build`
 2. **Daily dev:** `npm run dev`
 3. **Before deploy:** `npm run build`
+
+### 🚀 Deployment
+
+**For CD platforms (Render, Railway, Heroku, etc.):**
+- Build Command: `npm run install:all && npm run build`
+- Start Command: `cd backend && npm start`
+
+See `CD_DEPLOYMENT_GUIDE.md` for platform-specific instructions.
 
 **Development URLs:**
 - Frontend: http://localhost:5173

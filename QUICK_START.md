@@ -32,7 +32,7 @@ This will:
 
 ### 🚀 Start Production Server
 ```bash
-npm start
+cd backend && npm start
 ```
 
 ---
@@ -44,7 +44,6 @@ npm start
 | `npm run install:all` | 📦 Install all dependencies |
 | `npm run dev` | 🔥 Start development servers |
 | `npm run build` | 🏗️ Build for production |
-| `npm start` | 🚀 Start production server |
 | `npm run clean` | 🧹 Clean all build files |
 
 ### 🔧 Advanced Commands
@@ -79,7 +78,7 @@ npm run dev
 ### Before Deployment:
 ```bash
 npm run build
-npm start  # Test production build
+cd backend && npm start  # Test production build
 ```
 
 ---
