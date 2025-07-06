@@ -12,6 +12,134 @@ import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
 type BrokerService = ShoonyaService | FyersService;
 export const userBrokerConnections = new Map<string, Map<string, BrokerService>>();
 
+// Helper function to analyze order errors and determine retry capability
+const analyzeOrderError = (errorMessage: string, errorCode: string, brokerName: string) => {
+  const message = errorMessage.toLowerCase();
+
+  // KYC/Compliance related errors (not retryable)
+  if (message.includes('kra pending') || message.includes('kyc') || message.includes('compliance')) {
+    return {
+      retryable: false,
+      actionRequired: 'Complete KYC/KRA documentation with your broker'
+    };
+  }
+
+  // Account blocked/suspended (not retryable)
+  if (message.includes('blocked') || message.includes('suspended') || message.includes('disabled')) {
+    return {
+      retryable: false,
+      actionRequired: 'Contact broker support to unblock your account'
+    };
+  }
+
+  // Insufficient funds (not retryable without adding funds)
+  if (message.includes('insufficient') || message.includes('margin') || message.includes('balance')) {
+    return {
+      retryable: false,
+      actionRequired: 'Add sufficient funds to your trading account'
+    };
+  }
+
+  // Market closed/timing issues (retryable)
+  if (message.includes('market closed') || message.includes('trading hours') || message.includes('session')) {
+    return {
+      retryable: true,
+      actionRequired: 'Retry during market hours'
+    };
+  }
+
+  // Network/connectivity issues (retryable)
+  if (message.includes('network') || message.includes('timeout') || message.includes('connection')) {
+    return {
+      retryable: true,
+      actionRequired: 'Check internet connection and retry'
+    };
+  }
+
+  // Rate limiting (retryable)
+  if (message.includes('rate limit') || message.includes('too many requests')) {
+    return {
+      retryable: true,
+      actionRequired: 'Wait a few minutes and retry'
+    };
+  }
+
+  // Server errors (retryable)
+  if (message.includes('server error') || message.includes('internal error') || errorCode.startsWith('5')) {
+    return {
+      retryable: true,
+      actionRequired: 'Broker server issue - retry after some time'
+    };
+  }
+
+  // Default for unknown errors
+  return {
+    retryable: true,
+    actionRequired: 'Review error details and retry if appropriate'
+  };
+};
+
+// Helper function to save failed orders to database
+const saveFailedOrder = async (orderData: {
+  userId: string;
+  brokerName: string;
+  accountId: string;
+  symbol: string;
+  action: string;
+  quantity: number;
+  orderType: string;
+  price: number;
+  triggerPrice: number;
+  exchange: string;
+  productType: string;
+  remarks: string;
+  errorType: string;
+  errorCode: string;
+  errorMessage: string;
+  retryable: boolean;
+  actionRequired?: string;
+  rawResponse?: any;
+}) => {
+  try {
+    const failedOrderData = {
+      user_id: orderData.userId,
+      account_id: orderData.accountId,
+      broker_name: orderData.brokerName,
+      symbol: orderData.symbol,
+      action: orderData.action as 'BUY' | 'SELL',
+      quantity: orderData.quantity,
+      price: orderData.price,
+      order_type: orderData.orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+      status: 'FAILED' as const,
+      exchange: orderData.exchange,
+      product_type: orderData.productType,
+      remarks: orderData.remarks,
+      error_type: orderData.errorType,
+      error_code: orderData.errorCode,
+      error_message: orderData.errorMessage,
+      retryable: orderData.retryable,
+      action_required: orderData.actionRequired,
+      retry_count: 0,
+      raw_response: orderData.rawResponse ? JSON.stringify(orderData.rawResponse) : null,
+      executed_at: new Date().toISOString(),
+    };
+
+    const savedOrder = await userDatabase.createOrderHistory(failedOrderData);
+    console.log('💾 Failed order saved for retry capability:', {
+      orderId: savedOrder.id,
+      symbol: orderData.symbol,
+      error: orderData.errorMessage,
+      retryable: orderData.retryable
+    });
+
+    return savedOrder;
+  } catch (error: any) {
+    console.error('⚠️ Failed to save failed order:', error.message);
+    // Don't throw - we don't want to fail the error response if saving fails
+    return null;
+  }
+};
+
 /**
  * Auto-reactivate account if session is expired
  * Returns true if account is active/reactivated, false if reactivation failed
@@ -1623,9 +1751,61 @@ export const placeOrder = async (
           },
         });
       } else {
+        // Enhanced error handling for Shoonya
+        const errorMessage = orderResponse.emsg || 'Failed to place order';
+        const errorCode = orderResponse.errorCode || 'UNKNOWN';
+
+        // Determine if error is retryable and what action is required
+        const errorAnalysis = analyzeOrderError(errorMessage, errorCode, brokerName);
+
+        console.error('❌ Shoonya order placement failed:', {
+          stat: orderResponse.stat,
+          emsg: orderResponse.emsg,
+          errorCode: orderResponse.errorCode,
+          retryable: errorAnalysis.retryable,
+        });
+
+        // Save failed order to database for retry capability
+        await saveFailedOrder({
+          userId,
+          brokerName,
+          accountId: account.id.toString(),
+          symbol,
+          action,
+          quantity: parseInt(quantity),
+          orderType,
+          price: price ? parseFloat(price) : 0,
+          triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
+          exchange: exchange || 'NSE',
+          productType: productType || 'C',
+          remarks: remarks || '',
+          errorType: 'BROKER_ERROR',
+          errorCode: String(errorCode),
+          errorMessage,
+          retryable: errorAnalysis.retryable,
+          actionRequired: errorAnalysis.actionRequired,
+          rawResponse: orderResponse
+        });
+
         res.status(400).json({
           success: false,
-          message: orderResponse.emsg || 'Failed to place order',
+          message: 'Order placement failed',
+          error: {
+            type: 'BROKER_ERROR',
+            code: String(errorCode),
+            message: errorMessage,
+            brokerName,
+            retryable: errorAnalysis.retryable,
+            actionRequired: errorAnalysis.actionRequired
+          },
+          orderDetails: {
+            symbol,
+            action,
+            quantity,
+            orderType,
+            exchange: exchange || 'NSE',
+            productType: productType || 'C'
+          }
         });
       }
     } else if (brokerName === 'fyers') {
@@ -1706,26 +1886,189 @@ export const placeOrder = async (
         });
       } else {
         // Enhanced error handling for Fyers
+        const errorMessage = orderResponse.emsg || orderResponse.message || 'Failed to place order';
+        const errorCode = orderResponse.errorCode || orderResponse.code || 'UNKNOWN';
+
+        // Determine if error is retryable and what action is required
+        const errorAnalysis = analyzeOrderError(errorMessage, errorCode, brokerName);
+
         console.error('❌ Fyers order placement failed:', {
           stat: orderResponse.stat,
           emsg: orderResponse.emsg,
           errorCode: orderResponse.errorCode,
+          retryable: errorAnalysis.retryable,
           rawResponse: orderResponse.rawResponse
+        });
+
+        // Save failed order to database for retry capability
+        await saveFailedOrder({
+          userId,
+          brokerName,
+          accountId: account.id.toString(),
+          symbol,
+          action,
+          quantity: parseInt(quantity),
+          orderType,
+          price: price ? parseFloat(price) : 0,
+          triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
+          exchange: exchange || 'NSE',
+          productType: productType || 'C',
+          remarks: remarks || '',
+          errorType: 'BROKER_ERROR',
+          errorCode: String(errorCode),
+          errorMessage,
+          retryable: errorAnalysis.retryable,
+          actionRequired: errorAnalysis.actionRequired,
+          rawResponse: orderResponse
         });
 
         res.status(400).json({
           success: false,
-          message: orderResponse.emsg || 'Failed to place order',
-          errorCode: orderResponse.errorCode,
-          details: orderResponse.rawResponse
+          message: 'Order placement failed',
+          error: {
+            type: 'BROKER_ERROR',
+            code: String(errorCode),
+            message: errorMessage,
+            brokerName,
+            retryable: errorAnalysis.retryable,
+            actionRequired: errorAnalysis.actionRequired
+          },
+          orderDetails: {
+            symbol,
+            action,
+            quantity,
+            orderType,
+            exchange: exchange || 'NSE',
+            productType: productType || 'C'
+          }
         });
       }
     }
   } catch (error: any) {
     console.error('🚨 Place order error:', error);
+
+    // Extract order details from request for error response
+    const { brokerName, symbol, action, quantity, orderType, exchange, productType } = req.body;
+
+    // Determine error type and if it's retryable
+    const errorAnalysis = analyzeOrderError(error.message || 'Internal server error', '500', brokerName || 'unknown');
+
     res.status(500).json({
       success: false,
-      message: error.message || 'Failed to place order',
+      message: 'Order placement failed due to system error',
+      error: {
+        type: 'SYSTEM_ERROR',
+        code: '500',
+        message: error.message || 'Internal server error',
+        brokerName: brokerName || 'unknown',
+        retryable: errorAnalysis.retryable,
+        actionRequired: errorAnalysis.actionRequired
+      },
+      orderDetails: {
+        symbol: symbol || 'unknown',
+        action: action || 'unknown',
+        quantity: quantity || 'unknown',
+        orderType: orderType || 'unknown',
+        exchange: exchange || 'unknown',
+        productType: productType || 'unknown'
+      }
+    });
+  }
+};
+
+// Retry a failed order
+export const retryFailedOrder = async (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { orderId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // Get the failed order details
+    const failedOrder = await userDatabase.getOrderById(orderId);
+
+    if (!failedOrder) {
+      res.status(404).json({
+        success: false,
+        message: 'Failed order not found',
+      });
+      return;
+    }
+
+    // Verify the order belongs to the user
+    if (failedOrder.user_id !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied - order belongs to different user',
+      });
+      return;
+    }
+
+    // Check if order is retryable
+    if (!failedOrder.retryable) {
+      res.status(400).json({
+        success: false,
+        message: 'Order is not retryable',
+        error: {
+          type: 'VALIDATION_ERROR',
+          code: 'NOT_RETRYABLE',
+          message: failedOrder.error_message,
+          actionRequired: failedOrder.action_required
+        }
+      });
+      return;
+    }
+
+    // Update retry count
+    const newRetryCount = (failedOrder.retry_count || 0) + 1;
+    await userDatabase.updateOrderRetryCount(orderId, newRetryCount);
+
+    // Retry the order by calling the place order logic
+    const retryOrderData = {
+      brokerName: failedOrder.broker_name,
+      accountId: failedOrder.account_id,
+      symbol: failedOrder.symbol,
+      action: failedOrder.action,
+      quantity: String(failedOrder.quantity),
+      orderType: failedOrder.order_type,
+      price: failedOrder.price ? String(failedOrder.price) : undefined,
+      triggerPrice: undefined, // Add if needed
+      exchange: failedOrder.exchange,
+      productType: failedOrder.product_type,
+      remarks: `Retry #${newRetryCount} - ${failedOrder.remarks}`
+    };
+
+    // Create a new request object for the retry
+    const retryReq = {
+      ...req,
+      body: retryOrderData
+    } as AuthenticatedRequest;
+
+    // Call the place order function
+    await placeOrder(retryReq, res, next);
+
+  } catch (error: any) {
+    console.error('🚨 Retry order error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retry order',
+      error: {
+        type: 'SYSTEM_ERROR',
+        code: '500',
+        message: error.message || 'Internal server error',
+        retryable: true,
+        actionRequired: 'Try again later'
+      }
     });
   }
 };

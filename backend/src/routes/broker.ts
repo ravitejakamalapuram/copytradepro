@@ -11,6 +11,7 @@ import {
   deactivateAccount,
   disconnectBroker,
   placeOrder,
+  retryFailedOrder,
   getOrderHistory,
   getOrderStatus,
   checkOrderStatus,
@@ -123,6 +124,7 @@ router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAcco
 
 router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
+router.post('/retry-order/:orderId', authenticateToken, retryFailedOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
 router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
 router.post('/check-order-status', authenticateToken, checkOrderStatus);

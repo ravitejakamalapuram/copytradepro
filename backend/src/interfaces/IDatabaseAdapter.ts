@@ -59,12 +59,20 @@ export interface OrderHistory {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: string;
   created_at: string;
+  // New fields for failed order tracking
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  retryable?: boolean;
+  action_required?: string;
+  retry_count?: number;
+  raw_response?: string;
   account_info?: {
     account_id: string;
     user_name: string;
@@ -82,11 +90,19 @@ export interface CreateOrderHistoryData {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange?: string;
   product_type?: string;
   remarks?: string;
   executed_at: string;
+  // New fields for failed order tracking
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  retryable?: boolean;
+  action_required?: string;
+  retry_count?: number;
+  raw_response?: string;
 }
 
 export interface OrderFilters {

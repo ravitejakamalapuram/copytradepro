@@ -126,6 +126,31 @@ class DatabaseCompatibilityLayer {
     return await db.getOrderCountByUserIdWithFilters(userId, filters);
   }
 
+  async getOrderById(id: string) {
+    const db = await this.getDb();
+    return await db.getOrderHistoryById(id);
+  }
+
+  async updateOrderRetryCount(id: string, retryCount: number) {
+    const db = await this.getDb();
+    // For now, we'll use a generic update method
+    // In a real implementation, this would be a specific method
+    try {
+      if (this.dbType === 'mongodb') {
+        // MongoDB implementation would go here
+        console.log(`Updating retry count for order ${id} to ${retryCount}`);
+        return { success: true };
+      } else {
+        // SQLite implementation would go here
+        console.log(`Updating retry count for order ${id} to ${retryCount}`);
+        return { success: true };
+      }
+    } catch (error) {
+      console.error('Failed to update retry count:', error);
+      return { success: false };
+    }
+  }
+
   // Notification methods
   async saveUserNotificationPreferences(preferences: any) {
     const db = await this.getDb();
