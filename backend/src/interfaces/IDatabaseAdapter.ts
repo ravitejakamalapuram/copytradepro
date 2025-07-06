@@ -59,7 +59,7 @@ export interface OrderHistory {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
+  status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
@@ -90,7 +90,7 @@ export interface CreateOrderHistoryData {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
+  status?: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange?: string;
   product_type?: string;
   remarks?: string;
@@ -146,8 +146,8 @@ export interface IDatabaseAdapter {
   getOrderHistoryById(id: number | string): Promise<OrderHistory | null> | OrderHistory | null;
   getOrderHistoryByUserId(userId: number | string, limit?: number, offset?: number): Promise<OrderHistory[]> | OrderHistory[];
   getOrderHistoryByUserIdWithFilters(userId: number | string, limit?: number, offset?: number, filters?: OrderFilters): Promise<OrderHistory[]> | OrderHistory[];
-  updateOrderStatus(id: number | string, status: string): Promise<boolean> | boolean;
-  updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: string): Promise<boolean> | boolean;
+  updateOrderStatus(id: number | string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'): Promise<boolean> | boolean;
+  updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'): Promise<boolean> | boolean;
   deleteOrderHistory(id: number | string): Promise<boolean> | boolean;
   getAllOrderHistory(limit?: number, offset?: number): Promise<OrderHistory[]> | OrderHistory[];
   getOrderCountByUserIdWithFilters(userId: number | string, filters?: OrderFilters): Promise<number> | number;

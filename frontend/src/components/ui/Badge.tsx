@@ -56,7 +56,7 @@ Badge.displayName = 'Badge';
 // StatusBadge Component
 export interface StatusBadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   /** Status type */
-  status: 'active' | 'inactive' | 'pending' | 'executed' | 'rejected' | 'cancelled' | 'error';
+  status: 'active' | 'inactive' | 'pending' | 'submitted' | 'executed' | 'rejected' | 'cancelled' | 'failed' | 'error';
   /** Show status icon */
   showIcon?: boolean;
 }

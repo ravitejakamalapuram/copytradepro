@@ -198,7 +198,10 @@ export const useNotifications = (): UseNotificationsReturn => {
         let notificationType: NotificationItem['type'] = 'info';
         let message = `Order ${order.symbol} status changed from ${oldStatus} to ${newStatus}`;
         
-        if (newStatus === 'EXECUTED') {
+        if (newStatus === 'SUBMITTED') {
+          notificationType = 'info';
+          message = `Order submitted: ${order.action} ${order.quantity} ${order.symbol} sent to exchange`;
+        } else if (newStatus === 'EXECUTED') {
           notificationType = 'success';
           message = `Order executed: ${order.action} ${order.quantity} ${order.symbol} at ₹${order.price}`;
         } else if (newStatus === 'REJECTED' || newStatus === 'FAILED') {

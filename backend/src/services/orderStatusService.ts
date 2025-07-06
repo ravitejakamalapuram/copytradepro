@@ -126,7 +126,7 @@ class OrderStatusService extends EventEmitter {
     try {
       // Get all pending orders from all users
       const orders = userDatabase.getAllOrderHistory()
-        .filter(order => ['PLACED', 'PENDING'].includes(order.status));
+        .filter(order => ['SUBMITTED', 'PENDING'].includes(order.status));
 
       // Convert OrderHistory to Order format
       return orders.map(order => ({
@@ -349,7 +349,7 @@ class OrderStatusService extends EventEmitter {
   private mapShoonyaStatus(shoonyaStatus: string): string {
     const statusMap: { [key: string]: string } = {
       'PENDING': 'PENDING',
-      'OPEN': 'PLACED',
+      'OPEN': 'SUBMITTED',
       'COMPLETE': 'EXECUTED',
       'CANCELLED': 'CANCELLED',
       'REJECTED': 'REJECTED',
@@ -382,7 +382,7 @@ class OrderStatusService extends EventEmitter {
         // Use the broker_order_id to update the database
         const updated = userDatabase.updateOrderStatus(
           order.broker_order_id || order.id,
-          newStatus as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED'
+          newStatus as 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'
         );
 
         if (updated) {
@@ -427,7 +427,7 @@ class OrderStatusService extends EventEmitter {
       }
 
       // Remove from monitoring if order is complete
-      if (['EXECUTED', 'CANCELLED', 'REJECTED'].includes(newStatus)) {
+      if (['EXECUTED', 'CANCELLED', 'REJECTED', 'FAILED'].includes(newStatus)) {
         this.removeOrderFromMonitoring(order);
       }
 

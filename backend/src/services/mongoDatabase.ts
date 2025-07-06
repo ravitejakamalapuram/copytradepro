@@ -45,12 +45,20 @@ interface OrderHistoryDocument extends Document {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: Date;
   created_at: Date;
+  // New fields for failed order tracking
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  retryable?: boolean;
+  action_required?: string;
+  retry_count?: number;
+  raw_response?: string;
 }
 
 // MongoDB Schemas
@@ -86,16 +94,24 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
   order_type: { type: String, enum: ['MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET'], required: true },
-  status: { 
-    type: String, 
-    enum: ['PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED'], 
-    default: 'PLACED' 
+  status: {
+    type: String,
+    enum: ['SUBMITTED', 'PENDING', 'EXECUTED', 'REJECTED', 'CANCELLED', 'PARTIALLY_FILLED', 'FAILED'],
+    default: 'SUBMITTED'
   },
   exchange: { type: String, default: 'NSE' },
   product_type: { type: String, default: 'C' },
   remarks: { type: String, default: '' },
   executed_at: { type: Date, required: true },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
+  // New fields for failed order tracking
+  error_type: { type: String },
+  error_code: { type: String },
+  error_message: { type: String },
+  retryable: { type: Boolean, default: false },
+  action_required: { type: String },
+  retry_count: { type: Number, default: 0 },
+  raw_response: { type: String }
 });
 
 // Add compound indexes
@@ -589,7 +605,7 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
-  async updateOrderStatus(id: string, status: string): Promise<boolean> {
+  async updateOrderStatus(id: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'): Promise<boolean> {
     try {
       const result = await this.OrderHistoryModel.findByIdAndUpdate(
         id,
@@ -603,7 +619,7 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
-  async updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: string): Promise<boolean> {
+  async updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'): Promise<boolean> {
     try {
       const result = await this.OrderHistoryModel.findOneAndUpdate(
         { broker_order_id: brokerOrderId },

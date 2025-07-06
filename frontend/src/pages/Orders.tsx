@@ -256,7 +256,7 @@ const Orders: React.FC = () => {
 
   // Apply both status and account filters
   const filteredOrders = filterOrdersByAccount(orders).filter(order => {
-    if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
+    if (activeTab === 'pending') return ['SUBMITTED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
     if (activeTab === 'executed') return order.status === 'EXECUTED';
     return true;
   });
@@ -270,12 +270,13 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'PLACED': return 'var(--kite-neutral)';
-      case 'PENDING': return 'var(--kite-neutral)';
+      case 'SUBMITTED': return 'var(--kite-warning)';
+      case 'PENDING': return 'var(--kite-info)';
       case 'EXECUTED': return 'var(--kite-profit)';
-      case 'PARTIALLY_FILLED': return 'var(--kite-neutral)';
-      case 'CANCELLED': return 'var(--kite-text-secondary)';
       case 'REJECTED': return 'var(--kite-loss)';
+      case 'CANCELLED': return 'var(--kite-text-secondary)';
+      case 'PARTIALLY_FILLED': return 'var(--kite-info)';
+      case 'FAILED': return 'var(--kite-loss)';
       default: return 'var(--kite-text-primary)';
     }
   };
@@ -656,7 +657,7 @@ const Orders: React.FC = () => {
           }}>
             {[
               { key: 'all', label: 'All Orders', count: orders.length },
-              { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
+              { key: 'pending', label: 'Pending', count: orders.filter(o => ['SUBMITTED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
               { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
             ].map(tab => (
               <button
@@ -917,7 +918,7 @@ const Orders: React.FC = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-neutral)' }}>
-                {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
+                {orders.filter(o => ['SUBMITTED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
               </div>
               <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                 Pending
@@ -925,10 +926,10 @@ const Orders: React.FC = () => {
             </div>
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-loss)' }}>
-                {orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length}
+                {orders.filter(o => ['CANCELLED', 'REJECTED', 'FAILED'].includes(o.status)).length}
               </div>
               <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
-                Cancelled/Rejected
+                Cancelled/Rejected/Failed
               </div>
             </div>
           </div>

@@ -59,10 +59,12 @@ a:hover {
    ========================================================================== */
 
 /* Trading status colors */
+.status-submitted { color: var(--color-warning-600); }
+.status-pending { color: var(--color-info-600); }
 .status-executed { color: var(--color-success-600); }
 .status-rejected { color: var(--color-danger-600); }
-.status-pending { color: var(--color-warning-600); }
 .status-cancelled { color: var(--color-neutral-500); }
+.status-failed { color: var(--color-danger-600); }
 
 /* Price display utilities */
 .price-positive { color: var(--color-success-600); }

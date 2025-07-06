@@ -101,10 +101,14 @@ const saveFailedOrder = async (orderData: {
   rawResponse?: any;
 }) => {
   try {
+    // Generate a unique broker order ID for orders that failed before submission
+    const failedOrderId = `FAILED_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     const failedOrderData = {
       user_id: orderData.userId,
       account_id: orderData.accountId,
       broker_name: orderData.brokerName,
+      broker_order_id: failedOrderId,
       symbol: orderData.symbol,
       action: orderData.action as 'BUY' | 'SELL',
       quantity: orderData.quantity,
@@ -1680,9 +1684,9 @@ export const placeOrder = async (
     // Handle response based on broker type
     if (brokerName === 'shoonya') {
       if (orderResponse.stat === 'Ok') {
-        // Save order to history with PLACED status
-        // Note: Status is 'PLACED' because broker API success only means order was submitted,
-        // not that it was executed. Actual execution depends on market conditions.
+        // Save order to history with SUBMITTED status
+        // Note: Status is 'SUBMITTED' because broker API success means order was submitted to exchange,
+        // actual execution status will be updated via status checking.
         try {
           const orderHistoryData = {
             user_id: userId, // Keep as string for MongoDB ObjectId
@@ -1694,7 +1698,7 @@ export const placeOrder = async (
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
             order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
+            status: 'SUBMITTED' as const, // Order successfully submitted to exchange
             exchange: exchange || 'NSE',
             product_type: productType || 'C',
             remarks: remarks || `Order placed via CopyTrade Pro`,
@@ -1702,8 +1706,8 @@ export const placeOrder = async (
           };
 
           const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
-          console.log('✅ Order placed and saved to history:', orderResponse.norenordno);
-          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+          console.log('✅ Order submitted and saved to history:', orderResponse.norenordno);
+          console.log('ℹ️  Status: SUBMITTED (order sent to exchange, awaiting execution)');
 
           // Add order to real-time monitoring
           const orderForMonitoring = {
@@ -1714,7 +1718,7 @@ export const placeOrder = async (
             action: action,
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
-            status: 'PLACED',
+            status: 'SUBMITTED',
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno,
             order_type: orderType,
@@ -1734,7 +1738,7 @@ export const placeOrder = async (
 
         res.status(200).json({
           success: true,
-          message: 'Order placed successfully (awaiting execution)',
+          message: 'Order submitted successfully (awaiting execution)',
           data: {
             orderId: orderResponse.norenordno,
             brokerName,
@@ -1765,27 +1769,88 @@ export const placeOrder = async (
           retryable: errorAnalysis.retryable,
         });
 
-        // Save failed order to database for retry capability
-        await saveFailedOrder({
-          userId,
-          brokerName,
-          accountId: account.id.toString(),
-          symbol,
-          action,
-          quantity: parseInt(quantity),
-          orderType,
-          price: price ? parseFloat(price) : 0,
-          triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
-          exchange: exchange || 'NSE',
-          productType: productType || 'C',
-          remarks: remarks || '',
-          errorType: 'BROKER_ERROR',
-          errorCode: String(errorCode),
-          errorMessage,
-          retryable: errorAnalysis.retryable,
-          actionRequired: errorAnalysis.actionRequired,
-          rawResponse: orderResponse
-        });
+        // Check if order was submitted to exchange but failed there (has broker order ID)
+        const rawResponse = orderResponse.rawResponse || orderResponse;
+        if (orderResponse.norenordno || orderResponse.id || orderResponse.orderId || rawResponse.id || rawResponse.norenordno) {
+          // Order was submitted to exchange but failed - save as regular order with FAILED status
+          try {
+            const brokerOrderId = orderResponse.norenordno || orderResponse.id || orderResponse.orderId || rawResponse.id || rawResponse.norenordno;
+
+            const orderHistoryData = {
+              user_id: userId,
+              account_id: account.id.toString(),
+              broker_name: brokerName,
+              broker_order_id: brokerOrderId,
+              symbol: symbol,
+              action: action as 'BUY' | 'SELL',
+              quantity: parseInt(quantity),
+              price: price ? parseFloat(price) : 0,
+              order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+              status: 'REJECTED' as const,
+              exchange: exchange || 'NSE',
+              product_type: productType || 'C',
+              remarks: remarks || `Order failed: ${errorMessage}`,
+              executed_at: new Date().toISOString(),
+              error_type: 'BROKER_ERROR',
+              error_code: String(errorCode),
+              error_message: errorMessage,
+              retryable: errorAnalysis.retryable,
+              action_required: errorAnalysis.actionRequired,
+              retry_count: 0,
+              raw_response: JSON.stringify(orderResponse)
+            };
+
+            const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
+            console.log('💾 Shoonya failed order saved to history with broker order ID:', brokerOrderId);
+
+            // Add to real-time monitoring for status updates
+            const orderForMonitoring = {
+              id: savedOrder.id.toString(),
+              user_id: userId,
+              account_id: account.id.toString(),
+              symbol: symbol,
+              action: action,
+              quantity: parseInt(quantity),
+              price: price ? parseFloat(price) : 0,
+              status: 'REJECTED',
+              broker_name: brokerName,
+              broker_order_id: brokerOrderId,
+              order_type: orderType,
+              exchange: exchange || 'NSE',
+              product_type: productType || 'C',
+              remarks: remarks || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+            console.log('📊 Shoonya failed order added to monitoring:', brokerOrderId);
+          } catch (historyError: any) {
+            console.error('⚠️ Failed to save Shoonya failed order history:', historyError.message);
+          }
+        } else {
+          // Order failed before submission - save using saveFailedOrder function
+          await saveFailedOrder({
+            userId,
+            brokerName,
+            accountId: account.id.toString(),
+            symbol,
+            action,
+            quantity: parseInt(quantity),
+            orderType,
+            price: price ? parseFloat(price) : 0,
+            triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
+            exchange: exchange || 'NSE',
+            productType: productType || 'C',
+            remarks: remarks || '',
+            errorType: 'BROKER_ERROR',
+            errorCode: String(errorCode),
+            errorMessage,
+            retryable: errorAnalysis.retryable,
+            actionRequired: errorAnalysis.actionRequired,
+            rawResponse: orderResponse
+          });
+        }
 
         res.status(400).json({
           success: false,
@@ -1813,9 +1878,9 @@ export const placeOrder = async (
       console.log('🔍 Processing Fyers order response:', JSON.stringify(orderResponse, null, 2));
 
       if (orderResponse.stat === 'Ok') {
-        // Save order to history with PLACED status
-        // Note: Status is 'PLACED' because broker API success only means order was submitted,
-        // not that it was executed. Actual execution depends on market conditions.
+        // Save order to history with SUBMITTED status
+        // Note: Status is 'SUBMITTED' because broker API success means order was submitted to exchange,
+        // actual execution status will be updated via status checking.
         try {
           const orderHistoryData = {
             user_id: userId, // Keep as string for MongoDB ObjectId
@@ -1827,7 +1892,7 @@ export const placeOrder = async (
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
             order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-            status: 'PLACED' as const, // Order successfully placed, not necessarily executed
+            status: 'SUBMITTED' as const, // Order successfully submitted to exchange
             exchange: exchange || 'NSE',
             product_type: productType || 'C',
             remarks: remarks || `Order placed via CopyTrade Pro`,
@@ -1835,8 +1900,8 @@ export const placeOrder = async (
           };
 
           const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
-          console.log('✅ Fyers order placed and saved to history:', orderResponse.norenordno);
-          console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
+          console.log('✅ Fyers order submitted and saved to history:', orderResponse.norenordno);
+          console.log('ℹ️  Status: SUBMITTED (order sent to exchange, awaiting execution)');
 
           // Add order to real-time monitoring
           const orderForMonitoring = {
@@ -1847,7 +1912,7 @@ export const placeOrder = async (
             action: action,
             quantity: parseInt(quantity),
             price: price ? parseFloat(price) : 0,
-            status: 'PLACED',
+            status: 'SUBMITTED',
             broker_name: brokerName,
             broker_order_id: orderResponse.norenordno, // Use standardized field name
             order_type: orderType,
@@ -1867,7 +1932,7 @@ export const placeOrder = async (
 
         res.status(200).json({
           success: true,
-          message: orderResponse.message || 'Order placed successfully (awaiting execution)',
+          message: orderResponse.message || 'Order submitted successfully (awaiting execution)',
           data: {
             orderId: orderResponse.norenordno,
             brokerName,
@@ -1878,7 +1943,7 @@ export const placeOrder = async (
             price,
             triggerPrice,
             exchange,
-            status: 'PLACED',
+            status: 'SUBMITTED',
             timestamp: new Date().toISOString(),
             note: 'Order has been submitted to the exchange and is awaiting execution',
             rawResponse: orderResponse.rawResponse // Include raw response for debugging
@@ -1900,27 +1965,88 @@ export const placeOrder = async (
           rawResponse: orderResponse.rawResponse
         });
 
-        // Save failed order to database for retry capability
-        await saveFailedOrder({
-          userId,
-          brokerName,
-          accountId: account.id.toString(),
-          symbol,
-          action,
-          quantity: parseInt(quantity),
-          orderType,
-          price: price ? parseFloat(price) : 0,
-          triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
-          exchange: exchange || 'NSE',
-          productType: productType || 'C',
-          remarks: remarks || '',
-          errorType: 'BROKER_ERROR',
-          errorCode: String(errorCode),
-          errorMessage,
-          retryable: errorAnalysis.retryable,
-          actionRequired: errorAnalysis.actionRequired,
-          rawResponse: orderResponse
-        });
+        // Check if order was submitted to exchange but failed there (has broker order ID)
+        const rawResponse = orderResponse.rawResponse || orderResponse;
+        if (orderResponse.norenordno || orderResponse.id || orderResponse.orderId || rawResponse.id || rawResponse.norenordno) {
+          // Order was submitted to exchange but failed - save as regular order with FAILED status
+          try {
+            const brokerOrderId = orderResponse.norenordno || orderResponse.id || orderResponse.orderId || rawResponse.id || rawResponse.norenordno;
+
+            const orderHistoryData = {
+              user_id: userId,
+              account_id: account.id.toString(),
+              broker_name: brokerName,
+              broker_order_id: brokerOrderId,
+              symbol: symbol,
+              action: action as 'BUY' | 'SELL',
+              quantity: parseInt(quantity),
+              price: price ? parseFloat(price) : 0,
+              order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+              status: 'REJECTED' as const,
+              exchange: exchange || 'NSE',
+              product_type: productType || 'C',
+              remarks: remarks || `Order failed: ${errorMessage}`,
+              executed_at: new Date().toISOString(),
+              error_type: 'BROKER_ERROR',
+              error_code: String(errorCode),
+              error_message: errorMessage,
+              retryable: errorAnalysis.retryable,
+              action_required: errorAnalysis.actionRequired,
+              retry_count: 0,
+              raw_response: JSON.stringify(orderResponse)
+            };
+
+            const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
+            console.log('💾 Failed order saved to history with broker order ID:', brokerOrderId);
+
+            // Add to real-time monitoring for status updates
+            const orderForMonitoring = {
+              id: savedOrder.id.toString(),
+              user_id: userId,
+              account_id: account.id.toString(),
+              symbol: symbol,
+              action: action,
+              quantity: parseInt(quantity),
+              price: price ? parseFloat(price) : 0,
+              status: 'REJECTED',
+              broker_name: brokerName,
+              broker_order_id: brokerOrderId,
+              order_type: orderType,
+              exchange: exchange || 'NSE',
+              product_type: productType || 'C',
+              remarks: remarks || '',
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+
+            await orderStatusService.addOrderToMonitoring(orderForMonitoring);
+            console.log('📊 Failed order added to monitoring:', brokerOrderId);
+          } catch (historyError: any) {
+            console.error('⚠️ Failed to save failed order history:', historyError.message);
+          }
+        } else {
+          // Order failed before submission - save using saveFailedOrder function
+          await saveFailedOrder({
+            userId,
+            brokerName,
+            accountId: account.id.toString(),
+            symbol,
+            action,
+            quantity: parseInt(quantity),
+            orderType,
+            price: price ? parseFloat(price) : 0,
+            triggerPrice: triggerPrice ? parseFloat(triggerPrice) : 0,
+            exchange: exchange || 'NSE',
+            productType: productType || 'C',
+            remarks: remarks || '',
+            errorType: 'BROKER_ERROR',
+            errorCode: String(errorCode),
+            errorMessage,
+            retryable: errorAnalysis.retryable,
+            actionRequired: errorAnalysis.actionRequired,
+            rawResponse: orderResponse
+          });
+        }
 
         res.status(400).json({
           success: false,

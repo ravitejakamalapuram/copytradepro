@@ -101,12 +101,12 @@ class DatabaseCompatibilityLayer {
     return await db.getOrderHistoryByUserIdWithFilters(userId, limit, offset, filters);
   }
 
-  async updateOrderStatus(id: number, status: string) {
+  async updateOrderStatus(id: number, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED') {
     const db = await this.getDb();
     return await db.updateOrderStatus(id, status);
   }
 
-  async updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: string) {
+  async updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED') {
     const db = await this.getDb();
     return await db.updateOrderStatusByBrokerOrderId(brokerOrderId, status);
   }
