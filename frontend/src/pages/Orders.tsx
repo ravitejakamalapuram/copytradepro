@@ -5,6 +5,202 @@ import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 
+// Enhanced Interactive Tooltip Component
+const Tooltip: React.FC<{
+  children: React.ReactNode;
+  order: Order;
+  show: boolean;
+}> = ({ children, order, show }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (show) {
+      setPosition({ x: e.clientX + 15, y: e.clientY - 10 });
+      setIsVisible(true);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsVisible(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (show && isVisible) {
+      setPosition({ x: e.clientX + 15, y: e.clientY - 10 });
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'REJECTED': return '#dc3545';
+      case 'FAILED': return '#dc3545';
+      case 'CANCELLED': return '#6c757d';
+      default: return '#dc3545';
+    }
+  };
+
+  const renderTooltipContent = () => {
+    const hasError = order.errorMessage && order.errorMessage.trim() !== '';
+
+    return (
+      <div style={{
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        lineHeight: '1.4'
+      }}>
+        {/* Header */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          marginBottom: '8px',
+          paddingBottom: '6px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.2)'
+        }}>
+          <span style={{
+            fontSize: '16px',
+            marginRight: '6px'
+          }}>⚠️</span>
+          <span style={{
+            fontWeight: '600',
+            fontSize: '0.9rem',
+            color: getStatusColor(order.status)
+          }}>
+            Order {order.status}
+          </span>
+        </div>
+
+        {/* Error Details */}
+        {hasError ? (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{
+              fontSize: '0.75rem',
+              color: 'rgba(255, 255, 255, 0.7)',
+              marginBottom: '4px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px'
+            }}>
+              Error Details
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(220, 53, 69, 0.1)',
+              border: '1px solid rgba(220, 53, 69, 0.3)',
+              borderRadius: '4px',
+              padding: '8px',
+              fontSize: '0.85rem',
+              color: '#ffebee'
+            }}>
+              <div style={{ fontWeight: '500', marginBottom: '2px' }}>
+                {order.errorType || 'Error'}
+              </div>
+              <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+                {order.errorMessage}
+              </div>
+              {order.errorCode && (
+                <div style={{
+                  fontSize: '0.75rem',
+                  marginTop: '4px',
+                  color: 'rgba(255, 255, 255, 0.6)'
+                }}>
+                  Code: {order.errorCode}
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{ marginBottom: '10px' }}>
+            <div style={{
+              backgroundColor: 'rgba(255, 193, 7, 0.1)',
+              border: '1px solid rgba(255, 193, 7, 0.3)',
+              borderRadius: '4px',
+              padding: '8px',
+              fontSize: '0.85rem',
+              color: '#fff3cd'
+            }}>
+              No error details available
+            </div>
+          </div>
+        )}
+
+        {/* Order Information */}
+        <div style={{
+          fontSize: '0.75rem',
+          color: 'rgba(255, 255, 255, 0.7)',
+          marginBottom: '6px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px'
+        }}>
+          Order Information
+        </div>
+
+        <div style={{ fontSize: '0.8rem', color: 'rgba(255, 255, 255, 0.9)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Symbol:</span>
+            <span style={{ fontWeight: '500' }}>{order.symbol}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Broker:</span>
+            <span style={{
+              fontWeight: '500',
+              textTransform: 'capitalize'
+            }}>{order.brokerName || 'N/A'}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Order ID:</span>
+            <span style={{
+              fontFamily: 'monospace',
+              fontSize: '0.75rem',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              padding: '1px 4px',
+              borderRadius: '2px'
+            }}>{order.brokerOrderId}</span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Time:</span>
+            <span>{order.time}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <span
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onMouseMove={handleMouseMove}
+        style={{ position: 'relative' }}
+      >
+        {children}
+      </span>
+      {isVisible && show && (
+        <div
+          style={{
+            position: 'fixed',
+            left: position.x,
+            top: position.y,
+            backgroundColor: '#1a1a1a',
+            color: 'white',
+            padding: '12px',
+            borderRadius: '8px',
+            fontSize: '0.875rem',
+            maxWidth: '320px',
+            minWidth: '280px',
+            zIndex: 1000,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            backdropFilter: 'blur(8px)',
+            pointerEvents: 'none',
+            transform: 'translateY(-50%)'
+          }}
+        >
+          {renderTooltipContent()}
+        </div>
+      )}
+    </>
+  );
+};
+
 interface Order {
   id: string;
   symbol: string;
@@ -13,7 +209,7 @@ interface Order {
   qty: number;
   price?: number;
   triggerPrice?: number;
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   time: string;
   filledQty: number;
   avgPrice?: number;
@@ -21,6 +217,11 @@ interface Order {
   brokerName?: string;
   brokerOrderId?: string;
   exchange?: string;
+  errorMessage?: string;
+  errorType?: string;
+  errorCode?: string;
+  retryable?: boolean;
+  actionRequired?: string;
   accountInfo?: {
     account_id: string;
     user_name: string;
@@ -126,28 +327,69 @@ const Orders: React.FC = () => {
 
       if (response.success && response.data) {
         // Convert backend order format to our interface
-        const ordersData = response.data.orders.map((order: any) => ({
-          id: order.id.toString(),
-          symbol: order.symbol,
-          type: order.action.toUpperCase() as 'BUY' | 'SELL',
-          orderType: order.order_type as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-          qty: order.quantity,
-          price: order.price,
-          triggerPrice: 0, // Not available in broker order history
-          status: order.status.toUpperCase() as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED',
-          time: new Date(order.executed_at || order.created_at).toLocaleTimeString('en-IN', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
-          }),
-          filledQty: order.status === 'EXECUTED' ? order.quantity : 0,
-          avgPrice: order.status === 'EXECUTED' ? order.price : undefined,
-          createdAt: order.executed_at || order.created_at,
-          brokerName: order.broker_name,
-          brokerOrderId: order.broker_order_id,
-          exchange: order.exchange,
-          accountInfo: order.account_info
-        }));
+        console.log('📊 Total orders received:', response.data.orders.length);
+        console.log('🔍 Raw API Response:', response.data.orders);
+
+        const ordersData = response.data.orders.map((order: any, index: number) => {
+          // Debug logging for ALL orders to see what we're getting
+          console.log(`📋 Order ${index + 1}:`, {
+            broker_order_id: order.broker_order_id,
+            status: order.status,
+            symbol: order.symbol,
+            error_message: order.error_message,
+            error_type: order.error_type,
+            error_code: order.error_code,
+            hasErrorMessage: !!order.error_message,
+            allFields: Object.keys(order),
+            isTargetOrder: order.broker_order_id === '25070500004292'
+          });
+
+          // Special logging for the specific order we're looking for
+          if (order.broker_order_id === '25070500004292') {
+            console.log('🎯 FOUND TARGET ORDER 25070500004292:', order);
+          }
+
+          // Debug logging for rejected/failed orders
+          if (order.status === 'REJECTED' || order.status === 'FAILED') {
+            console.log('🔍 Rejected/Failed Order Debug:', {
+              broker_order_id: order.broker_order_id,
+              status: order.status,
+              error_message: order.error_message,
+              error_type: order.error_type,
+              error_code: order.error_code,
+              symbol: order.symbol,
+              fullOrder: order
+            });
+          }
+
+          return {
+            id: order.id.toString(),
+            symbol: order.symbol,
+            type: order.action.toUpperCase() as 'BUY' | 'SELL',
+            orderType: order.order_type as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+            qty: order.quantity,
+            price: order.price,
+            triggerPrice: 0, // Not available in broker order history
+            status: order.status.toUpperCase() as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED',
+            time: new Date(order.executed_at || order.created_at).toLocaleTimeString('en-IN', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit'
+            }),
+            filledQty: order.status === 'EXECUTED' ? order.quantity : 0,
+            avgPrice: order.status === 'EXECUTED' ? order.price : undefined,
+            createdAt: order.executed_at || order.created_at,
+            brokerName: order.broker_name,
+            brokerOrderId: order.broker_order_id,
+            exchange: order.exchange,
+            errorMessage: order.error_message,
+            errorType: order.error_type,
+            errorCode: order.error_code,
+            retryable: order.retryable,
+            actionRequired: order.action_required,
+            accountInfo: order.account_info
+          };
+        });
 
         setOrders(ordersData);
         setLastRefresh(new Date());
@@ -692,6 +934,7 @@ const Orders: React.FC = () => {
                   <tr>
                     <th>Time</th>
                     <th>Instrument</th>
+                    <th>Broker</th>
                     <th>Type</th>
                     <th>Order Type</th>
                     <th>Qty.</th>
@@ -751,7 +994,23 @@ const Orders: React.FC = () => {
                         )}
                       </td>
                       <td>
-                        <span style={{ 
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{
+                            fontSize: '0.75rem',
+                            padding: '0.125rem 0.375rem',
+                            backgroundColor: order.brokerName === 'shoonya' ? '#e3f2fd' : '#f3e5f5',
+                            color: order.brokerName === 'shoonya' ? '#1976d2' : '#7b1fa2',
+                            borderRadius: '0.375rem',
+                            fontWeight: '600',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.025em'
+                          }}>
+                            {order.brokerName || 'N/A'}
+                          </span>
+                        </div>
+                      </td>
+                      <td>
+                        <span style={{
                           color: getTypeColor(order.type),
                           fontWeight: '500',
                           fontSize: '0.875rem'
@@ -772,13 +1031,31 @@ const Orders: React.FC = () => {
                         {order.triggerPrice ? formatCurrency(order.triggerPrice) : '-'}
                       </td>
                       <td>
-                        <span style={{ 
-                          color: getStatusColor(order.status),
-                          fontWeight: '500',
-                          fontSize: '0.875rem'
-                        }}>
-                          {order.status}
-                        </span>
+                        <Tooltip
+                          show={order.status === 'REJECTED' || order.status === 'FAILED'}
+                          order={order}
+                        >
+                          <span
+                            style={{
+                              color: getStatusColor(order.status),
+                              fontWeight: '500',
+                              fontSize: '0.875rem',
+                              cursor: (order.status === 'REJECTED' || order.status === 'FAILED') ? 'help' : 'default',
+                              position: 'relative'
+                            }}
+                          >
+                            {order.status}
+                            {(order.status === 'REJECTED' || order.status === 'FAILED') && (
+                              <span style={{
+                                marginLeft: '0.25rem',
+                                fontSize: '0.75rem',
+                                opacity: 0.7
+                              }}>
+                                ⚠️
+                              </span>
+                            )}
+                          </span>
+                        </Tooltip>
                       </td>
                       <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
                         {order.filledQty}/{order.qty}

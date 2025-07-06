@@ -268,10 +268,24 @@ export class MongoDatabase implements IDatabaseAdapter {
         }
       : null;
 
-    return {
+    // Handle account_id properly - if it's populated (object), use the _id, otherwise use as string
+    let accountId: string;
+    if (typeof accountData === 'object' && accountData && accountData._id) {
+      accountId = accountData._id.toString();
+    } else if (typeof doc.account_id === 'string') {
+      accountId = doc.account_id;
+    } else if (doc.account_id && typeof doc.account_id.toString === 'function') {
+      accountId = doc.account_id.toString();
+    } else {
+      // Fallback for corrupted data
+      console.warn('⚠️ Corrupted account_id data found:', doc.account_id);
+      accountId = 'unknown';
+    }
+
+    const result: any = {
       id: (doc._id as mongoose.Types.ObjectId).toString(),
       user_id: doc.user_id.toString(),
-      account_id: typeof doc.account_id === 'string' ? doc.account_id : doc.account_id.toString(),
+      account_id: accountId,
       broker_name: doc.broker_name,
       broker_order_id: doc.broker_order_id,
       symbol: doc.symbol,
@@ -284,10 +298,35 @@ export class MongoDatabase implements IDatabaseAdapter {
       product_type: doc.product_type,
       remarks: doc.remarks,
       executed_at: doc.executed_at.toISOString(),
-      created_at: doc.created_at.toISOString(),
-      // Add account information if populated
-      ...(accountInfo && { account_info: accountInfo })
+      created_at: doc.created_at.toISOString()
     };
+
+    // Add error tracking fields only if they exist
+    if (doc.error_type) result.error_type = doc.error_type;
+    if (doc.error_code) result.error_code = doc.error_code;
+    if (doc.error_message) result.error_message = doc.error_message;
+    if (doc.retryable !== undefined) result.retryable = doc.retryable;
+    if (doc.action_required) result.action_required = doc.action_required;
+    if (doc.retry_count !== undefined) result.retry_count = doc.retry_count;
+    if (doc.raw_response) result.raw_response = doc.raw_response;
+
+    // Debug logging for orders with FAILED or REJECTED status
+    if (doc.status === 'FAILED' || doc.status === 'REJECTED') {
+      console.log('🔍 MongoDB Debug - Failed/Rejected Order:', {
+        broker_order_id: doc.broker_order_id,
+        status: doc.status,
+        error_type: doc.error_type,
+        error_code: doc.error_code,
+        error_message: doc.error_message,
+        hasErrorMessage: !!doc.error_message,
+        errorMessageLength: doc.error_message ? doc.error_message.length : 0
+      });
+    }
+
+    // Add account information if populated
+    if (accountInfo) result.account_info = accountInfo;
+
+    return result;
   }
 
   // User Management Methods
@@ -506,11 +545,32 @@ export class MongoDatabase implements IDatabaseAdapter {
         exchange: orderData.exchange || 'NSE',
         product_type: orderData.product_type || 'C',
         remarks: orderData.remarks || '',
-        executed_at: new Date(orderData.executed_at)
+        executed_at: new Date(orderData.executed_at),
+        // Include error tracking fields
+        error_type: orderData.error_type,
+        error_code: orderData.error_code,
+        error_message: orderData.error_message,
+        retryable: orderData.retryable,
+        action_required: orderData.action_required,
+        retry_count: orderData.retry_count || 0,
+        raw_response: orderData.raw_response
       });
 
       const savedOrder = await orderDoc.save();
       console.log('✅ Order history created successfully:', orderData.broker_order_id);
+
+      // Debug logging for failed/rejected orders
+      if (orderData.status === 'FAILED' || orderData.status === 'REJECTED') {
+        console.log('💾 Failed order saved with error details:', {
+          broker_order_id: orderData.broker_order_id,
+          status: orderData.status,
+          error_type: orderData.error_type,
+          error_code: orderData.error_code,
+          error_message: orderData.error_message,
+          retryable: orderData.retryable
+        });
+      }
+
       return this.orderHistoryDocToInterface(savedOrder);
     } catch (error) {
       console.error('🚨 Failed to create order history:', error);
