@@ -253,29 +253,41 @@ class NotificationService {
     let icon = '/icons/icon-192x192.png';
 
     switch (newStatus.toUpperCase()) {
+      case 'SUBMITTED':
+        title = `📤 Order Submitted`;
+        body = `${action} ${quantity} ${symbol} order has been submitted to exchange`;
+        icon = '/icons/info-icon.png';
+        break;
+
       case 'EXECUTED':
       case 'FILLED':
         title = `✅ Order Executed`;
         body = `${action} ${quantity} ${symbol} order has been executed successfully`;
         icon = '/icons/success-icon.png';
         break;
-      
+
       case 'REJECTED':
         title = `❌ Order Rejected`;
         body = `${action} ${quantity} ${symbol} order was rejected`;
         icon = '/icons/error-icon.png';
         break;
-      
+
       case 'CANCELLED':
         title = `🚫 Order Cancelled`;
         body = `${action} ${quantity} ${symbol} order has been cancelled`;
         icon = '/icons/warning-icon.png';
         break;
-      
+
       case 'PARTIALLY_FILLED':
         title = `🔄 Order Partially Filled`;
         body = `${action} ${quantity} ${symbol} order is partially executed`;
         icon = '/icons/partial-icon.png';
+        break;
+
+      case 'FAILED':
+        title = `⚠️ Order Failed`;
+        body = `${action} ${quantity} ${symbol} order failed due to technical error`;
+        icon = '/icons/error-icon.png';
         break;
       
       case 'PENDING':

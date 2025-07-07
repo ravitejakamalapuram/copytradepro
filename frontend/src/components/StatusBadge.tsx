@@ -8,6 +8,21 @@ interface StatusBadgeProps {
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => {
   const getStatusConfig = (status: string) => {
     switch (status.toUpperCase()) {
+      case 'SUBMITTED':
+        return {
+          variant: 'badge-warning',
+          icon: '📤',
+          label: 'Submitted'
+        };
+
+      case 'PENDING':
+      case 'OPEN':
+        return {
+          variant: 'badge-info',
+          icon: '⏳',
+          label: 'Pending'
+        };
+
       case 'EXECUTED':
       case 'COMPLETE':
       case 'FILLED':
@@ -16,24 +31,14 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => 
           icon: '✅',
           label: 'Executed'
         };
-      
+
       case 'REJECTED':
-      case 'FAILED':
         return {
           variant: 'badge-danger',
           icon: '❌',
           label: 'Rejected'
         };
-      
-      case 'PENDING':
-      case 'PLACED':
-      case 'OPEN':
-        return {
-          variant: 'badge-warning',
-          icon: '⏳',
-          label: 'Pending'
-        };
-      
+
       case 'CANCELLED':
       case 'CANCELED':
         return {
@@ -41,7 +46,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => 
           icon: '🚫',
           label: 'Cancelled'
         };
-      
+
       case 'PARTIALLY_FILLED':
       case 'PARTIAL':
         return {
@@ -49,7 +54,14 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => 
           icon: '🔄',
           label: 'Partial'
         };
-      
+
+      case 'FAILED':
+        return {
+          variant: 'badge-danger',
+          icon: '⚠️',
+          label: 'Failed'
+        };
+
       default:
         return {
           variant: 'badge-neutral',

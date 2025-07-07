@@ -64,12 +64,20 @@ export interface OrderHistory {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: string;
   created_at: string;
+  // New fields for failed order tracking
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  retryable?: boolean;
+  action_required?: string;
+  retry_count?: number;
+  raw_response?: string;
 }
 
 export interface CreateOrderHistoryData {
@@ -82,11 +90,19 @@ export interface CreateOrderHistoryData {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status?: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange?: string;
   product_type?: string;
   remarks?: string;
   executed_at: string;
+  // New fields for failed order tracking
+  error_type?: string;
+  error_code?: string;
+  error_message?: string;
+  retryable?: boolean;
+  action_required?: string;
+  retry_count?: number;
+  raw_response?: string;
 }
 
 export class SQLiteUserDatabase {
@@ -246,12 +262,19 @@ export class SQLiteUserDatabase {
         quantity INTEGER NOT NULL,
         price REAL,
         order_type TEXT NOT NULL CHECK (order_type IN ('MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET', 'BRACKET', 'COVER', 'ICEBERG', 'TRAILING_SL')),
-        status TEXT NOT NULL DEFAULT 'PLACED' CHECK (status IN ('PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED')),
+        status TEXT NOT NULL DEFAULT 'SUBMITTED' CHECK (status IN ('SUBMITTED', 'PENDING', 'EXECUTED', 'REJECTED', 'CANCELLED', 'PARTIALLY_FILLED', 'FAILED')),
         exchange TEXT NOT NULL DEFAULT 'NSE',
         product_type TEXT NOT NULL DEFAULT 'C',
         remarks TEXT,
         executed_at DATETIME NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        error_type TEXT,
+        error_code TEXT,
+        error_message TEXT,
+        retryable INTEGER DEFAULT 0,
+        action_required TEXT,
+        retry_count INTEGER DEFAULT 0,
+        raw_response TEXT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (account_id) REFERENCES connected_accounts(id) ON DELETE CASCADE
       )
@@ -834,8 +857,9 @@ export class SQLiteUserDatabase {
     const insertOrder = this.db.prepare(`
       INSERT INTO order_history (
         user_id, account_id, broker_name, broker_order_id, symbol, action,
-        quantity, price, order_type, status, exchange, product_type, remarks, executed_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        quantity, price, order_type, status, exchange, product_type, remarks, executed_at,
+        error_type, error_code, error_message, retryable, action_required, retry_count, raw_response
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -849,11 +873,18 @@ export class SQLiteUserDatabase {
         orderData.quantity,
         orderData.price,
         orderData.order_type,
-        orderData.status || 'EXECUTED',
+        orderData.status || 'SUBMITTED',
         orderData.exchange || 'NSE',
         orderData.product_type || 'C',
         orderData.remarks || '',
-        orderData.executed_at
+        orderData.executed_at,
+        orderData.error_type || null,
+        orderData.error_code || null,
+        orderData.error_message || null,
+        orderData.retryable ? 1 : 0,
+        orderData.action_required || null,
+        orderData.retry_count || 0,
+        orderData.raw_response || null
       );
 
       const orderId = result.lastInsertRowid as number;
@@ -976,7 +1007,7 @@ export class SQLiteUserDatabase {
   }
 
   // Update order status (for when we get actual execution updates)
-  updateOrderStatus(brokerOrderId: string, status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED', executedPrice?: number): boolean {
+  updateOrderStatus(brokerOrderId: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED', executedPrice?: number): boolean {
     const updateOrder = this.db.prepare(`
       UPDATE order_history
       SET status = ?, price = COALESCE(?, price)
@@ -996,6 +1027,11 @@ export class SQLiteUserDatabase {
       console.error('🚨 Failed to update order status:', error);
       throw error;
     }
+  }
+
+  // Update order status by broker order ID (alias for updateOrderStatus)
+  updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: 'SUBMITTED' | 'PENDING' | 'EXECUTED' | 'REJECTED' | 'CANCELLED' | 'PARTIALLY_FILLED' | 'FAILED'): boolean {
+    return this.updateOrderStatus(brokerOrderId, status);
   }
 
   // Get order by broker order ID

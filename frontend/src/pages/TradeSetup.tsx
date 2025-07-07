@@ -259,9 +259,9 @@ const TradeSetup: React.FC = () => {
         const totalCount = orderForm.selectedAccounts.length;
 
         if (failed.length === 0) {
-          alert(`🎉 All orders placed successfully! (${successCount}/${totalCount} accounts)`);
+          alert(`🎉 All orders submitted successfully! (${successCount}/${totalCount} accounts)\n\nOrders have been sent to the exchange and are awaiting execution. You can check their status on the Orders page.`);
         } else {
-          alert(`⚠️ Partial success: ${successCount}/${totalCount} orders placed successfully`);
+          alert(`⚠️ Partial success: ${successCount}/${totalCount} orders submitted successfully\n\nSubmitted orders are awaiting execution. Check the Orders page for status updates.`);
         }
 
         // Reset form
@@ -693,7 +693,7 @@ const TradeSetup: React.FC = () => {
                 }}
               >
                 {submitting
-                  ? `Placing Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
+                  ? `Submitting Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
                   : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
                 }
               </button>

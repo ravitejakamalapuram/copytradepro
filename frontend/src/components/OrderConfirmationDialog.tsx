@@ -190,8 +190,8 @@ const OrderConfirmationDialog: React.FC<OrderConfirmationDialogProps> = ({
           {/* Disclaimer */}
           <div className="disclaimer">
             <p>
-              <strong>Disclaimer:</strong> Trading involves risk. Please ensure you understand 
-              the risks involved and trade responsibly. Orders once placed cannot be undone.
+              <strong>Disclaimer:</strong> Trading involves risk. Please ensure you understand
+              the risks involved and trade responsibly. Orders once submitted cannot be undone.
             </p>
           </div>
         </div>
@@ -211,7 +211,7 @@ const OrderConfirmationDialog: React.FC<OrderConfirmationDialogProps> = ({
               disabled={isSubmitting}
               loading={isSubmitting}
             >
-              {isSubmitting ? 'Placing Order...' : 'Confirm & Place Order'}
+              {isSubmitting ? 'Submitting Order...' : 'Confirm & Submit Order'}
             </Button>
           </HStack>
         </div>

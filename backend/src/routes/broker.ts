@@ -11,6 +11,7 @@ import {
   deactivateAccount,
   disconnectBroker,
   placeOrder,
+  retryFailedOrder,
   getOrderHistory,
   getOrderStatus,
   checkOrderStatus,
@@ -73,8 +74,14 @@ const connectBrokerValidation = [
   body('credentials.redirectUri')
     .if(body('brokerName').equals('fyers'))
     .trim()
-    .isURL()
-    .withMessage('Valid Redirect URI is required for Fyers'),
+    .custom((value) => {
+      // Allow localhost URLs for development and standard URLs for production
+      const urlPattern = /^https?:\/\/(localhost|127\.0\.0\.1|[\w.-]+)(:\d+)?(\/.*)?$/;
+      if (!urlPattern.test(value)) {
+        throw new Error('Valid Redirect URI is required for Fyers (http/https URLs allowed)');
+      }
+      return true;
+    }),
 ];
 
 // Validation rules for placing orders
@@ -117,6 +124,7 @@ router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAcco
 
 router.post('/disconnect', authenticateToken, disconnectBroker);
 router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
+router.post('/retry-order/:orderId', authenticateToken, retryFailedOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
 router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
 router.post('/check-order-status', authenticateToken, checkOrderStatus);

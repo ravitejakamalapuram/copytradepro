@@ -131,12 +131,16 @@ export class FyersOrderHelper {
   // Product type mapping: Application format -> Fyers format
   private static readonly PRODUCT_TYPE_MAP = {
     'CNC': 'CNC',
+    'C': 'CNC',
     'DELIVERY': 'CNC',
     'INTRADAY': 'INTRADAY',
     'MIS': 'INTRADAY',
+    'M': 'INTRADAY',
     'MARGIN': 'MARGIN',
+    'H': 'MARGIN',
     'CO': 'CO',
-    'BO': 'BO'
+    'BO': 'BO',
+    'B': 'BO'
   };
 
   // Order side mapping: Application format -> Fyers format
