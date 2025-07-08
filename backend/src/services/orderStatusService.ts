@@ -237,14 +237,14 @@ class OrderStatusService extends EventEmitter {
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
             logger.debug(`Broker API response:`, brokerStatus);
 
-            if (brokerStatus && brokerStatus.stat === 'Ok') {
+            if (brokerStatus && (brokerStatus as any).stat === 'Ok') {
               const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
               if (mappedStatus !== order.status) {
                 newStatus = mappedStatus;
                 logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
               }
             } else {
-              logger.warn(`Failed to get order status from Shoonya API: ${brokerStatus?.emsg || 'Unknown error'}`);
+              logger.warn(`Failed to get order status from Shoonya API: ${(brokerStatus as any)?.emsg || 'Unknown error'}`);
             }
           } else {
             logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);

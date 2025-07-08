@@ -139,9 +139,9 @@ export class BrokerConnectionHelper {
   ): Promise<boolean> {
     try {
       if (brokerName === 'shoonya') {
-        return await (connection as ShoonyaService).validateSession(accountId);
+        return await (connection as any).validateSession(accountId);
       } else if (brokerName === 'fyers') {
-        return await (connection as FyersService).validateSession();
+        return await (connection as any).validateSession();
       }
       return false;
     } catch (error) {
