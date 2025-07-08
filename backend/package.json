@@ -11,7 +11,9 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@copytrade/unified-broker": "^1.0.2",
+    "@copytrade/broker-fyers": "^1.0.0",
+    "@copytrade/broker-shoonya": "^1.0.0",
+    "@copytrade/unified-broker": "^1.1.0",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.2.0",

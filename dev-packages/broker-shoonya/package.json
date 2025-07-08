@@ -35,9 +35,10 @@
     "otplib": "^12.0.1"
   },
   "peerDependencies": {
-    "@copytrade/unified-broker": "^1.0.2"
+    "@copytrade/unified-broker": "^1.1.0"
   },
   "devDependencies": {
+    "@copytrade/unified-broker": "^1.1.0",
     "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   },

@@ -8,9 +8,8 @@ import { createServer } from 'http';
 import path from 'path';
 
 // Import broker plugins to register them
-// TODO: Fix dev packages and re-enable these imports
-// import '@copytrade/broker-shoonya';
-// import '@copytrade/broker-fyers';
+import '@copytrade/broker-shoonya';
+import '@copytrade/broker-fyers';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
