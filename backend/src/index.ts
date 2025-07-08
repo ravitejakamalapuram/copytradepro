@@ -171,6 +171,14 @@ if (io) {
 // Initialize database and start services
 async function startServer() {
   try {
+    // Check if port is already in use
+    const isPortInUse = await checkPortInUse(PORT as number);
+    if (isPortInUse) {
+      console.log(`⚠️ Port ${PORT} is already in use. Attempting to kill existing processes...`);
+      await killExistingProcesses();
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+    }
+
     // Initialize database
     console.log('🔧 Initializing database...');
     const database = await getDatabase();
@@ -184,7 +192,7 @@ async function startServer() {
       console.error('Failed to start order status monitoring:', error);
     });
 
-    // Start server
+    // Start server with error handling
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
@@ -195,10 +203,42 @@ async function startServer() {
       console.log(`📈 NSE & BSE CSV Databases initialized with daily auto-updates`);
       console.log(`⚡ Real-time price streaming active`);
     });
+
+    // Handle server errors
+    server.on('error', (error: any) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`🚨 Port ${PORT} is already in use. Please stop other instances or use a different port.`);
+        process.exit(1);
+      } else {
+        console.error('🚨 Server error:', error);
+        process.exit(1);
+      }
+    });
+
   } catch (error) {
     console.error('🚨 Failed to start server:', error);
     process.exit(1);
   }
+}
+
+// Helper function to check if port is in use
+async function checkPortInUse(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    exec(`lsof -ti:${port}`, (error: any, stdout: string) => {
+      resolve(!!stdout.trim());
+    });
+  });
+}
+
+// Helper function to kill existing processes
+async function killExistingProcesses(): Promise<void> {
+  return new Promise((resolve) => {
+    const { exec } = require('child_process');
+    exec(`pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true`, () => {
+      resolve();
+    });
+  });
 }
 
 // Start the server
