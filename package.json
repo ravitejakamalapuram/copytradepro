@@ -4,26 +4,14 @@
   "description": "Professional trading application with multi-broker support",
   "private": true,
   "scripts": {
-    "build": "./build.sh",
     "start": "cd backend && npm start",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev": "npm run check:deps && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:force": "npm run install:deps && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "install:backend": "cd backend && npm install",
-    "install:frontend": "cd frontend && npm install",
-    "install:all": "npm run install:backend && npm run install:frontend",
-    "install:deps": "bash install-deps.sh || npm run install:all",
-    "check:deps": "bash check-deps.sh || npm run install:all",
-    "setup": "bash setup.sh || npm run install:all",
-
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
-    "clean": "rm -rf backend/dist frontend/dist backend/public packages/*/dist",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build:packages": "npm run build --workspace=packages/unified-broker",
-    "publish:unified-broker": "cd packages/unified-broker && npm publish",
-    "test:packages": "npm run test --workspace=packages/unified-broker"
+    "build": "npm run build:backend && npm run build:frontend && mkdir -p backend/public && cp -r frontend/dist/* backend/public/",
+    "clean": "rm -rf backend/dist frontend/dist backend/public"
   },
   "keywords": [
     "trading",
@@ -41,14 +29,5 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "workspaces": [
-    "packages/*",
-    "backend",
-    "frontend"
-  ],
-  "dependencies": {
-    "@types/node-cron": "^3.0.11",
-    "node-cron": "^4.1.1"
   }
 }

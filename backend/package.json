@@ -3,48 +3,17 @@
   "version": "1.0.0",
   "description": "CopyTrade Pro backend application",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "private": true,
   "scripts": {
     "build": "tsc",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build",
-    "dev": "tsc -p tsconfig.publish.json --watch",
-    "test": "jest --testPathPatterns=integration"
+    "dev": "nodemon",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist"
   },
-  "keywords": [
-    "broker",
-    "trading",
-    "stock-market",
-    "india",
-    "unified-api",
-    "plugin-architecture",
-    "shoonya",
-    "fyers",
-    "fintech",
-    "api",
-    "typescript",
-    "nse",
-    "bse"
-  ],
-  "author": "CopyTrade Team <contact@copytrade.com>",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/ravitejakamalapuram/copytradepro.git"
-  },
-  "homepage": "https://github.com/ravitejakamalapuram/copytradepro#readme",
-  "bugs": {
-    "url": "https://github.com/ravitejakamalapuram/copytradepro/issues"
-  },
-  "files": [
-    "dist",
-    "README-PUBLISH.md",
-    "LICENSE"
-  ],
   "dependencies": {
-    "@copytrade/broker-fyers": "file:../packages/broker-fyers",
-    "@copytrade/broker-shoonya": "file:../packages/broker-shoonya",
-    "@copytrade/unified-broker": "file:../packages/unified-broker",
+    "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",
+    "@copytrade/broker-shoonya": "file:../dev-packages/broker-shoonya",
+    "@copytrade/unified-broker": "^1.0.2",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.2.0",
@@ -67,26 +36,18 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
-    "@jest/globals": "^29.0.0",
-    "@types/bcryptjs": "^3.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/express-rate-limit": "^6.0.2",
-    "@types/express-validator": "^3.0.2",
-    "@types/helmet": "^4.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^20.0.0",
     "@types/uuid": "^10.0.0",
     "@types/web-push": "^3.6.4",
-    "jest": "^29.0.0",
+    "nodemon": "^3.0.0",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }
