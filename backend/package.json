@@ -6,10 +6,9 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "dev": "npm run kill-ports && nodemon",
+    "dev": "nodemon",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist",
-    "kill-ports": "pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true"
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@copytrade/broker-fyers": "^1.0.0",

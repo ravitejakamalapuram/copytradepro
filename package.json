@@ -4,13 +4,10 @@
   "description": "Professional trading application with multi-broker support",
   "private": true,
   "scripts": {
+    "install": "cd backend && npm install && cd ../frontend && npm install",
     "start": "cd backend && npm start",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build:frontend": "cd frontend && npm run build",
-    "build:backend": "cd backend && npm run build",
-    "build": "npm run build:backend && npm run build:frontend && mkdir -p backend/public && cp -r frontend/dist/* backend/public/",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build && mkdir -p backend/public && cp -r frontend/dist/* backend/public/",
     "clean": "rm -rf backend/dist frontend/dist backend/public"
   },
   "keywords": [
