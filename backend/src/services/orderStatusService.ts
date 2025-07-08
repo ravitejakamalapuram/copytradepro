@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
-import { ShoonyaService } from './shoonyaService';
+import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
 // Import broker connections from controller
@@ -8,12 +8,12 @@ import { userBrokerConnections } from '../controllers/brokerController';
 
 // Broker connection manager interface
 interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
 }
 
 // Create broker connection manager implementation
 const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
     const userConnections = userBrokerConnections.get(userId);
     if (!userConnections) {
       console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
@@ -29,10 +29,10 @@ const brokerConnectionManager: BrokerConnectionManager = {
     }
 
     if (brokerName === 'shoonya') {
-      const shoonyaService = brokerService as ShoonyaService;
-      if (shoonyaService.isLoggedIn()) {
+      const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+      if (brokerServiceTyped.isLoggedIn && brokerServiceTyped.isLoggedIn()) {
         console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
-        return shoonyaService;
+        return brokerServiceTyped;
       } else {
         console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
         return null;
@@ -326,8 +326,8 @@ class OrderStatusService extends EventEmitter {
       if (brokerService && brokerService.isLoggedIn()) {
         // For Shoonya, the broker account ID is the user ID
         if (order.broker_name === 'shoonya') {
-          const shoonyaService = brokerService as ShoonyaService;
-          const userId = shoonyaService.getUserId();
+          const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+          const userId = brokerServiceTyped.getUserId && brokerServiceTyped.getUserId();
           if (userId) {
             logger.debug(`Found broker account ID from active connection: ${userId}`);
             return userId; // This is the broker account ID (e.g., "FN135006")

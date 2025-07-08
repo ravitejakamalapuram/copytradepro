@@ -6,8 +6,7 @@ import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
 import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
-import { brokerManager } from '../services/BrokerManager';
-import { IBrokerService } from '@copytrade/unified-broker';
+import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 
 // Store broker connections per user (in production, use Redis or database)
 // Legacy connection map - will be phased out in favor of brokerManager
@@ -17,14 +16,8 @@ export const userBrokerConnections = new Map<string, Map<string, any>>();
  * Helper function to get broker service using the new broker manager
  * Falls back to legacy connection map for backward compatibility
  */
-function getBrokerService(userId: string, brokerName: string, accountId?: string): IBrokerService | any | null {
-  // Try new broker manager first
-  const connection = brokerManager.getConnection(userId, brokerName, accountId);
-  if (connection) {
-    return connection.service;
-  }
-
-  // Fall back to legacy connection map
+function getBrokerService(userId: string, brokerName: string, accountId?: string): any | null {
+  // Fall back to legacy connection map for now
   const userConnections = userBrokerConnections.get(userId);
   if (userConnections) {
     const connectionKey = accountId ? `${brokerName}_${accountId}` : `${brokerName}`;

@@ -1,10 +1,9 @@
 import { Response } from 'express';
-import { ShoonyaService } from '../services/shoonyaService';
-import { FyersService } from '../services/fyersService';
+import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 import { userBrokerConnections } from '../controllers/brokerController';
 
 // Type definitions
-export type BrokerService = ShoonyaService | FyersService;
+export type BrokerService = IBrokerService;
 
 export interface BrokerConnectionResult {
   success: boolean;
