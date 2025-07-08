@@ -1,0 +1,61 @@
+{
+  "name": "@copytrade/unified-broker",
+  "version": "1.1.0",
+  "description": "Unified broker interface library for Indian stock market brokers with plugin architecture",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "dev": "tsc -p tsconfig.publish.json --watch",
+    "test": "jest --testPathPatterns=integration"
+  },
+  "keywords": [
+    "broker",
+    "trading",
+    "stock-market",
+    "india",
+    "unified-api",
+    "plugin-architecture",
+    "shoonya",
+    "fyers",
+    "fintech",
+    "api",
+    "typescript",
+    "nse",
+    "bse"
+  ],
+  "author": "CopyTrade Team <contact@copytrade.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravitejakamalapuram/copytradepro.git"
+  },
+  "homepage": "https://github.com/ravitejakamalapuram/copytradepro#readme",
+  "bugs": {
+    "url": "https://github.com/ravitejakamalapuram/copytradepro/issues"
+  },
+  "files": [
+    "dist",
+    "README-PUBLISH.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "axios": "^1.6.0",
+    "otplib": "^12.0.1",
+    "fyers-api-v3": "^1.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "@jest/globals": "^29.0.0",
+    "jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

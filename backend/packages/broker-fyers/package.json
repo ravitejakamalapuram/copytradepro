@@ -1,0 +1,47 @@
+{
+  "name": "@copytrade/broker-fyers",
+  "version": "1.0.0",
+  "description": "Fyers broker adapter for the unified broker library",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "jest"
+  },
+  "keywords": [
+    "fyers",
+    "broker",
+    "trading",
+    "stock-market",
+    "india"
+  ],
+  "author": "CopyTrade Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravitejakamalapuram/copytradepro.git",
+    "directory": "packages/broker-fyers"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "dependencies": {
+    "axios": "^1.6.0",
+    "fyers-api-v3": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@copytrade/broker-core": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

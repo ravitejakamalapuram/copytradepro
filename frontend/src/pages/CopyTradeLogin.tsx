@@ -128,7 +128,11 @@ const CopyTradeLogin: React.FC = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      isRegisterMode ? performRegister() : performLogin();
+      if (isRegisterMode) {
+        performRegister();
+      } else {
+        performLogin();
+      }
     }
   };
 

@@ -1,5 +1,37 @@
 import api from './api';
 
+// Define interfaces for better type safety
+interface Order {
+  id: string;
+  symbol: string;
+  action: 'BUY' | 'SELL';
+  quantity: number;
+  orderType: string;
+  price?: number;
+  status: string;
+  exchange: string;
+  brokerName: string;
+  createdAt: string;
+}
+
+interface Position {
+  symbol: string;
+  exchange: string;
+  quantity: number;
+  averagePrice: number;
+  currentPrice: number;
+  pnl: number;
+  pnlPercent: number;
+}
+
+interface Quote {
+  symbol: string;
+  exchange: string;
+  ltp: number;
+  change: number;
+  changePercent: number;
+}
+
 export interface ShoonyaCredentials {
   userId: string;
   password: string;
@@ -90,11 +122,14 @@ export const brokerService = {
       return response.data;
     } catch (error: any) {
       console.error('🚨 Connect broker error:', error);
-      
-      if (error.response?.data) {
-        return error.response.data;
+
+      if (error && typeof error === 'object' && 'response' in error) {
+        const axiosError = error as { response?: { data?: BrokerConnectionResponse } };
+        if (axiosError.response?.data) {
+          return axiosError.response.data;
+        }
       }
-      
+
       return {
         success: false,
         message: 'Network error. Please check your connection and try again.',
@@ -140,7 +175,7 @@ export const brokerService = {
     }
   },
 
-  async getOrderBook(brokerName: string): Promise<any> {
+  async getOrderBook(brokerName: string): Promise<{ success: boolean; data?: Order[]; message?: string }> {
     try {
       const response = await api.get(`/broker/orders/${brokerName}`);
       return response.data;
@@ -178,7 +213,7 @@ export const brokerService = {
     }
   },
 
-  async getPositions(brokerName: string): Promise<any> {
+  async getPositions(brokerName: string): Promise<{ success: boolean; data?: Position[]; message?: string }> {
     try {
       const response = await api.get(`/broker/positions/${brokerName}`);
       return response.data;
@@ -198,7 +233,7 @@ export const brokerService = {
 
 
 
-  async getQuotes(brokerName: string, exchange: string, token: string): Promise<any> {
+  async getQuotes(brokerName: string, exchange: string, token: string): Promise<{ success: boolean; data?: Quote; message?: string }> {
     try {
       const response = await api.get(`/broker/quotes/${brokerName}/${exchange}/${token}`);
       return response.data;

@@ -613,42 +613,7 @@ const TradeSetup: React.FC = () => {
                           <Checkbox
                             checked={orderForm.selectedAccounts.includes(account.id)}
                             onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            label={
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{
-                                    fontWeight: '600',
-                                    fontSize: '0.875rem',
-                                    color: 'var(--kite-text-primary)'
-                                  }}>
-                                    {account.brokerName.toUpperCase()}
-                                  </span>
-                                  <span style={{
-                                    fontSize: '0.75rem',
-                                    padding: '0.125rem 0.375rem',
-                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
-                                    color: 'white',
-                                    borderRadius: '0.25rem',
-                                    fontWeight: '500'
-                                  }}>
-                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontSize: '0.875rem',
-                                  fontWeight: '500',
-                                  color: 'var(--kite-text-primary)'
-                                }}>
-                                  Account: {account.userId}
-                                </span>
-                                <span style={{
-                                  fontSize: '0.75rem',
-                                  color: 'var(--kite-text-secondary)'
-                                }}>
-                                  {account.userName} • {account.email}
-                                </span>
-                              </div>
-                            }
+                            label={`${account.brokerName} (${account.isActive ? 'Active' : 'Inactive'})`}
                             size="base"
                           />
                         </div>

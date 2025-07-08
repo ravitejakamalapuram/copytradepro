@@ -31,8 +31,6 @@ const OrderConfirmationDialog: React.FC<OrderConfirmationDialogProps> = ({
   orderDetails,
   isSubmitting = false,
 }) => {
-  if (!isOpen) return null;
-
   const {
     symbol,
     action,
@@ -70,6 +68,8 @@ const OrderConfirmationDialog: React.FC<OrderConfirmationDialogProps> = ({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, isSubmitting, onClose]);
+
+  if (!isOpen) return null;
 
   // Risk warnings based on order type and action
   const getRiskWarnings = () => {

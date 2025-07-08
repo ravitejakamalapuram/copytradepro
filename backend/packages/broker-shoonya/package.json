@@ -1,0 +1,54 @@
+{
+  "name": "@copytrade/broker-shoonya",
+  "version": "1.0.0",
+  "description": "Shoonya (Finvasia) broker adapter for the unified broker library",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "shoonya",
+    "finvasia",
+    "broker",
+    "trading",
+    "stock-market",
+    "india",
+    "nse",
+    "bse",
+    "api"
+  ],
+  "author": "CopyTrade Team <contact@copytrade.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ravitejakamalapuram/copytradepro.git",
+    "directory": "packages/broker-shoonya"
+  },
+  "homepage": "https://github.com/ravitejakamalapuram/copytradepro#readme",
+  "bugs": {
+    "url": "https://github.com/ravitejakamalapuram/copytradepro/issues"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "axios": "^1.6.0",
+    "otplib": "^12.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

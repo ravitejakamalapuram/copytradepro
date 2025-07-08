@@ -2,7 +2,7 @@ import express from 'express';
 import { body } from 'express-validator';
 import {
   connectBroker,
-  validateFyersAuthCode,
+  validateBrokerAuthCode,
   getConnectedAccounts,
   checkAccountSessionStatus,
   saveConnectedAccount,
@@ -24,11 +24,14 @@ import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
+// Import unified broker system to get supported brokers dynamically
+import { getSupportedBrokers } from '@copytrade/unified-broker';
+
 // Validation rules for broker connection
 const connectBrokerValidation = [
   body('brokerName')
-    .isIn(['shoonya', 'fyers'])
-    .withMessage('Supported brokers: shoonya, fyers'),
+    .isIn(getSupportedBrokers())
+    .withMessage(`Supported brokers: ${getSupportedBrokers().join(', ')}`),
 
   // Conditional validation for Shoonya
   body('credentials.userId')
@@ -79,9 +82,9 @@ const connectBrokerValidation = [
 
 // Validation rules for placing orders
 const placeOrderValidation = [
-  body('brokerName')
-    .isIn(['shoonya', 'fyers'])
-    .withMessage('Supported brokers: shoonya, fyers'),
+  body('accountId')
+    .isMongoId()
+    .withMessage('Valid account ID is required'),
   body('symbol')
     .trim()
     .isLength({ min: 1 })
@@ -105,7 +108,7 @@ const placeOrderValidation = [
 
 // Routes
 router.post('/connect', authenticateToken, connectBrokerValidation, connectBroker);
-router.post('/validate-fyers-auth', authenticateToken, validateFyersAuthCode);
+router.post('/validate-auth', authenticateToken, validateBrokerAuthCode);
 
 // Account management routes
 router.get('/accounts', authenticateToken, getConnectedAccounts);

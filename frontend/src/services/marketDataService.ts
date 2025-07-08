@@ -26,7 +26,7 @@ export interface SymbolSearchResult {
   change?: number;
   changePercent?: number;
   token?: string;
-  brokerData?: any;
+  brokerData?: Record<string, unknown>;
 }
 
 class MarketDataService {
