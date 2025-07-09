@@ -358,13 +358,15 @@ export class UnifiedBrokerManager {
 
         // Check if this is an OAuth flow
         if (result.authUrl) {
+          console.log(`🔄 OAuth flow required for ${account.broker_name} account ${accountId}`);
           return {
             success: false,
             message: result.message || 'OAuth authentication required',
             authStep: AuthenticationStep.OAUTH_REQUIRED,
             authUrl: result.authUrl,
             accountId: account.account_id,
-            brokerName: account.broker_name
+            brokerName: account.broker_name,
+            userName: account.user_name
           };
         }
 
@@ -372,7 +374,9 @@ export class UnifiedBrokerManager {
           success: false,
           message: result.message || 'Failed to activate account',
           authStep: AuthenticationStep.REAUTH_REQUIRED,
-          error: 'ACTIVATION_FAILED'
+          error: 'ACTIVATION_FAILED',
+          accountId: account.account_id,
+          brokerName: account.broker_name
         };
       }
     } catch (error: any) {
