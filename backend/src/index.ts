@@ -8,11 +8,11 @@ import { createServer } from 'http';
 import path from 'path';
 
 // Import unified broker system
-import { initializeUnifiedBroker } from '@copytrade/unified-broker';
+import { initializeUnifiedBroker, getBrokerSystemStatus } from '@copytrade/unified-broker';
 
-// Import broker plugins for manual registration
-import shoonyaBroker from '@copytrade/broker-shoonya';
-import fyersBroker from '@copytrade/broker-fyers';
+// Import broker plugins for explicit initialization
+import { initializeShoonyaBroker } from '@copytrade/broker-shoonya';
+import { initializeFyersBroker } from '@copytrade/broker-fyers';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
@@ -211,16 +211,28 @@ async function startServer() {
     const database = await getDatabase();
     console.log(`✅ Database initialized: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
 
-    // Initialize unified broker system
+    // Initialize unified broker system with explicit control
     console.log('🔧 Initializing unified broker system...');
     initializeUnifiedBroker();
 
-    // Manually register broker plugins
-    console.log('🔧 Registering broker plugins...');
-    shoonyaBroker.register();
-    fyersBroker.register();
+    // Initialize broker plugins explicitly
+    console.log('🔧 Initializing broker plugins...');
 
-    console.log('✅ Unified broker system initialized');
+    try {
+      initializeShoonyaBroker();
+    } catch (error) {
+      console.error('❌ Failed to initialize Shoonya broker:', error);
+    }
+
+    try {
+      initializeFyersBroker();
+    } catch (error) {
+      console.error('❌ Failed to initialize Fyers broker:', error);
+    }
+
+    // Final status check
+    const status = getBrokerSystemStatus();
+    console.log(`✅ Unified broker system ready with ${status.totalBrokers} broker(s):`, status.availableBrokers);
 
     // Initialize broker account cache
     await initializeBrokerAccountCache();
