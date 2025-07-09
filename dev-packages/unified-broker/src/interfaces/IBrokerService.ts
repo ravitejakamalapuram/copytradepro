@@ -2,6 +2,9 @@
  * Generic Broker Service Interface
  * This interface defines the contract that all broker services must implement
  * to eliminate hardcoded broker-specific checks throughout the codebase
+ *
+ * NOTE: This interface is being deprecated in favor of IUnifiedBrokerService
+ * which provides standardized responses and better business logic encapsulation
  */
 
 export interface BrokerCredentials {

@@ -9,7 +9,8 @@ import {
   CreateConnectedAccountData,
   OrderHistory,
   CreateOrderHistoryData,
-  OrderFilters
+  OrderFilters,
+  AccountStatus
 } from '../interfaces/IDatabaseAdapter';
 
 // MongoDB Document Interfaces
@@ -31,6 +32,8 @@ interface ConnectedAccountDocument extends Document {
   exchanges: string;
   products: string;
   encrypted_credentials: string;
+  account_status: string; // 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH'
+  token_expiry_time: Date | null; // Date or null for infinity (Shoonya)
   created_at: Date;
   updated_at: Date;
 }
@@ -72,6 +75,8 @@ const ConnectedAccountSchema = new Schema<ConnectedAccountDocument>({
   exchanges: { type: String, required: true }, // JSON string
   products: { type: String, required: true }, // JSON string
   encrypted_credentials: { type: String, required: true },
+  account_status: { type: String, required: true, enum: ['ACTIVE', 'INACTIVE', 'PROCEED_TO_OAUTH'], default: 'INACTIVE' },
+  token_expiry_time: { type: Date, default: null }, // null for infinity (Shoonya)
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -172,6 +177,19 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
+  async healthCheck(): Promise<boolean> {
+    try {
+      if (!this.isInitialized) {
+        return false;
+      }
+      // Check if mongoose connection is ready
+      return mongoose.connection.readyState === 1;
+    } catch (error) {
+      console.error('🚨 MongoDB health check failed:', error);
+      return false;
+    }
+  }
+
   isConnected(): boolean {
     return this.isInitialized && mongoose.connection.readyState === 1;
   }
@@ -236,6 +254,8 @@ export class MongoDatabase implements IDatabaseAdapter {
       exchanges: doc.exchanges,
       products: doc.products,
       encrypted_credentials: doc.encrypted_credentials,
+      account_status: doc.account_status as AccountStatus,
+      token_expiry_time: doc.token_expiry_time ? doc.token_expiry_time.toISOString() : null,
       created_at: doc.created_at.toISOString(),
       updated_at: doc.updated_at.toISOString()
     };
@@ -301,6 +321,11 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
+  // Alias for backward compatibility
+  async getUserById(id: number | string): Promise<User | null> {
+    return this.findUserById(id.toString());
+  }
+
   async findUserByEmail(email: string): Promise<User | null> {
     try {
       const user = await this.UserModel.findOne({ email });
@@ -309,6 +334,11 @@ export class MongoDatabase implements IDatabaseAdapter {
       console.error('🚨 Failed to find user by email:', error);
       return null;
     }
+  }
+
+  // Alias for backward compatibility
+  async getUserByEmail(email: string): Promise<User | null> {
+    return this.findUserByEmail(email);
   }
 
   async updateUser(id: string, userData: UpdateUserData): Promise<User | null> {
@@ -374,7 +404,9 @@ export class MongoDatabase implements IDatabaseAdapter {
         broker_display_name: accountData.broker_display_name,
         exchanges: JSON.stringify(accountData.exchanges),
         products: JSON.stringify(accountData.products),
-        encrypted_credentials: encryptedCredentials
+        encrypted_credentials: encryptedCredentials,
+        account_status: accountData.account_status,
+        token_expiry_time: accountData.token_expiry_time ? new Date(accountData.token_expiry_time) : null
       });
 
       const savedAccount = await accountDoc.save();
@@ -449,6 +481,22 @@ export class MongoDatabase implements IDatabaseAdapter {
     } catch (error) {
       console.error('🚨 Failed to delete connected account:', error);
       return false;
+    }
+  }
+
+  async getAccountCredentials(id: string): Promise<any> {
+    try {
+      const account = await this.ConnectedAccountModel.findById(id);
+      if (!account) {
+        return null;
+      }
+
+      // Decrypt and return credentials
+      const decryptedCredentials = this.decrypt(account.encrypted_credentials);
+      return JSON.parse(decryptedCredentials);
+    } catch (error) {
+      console.error('🚨 Failed to get account credentials:', error);
+      return null;
     }
   }
 

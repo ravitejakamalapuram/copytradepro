@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import { AccountStatus } from '../interfaces/IDatabaseAdapter';
 
 export interface User {
   id: number;
@@ -35,9 +36,10 @@ export interface ConnectedAccount {
   exchanges: string; // JSON string
   products: string; // JSON string
   encrypted_credentials: string; // Encrypted JSON
+  account_status: AccountStatus; // 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH'
+  token_expiry_time: string | null; // ISO string or null for infinity (Shoonya)
   created_at: string;
   updated_at: string;
-  // Note: is_active removed - always validate in real-time
 }
 
 export interface CreateConnectedAccountData {
@@ -50,7 +52,8 @@ export interface CreateConnectedAccountData {
   exchanges: string[];
   products: any[];
   credentials: any; // Will be encrypted before storage
-  // Note: is_active removed - always validate in real-time
+  account_status: string; // 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH'
+  token_expiry_time?: string | null; // ISO string or null for infinity (Shoonya)
 }
 
 export interface OrderHistory {
@@ -206,6 +209,8 @@ export class SQLiteUserDatabase {
         exchanges TEXT NOT NULL, -- JSON array as string
         products TEXT NOT NULL, -- JSON array as string
         encrypted_credentials TEXT NOT NULL, -- Encrypted credentials JSON
+        account_status TEXT NOT NULL DEFAULT 'INACTIVE' CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'PROCEED_TO_OAUTH')),
+        token_expiry_time DATETIME DEFAULT NULL, -- NULL for infinity (Shoonya)
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
@@ -686,8 +691,9 @@ export class SQLiteUserDatabase {
     const insertAccount = this.db.prepare(`
       INSERT OR REPLACE INTO connected_accounts (
         user_id, broker_name, account_id, user_name, email,
-        broker_display_name, exchanges, products, encrypted_credentials
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        broker_display_name, exchanges, products, encrypted_credentials,
+        account_status, token_expiry_time
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     try {
@@ -703,7 +709,9 @@ export class SQLiteUserDatabase {
         accountData.broker_display_name,
         JSON.stringify(accountData.exchanges),
         JSON.stringify(accountData.products),
-        encryptedCredentials
+        encryptedCredentials,
+        accountData.account_status,
+        accountData.token_expiry_time
       );
 
       const accountId = result.lastInsertRowid as number;
@@ -811,6 +819,8 @@ export class SQLiteUserDatabase {
       throw error;
     }
   }
+
+
 
   // Get connected account by user and broker
   getConnectedAccountByUserAndBroker(userId: number, brokerName: string): ConnectedAccount | null {
@@ -1358,6 +1368,17 @@ export class SQLiteUserDatabase {
     } catch (error) {
       console.error('🚨 Failed to get notification preferences:', error);
       return null;
+    }
+  }
+
+  healthCheck(): boolean {
+    try {
+      // Simple check to see if database is accessible
+      const result = this.db.prepare('SELECT 1').get();
+      return result !== undefined;
+    } catch (error) {
+      console.error('🚨 SQLite health check failed:', error);
+      return false;
     }
   }
 }

@@ -6,6 +6,12 @@
 // Core interfaces and types
 export * from './interfaces/IBrokerService';
 
+// New unified interfaces for standardized broker responses
+export * from './interfaces/UnifiedBrokerResponse';
+
+// Unified broker factory
+export * from './factories/UnifiedBrokerFactory';
+
 // Registry system for plugin management
 import { BrokerRegistry, BrokerPlugin } from './registry/BrokerRegistry';
 export { BrokerRegistry, BrokerPlugin };

@@ -5,53 +5,24 @@ import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
 import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
-import { IBrokerService } from '@copytrade/unified-broker';
-import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
+
+import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
+
 import {
   ActivateAccountResponse,
   AuthenticationStep,
   ApiErrorCode,
-  createActivationResponse,
-  createErrorResponse,
-  createSuccessResponse
+  createActivationResponse
 } from '@copytrade/shared-types';
 
-// All broker connections now managed by UnifiedBrokerManager
+// All broker connections now managed by Enhanced Unified Broker Manager
 
 /**
- * Helper function to get broker service using the unified broker manager
- */
-function getBrokerService(userId: string, brokerName: string, accountId?: string): IBrokerService | null {
-  if (!accountId) {
-    // If no specific account ID, try to find any connection for this broker
-    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
-    if (connections.length > 0) {
-      return connections[0]?.service || null;
-    }
-    return null;
-  }
-
-  return unifiedBrokerManager.getBrokerService(userId, brokerName, accountId);
-}
-
-/**
- * Helper function to validate session using unified broker manager
- */
-async function validateBrokerSession(userId: string, brokerName: string, accountId: string): Promise<boolean> {
-  try {
-    return await unifiedBrokerManager.validateConnection(userId, brokerName, accountId);
-  } catch (error) {
-    console.error(`🚨 Session validation error for ${brokerName}:`, error);
-    return false;
-  }
-}
-
-/**
- * Helper function to logout from broker using unified broker manager
+ * Helper function to logout from broker using enhanced unified broker manager
  */
 async function logoutFromBroker(userId: string, brokerName: string, accountId: string): Promise<void> {
   try {
-    await unifiedBrokerManager.disconnect(userId, brokerName, accountId);
+    await enhancedUnifiedBrokerManager.disconnect(userId, brokerName, accountId);
   } catch (error) {
     console.error(`🚨 Logout failed for ${brokerName}:`, error);
     throw error;
@@ -68,7 +39,7 @@ async function placeBrokerOrder(
   orderRequest: any
 ): Promise<any> {
   try {
-    const brokerService = unifiedBrokerManager.getBrokerService(userId, brokerName, accountId);
+    const brokerService = enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, accountId);
 
     if (!brokerService) {
       throw new Error(`No active connection found for ${brokerName} account ${accountId}`);
@@ -96,23 +67,32 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
       return false;
     }
 
-    // Check if connection exists using unified broker manager
-    const existingConnection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+    // Check if connection exists using enhanced unified broker manager
+    const existingConnection = enhancedUnifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
 
     if (existingConnection) {
       // Test if existing connection is still valid
       try {
-        const isValid = await unifiedBrokerManager.validateConnection(userId, account.broker_name, account.account_id);
-        if (isValid) {
+        // Get credentials for validation
+        const credentials = await userDatabase.getAccountCredentials(account.id);
+
+        const validationResult = await enhancedUnifiedBrokerManager.validateSession(
+          userId,
+          account.broker_name,
+          account.account_id,
+          credentials
+        );
+
+        if (validationResult.isValid) {
           console.log(`✅ Account ${accountId} session is already valid`);
           return true;
         } else {
           console.log(`⚠️ Account ${accountId} session is invalid, removing connection`);
-          await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
+          await enhancedUnifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
         }
       } catch (error: any) {
         console.log(`⚠️ Session validation failed for ${accountId}:`, error.message);
-        await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
+        await enhancedUnifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
       }
     }
 
@@ -228,8 +208,8 @@ export const getAvailableBrokers = async (
       return;
     }
 
-    // Get available brokers from unified broker manager
-    const availableBrokers = unifiedBrokerManager.getAvailableBrokers();
+    // Get available brokers from enhanced unified broker manager
+    const availableBrokers = enhancedUnifiedBrokerManager.getAvailableBrokers();
 
     console.log(`📋 Available brokers for user ${userId}:`, availableBrokers);
 
@@ -298,48 +278,106 @@ export const completeOAuthAuth = async (
       return;
     }
 
-    // Complete OAuth authentication using unified broker manager
-    const result = await unifiedBrokerManager.completeOAuthAuth(
-      userId,
-      account.broker_name,
-      authCode,
-      credentials // Use decrypted credentials from database
-    );
-
-    if (result.success) {
-      console.log(`✅ OAuth completed successfully for ${account.broker_name}`);
-
-      // Update database account with actual broker account ID if available
-      if (result.accountId && result.accountId !== account.account_id) {
-        await userDatabase.updateConnectedAccount(accountId, {
-          account_id: result.accountId, // Update account_id to match broker
-          user_name: result.accountId, // Update user_name to match broker
-          updated_at: new Date()
-        });
-        console.log(`✅ Database account ${accountId} updated with broker account ID: ${result.accountId}`);
-      }
-
-      // Add to broker account cache for fast lookups
-      addToBrokerAccountCache(
-        result.accountId || account.account_id, // Use actual broker account ID
+    // Complete OAuth authentication using enhanced unified broker manager
+    try {
+      const result = await enhancedUnifiedBrokerManager.completeOAuthAuth(
         userId,
         account.broker_name,
-        result.accountId || account.user_name
+        authCode,
+        credentials // Use decrypted credentials from database
       );
 
-      res.status(200).json({
-        success: true,
-        message: 'OAuth authentication completed successfully',
-        data: {
-          accountId: result.accountId,
-          brokerName: account.broker_name
+      if (result.success && result.accountInfo) {
+        console.log(`✅ OAuth completed successfully for ${account.broker_name}`);
+
+        // Update database account with complete information from standardized response
+        try {
+          // Update credentials with auth code for future use
+          const updatedCredentials = {
+            ...credentials,
+            authCode: authCode
+          };
+
+          // Update database account with complete information
+          await userDatabase.updateConnectedAccount(accountId, {
+            account_id: result.accountInfo.accountId,
+            user_name: result.accountInfo.userName,
+            email: result.accountInfo.email || account.email,
+            broker_display_name: result.accountInfo.brokerDisplayName,
+            exchanges: result.accountInfo.exchanges,
+            products: result.accountInfo.products,
+            credentials: updatedCredentials,
+            account_status: result.accountStatus,
+            token_expiry_time: result.tokenInfo?.expiryTime || null
+          });
+
+          console.log(`✅ Database account ${accountId} updated with OAuth completion`);
+        } catch (updateError: any) {
+          console.error('⚠️ Failed to update account after OAuth completion:', updateError.message);
+
+          // Update with minimal information if update fails
+          await userDatabase.updateConnectedAccount(accountId, {
+            account_id: result.accountInfo.accountId,
+            user_name: result.accountInfo.userName,
+            account_status: result.accountStatus,
+            token_expiry_time: result.tokenInfo?.expiryTime || null
+          });
         }
-      });
-    } else {
-      console.error(`❌ OAuth completion failed for ${account.broker_name}:`, result.message);
-      res.status(400).json({
+
+        // Get updated account from database
+        const updatedAccount = await userDatabase.getConnectedAccountById(accountId);
+        if (!updatedAccount) {
+          throw new Error('Failed to retrieve updated account');
+        }
+
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          updatedAccount.account_id,
+          userId,
+          account.broker_name,
+          updatedAccount.user_name
+        );
+
+        // Return standardized account object (same contract as get accounts API)
+        const accountResponse = {
+          id: updatedAccount.id,
+          brokerName: updatedAccount.broker_name,
+          accountId: updatedAccount.account_id,
+          userId: updatedAccount.user_id.toString(),
+          userName: updatedAccount.user_name,
+          email: updatedAccount.email,
+          brokerDisplayName: updatedAccount.broker_display_name,
+          exchanges: JSON.parse(updatedAccount.exchanges),
+          products: JSON.parse(updatedAccount.products),
+          isActive: result.accountStatus === 'ACTIVE',
+          accountStatus: updatedAccount.account_status,
+          tokenExpiryTime: updatedAccount.token_expiry_time,
+          createdAt: updatedAccount.created_at,
+        };
+
+        res.status(200).json({
+          success: true,
+          message: result.message,
+          data: accountResponse
+        });
+      } else {
+        // OAuth completion failed - return standardized error response
+        console.error(`❌ OAuth completion failed for ${account.broker_name}:`, result.message);
+
+        res.status(400).json({
+          success: false,
+          message: result.message,
+          errorType: result.errorType,
+          accountStatus: result.accountStatus,
+          authenticationStep: result.authenticationStep
+        });
+      }
+    } catch (oauthError: any) {
+      console.error(`🚨 OAuth completion error for ${account.broker_name}:`, oauthError);
+      res.status(500).json({
         success: false,
-        message: result.message || 'OAuth authentication failed'
+        message: 'OAuth completion failed. Please try again.',
+        errorType: 'OAUTH_COMPLETION_ERROR'
       });
     }
   } catch (error: any) {
@@ -357,7 +395,7 @@ export const handleOAuthCallback = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { code, state, broker } = req.query;
+    const { code, broker } = req.query;
     const userId = req.user?.id;
 
     if (!userId) {
@@ -378,8 +416,8 @@ export const handleOAuthCallback = async (
 
     console.log(`🔄 Processing OAuth callback for ${broker} with code: ${code}`);
 
-    // Complete OAuth authentication using unified broker manager
-    const result = await unifiedBrokerManager.completeOAuthAuth(
+    // Complete OAuth authentication using enhanced unified broker manager
+    const result = await enhancedUnifiedBrokerManager.completeOAuthAuth(
       userId,
       broker as string,
       code as string,
@@ -391,7 +429,7 @@ export const handleOAuthCallback = async (
 
       // Redirect to frontend with success
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/account-setup?oauth=success&broker=${broker}&account=${result.accountId}`);
+      res.redirect(`${frontendUrl}/account-setup?oauth=success&broker=${broker}&account=${result.accountInfo?.accountId || 'unknown'}`);
     } else {
       console.error(`❌ OAuth completion failed for ${broker}:`, result.message);
 
@@ -439,51 +477,71 @@ export const connectBroker = async (
       return;
     }
 
-    // Use unified broker manager for connection
+    // Use enhanced unified broker manager for connection
     try {
-      const result = await unifiedBrokerManager.connectToBroker(userId, brokerName, credentials);
+      const result = await enhancedUnifiedBrokerManager.connectToBroker(userId, brokerName, credentials);
 
-      if (result.success && result.accountId) {
-        // Save account to database
+      if (result.success && result.accountInfo) {
+        // Direct authentication successful (e.g., Shoonya)
+        // Store encrypted credentials only after successful authentication
         try {
           const dbAccount = await userDatabase.createConnectedAccount({
             user_id: userId,
             broker_name: brokerName,
-            account_id: result.accountId,
-            user_name: result.accountId, // Use account ID as fallback
-            email: '', // Will be updated if available
-            broker_display_name: brokerName.toUpperCase(),
-            exchanges: [],
-            products: [],
+            account_id: result.accountInfo.accountId,
+            user_name: result.accountInfo.userName,
+            email: result.accountInfo.email || '',
+            broker_display_name: result.accountInfo.brokerDisplayName,
+            exchanges: result.accountInfo.exchanges,
+            products: result.accountInfo.products,
             credentials: credentials,
+            account_status: result.accountStatus,
+            token_expiry_time: result.tokenInfo?.expiryTime || null,
           });
 
-          console.log('✅ Account saved to database:', dbAccount.id);
+          console.log('✅ Account saved to database with status:', result.accountStatus, dbAccount.id);
 
           // Add to broker account cache for fast lookups
           addToBrokerAccountCache(
-            result.accountId,
+            result.accountInfo.accountId,
             userId,
             brokerName,
-            result.accountId
+            result.accountInfo.userName
           );
+
+          // Return standardized account object (same contract as get accounts API)
+          const accountResponse = {
+            id: dbAccount.id,
+            brokerName: dbAccount.broker_name,
+            accountId: dbAccount.account_id,
+            userId: dbAccount.user_id.toString(),
+            userName: dbAccount.user_name,
+            email: dbAccount.email,
+            brokerDisplayName: dbAccount.broker_display_name,
+            exchanges: JSON.parse(dbAccount.exchanges),
+            products: JSON.parse(dbAccount.products),
+            isActive: result.accountStatus === 'ACTIVE',
+            accountStatus: dbAccount.account_status,
+            tokenExpiryTime: dbAccount.token_expiry_time,
+            createdAt: dbAccount.created_at,
+          };
+
+          res.status(200).json({
+            success: true,
+            message: result.message,
+            data: accountResponse,
+          });
         } catch (dbError: any) {
           console.error('🚨 Failed to save account to database:', dbError.message);
+          res.status(500).json({
+            success: false,
+            message: 'Authentication successful but failed to save account',
+          });
         }
-
-        res.status(200).json({
-          success: true,
-          message: result.message,
-          data: {
-            brokerName,
-            accountId: result.accountId,
-            message: 'Connection established successfully',
-          },
-        });
       } else if (result.authUrl) {
-        // OAuth flow - save account first, then return auth URL
+        // OAuth flow (e.g., Fyers) - save account only after successful OAuth URL generation
+        // Store encrypted credentials only after successful OAuth URL generation
         try {
-          // For OAuth brokers, we need to save the account first in inactive state
           // Use a temporary account ID that will be updated after OAuth completion
           const tempAccountId = `${brokerName}_${userId}_${Date.now()}`;
 
@@ -497,20 +555,35 @@ export const connectBroker = async (
             exchanges: [],
             products: [],
             credentials: credentials,
-            is_active: false, // Inactive until OAuth is completed
+            account_status: result.accountStatus,
+            token_expiry_time: result.tokenInfo?.expiryTime || null,
           });
 
-          console.log('✅ OAuth account saved to database (inactive):', dbAccount.id);
+          console.log('✅ OAuth account saved to database with status:', result.accountStatus, dbAccount.id);
+
+          // Return standardized account object with OAuth URL
+          const accountResponse = {
+            id: dbAccount.id,
+            brokerName: dbAccount.broker_name,
+            accountId: dbAccount.account_id,
+            userId: dbAccount.user_id.toString(),
+            userName: dbAccount.user_name,
+            email: dbAccount.email,
+            brokerDisplayName: dbAccount.broker_display_name,
+            exchanges: JSON.parse(dbAccount.exchanges),
+            products: JSON.parse(dbAccount.products),
+            isActive: false,
+            accountStatus: dbAccount.account_status,
+            tokenExpiryTime: dbAccount.token_expiry_time,
+            createdAt: dbAccount.created_at,
+            authUrl: result.authUrl,
+            requiresAuthCode: result.requiresAuthCode || true,
+          };
 
           res.status(200).json({
             success: true,
-            message: result.message || 'Auth URL generated. Please complete authentication.',
-            data: {
-              brokerName,
-              authUrl: result.authUrl,
-              requiresAuthCode: true,
-              accountId: dbAccount.id, // Return the database account ID for OAuth completion
-            },
+            message: result.message,
+            data: accountResponse,
           });
         } catch (dbError: any) {
           console.error('🚨 Failed to save OAuth account to database:', dbError.message);
@@ -520,29 +593,24 @@ export const connectBroker = async (
           });
         }
       } else {
+        // Authentication failed - return standardized error response
         res.status(400).json({
           success: false,
-          message: result.message || 'Failed to establish connection',
+          message: result.message,
+          errorType: result.errorType,
+          accountStatus: result.accountStatus,
+          authenticationStep: result.authenticationStep
         });
       }
     } catch (connectionError: any) {
-      // Handle broker-specific responses (like auth URL for OAuth brokers)
-      if (connectionError.authUrl) {
-        res.status(200).json({
-          success: true,
-          message: 'Auth URL generated. Please complete authentication.',
-          data: {
-            brokerName,
-            authUrl: connectionError.authUrl,
-            requiresAuthCode: true,
-          },
-        });
-      } else {
-        res.status(400).json({
-          success: false,
-          message: connectionError.message || 'Failed to connect to broker',
-        });
-      }
+      console.error('🚨 Connection error:', connectionError);
+
+      // Authentication unsuccessful or unable to create redirect URL - throw error
+      res.status(400).json({
+        success: false,
+        message: connectionError.message || 'Failed to connect to broker',
+        errorType: 'BROKER_ERROR'
+      });
     }
   } catch (error: any) {
     console.error('🚨 Connect broker error:', error);
@@ -581,16 +649,16 @@ export const validateBrokerAuthCode = async (
     // Complete OAuth authentication using unified broker manager
     const brokerName = credentials.brokerName || req.body.brokerName || 'fyers';
     try {
-      const result = await unifiedBrokerManager.completeOAuthAuth(userId, brokerName, authCode, credentials);
+      const result = await enhancedUnifiedBrokerManager.completeOAuthAuth(userId, brokerName, authCode, credentials);
 
-      if (result.success && result.accountId) {
+      if (result.success && result.accountInfo?.accountId) {
         // Save account to database
         try {
           const dbAccount = await userDatabase.createConnectedAccount({
             user_id: userId,
             broker_name: brokerName,
-            account_id: result.accountId,
-            user_name: result.accountId,
+            account_id: result.accountInfo.accountId,
+            user_name: result.accountInfo.accountId,
             email: '',
             broker_display_name: brokerName.toUpperCase(),
             exchanges: [],
@@ -602,10 +670,10 @@ export const validateBrokerAuthCode = async (
 
           // Add to broker account cache
           addToBrokerAccountCache(
-            result.accountId,
+            result.accountInfo.accountId,
             userId,
             brokerName,
-            result.accountId
+            result.accountInfo.accountId
           );
         } catch (dbError: any) {
           console.error('🚨 Failed to save OAuth account to database:', dbError.message);
@@ -616,7 +684,7 @@ export const validateBrokerAuthCode = async (
           message: result.message,
           data: {
             brokerName,
-            accountId: result.accountId,
+            accountId: result.accountInfo?.accountId || 'unknown',
             message: 'Authentication completed successfully',
           },
         });
@@ -668,32 +736,72 @@ export const getConnectedAccounts = async (
         dbAccounts.map(async (dbAccount: any) => {
           let isReallyActive = false;
 
-          // Check if broker connection exists and validate session
-          const connection = unifiedBrokerManager.getConnection(userId, dbAccount.broker_name, dbAccount.account_id);
+          // Check if broker connection exists in enhanced manager
+          const connection = enhancedUnifiedBrokerManager.getConnection(userId, dbAccount.broker_name, dbAccount.account_id);
 
           if (connection) {
             try {
-              const sessionValid = await validateBrokerSession(userId, dbAccount.broker_name, dbAccount.account_id);
+              // Get credentials for validation
+              const credentials = await userDatabase.getAccountCredentials(dbAccount.id);
 
-              if (sessionValid) {
+              // Use enhanced manager's validation
+              const validationResult = await enhancedUnifiedBrokerManager.validateSession(
+                userId,
+                dbAccount.broker_name,
+                dbAccount.account_id,
+                credentials
+              );
+
+              if (validationResult.isValid) {
                 isReallyActive = true;
                 console.log(`✅ Session valid for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
               } else {
                 console.log(`⚠️ Session expired for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
                 // Remove connection if session is invalid
-                await unifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
+                await enhancedUnifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
                 isReallyActive = false;
               }
             } catch (validationError: any) {
               console.error(`🚨 Session validation error for ${dbAccount.broker_name}:`, validationError.message);
               // On validation error, remove connection and mark as inactive
-              await unifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
+              await enhancedUnifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
               isReallyActive = false;
             }
           } else {
             // No broker service in memory means not active
             console.log(`⚠️ No active connection found for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
             isReallyActive = false;
+          }
+
+          // Determine token expiry status for UI button logic
+          const now = new Date();
+          let isTokenExpired = false;
+          let shouldShowActivateButton = false;
+          let shouldShowDeactivateButton = false;
+
+          if (dbAccount.token_expiry_time) {
+            // Token has an expiry time (Fyers)
+            const expiryTime = new Date(dbAccount.token_expiry_time);
+            isTokenExpired = now > expiryTime;
+
+            if (isTokenExpired) {
+              shouldShowActivateButton = true;
+              shouldShowDeactivateButton = false;
+              isReallyActive = false; // Override active status if token is expired
+            } else {
+              shouldShowActivateButton = false;
+              shouldShowDeactivateButton = true;
+            }
+          } else {
+            // Token has no expiry (Shoonya - infinity)
+            if (dbAccount.broker_name === 'shoonya') {
+              shouldShowActivateButton = false;
+              shouldShowDeactivateButton = false; // Shoonya doesn't show deactivate button
+            } else {
+              // Other brokers without expiry time
+              shouldShowActivateButton = !isReallyActive;
+              shouldShowDeactivateButton = isReallyActive;
+            }
           }
 
           const accountData = {
@@ -707,6 +815,11 @@ export const getConnectedAccounts = async (
             exchanges: JSON.parse(dbAccount.exchanges || '[]'),
             products: JSON.parse(dbAccount.products || '[]'),
             isActive: isReallyActive, // Pure real-time validated status
+            accountStatus: dbAccount.account_status || 'INACTIVE',
+            tokenExpiryTime: dbAccount.token_expiry_time,
+            isTokenExpired,
+            shouldShowActivateButton,
+            shouldShowDeactivateButton,
             createdAt: dbAccount.created_at,
           };
 
@@ -715,8 +828,7 @@ export const getConnectedAccounts = async (
         })
       );
 
-      // Debug: List all connections
-      unifiedBrokerManager.debugListConnections();
+      // Debug: Enhanced manager doesn't need debug listing
 
       res.status(200).json({
         success: true,
@@ -773,14 +885,23 @@ export const checkAccountSessionStatus = async (
       message: 'No active session found',
     };
 
-    // Check if broker connection exists and validate session
-    const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+    // Check if broker connection exists in enhanced manager
+    const connection = enhancedUnifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
 
     if (connection) {
       try {
-        const sessionValid = await validateBrokerSession(userId, account.broker_name, account.account_id);
+        // Get credentials for validation
+        const credentials = await userDatabase.getAccountCredentials(account.id);
 
-        if (sessionValid) {
+        // Use enhanced manager's validation
+        const validationResult = await enhancedUnifiedBrokerManager.validateSession(
+          userId,
+          account.broker_name,
+          account.account_id,
+          credentials
+        );
+
+        if (validationResult.isValid) {
           isActive = true;
           sessionInfo = {
             lastChecked: new Date().toISOString(),
@@ -789,7 +910,7 @@ export const checkAccountSessionStatus = async (
           };
         } else {
           // Remove connection if session is invalid
-          await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
+          await enhancedUnifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
           sessionInfo = {
             lastChecked: new Date().toISOString(),
             status: 'expired',
@@ -799,7 +920,7 @@ export const checkAccountSessionStatus = async (
       } catch (validationError: any) {
         console.error(`🚨 Session validation error for ${account.broker_name}:`, validationError.message);
         // On validation error, remove connection
-        await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
+        await enhancedUnifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
         sessionInfo = {
           lastChecked: new Date().toISOString(),
           status: 'error',
@@ -894,8 +1015,8 @@ export const removeConnectedAccount = async (
         return;
       }
 
-      // Perform actual logout from broker using unified manager
-      const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+      // Perform actual logout from broker using enhanced manager
+      const connection = enhancedUnifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
       if (connection) {
         try {
           await logoutFromBroker(userId, account.broker_name, account.account_id);
@@ -977,10 +1098,21 @@ export const activateAccount = async (
       return;
     }
 
-    // Use unified broker manager for account activation
+    // Use enhanced unified broker manager for account activation
     try {
       console.log(`🔄 Starting activation for account ${accountId} (user ${userId})`);
-      const result = await unifiedBrokerManager.autoActivateAccount(userId, accountId);
+
+      // Get account details from database
+      const account = await userDatabase.getConnectedAccountById(accountId);
+      if (!account) {
+        throw new Error('Account not found');
+      }
+
+      // Get credentials for activation
+      const credentials = await userDatabase.getAccountCredentials(accountId);
+
+      // Use enhanced manager to connect/activate
+      const result = await enhancedUnifiedBrokerManager.connectToBroker(userId, account.broker_name, credentials);
 
       if (result.success) {
         // Add to broker account cache for fast lookups
@@ -1001,10 +1133,10 @@ export const activateAccount = async (
           {
             accountId,
             isActive: true,
-            authStep: result.authStep,
+            authStep: 'ACTIVE' as any,
             additionalData: {
-              ...(result.brokerName && { brokerName: result.brokerName }),
-              ...(result.userName && { userName: result.userName }),
+              ...(account?.broker_name && { brokerName: account.broker_name }),
+              ...(result.accountInfo?.userName && { userName: result.accountInfo.userName }),
               exchanges: account?.exchanges ? JSON.parse(account.exchanges) : [],
               products: account?.products ? JSON.parse(account.products) : []
             }
@@ -1016,8 +1148,8 @@ export const activateAccount = async (
         console.log(`❌ Account ${accountId} activation failed: ${result.message}`);
 
         // Handle OAuth flow - return auth URL for redirect
-        if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
-          console.log(`🔄 OAuth authentication required for ${result.brokerName}: ${result.authUrl}`);
+        if (result.authenticationStep === 'OAUTH_REQUIRED' && result.authUrl) {
+          console.log(`🔄 OAuth authentication required for ${account?.broker_name}: ${result.authUrl}`);
 
           // Simple response with just the auth URL
           res.status(200).json({
@@ -1029,9 +1161,7 @@ export const activateAccount = async (
         }
 
         // Handle other failures
-        const errorCode = result.error === 'CREDENTIALS_NOT_FOUND' ? ApiErrorCode.INVALID_CREDENTIALS :
-                         result.error === 'ACCOUNT_NOT_FOUND' ? ApiErrorCode.ACCOUNT_NOT_FOUND :
-                         ApiErrorCode.BROKER_ERROR;
+        const errorCode = ApiErrorCode.BROKER_ERROR;
 
         const response: ActivateAccountResponse = createActivationResponse(
           false,
@@ -1040,7 +1170,7 @@ export const activateAccount = async (
           {
             code: errorCode,
             message: result.message,
-            details: result.error
+            details: result.message
           }
         );
 
@@ -1097,8 +1227,8 @@ export const deactivateAccount = async (
       return;
     }
 
-    // Perform actual logout from broker using unified manager
-    const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+    // Perform actual logout from broker using enhanced manager
+    const connection = enhancedUnifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
     if (connection) {
       try {
         await logoutFromBroker(userId, account.broker_name, account.account_id);
@@ -1154,7 +1284,7 @@ export const disconnectBroker = async (
       return;
     }
 
-    const connection = unifiedBrokerManager.getConnection(userId, brokerName, accountId);
+    const connection = enhancedUnifiedBrokerManager.getConnection(userId, brokerName, accountId);
 
     if (!connection) {
       res.status(404).json({
@@ -2012,8 +2142,10 @@ export const getQuotes = async (
 
     console.log(`📊 Getting quotes for ${exchange}:${token} via ${brokerName} account ${resolvedAccountId}`);
 
-    // Use unified broker interface for quotes
-    const unifiedBrokerService = getBrokerService(userId, brokerName, resolvedAccountId);
+    // Use enhanced unified broker interface for quotes
+    const unifiedBrokerService = resolvedAccountId ?
+      enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, resolvedAccountId) :
+      null;
     let quotes: any;
 
     if (unifiedBrokerService && 'getQuote' in unifiedBrokerService) {
@@ -2083,8 +2215,8 @@ const brokerConnectionManagerImpl = {
         return null;
       }
 
-      // Step 3: Get active connection for the user using unified manager
-      const connection = unifiedBrokerManager.getConnection(accountMapping.userId, brokerName, accountMapping.accountId);
+      // Step 3: Get active connection for the user using enhanced manager
+      const connection = enhancedUnifiedBrokerManager.getConnection(accountMapping.userId, brokerName, accountMapping.accountId);
       if (!connection) {
         console.log(`❌ No active connection found for user ${accountMapping.userId}`);
         return null;

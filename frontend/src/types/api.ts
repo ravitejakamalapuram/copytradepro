@@ -68,7 +68,9 @@ export interface ConnectedAccount {
   brokerDisplayName: string;
   exchanges: string[];
   products: string[];
-  isActive: boolean;
+  isActive: boolean; // Computed field for backward compatibility
+  accountStatus: 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH'; // New authentication status
+  tokenExpiryTime: string | null; // ISO string or null for infinity (Shoonya)
   createdAt: Date;
   accessToken?: string;
 }

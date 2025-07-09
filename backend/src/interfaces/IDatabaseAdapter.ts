@@ -21,6 +21,9 @@ export interface UpdateUserData {
   password?: string;
 }
 
+// Account status enum for authentication flow
+export type AccountStatus = 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH';
+
 export interface ConnectedAccount {
   id: number | string;
   user_id: number | string;
@@ -32,6 +35,8 @@ export interface ConnectedAccount {
   exchanges: string; // JSON string
   products: string; // JSON string
   encrypted_credentials: string; // Encrypted JSON
+  account_status: AccountStatus; // Authentication status
+  token_expiry_time: string | null; // ISO string or null for infinity (Shoonya)
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +51,8 @@ export interface CreateConnectedAccountData {
   exchanges: string[];
   products: any[];
   credentials: any; // Will be encrypted before storage
+  account_status: AccountStatus; // Authentication status
+  token_expiry_time?: string | null; // ISO string or null for infinity (Shoonya)
 }
 
 export interface OrderHistory {
@@ -111,7 +118,9 @@ export interface IDatabaseAdapter {
 
   // User Management
   createUser(userData: CreateUserData): Promise<User> | User;
+  getUserById(id: number | string): Promise<User | null> | User | null;
   findUserById(id: number | string): Promise<User | null> | User | null;
+  getUserByEmail(email: string): Promise<User | null> | User | null;
   findUserByEmail(email: string): Promise<User | null> | User | null;
   updateUser(id: number | string, userData: UpdateUserData): Promise<User | null> | User | null;
   deleteUser(id: number | string): Promise<boolean> | boolean;
@@ -124,6 +133,7 @@ export interface IDatabaseAdapter {
   getConnectedAccountById(id: number | string): Promise<ConnectedAccount | null> | ConnectedAccount | null;
   updateConnectedAccount(id: number | string, accountData: Partial<CreateConnectedAccountData>): Promise<ConnectedAccount | null> | ConnectedAccount | null;
   deleteConnectedAccount(id: number | string): Promise<boolean> | boolean;
+  getAccountCredentials(id: number | string): Promise<any> | any; // Get decrypted credentials for an account
 
   // Order History Management
   createOrderHistory(orderData: CreateOrderHistoryData): Promise<OrderHistory> | OrderHistory;
@@ -139,4 +149,7 @@ export interface IDatabaseAdapter {
   // Notification Preferences (if needed)
   saveUserNotificationPreferences(preferences: any): Promise<boolean> | boolean;
   getUserNotificationPreferences(userId: number | string): Promise<any> | any;
+
+  // Health Check
+  healthCheck(): Promise<boolean> | boolean;
 }

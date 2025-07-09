@@ -55,7 +55,10 @@ export interface FyersQuote {
 export class FyersService {
   private fyers: any;
   private accessToken: string | null = null;
+  private refreshToken: string | null = null;
   private appId: string = '';
+  private clientId: string = '';
+  private secretKey: string = '';
 
   constructor() {
     // Initialize the official Fyers API client
@@ -77,8 +80,12 @@ export class FyersService {
   }
 
   // Generate access token from auth code
-  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; accountId?: string; message: string }> {
+  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; accountId?: string; message: string; expiryTime?: string }> {
     try {
+      // Store credentials for refresh token usage
+      this.clientId = credentials.clientId;
+      this.secretKey = credentials.secretKey;
+
       // Set App ID before generating access token
       this.fyers.setAppId(credentials.clientId);
 
@@ -90,9 +97,11 @@ export class FyersService {
 
       if (response.s === 'ok') {
         this.accessToken = response.access_token;
+        this.refreshToken = response.refresh_token; // Capture refresh token
         this.fyers.setAccessToken(response.access_token);
 
         console.log('✅ Fyers access token generated successfully');
+        console.log('✅ Fyers refresh token captured:', !!response.refresh_token);
 
         // Get user profile to extract actual account ID
         try {
@@ -101,11 +110,16 @@ export class FyersService {
             const accountId = profileResponse.data.fy_id || profileResponse.data.id || profileResponse.data.user_id;
             console.log(`✅ Fyers profile fetched, account ID: ${accountId}`);
 
+            // Calculate expiry time (Fyers tokens typically expire in 24 hours)
+            const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
             return {
               success: true,
               accessToken: response.access_token,
+              refreshToken: response.refresh_token,
               accountId: accountId, // Return actual Fyers account ID
               message: 'Access token generated successfully',
+              expiryTime: expiryTime,
             };
           } else {
             console.log('⚠️ Profile fetch failed, using client ID as fallback');

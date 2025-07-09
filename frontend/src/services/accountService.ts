@@ -1,6 +1,8 @@
 import api from './api';
 import { AuthenticationStep } from '@copytrade/shared-types';
 
+export type AccountStatus = 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH';
+
 export interface ConnectedAccount {
   id: string;
   brokerName: string;
@@ -11,7 +13,9 @@ export interface ConnectedAccount {
   brokerDisplayName: string;
   exchanges: string[];
   products: string[];
-  isActive: boolean;
+  isActive: boolean; // Computed field for backward compatibility
+  accountStatus: AccountStatus; // New authentication status
+  tokenExpiryTime: string | null; // ISO string or null for infinity (Shoonya)
   createdAt: Date | string;
   accessToken?: string;
   // Fyers specific
@@ -209,6 +213,8 @@ export const accountService = {
         email: '',
         brokerDisplayName: 'Fyers',
         accessToken: brokerResponse.accessToken,
+        accountStatus: 'PROCEED_TO_OAUTH' as AccountStatus,
+        tokenExpiryTime: null,
       };
     } else if (brokerName === 'shoonya') {
       return {
@@ -220,6 +226,8 @@ export const accountService = {
         brokerDisplayName: 'Shoonya',
         exchanges: brokerResponse.exchanges || [],
         products: brokerResponse.products || [],
+        accountStatus: 'ACTIVE' as AccountStatus,
+        tokenExpiryTime: null,
       };
     }
 
@@ -231,6 +239,8 @@ export const accountService = {
       userName: 'Unknown User',
       email: '',
       brokerDisplayName: brokerName,
+      accountStatus: 'INACTIVE' as AccountStatus,
+      tokenExpiryTime: null,
     };
   }
 };
