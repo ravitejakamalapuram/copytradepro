@@ -96,11 +96,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   payload: { user: response.data.user, token },
                 });
               } else {
-                // Token is invalid, clear storage
-                console.warn('🔑 Token validation failed, logging out');
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                dispatch({ type: 'LOGOUT' });
+                // Token is invalid - check environment
+                const isDevelopment = import.meta.env.DEV;
+                if (isDevelopment) {
+                  console.warn('🔑 Token validation failed in development, keeping user logged in');
+                  // Keep user logged in during development
+                } else {
+                  console.warn('🔑 Token validation failed, logging out');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  dispatch({ type: 'LOGOUT' });
+                }
               }
             } catch (error: any) {
               console.warn(`🔄 Token verification failed (${4 - retries}/3):`, error.message);
