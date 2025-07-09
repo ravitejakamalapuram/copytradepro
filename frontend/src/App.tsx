@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './hooks/useAuth';
+import { useConnectionStatus } from './hooks/useConnectionStatus';
 import LandingPage from './pages/LandingPage';
 import CopyTradeLogin from './pages/CopyTradeLogin';
 
@@ -21,6 +22,32 @@ import AccountSetup from './pages/AccountSetup';
 import Portfolio from './pages/Portfolio';
 import MarketOverview from './pages/MarketOverview';
 import './styles/enterprise-base.css';
+
+// Connection Status Component
+const ConnectionStatus: React.FC = () => {
+  const { isOnline } = useConnectionStatus();
+
+  if (isOnline) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: '#ff6b35',
+      color: 'white',
+      padding: '0.5rem',
+      textAlign: 'center',
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      zIndex: 9999,
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}>
+      🔌 Server connection lost. Retrying... (You can continue working offline)
+    </div>
+  );
+};
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -177,6 +204,7 @@ const App: React.FC = () => {
   return (
     <Router>
       <AuthProvider>
+        <ConnectionStatus />
         <AppContent />
         <NotificationDisplay position="top-right" />
       </AuthProvider>
