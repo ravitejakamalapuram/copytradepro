@@ -251,6 +251,63 @@ export const getAvailableBrokers = async (
   }
 };
 
+// OAuth callback handler for brokers like Fyers
+export const handleOAuthCallback = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { code, state, broker } = req.query;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!code || !broker) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing authorization code or broker parameter',
+      });
+      return;
+    }
+
+    console.log(`🔄 Processing OAuth callback for ${broker} with code: ${code}`);
+
+    // Complete OAuth authentication using unified broker manager
+    const result = await unifiedBrokerManager.completeOAuthAuth(
+      userId,
+      broker as string,
+      code as string,
+      {} // credentials will be retrieved from database
+    );
+
+    if (result.success) {
+      console.log(`✅ OAuth completed successfully for ${broker}`);
+
+      // Redirect to frontend with success
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/account-setup?oauth=success&broker=${broker}&account=${result.accountId}`);
+    } else {
+      console.error(`❌ OAuth completion failed for ${broker}:`, result.message);
+
+      // Redirect to frontend with error
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      res.redirect(`${frontendUrl}/account-setup?oauth=error&message=${encodeURIComponent(result.message || 'OAuth failed')}`);
+    }
+  } catch (error: any) {
+    console.error('🚨 OAuth callback error:', error);
+
+    // Redirect to frontend with error
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    res.redirect(`${frontendUrl}/account-setup?oauth=error&message=${encodeURIComponent('OAuth callback failed')}`);
+  }
+};
+
 // All account management now handled by UnifiedBrokerManager and database
 
 export const connectBroker = async (
@@ -830,22 +887,15 @@ export const activateAccount = async (
       } else {
         console.log(`❌ Account ${accountId} activation failed: ${result.message}`);
 
-        // Handle OAuth flow
+        // Handle OAuth flow - redirect user to OAuth URL
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
-          const response: ActivateAccountResponse = createActivationResponse(
-            false,
-            result.message,
-            {
-              accountId,
-              isActive: false,
-              authStep: result.authStep,
-              authUrl: result.authUrl,
-              additionalData: {
-                ...(result.brokerName && { brokerName: result.brokerName })
-              }
-            }
-          );
-          res.status(200).json(response); // 200 for OAuth flow, not an error
+          console.log(`🔄 Redirecting to OAuth URL for ${result.brokerName}: ${result.authUrl}`);
+
+          // For OAuth flows, redirect the user directly to the auth URL
+          // This creates a unified experience where activation always "works"
+          // Add broker and account info to the redirect URL for callback processing
+          const redirectUrl = `${result.authUrl}&broker=${result.brokerName}&account=${accountId}`;
+          res.redirect(redirectUrl);
           return;
         }
 

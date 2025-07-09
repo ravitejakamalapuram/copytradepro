@@ -40,7 +40,7 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
 
       // Only logout for authentication-related endpoints, not broker operations
-      if (url.includes('/auth/') || url.includes('/profile')) {
+      if (url.includes('/auth/')) {
         console.log('🚨 User authentication failed, logging out');
         localStorage.removeItem('token');
         localStorage.removeItem('user');

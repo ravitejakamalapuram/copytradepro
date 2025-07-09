@@ -11,6 +11,7 @@ import {
   activateAccount,
   deactivateAccount,
   disconnectBroker,
+  handleOAuthCallback,
   placeOrder,
   getOrderHistory,
   getOrderStatus,
@@ -113,6 +114,9 @@ router.post('/validate-auth', authenticateToken, validateBrokerAuthCode);
 
 // Broker information routes
 router.get('/available', authenticateToken, getAvailableBrokers);
+
+// OAuth callback route (for Fyers and other OAuth brokers)
+router.get('/oauth/callback', authenticateToken, handleOAuthCallback);
 
 // Account management routes
 router.get('/accounts', authenticateToken, getConnectedAccounts);

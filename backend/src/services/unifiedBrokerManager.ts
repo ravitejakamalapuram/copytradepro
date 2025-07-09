@@ -433,6 +433,8 @@ export class UnifiedBrokerManager {
   isBrokerAvailable(brokerName: string): boolean {
     return this.brokerRegistry.isBrokerAvailable(brokerName);
   }
+
+
 }
 
 // Export singleton instance
