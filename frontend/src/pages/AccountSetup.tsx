@@ -111,11 +111,41 @@ const AccountSetup: React.FC = () => {
         return;
       }
 
-      // Monitor popup for auth code
+      // Show instructions and input alert after popup opens
+      setTimeout(() => {
+        const authCode = prompt(
+          '📋 OAuth Instructions:\n\n' +
+          '1. Complete the authentication in the popup window\n' +
+          '2. After authorization, you will see a URL with "code=" parameter\n' +
+          '3. Copy the authorization code from the URL\n' +
+          '4. Paste it below and click OK\n\n' +
+          'Enter the authorization code:'
+        );
+
+        if (authCode && authCode.trim()) {
+          console.log('✅ Auth code entered manually:', authCode.trim());
+          popup.close();
+
+          // Complete OAuth authentication with manually entered code
+          completeOAuthAuth(accountId, authCode.trim())
+            .then(() => resolve())
+            .catch(reject);
+        } else if (authCode === null) {
+          // User cancelled the prompt
+          popup.close();
+          reject(new Error('OAuth cancelled by user'));
+        } else {
+          // Empty code entered
+          popup.close();
+          reject(new Error('No authorization code provided'));
+        }
+      }, 2000); // Wait 2 seconds for popup to load
+
+      // Monitor popup for auth code (fallback - automatic detection)
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed);
-          reject(new Error('OAuth popup was closed'));
+          // Don't reject here as user might have used manual input
           return;
         }
 
@@ -126,7 +156,7 @@ const AccountSetup: React.FC = () => {
           const authCode = urlParams.get('code');
 
           if (authCode) {
-            console.log('✅ Auth code received:', authCode);
+            console.log('✅ Auth code detected automatically:', authCode);
             clearInterval(checkClosed);
             popup.close();
 
@@ -228,25 +258,60 @@ const AccountSetup: React.FC = () => {
       }
 
       if (result.success) {
-        alert('Broker connected successfully!');
-        // Refresh accounts
-        const connectedAccounts = await accountService.getConnectedAccounts();
-        setAccounts(connectedAccounts);
-        // Reset form
-        setShowAddForm(false);
-        setSelectedBroker('');
-        setFormData({
-          brokerName: '',
-          userId: '',
-          password: '',
-          totpKey: '',
-          vendorCode: '',
-          apiSecret: '',
-          imei: '',
-          clientId: '',
-          secretKey: '',
-          redirectUri: '',
-        });
+        // Check if OAuth authentication is required
+        if (result.data?.requiresAuthCode && result.data?.authUrl && result.data?.accountId) {
+          console.log('🔄 OAuth authentication required for new connection');
+          console.log('📋 Account ID for OAuth:', result.data.accountId);
+
+          // The account has been saved in inactive state, now complete OAuth
+          try {
+            await handleOAuthFlow(result.data.accountId, result.data.authUrl);
+
+            // After successful OAuth, refresh accounts
+            const connectedAccounts = await accountService.getConnectedAccounts();
+            setAccounts(connectedAccounts);
+
+            // Reset form
+            setShowAddForm(false);
+            setSelectedBroker('');
+            setFormData({
+              brokerName: '',
+              userId: '',
+              password: '',
+              totpKey: '',
+              vendorCode: '',
+              apiSecret: '',
+              imei: '',
+              clientId: '',
+              secretKey: '',
+              redirectUri: '',
+            });
+          } catch (oauthError: any) {
+            console.error('❌ OAuth flow failed:', oauthError);
+            setError(oauthError.message || 'OAuth authentication failed');
+          }
+        } else {
+          // Direct connection successful (e.g., Shoonya)
+          alert('Broker connected successfully!');
+          // Refresh accounts
+          const connectedAccounts = await accountService.getConnectedAccounts();
+          setAccounts(connectedAccounts);
+          // Reset form
+          setShowAddForm(false);
+          setSelectedBroker('');
+          setFormData({
+            brokerName: '',
+            userId: '',
+            password: '',
+            totpKey: '',
+            vendorCode: '',
+            apiSecret: '',
+            imei: '',
+            clientId: '',
+            secretKey: '',
+            redirectUri: '',
+          });
+        }
       } else {
         setError(result.message || 'Failed to connect broker');
       }

@@ -27,14 +27,11 @@ import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
 
-// Import unified broker system to get supported brokers dynamically
-import { getSupportedBrokers } from '@copytrade/unified-broker';
-
 // Validation rules for broker connection
 const connectBrokerValidation = [
   body('brokerName')
-    .isIn(getSupportedBrokers())
-    .withMessage(`Supported brokers: ${getSupportedBrokers().join(', ')}`),
+    .isIn(['shoonya', 'fyers'])
+    .withMessage('Supported brokers: shoonya, fyers'),
 
   // Conditional validation for Shoonya
   body('credentials.userId')

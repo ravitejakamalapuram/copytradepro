@@ -77,8 +77,11 @@ export class FyersService {
   }
 
   // Generate access token from auth code
-  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; message: string }> {
+  async generateAccessToken(authCode: string, credentials: FyersCredentials): Promise<{ success: boolean; accessToken?: string; accountId?: string; message: string }> {
     try {
+      // Set App ID before generating access token
+      this.fyers.setAppId(credentials.clientId);
+
       const response = await this.fyers.generate_access_token({
         client_id: credentials.clientId,
         secret_key: credentials.secretKey,
@@ -88,8 +91,30 @@ export class FyersService {
       if (response.s === 'ok') {
         this.accessToken = response.access_token;
         this.fyers.setAccessToken(response.access_token);
-        
+
         console.log('✅ Fyers access token generated successfully');
+
+        // Get user profile to extract actual account ID
+        try {
+          const profileResponse = await this.fyers.get_profile();
+          if (profileResponse.s === 'ok' && profileResponse.data) {
+            const accountId = profileResponse.data.fy_id || profileResponse.data.id || profileResponse.data.user_id;
+            console.log(`✅ Fyers profile fetched, account ID: ${accountId}`);
+
+            return {
+              success: true,
+              accessToken: response.access_token,
+              accountId: accountId, // Return actual Fyers account ID
+              message: 'Access token generated successfully',
+            };
+          } else {
+            console.log('⚠️ Profile fetch failed, using client ID as fallback');
+          }
+        } catch (profileError: any) {
+          console.log('⚠️ Profile fetch error:', profileError.message);
+        }
+
+        // Fallback: return without account ID
         return {
           success: true,
           accessToken: response.access_token,
@@ -111,11 +136,13 @@ export class FyersService {
   async login(credentials: FyersCredentials): Promise<{ success: boolean; authUrl?: string; message: string }> {
     try {
       const authUrl = this.generateAuthUrl(credentials);
-      
+
+      // For OAuth flows, return success: false with authUrl
+      // This indicates that authentication is required
       return {
-        success: true,
+        success: false,
         authUrl,
-        message: 'Please visit the auth URL to complete authentication',
+        message: 'OAuth authentication required',
       };
     } catch (error: any) {
       console.error('🚨 Fyers login failed:', error);

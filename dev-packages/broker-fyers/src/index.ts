@@ -27,29 +27,32 @@ const fyersPlugin: BrokerPlugin = {
 
 
 
-// Default export for auto-registration
-export default {
-  register: registerFyersPlugin,
-  plugin: fyersPlugin,
-  createInstance: createFyersInstance
-};
-
 /**
- * Auto-registration function
+ * Initialize and register the Fyers broker plugin
+ * Call this method explicitly to register the broker
  */
-export function registerFyersPlugin(registry?: BrokerRegistry): void {
+export function initializeFyersBroker(registry?: BrokerRegistry): void {
   const targetRegistry = registry || BrokerRegistry.getInstance();
-  targetRegistry.registerPlugin(fyersPlugin);
-  console.log(`✅ Registered Fyers broker plugin v${PLUGIN_INFO.version}`);
+
+  try {
+    targetRegistry.registerPlugin(fyersPlugin);
+    console.log(`✅ Fyers broker plugin v${PLUGIN_INFO.version} registered successfully`);
+  } catch (error) {
+    console.error(`❌ Failed to register Fyers broker plugin:`, error);
+    throw error;
+  }
 }
 
-// Auto-register when imported (if registry is available)
-try {
-  registerFyersPlugin();
-} catch (error) {
-  // Registry might not be available yet, that's okay
-  console.log('ℹ️ Fyers plugin will register when broker core is initialized');
-}
+// Export plugin info for inspection
+export const fyersBrokerInfo = PLUGIN_INFO;
+
+// Default export for easy access
+export default {
+  initialize: initializeFyersBroker,
+  plugin: fyersPlugin,
+  createInstance: createFyersInstance,
+  info: PLUGIN_INFO
+};
 
 // Named exports for manual usage
 export { FyersServiceAdapter };

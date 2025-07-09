@@ -18,25 +18,55 @@ export class FyersServiceAdapter extends IBrokerService {
   async login(credentials: BrokerCredentials): Promise<LoginResponse> {
     try {
       const fyersCredentials = credentials as FyersCredentials;
-      // Map to the expected Fyers service format
-      const serviceCredentials = {
-        clientId: fyersCredentials.clientId,
-        secretKey: fyersCredentials.secretKey,
-        redirectUri: fyersCredentials.redirectUri || '',
-        authCode: fyersCredentials.authCode,
-        accessToken: fyersCredentials.accessToken,
-        refreshToken: fyersCredentials.refreshToken
-      };
-      const response = await this.fyersService.login(serviceCredentials);
-      
-      if (response.success) {
-        this.setConnected(true, fyersCredentials.appId); // Use appId as account identifier
-        return this.createSuccessResponse(response.message || 'Login successful', {
-          accountId: fyersCredentials.appId,
-          authUrl: response.authUrl
-        });
+
+      // If we have an auth code, complete the OAuth flow
+      if (fyersCredentials.authCode) {
+        // Complete OAuth authentication
+        const serviceCredentials = {
+          clientId: fyersCredentials.clientId,
+          secretKey: fyersCredentials.secretKey,
+          redirectUri: fyersCredentials.redirectUri || '',
+          authCode: fyersCredentials.authCode,
+          accessToken: fyersCredentials.accessToken,
+          refreshToken: fyersCredentials.refreshToken
+        };
+
+        const tokenResponse = await this.fyersService.generateAccessToken(fyersCredentials.authCode, serviceCredentials);
+
+        if (tokenResponse.success) {
+          this.setConnected(true, fyersCredentials.clientId);
+          return this.createSuccessResponse('OAuth authentication completed', {
+            accountId: fyersCredentials.clientId,
+            accessToken: tokenResponse.accessToken
+          });
+        } else {
+          return this.createErrorResponse(tokenResponse.message || 'OAuth completion failed', tokenResponse);
+        }
       } else {
-        return this.createErrorResponse(response.message || 'Login failed', response);
+        // Generate OAuth URL for initial authentication
+        const serviceCredentials = {
+          clientId: fyersCredentials.clientId,
+          secretKey: fyersCredentials.secretKey,
+          redirectUri: fyersCredentials.redirectUri || '',
+          authCode: fyersCredentials.authCode,
+          accessToken: fyersCredentials.accessToken,
+          refreshToken: fyersCredentials.refreshToken
+        };
+
+        const response = await this.fyersService.login(serviceCredentials);
+
+        if (!response.success && response.authUrl) {
+          // Return OAuth URL for frontend to handle
+          return {
+            success: false,
+            message: response.message || 'OAuth authentication required',
+            data: {
+              authUrl: response.authUrl
+            }
+          };
+        } else {
+          return this.createErrorResponse(response.message || 'Failed to generate OAuth URL', response);
+        }
       }
     } catch (error: any) {
       return this.createErrorResponse(error.message || 'Login failed', error);

@@ -288,23 +288,43 @@ export const completeOAuthAuth = async (
       return;
     }
 
+    // Get decrypted credentials from database
+    const credentials = await userDatabase.getAccountCredentials(accountId);
+    if (!credentials) {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to retrieve account credentials',
+      });
+      return;
+    }
+
     // Complete OAuth authentication using unified broker manager
     const result = await unifiedBrokerManager.completeOAuthAuth(
       userId,
       account.broker_name,
       authCode,
-      {} // credentials will be retrieved from database
+      credentials // Use decrypted credentials from database
     );
 
     if (result.success) {
       console.log(`✅ OAuth completed successfully for ${account.broker_name}`);
 
+      // Update database account with actual broker account ID if available
+      if (result.accountId && result.accountId !== account.account_id) {
+        await userDatabase.updateConnectedAccount(accountId, {
+          account_id: result.accountId, // Update account_id to match broker
+          user_name: result.accountId, // Update user_name to match broker
+          updated_at: new Date()
+        });
+        console.log(`✅ Database account ${accountId} updated with broker account ID: ${result.accountId}`);
+      }
+
       // Add to broker account cache for fast lookups
       addToBrokerAccountCache(
-        account.account_id,
+        result.accountId || account.account_id, // Use actual broker account ID
         userId,
         account.broker_name,
-        account.user_name
+        result.accountId || account.user_name
       );
 
       res.status(200).json({
@@ -461,16 +481,44 @@ export const connectBroker = async (
           },
         });
       } else if (result.authUrl) {
-        // OAuth flow - return auth URL
-        res.status(200).json({
-          success: true,
-          message: result.message || 'Auth URL generated. Please complete authentication.',
-          data: {
-            brokerName,
-            authUrl: result.authUrl,
-            requiresAuthCode: true,
-          },
-        });
+        // OAuth flow - save account first, then return auth URL
+        try {
+          // For OAuth brokers, we need to save the account first in inactive state
+          // Use a temporary account ID that will be updated after OAuth completion
+          const tempAccountId = `${brokerName}_${userId}_${Date.now()}`;
+
+          const dbAccount = await userDatabase.createConnectedAccount({
+            user_id: userId,
+            broker_name: brokerName,
+            account_id: tempAccountId,
+            user_name: tempAccountId, // Will be updated after OAuth
+            email: 'oauth-pending@temp.com', // Will be updated after OAuth
+            broker_display_name: brokerName.toUpperCase(),
+            exchanges: [],
+            products: [],
+            credentials: credentials,
+            is_active: false, // Inactive until OAuth is completed
+          });
+
+          console.log('✅ OAuth account saved to database (inactive):', dbAccount.id);
+
+          res.status(200).json({
+            success: true,
+            message: result.message || 'Auth URL generated. Please complete authentication.',
+            data: {
+              brokerName,
+              authUrl: result.authUrl,
+              requiresAuthCode: true,
+              accountId: dbAccount.id, // Return the database account ID for OAuth completion
+            },
+          });
+        } catch (dbError: any) {
+          console.error('🚨 Failed to save OAuth account to database:', dbError.message);
+          res.status(500).json({
+            success: false,
+            message: 'Failed to prepare OAuth authentication',
+          });
+        }
       } else {
         res.status(400).json({
           success: false,

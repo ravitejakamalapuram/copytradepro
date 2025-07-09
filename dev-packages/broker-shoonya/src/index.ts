@@ -27,29 +27,32 @@ const shoonyaPlugin: BrokerPlugin = {
 
 
 
-// Default export for auto-registration
-export default {
-  register: registerShoonyaPlugin,
-  plugin: shoonyaPlugin,
-  createInstance: createShoonyaInstance
-};
-
 /**
- * Auto-registration function
+ * Initialize and register the Shoonya broker plugin
+ * Call this method explicitly to register the broker
  */
-export function registerShoonyaPlugin(registry?: BrokerRegistry): void {
+export function initializeShoonyaBroker(registry?: BrokerRegistry): void {
   const targetRegistry = registry || BrokerRegistry.getInstance();
-  targetRegistry.registerPlugin(shoonyaPlugin);
-  console.log(`✅ Registered Shoonya broker plugin v${PLUGIN_INFO.version}`);
+
+  try {
+    targetRegistry.registerPlugin(shoonyaPlugin);
+    console.log(`✅ Shoonya broker plugin v${PLUGIN_INFO.version} registered successfully`);
+  } catch (error) {
+    console.error(`❌ Failed to register Shoonya broker plugin:`, error);
+    throw error;
+  }
 }
 
-// Auto-register when imported (if registry is available)
-try {
-  registerShoonyaPlugin();
-} catch (error) {
-  // Registry might not be available yet, that's okay
-  console.log('ℹ️ Shoonya plugin will register when broker core is initialized');
-}
+// Export plugin info for inspection
+export const shoonyaBrokerInfo = PLUGIN_INFO;
+
+// Default export for easy access
+export default {
+  initialize: initializeShoonyaBroker,
+  plugin: shoonyaPlugin,
+  createInstance: createShoonyaInstance,
+  info: PLUGIN_INFO
+};
 
 // Named exports for manual usage
 export { ShoonyaServiceAdapter };

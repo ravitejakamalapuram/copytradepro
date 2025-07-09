@@ -31,14 +31,33 @@ export const LIBRARY_INFO = {
 };
 
 /**
- * Initialize the unified broker library
+ * Initialize the unified broker library with explicit control
  */
-export function initializeUnifiedBroker(): void {
+export function initializeUnifiedBroker(): BrokerRegistry {
   console.log(`🚀 Initializing ${LIBRARY_INFO.name} v${VERSION}`);
 
   const registry = BrokerRegistry.getInstance();
+  console.log(`✅ Unified broker library initialized - ready for broker registration`);
+
+  return registry;
+}
+
+/**
+ * Get the current status of the unified broker system
+ */
+export function getBrokerSystemStatus(): {
+  initialized: boolean;
+  availableBrokers: string[];
+  totalBrokers: number;
+} {
+  const registry = BrokerRegistry.getInstance();
   const availableBrokers = registry.getAvailableBrokers();
-  console.log(`✅ Unified broker library initialized with ${availableBrokers.length} broker(s):`, availableBrokers);
+
+  return {
+    initialized: true,
+    availableBrokers,
+    totalBrokers: availableBrokers.length
+  };
 }
 
 /**

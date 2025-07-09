@@ -65,6 +65,7 @@ export interface BrokerConnectionResponse {
     authUrl?: string;
     accessToken?: string;
     requiresAuthCode?: boolean;
+    accountId?: string; // Database account ID for OAuth completion
   };
   errors?: Array<{
     field: string;
