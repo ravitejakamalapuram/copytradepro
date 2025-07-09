@@ -9,7 +9,10 @@ import path from 'path';
 
 // Import broker plugins to register them
 import '@copytrade/broker-shoonya';
-// import '@copytrade/broker-fyers';
+import '@copytrade/broker-fyers';
+
+// Import unified broker system
+import { initializeUnifiedBroker } from '@copytrade/unified-broker';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
@@ -183,6 +186,11 @@ async function startServer() {
     console.log('🔧 Initializing database...');
     const database = await getDatabase();
     console.log(`✅ Database initialized: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
+
+    // Initialize unified broker system
+    console.log('🔧 Initializing unified broker system...');
+    initializeUnifiedBroker();
+    console.log('✅ Unified broker system initialized');
 
     // Initialize broker account cache
     await initializeBrokerAccountCache();
