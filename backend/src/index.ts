@@ -8,11 +8,7 @@ import { createServer } from 'http';
 import path from 'path';
 
 // Import unified broker system
-import { initializeUnifiedBroker, getBrokerSystemStatus } from '@copytrade/unified-broker';
-
-// Import broker plugins for explicit initialization
-import { initializeShoonyaBroker } from '@copytrade/broker-shoonya';
-import { initializeFyersBroker } from '@copytrade/broker-fyers';
+import { initializeUnifiedBroker } from '@copytrade/unified-broker';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
@@ -213,26 +209,44 @@ async function startServer() {
 
     // Initialize unified broker system with explicit control
     console.log('🔧 Initializing unified broker system...');
-    initializeUnifiedBroker();
+    const registry = initializeUnifiedBroker();
 
-    // Initialize broker plugins explicitly
+    // Initialize broker plugins explicitly with the same registry instance
     console.log('🔧 Initializing broker plugins...');
 
+    // Import and register plugins manually to ensure same registry
+    const { ShoonyaServiceAdapter } = require('@copytrade/broker-shoonya');
+    const { FyersServiceAdapter } = require('@copytrade/broker-fyers');
+
     try {
-      initializeShoonyaBroker();
+      // Register Shoonya plugin directly
+      const shoonyaPlugin = {
+        name: 'shoonya',
+        version: '1.0.0',
+        createInstance: () => new ShoonyaServiceAdapter()
+      };
+      registry.registerPlugin(shoonyaPlugin);
+      console.log('✅ Shoonya broker plugin registered directly');
     } catch (error) {
-      console.error('❌ Failed to initialize Shoonya broker:', error);
+      console.error('❌ Failed to register Shoonya broker:', error);
     }
 
     try {
-      initializeFyersBroker();
+      // Register Fyers plugin directly
+      const fyersPlugin = {
+        name: 'fyers',
+        version: '1.0.0',
+        createInstance: () => new FyersServiceAdapter()
+      };
+      registry.registerPlugin(fyersPlugin);
+      console.log('✅ Fyers broker plugin registered directly');
     } catch (error) {
-      console.error('❌ Failed to initialize Fyers broker:', error);
+      console.error('❌ Failed to register Fyers broker:', error);
     }
 
     // Final status check
-    const status = getBrokerSystemStatus();
-    console.log(`✅ Unified broker system ready with ${status.totalBrokers} broker(s):`, status.availableBrokers);
+    const availableBrokers = registry.getAvailableBrokers();
+    console.log(`✅ Unified broker system ready with ${availableBrokers.length} broker(s):`, availableBrokers);
 
     // Initialize broker account cache
     await initializeBrokerAccountCache();
