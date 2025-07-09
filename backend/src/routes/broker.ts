@@ -4,6 +4,7 @@ import {
   connectBroker,
   validateBrokerAuthCode,
   getConnectedAccounts,
+  getAvailableBrokers,
   checkAccountSessionStatus,
   saveConnectedAccount,
   removeConnectedAccount,
@@ -109,6 +110,9 @@ const placeOrderValidation = [
 // Routes
 router.post('/connect', authenticateToken, connectBrokerValidation, connectBroker);
 router.post('/validate-auth', authenticateToken, validateBrokerAuthCode);
+
+// Broker information routes
+router.get('/available', authenticateToken, getAvailableBrokers);
 
 // Account management routes
 router.get('/accounts', authenticateToken, getConnectedAccounts);

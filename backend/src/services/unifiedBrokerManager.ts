@@ -415,6 +415,20 @@ export class UnifiedBrokerManager {
     });
     console.log(`📊 Total: ${this.connections.size} connections`);
   }
+
+  /**
+   * Get list of available/initialized brokers
+   */
+  getAvailableBrokers(): string[] {
+    return this.brokerRegistry.getAvailableBrokers();
+  }
+
+  /**
+   * Check if a specific broker is available
+   */
+  isBrokerAvailable(brokerName: string): boolean {
+    return this.brokerRegistry.isBrokerAvailable(brokerName);
+  }
 }
 
 // Export singleton instance

@@ -213,6 +213,44 @@ export const populateCacheForUser = async (userId: string) => {
   }
 };
 
+// Get available/initialized brokers
+export const getAvailableBrokers = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    // Get available brokers from unified broker manager
+    const availableBrokers = unifiedBrokerManager.getAvailableBrokers();
+
+    console.log(`📋 Available brokers for user ${userId}:`, availableBrokers);
+
+    res.status(200).json({
+      success: true,
+      message: 'Available brokers retrieved successfully',
+      data: {
+        brokers: availableBrokers,
+        count: availableBrokers.length
+      }
+    });
+  } catch (error: any) {
+    console.error('🚨 Get available brokers error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get available brokers',
+      error: error.message
+    });
+  }
+};
+
 // All account management now handled by UnifiedBrokerManager and database
 
 export const connectBroker = async (
