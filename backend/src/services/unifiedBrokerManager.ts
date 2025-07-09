@@ -72,15 +72,25 @@ export class UnifiedBrokerManager {
       // Attempt login
       const loginResult: LoginResponse = await tempBrokerService.login(credentials);
 
+      console.log(`🔍 DEBUG: Login result for ${brokerName}:`, {
+        success: loginResult.success,
+        message: loginResult.message,
+        hasData: !!loginResult.data,
+        dataKeys: loginResult.data ? Object.keys(loginResult.data) : [],
+        authUrl: loginResult.data?.authUrl
+      });
+
       if (!loginResult.success) {
         // Check if this is an OAuth flow that needs auth URL
         if (loginResult.data?.authUrl) {
+          console.log(`✅ OAuth URL detected: ${loginResult.data.authUrl}`);
           return {
             success: false,
             authUrl: loginResult.data.authUrl,
             message: loginResult.message || 'Authentication URL generated'
           };
         }
+        console.log(`❌ No OAuth URL found in login result`);
         throw new Error(loginResult.message || 'Login failed');
       }
 
