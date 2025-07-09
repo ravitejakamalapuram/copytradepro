@@ -3,8 +3,8 @@ import { userDatabase } from './sqliteDatabase';
 import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
-// Import broker connections from controller
-import { userBrokerConnections } from '../controllers/brokerController';
+// Import unified broker manager
+import { unifiedBrokerManager } from './unifiedBrokerManager';
 
 // Broker connection manager interface
 interface BrokerConnectionManager {
@@ -14,32 +14,25 @@ interface BrokerConnectionManager {
 // Create broker connection manager implementation
 const brokerConnectionManager: BrokerConnectionManager = {
   getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
-      console.log(`❌ No connections found for user ${userId}`);
+    console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+
+    // Get any connection for this broker
+    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+    if (connections.length === 0) {
+      console.log(`❌ No ${brokerName} connections found for user ${userId}`);
       return null;
     }
 
-    const brokerService = userConnections.get(brokerName);
-    if (!brokerService) {
-      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
-      console.log(`❌ No ${brokerName} connection found for user ${userId}`);
-      return null;
+    // Return the first active connection
+    const activeConnection = connections.find(conn => conn.isActive);
+    if (activeConnection) {
+      console.log(`✅ Found active ${brokerName} connection for user ${userId} (account: ${activeConnection.accountId})`);
+      return activeConnection.service;
     }
 
-    if (brokerName === 'shoonya') {
-      const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
-      if (brokerServiceTyped.isLoggedIn && brokerServiceTyped.isLoggedIn()) {
-        console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
-        return brokerServiceTyped;
-      } else {
-        console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
-        return null;
-      }
-    }
-
-    return null;
+    // If no active connection, try the first one
+    console.log(`⚠️ No active ${brokerName} connection found for user ${userId}, trying first available`);
+    return connections[0]?.service || null;
   }
 };
 

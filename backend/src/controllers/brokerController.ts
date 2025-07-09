@@ -8,9 +8,7 @@ import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
 import { IBrokerService } from '@copytrade/unified-broker';
 import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
 
-// Store broker connections per user (in production, use Redis or database)
-// Legacy connection map - will be phased out in favor of brokerManager
-export const userBrokerConnections = new Map<string, Map<string, any>>();
+// All broker connections now managed by UnifiedBrokerManager
 
 /**
  * Helper function to get broker service using the unified broker manager
@@ -29,7 +27,7 @@ function getBrokerService(userId: string, brokerName: string, accountId?: string
 }
 
 /**
- * Helper function to validate session without hardcoded broker checks
+ * Helper function to validate session using unified broker manager
  */
 async function validateBrokerSession(userId: string, brokerName: string, accountId: string): Promise<boolean> {
   try {
@@ -41,7 +39,7 @@ async function validateBrokerSession(userId: string, brokerName: string, account
 }
 
 /**
- * Helper function to logout from broker without hardcoded broker checks
+ * Helper function to logout from broker using unified broker manager
  */
 async function logoutFromBroker(userId: string, brokerName: string, accountId: string): Promise<void> {
   try {
@@ -53,7 +51,7 @@ async function logoutFromBroker(userId: string, brokerName: string, accountId: s
 }
 
 /**
- * Helper function to place order without hardcoded broker checks
+ * Helper function to place order using unified broker manager
  */
 async function placeBrokerOrder(
   userId: string,
@@ -90,24 +88,23 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
       return false;
     }
 
-    // Check if connection exists in legacy map
-    const userConnections = userBrokerConnections.get(userId);
-    const connectionKey = `${account.broker_name}_${account.account_id}`;
-    const existingConnection = userConnections?.get(connectionKey);
+    // Check if connection exists using unified broker manager
+    const existingConnection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
 
     if (existingConnection) {
       // Test if existing connection is still valid
       try {
-        if (existingConnection.isLoggedIn && existingConnection.isLoggedIn()) {
+        const isValid = await unifiedBrokerManager.validateConnection(userId, account.broker_name, account.account_id);
+        if (isValid) {
           console.log(`✅ Account ${accountId} session is already valid`);
           return true;
         } else {
           console.log(`⚠️ Account ${accountId} session is invalid, removing connection`);
-          userConnections?.delete(connectionKey);
+          await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
         }
       } catch (error: any) {
         console.log(`⚠️ Session validation failed for ${accountId}:`, error.message);
-        userConnections?.delete(connectionKey);
+        await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
       }
     }
 
@@ -208,24 +205,7 @@ export const populateCacheForUser = async (userId: string) => {
   }
 };
 
-// Legacy ConnectedAccount interface - will be phased out
-// interface ConnectedAccount {
-//   id: string;
-//   brokerName: string;
-//   accountId: string;
-//   userId: string;
-//   userName: string;
-//   email: string;
-//   brokerDisplayName: string;
-//   exchanges: string[];
-//   products: any[];
-//   isActive: boolean;
-//   createdAt: Date;
-//   accessToken?: string;
-// }
-
-// Legacy user connected accounts map - will be phased out
-// const userConnectedAccounts = new Map<string, ConnectedAccount[]>();
+// All account management now handled by UnifiedBrokerManager and database
 
 export const connectBroker = async (
   req: AuthenticatedRequest,
@@ -457,12 +437,10 @@ export const getConnectedAccounts = async (
         dbAccounts.map(async (dbAccount: any) => {
           let isReallyActive = false;
 
-          // Check if broker service exists in memory and validate session
-          const userConnections = userBrokerConnections.get(userId);
-          const connectionKey = `${dbAccount.broker_name}_${dbAccount.account_id}`;
-          const brokerService = userConnections?.get(connectionKey);
+          // Check if broker connection exists and validate session
+          const connection = unifiedBrokerManager.getConnection(userId, dbAccount.broker_name, dbAccount.account_id);
 
-          if (brokerService) {
+          if (connection) {
             try {
               const sessionValid = await validateBrokerSession(userId, dbAccount.broker_name, dbAccount.account_id);
 
@@ -471,14 +449,14 @@ export const getConnectedAccounts = async (
                 console.log(`✅ Session valid for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
               } else {
                 console.log(`⚠️ Session expired for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
-                // Remove from memory if session is invalid
-                userConnections?.delete(connectionKey);
+                // Remove connection if session is invalid
+                await unifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
                 isReallyActive = false;
               }
             } catch (validationError: any) {
               console.error(`🚨 Session validation error for ${dbAccount.broker_name}:`, validationError.message);
-              // On validation error, remove from memory and mark as inactive
-              userConnections?.delete(connectionKey);
+              // On validation error, remove connection and mark as inactive
+              await unifiedBrokerManager.disconnect(userId, dbAccount.broker_name, dbAccount.account_id);
               isReallyActive = false;
             }
           } else {
@@ -558,12 +536,10 @@ export const checkAccountSessionStatus = async (
       message: 'No active session found',
     };
 
-    // Check if broker service exists in memory and validate session
-    const userConnections = userBrokerConnections.get(userId);
-    const connectionKey = `${account.broker_name}_${account.account_id}`;
-    const brokerService = userConnections?.get(connectionKey);
+    // Check if broker connection exists and validate session
+    const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
 
-    if (brokerService) {
+    if (connection) {
       try {
         const sessionValid = await validateBrokerSession(userId, account.broker_name, account.account_id);
 
@@ -575,8 +551,8 @@ export const checkAccountSessionStatus = async (
             message: 'Session is valid and active',
           };
         } else {
-          // Remove from memory if session is invalid
-          userConnections?.delete(connectionKey);
+          // Remove connection if session is invalid
+          await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
           sessionInfo = {
             lastChecked: new Date().toISOString(),
             status: 'expired',
@@ -585,8 +561,8 @@ export const checkAccountSessionStatus = async (
         }
       } catch (validationError: any) {
         console.error(`🚨 Session validation error for ${account.broker_name}:`, validationError.message);
-        // On validation error, remove from memory
-        userConnections?.delete(connectionKey);
+        // On validation error, remove connection
+        await unifiedBrokerManager.disconnect(userId, account.broker_name, account.account_id);
         sessionInfo = {
           lastChecked: new Date().toISOString(),
           status: 'error',
@@ -681,19 +657,16 @@ export const removeConnectedAccount = async (
         return;
       }
 
-      // Perform actual logout from broker and remove from in-memory connections
-      const userConnections = userBrokerConnections.get(userId);
-      const connectionKey = `${account.broker_name}_${account.account_id}`;
-      if (userConnections && userConnections.has(connectionKey)) {
+      // Perform actual logout from broker using unified manager
+      const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+      if (connection) {
         try {
           await logoutFromBroker(userId, account.broker_name, account.account_id);
           console.log('✅ Successfully logged out from broker:', account.broker_name);
         } catch (logoutError: any) {
           console.error('⚠️ Logout error (continuing with removal):', logoutError.message);
         }
-
-        userConnections.delete(connectionKey);
-        console.log('✅ Removed from in-memory connections:', connectionKey);
+        console.log('✅ Removed connection from unified manager');
       }
 
       // Delete from database
@@ -841,20 +814,16 @@ export const deactivateAccount = async (
       return;
     }
 
-    // Perform actual logout from broker
-    const userConnections = userBrokerConnections.get(userId);
-    const connectionKey = `${account.broker_name}_${account.account_id}`;
-    if (userConnections && userConnections.has(connectionKey)) {
+    // Perform actual logout from broker using unified manager
+    const connection = unifiedBrokerManager.getConnection(userId, account.broker_name, account.account_id);
+    if (connection) {
       try {
         await logoutFromBroker(userId, account.broker_name, account.account_id);
         console.log('✅ Successfully logged out from broker:', account.broker_name);
       } catch (logoutError: any) {
         console.error('⚠️ Logout error (continuing anyway):', logoutError.message);
       }
-
-      // Remove from in-memory connections using account-specific key
-      userConnections.delete(connectionKey);
-      console.log('✅ Removed from in-memory connections:', connectionKey);
+      console.log('✅ Removed connection from unified manager');
     }
 
     // Note: No database status update needed - status is determined by real-time validation
@@ -902,10 +871,9 @@ export const disconnectBroker = async (
       return;
     }
 
-    const userConnections = userBrokerConnections.get(userId);
-    const connectionKey = `${brokerName}_${accountId}`;
+    const connection = unifiedBrokerManager.getConnection(userId, brokerName, accountId);
 
-    if (!userConnections || !userConnections.has(connectionKey)) {
+    if (!connection) {
       res.status(404).json({
         success: false,
         message: `Not connected to ${brokerName} account ${accountId}`,
@@ -913,11 +881,8 @@ export const disconnectBroker = async (
       return;
     }
 
-    // Logout from broker
+    // Logout from broker using unified manager
     await logoutFromBroker(userId, brokerName, accountId);
-
-    // Remove connection
-    userConnections.delete(connectionKey);
 
     res.status(200).json({
       success: true,
@@ -1772,7 +1737,7 @@ export const getQuotes = async (
       // Use the unified interface
       quotes = await unifiedBrokerService.getQuote(token, exchange);
     } else if (brokerService) {
-      // Fall back to legacy broker-specific calls using duck typing
+      // Use unified broker interface
       if (typeof brokerService.getQuote === 'function') {
         try {
           // Try different parameter formats based on broker API requirements
@@ -1835,18 +1800,16 @@ const brokerConnectionManagerImpl = {
         return null;
       }
 
-      // Step 3: Get active connection for the user
-      const userConnections = userBrokerConnections.get(accountMapping.userId);
-      if (!userConnections) {
-        console.log(`❌ No active connections found for user ${accountMapping.userId}`);
+      // Step 3: Get active connection for the user using unified manager
+      const connection = unifiedBrokerManager.getConnection(accountMapping.userId, brokerName, accountMapping.accountId);
+      if (!connection) {
+        console.log(`❌ No active connection found for user ${accountMapping.userId}`);
         return null;
       }
 
-      const connectionKey = `${brokerName}_${accountMapping.accountId}`;
-      const service = userConnections.get(connectionKey);
-      if (service) {
+      if (connection.service) {
         console.log(`✅ Found ${brokerName} service for user ${accountMapping.userId} (${accountMapping.userDisplayName})`);
-        return service;
+        return connection.service;
       }
 
       console.log(`❌ Service not found for user ${accountMapping.userId}`);
