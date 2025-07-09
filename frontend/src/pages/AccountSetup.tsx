@@ -6,17 +6,17 @@ import { accountService, type ConnectedAccount } from '../services/accountServic
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 
-const SUPPORTED_BROKERS = [
-  { 
-    id: 'shoonya', 
-    name: 'Shoonya', 
+const ALL_BROKERS = [
+  {
+    id: 'shoonya',
+    name: 'Shoonya',
     description: 'Reliable trading & investment platform by Finvasia',
     logo: '🏦',
     features: ['Zero brokerage on equity delivery', 'Advanced charting tools', 'API trading support']
   },
-  { 
-    id: 'fyers', 
-    name: 'Fyers', 
+  {
+    id: 'fyers',
+    name: 'Fyers',
     description: 'Advanced trading platform with powerful APIs',
     logo: '🚀',
     features: ['Professional trading tools', 'Real-time market data', 'Advanced order types']
@@ -41,6 +41,7 @@ interface FormData {
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [availableBrokers, setAvailableBrokers] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedBroker, setSelectedBroker] = useState<string>('');
   const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
@@ -61,21 +62,31 @@ const AccountSetup: React.FC = () => {
   });
 
   useEffect(() => {
-    const fetchAccounts = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        const connectedAccounts = await accountService.getConnectedAccounts();
+
+        // Fetch both connected accounts and available brokers
+        const [connectedAccounts, brokers] = await Promise.all([
+          accountService.getConnectedAccounts(),
+          accountService.getAvailableBrokers()
+        ]);
+
         setAccounts(connectedAccounts);
+        setAvailableBrokers(brokers);
+
+        console.log('📋 Available brokers:', brokers);
+        console.log('🔗 Connected accounts:', connectedAccounts.length);
       } catch (error: any) {
-        console.error('Failed to fetch accounts:', error);
-        setError('Failed to load connected accounts');
+        console.error('Failed to fetch data:', error);
+        setError('Failed to load account data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchAccounts();
+    fetchData();
   }, []);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
@@ -215,13 +226,7 @@ const AccountSetup: React.FC = () => {
     }
   };
 
-  const getStatusColor = (isActive: boolean): string => {
-    return isActive ? 'var(--kite-profit)' : 'var(--kite-neutral)';
-  };
 
-  const getStatusText = (isActive: boolean): string => {
-    return isActive ? 'Active' : 'Inactive';
-  };
 
   if (loading) {
     return (
@@ -293,14 +298,14 @@ const AccountSetup: React.FC = () => {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontSize: '1.25rem' }}>
-                            {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.logo || '🏦'}
+                            {ALL_BROKERS.find(b => b.id === account.brokerName)?.logo || '🏦'}
                           </span>
                           <div>
                             <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
                               {account.brokerName.charAt(0).toUpperCase() + account.brokerName.slice(1)}
                             </div>
                             <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
-                              {SUPPORTED_BROKERS.find(b => b.id === account.brokerName)?.description}
+                              {ALL_BROKERS.find(b => b.id === account.brokerName)?.description}
                             </div>
                           </div>
                         </div>
@@ -320,16 +325,39 @@ const AccountSetup: React.FC = () => {
                         )}
                       </td>
                       <td>
-                        <span style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: 'var(--kite-radius-sm)',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          backgroundColor: account.isActive ? 'var(--kite-bg-success)' : 'var(--kite-bg-neutral)',
-                          color: getStatusColor(account.isActive)
-                        }}>
-                          {getStatusText(account.isActive)}
-                        </span>
+                        {(() => {
+                          const isBrokerAvailable = availableBrokers.includes(account.brokerName);
+                          const isAccountActive = account.isActive;
+
+                          let status, bgColor, textColor;
+
+                          if (!isBrokerAvailable) {
+                            status = 'BROKER INACTIVE';
+                            bgColor = 'var(--kite-bg-error)';
+                            textColor = 'var(--kite-status-error)';
+                          } else if (isAccountActive) {
+                            status = 'ACTIVE';
+                            bgColor = 'var(--kite-bg-success)';
+                            textColor = 'var(--kite-status-success)';
+                          } else {
+                            status = 'INACTIVE';
+                            bgColor = 'var(--kite-bg-neutral)';
+                            textColor = 'var(--kite-text-secondary)';
+                          }
+
+                          return (
+                            <span style={{
+                              padding: '0.25rem 0.5rem',
+                              borderRadius: 'var(--kite-radius-sm)',
+                              fontSize: '0.75rem',
+                              fontWeight: '500',
+                              backgroundColor: bgColor,
+                              color: textColor
+                            }}>
+                              {status}
+                            </span>
+                          );
+                        })()}
                       </td>
                       <td style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
                         {new Date(account.createdAt).toLocaleDateString('en-IN')}
@@ -378,7 +406,7 @@ const AccountSetup: React.FC = () => {
           <div className="kite-card">
             <div className="kite-card-header">
               <h2 className="kite-card-title">
-                {selectedBroker ? `Connect ${SUPPORTED_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
+                {selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
               </h2>
               <button
                 className="kite-btn"
@@ -396,35 +424,79 @@ const AccountSetup: React.FC = () => {
               {!selectedBroker ? (
                 /* Broker Selection */
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-                  {SUPPORTED_BROKERS.map((broker) => (
+                  {ALL_BROKERS.map((broker) => {
+                    const isAvailable = availableBrokers.includes(broker.id);
+                    return (
                     <div
                       key={broker.id}
-                      onClick={() => handleBrokerSelect(broker.id)}
+                      onClick={() => isAvailable ? handleBrokerSelect(broker.id) : null}
                       style={{
                         padding: '1.5rem',
-                        border: '2px solid var(--kite-border-secondary)',
+                        border: `2px solid ${isAvailable ? 'var(--kite-border-secondary)' : 'var(--kite-border-disabled)'}`,
                         borderRadius: 'var(--kite-radius-lg)',
-                        cursor: 'pointer',
+                        cursor: isAvailable ? 'pointer' : 'not-allowed',
                         transition: 'all 0.2s ease',
-                        backgroundColor: 'var(--kite-bg-secondary)'
+                        backgroundColor: isAvailable ? 'var(--kite-bg-secondary)' : 'var(--kite-bg-disabled)',
+                        opacity: isAvailable ? 1 : 0.6,
+                        position: 'relative'
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--kite-brand-primary)';
-                        e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)';
+                        if (isAvailable) {
+                          e.currentTarget.style.borderColor = 'var(--kite-brand-primary)';
+                          e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)';
+                        }
                       }}
                       onMouseLeave={(e) => {
-                        e.currentTarget.style.borderColor = 'var(--kite-border-secondary)';
-                        e.currentTarget.style.backgroundColor = 'var(--kite-bg-secondary)';
+                        if (isAvailable) {
+                          e.currentTarget.style.borderColor = 'var(--kite-border-secondary)';
+                          e.currentTarget.style.backgroundColor = 'var(--kite-bg-secondary)';
+                        }
                       }}
                     >
+                      {/* Status indicator for unavailable brokers */}
+                      {!isAvailable && (
+                        <div style={{
+                          position: 'absolute',
+                          top: '0.75rem',
+                          right: '0.75rem',
+                          backgroundColor: 'var(--kite-status-error)',
+                          color: 'white',
+                          padding: '0.25rem 0.5rem',
+                          borderRadius: 'var(--kite-radius-sm)',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}>
+                          INACTIVE
+                        </div>
+                      )}
+
                       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                         <span style={{ fontSize: '2rem' }}>{broker.logo}</span>
                         <div>
-                          <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--kite-text-primary)' }}>
+                          <h3 style={{
+                            margin: 0,
+                            fontSize: '1.25rem',
+                            fontWeight: '600',
+                            color: isAvailable ? 'var(--kite-text-primary)' : 'var(--kite-text-disabled)'
+                          }}>
                             {broker.name}
+                            {isAvailable && (
+                              <span style={{
+                                marginLeft: '0.5rem',
+                                fontSize: '0.75rem',
+                                color: 'var(--kite-status-success)',
+                                fontWeight: '500'
+                              }}>
+                                ● AVAILABLE
+                              </span>
+                            )}
                           </h3>
-                          <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
-                            {broker.description}
+                          <p style={{
+                            margin: 0,
+                            fontSize: '0.875rem',
+                            color: isAvailable ? 'var(--kite-text-secondary)' : 'var(--kite-text-disabled)'
+                          }}>
+                            {isAvailable ? broker.description : 'Broker not initialized on server'}
                           </p>
                         </div>
                       </div>
@@ -436,7 +508,8 @@ const AccountSetup: React.FC = () => {
                         ))}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 /* Broker Credentials Form */
@@ -606,7 +679,7 @@ const AccountSetup: React.FC = () => {
                       marginTop: '2rem'
                     }}
                   >
-                    {submitting ? 'Connecting...' : `Connect ${SUPPORTED_BROKERS.find(b => b.id === selectedBroker)?.name}`}
+                    {submitting ? 'Connecting...' : `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}`}
                   </button>
                 </div>
               )}

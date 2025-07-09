@@ -169,6 +169,29 @@ export const accountService = {
     localStorage.removeItem('temp_account');
   },
 
+  // Get available/initialized brokers from backend
+  async getAvailableBrokers(): Promise<string[]> {
+    try {
+      const response = await api.get<{
+        success: boolean;
+        data: {
+          brokers: string[];
+          count: number;
+        };
+      }>('/broker/available');
+
+      if (response.data.success) {
+        return response.data.data.brokers;
+      } else {
+        console.error('Failed to get available brokers:', response.data);
+        return [];
+      }
+    } catch (error) {
+      console.error('Failed to fetch available brokers:', error);
+      return [];
+    }
+  },
+
   // Create account from broker response
   createAccountFromBrokerResponse(brokerName: string, brokerResponse: any, _credentials: any): ConnectedAccount {
     const baseAccount = {
