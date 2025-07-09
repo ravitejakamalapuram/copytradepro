@@ -93,6 +93,102 @@ const AccountSetup: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Handle OAuth flow with popup
+  const handleOAuthFlow = async (accountId: string, authUrl: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Opening OAuth popup for:', authUrl);
+
+      // Open OAuth URL in popup
+      const popup = window.open(
+        authUrl,
+        'oauth-popup',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
+
+      if (!popup) {
+        alert('Popup blocked! Please allow popups for this site and try again.');
+        reject(new Error('Popup blocked'));
+        return;
+      }
+
+      // Monitor popup for auth code
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          reject(new Error('OAuth popup was closed'));
+          return;
+        }
+
+        try {
+          // Check if popup URL contains auth code
+          const popupUrl = popup.location.href;
+          const urlParams = new URLSearchParams(new URL(popupUrl).search);
+          const authCode = urlParams.get('code');
+
+          if (authCode) {
+            console.log('✅ Auth code received:', authCode);
+            clearInterval(checkClosed);
+            popup.close();
+
+            // Complete OAuth authentication
+            completeOAuthAuth(accountId, authCode)
+              .then(() => resolve())
+              .catch(reject);
+          }
+        } catch (error) {
+          // Cross-origin error - popup is still on OAuth provider domain
+          // This is expected, continue monitoring
+        }
+      }, 1000);
+
+      // Timeout after 5 minutes
+      setTimeout(() => {
+        if (!popup.closed) {
+          clearInterval(checkClosed);
+          popup.close();
+          reject(new Error('OAuth timeout - please try again'));
+        }
+      }, 300000);
+    });
+  };
+
+  // Complete OAuth authentication with auth code
+  const completeOAuthAuth = async (accountId: string, authCode: string): Promise<void> => {
+    try {
+      console.log('🔄 Completing OAuth authentication...');
+
+      // Call backend to complete OAuth
+      const response = await fetch(`/api/broker/oauth/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          accountId,
+          authCode
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('✅ OAuth completed successfully');
+        alert('Account activated successfully!');
+
+        // Refresh accounts
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+      } else {
+        console.error('❌ OAuth completion failed:', result.message);
+        alert(`OAuth completion failed: ${result.message || 'Unknown error'}`);
+      }
+    } catch (error: any) {
+      console.error('🚨 OAuth completion error:', error);
+      alert(`OAuth completion failed: ${error.message || 'Network error'}`);
+    }
+  };
+
   const handleBrokerSelect = (brokerId: string) => {
     setSelectedBroker(brokerId);
     setFormData(prev => ({ ...prev, brokerName: brokerId }));
@@ -176,9 +272,7 @@ const AccountSetup: React.FC = () => {
         // Handle OAuth flow
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
           console.log('🔄 OAuth authentication required');
-          alert(`OAuth authentication required. Please complete authentication at: ${result.authUrl}`);
-          // Open OAuth URL in new window
-          window.open(result.authUrl, '_blank', 'width=600,height=700');
+          await handleOAuthFlow(accountId, result.authUrl);
         } else {
           console.error('❌ Account activation failed:', result.message);
           alert(`Failed to activate account: ${result.message || 'Unknown error'}`);

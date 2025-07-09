@@ -251,7 +251,87 @@ export const getAvailableBrokers = async (
   }
 };
 
-// OAuth callback handler for brokers like Fyers
+// Complete OAuth authentication with auth code
+export const completeOAuthAuth = async (
+  req: AuthenticatedRequest,
+  res: Response
+): Promise<void> => {
+  try {
+    const { accountId, authCode } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!accountId || !authCode) {
+      res.status(400).json({
+        success: false,
+        message: 'Account ID and auth code are required',
+      });
+      return;
+    }
+
+    console.log(`🔄 Completing OAuth for account ${accountId} with auth code: ${authCode}`);
+
+    // Get account from database to determine broker
+    const account = await userDatabase.getConnectedAccountById(accountId);
+    if (!account) {
+      res.status(404).json({
+        success: false,
+        message: 'Account not found',
+      });
+      return;
+    }
+
+    // Complete OAuth authentication using unified broker manager
+    const result = await unifiedBrokerManager.completeOAuthAuth(
+      userId,
+      account.broker_name,
+      authCode,
+      {} // credentials will be retrieved from database
+    );
+
+    if (result.success) {
+      console.log(`✅ OAuth completed successfully for ${account.broker_name}`);
+
+      // Add to broker account cache for fast lookups
+      addToBrokerAccountCache(
+        account.account_id,
+        userId,
+        account.broker_name,
+        account.user_name
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'OAuth authentication completed successfully',
+        data: {
+          accountId: result.accountId,
+          brokerName: account.broker_name
+        }
+      });
+    } else {
+      console.error(`❌ OAuth completion failed for ${account.broker_name}:`, result.message);
+      res.status(400).json({
+        success: false,
+        message: result.message || 'OAuth authentication failed'
+      });
+    }
+  } catch (error: any) {
+    console.error('🚨 OAuth completion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error during OAuth completion'
+    });
+  }
+};
+
+// OAuth callback handler for brokers like Fyers (legacy redirect-based flow)
 export const handleOAuthCallback = async (
   req: AuthenticatedRequest,
   res: Response
@@ -887,15 +967,25 @@ export const activateAccount = async (
       } else {
         console.log(`❌ Account ${accountId} activation failed: ${result.message}`);
 
-        // Handle OAuth flow - redirect user to OAuth URL
+        // Handle OAuth flow - return OAuth URL for frontend popup handling
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
-          console.log(`🔄 Redirecting to OAuth URL for ${result.brokerName}: ${result.authUrl}`);
+          console.log(`🔄 OAuth authentication required for ${result.brokerName}: ${result.authUrl}`);
 
-          // For OAuth flows, redirect the user directly to the auth URL
-          // This creates a unified experience where activation always "works"
-          // Add broker and account info to the redirect URL for callback processing
-          const redirectUrl = `${result.authUrl}&broker=${result.brokerName}&account=${accountId}`;
-          res.redirect(redirectUrl);
+          const response: ActivateAccountResponse = createActivationResponse(
+            false,
+            result.message || 'OAuth authentication required',
+            {
+              accountId,
+              isActive: false,
+              authStep: result.authStep,
+              authUrl: result.authUrl,
+              additionalData: {
+                ...(result.brokerName && { brokerName: result.brokerName }),
+                ...(result.userName && { userName: result.userName })
+              }
+            }
+          );
+          res.status(200).json(response); // 200 for OAuth flow, not an error
           return;
         }
 
