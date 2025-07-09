@@ -105,6 +105,30 @@ app.get('/health', (_req, res) => {
   }
 });
 
+// API Health check endpoint
+app.get('/api/health', (_req, res) => {
+  try {
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      version: '1.0.0',
+      services: {
+        database: 'SQLite',
+        websocket: 'Socket.IO',
+        orderMonitoring: 'Active'
+      }
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'ERROR',
+      timestamp: new Date().toISOString(),
+      error: 'Health check failed'
+    });
+  }
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/broker', brokerRoutes);
