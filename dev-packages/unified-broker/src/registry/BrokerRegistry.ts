@@ -23,6 +23,7 @@ export class BrokerRegistry {
   private static instance: BrokerRegistry;
   private plugins: Map<string, BrokerPlugin> = new Map();
   private instances: Map<string, IBrokerService> = new Map();
+  private accountInstances: Map<string, IBrokerService> = new Map(); // Per-account instances
   private config: BrokerRegistryConfig;
 
   private constructor(config: BrokerRegistryConfig = {}) {
@@ -73,6 +74,12 @@ export class BrokerRegistry {
     const normalizedName = brokerName.toLowerCase();
     this.plugins.delete(normalizedName);
     this.instances.delete(normalizedName);
+
+    // Remove all account instances for this broker
+    const keysToDelete = Array.from(this.accountInstances.keys())
+      .filter(key => key.startsWith(`${normalizedName}_`));
+    keysToDelete.forEach(key => this.accountInstances.delete(key));
+
     console.log(`🗑️ Unregistered broker plugin: ${brokerName}`);
   }
 
@@ -105,16 +112,52 @@ export class BrokerRegistry {
    * Get or create a singleton broker instance
    * @param brokerName - Name of the broker
    * @returns IBrokerService instance
+   * @deprecated Use getBrokerForAccount instead for account-specific instances
    */
   getBroker(brokerName: string): IBrokerService {
     const normalizedName = brokerName.toLowerCase();
-    
+
     if (!this.instances.has(normalizedName)) {
       const instance = this.createBroker(normalizedName);
       this.instances.set(normalizedName, instance);
     }
-    
+
     return this.instances.get(normalizedName)!;
+  }
+
+  /**
+   * Get or create a broker instance for a specific account
+   * This ensures each account has its own isolated broker service instance
+   * @param brokerName - Name of the broker
+   * @param accountId - Account ID for isolation
+   * @returns IBrokerService instance
+   */
+  getBrokerForAccount(brokerName: string, accountId: string): IBrokerService {
+    const normalizedName = brokerName.toLowerCase();
+    const accountKey = `${normalizedName}_${accountId}`;
+
+    if (!this.accountInstances.has(accountKey)) {
+      const instance = this.createBroker(normalizedName);
+      this.accountInstances.set(accountKey, instance);
+      console.log(`🏭 Created isolated broker instance for ${brokerName} account ${accountId}`);
+    }
+
+    return this.accountInstances.get(accountKey)!;
+  }
+
+  /**
+   * Remove broker instance for a specific account
+   * @param brokerName - Name of the broker
+   * @param accountId - Account ID
+   */
+  removeBrokerForAccount(brokerName: string, accountId: string): void {
+    const normalizedName = brokerName.toLowerCase();
+    const accountKey = `${normalizedName}_${accountId}`;
+
+    if (this.accountInstances.has(accountKey)) {
+      this.accountInstances.delete(accountKey);
+      console.log(`🗑️ Removed broker instance for ${brokerName} account ${accountId}`);
+    }
   }
 
   /**
@@ -151,6 +194,7 @@ export class BrokerRegistry {
    */
   clearInstances(): void {
     this.instances.clear();
+    this.accountInstances.clear();
   }
 
   /**
@@ -159,6 +203,7 @@ export class BrokerRegistry {
   reset(): void {
     this.plugins.clear();
     this.instances.clear();
+    this.accountInstances.clear();
   }
 
   /**

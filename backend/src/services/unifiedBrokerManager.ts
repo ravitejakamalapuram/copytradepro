@@ -6,6 +6,7 @@
 
 import { BrokerRegistry, IBrokerService, BrokerCredentials, LoginResponse } from '@copytrade/unified-broker';
 import { userDatabase } from './databaseCompatibility';
+import { AuthenticationStep } from '@copytrade/shared-types';
 
 export interface BrokerConnection {
   userId: string;
@@ -14,6 +15,18 @@ export interface BrokerConnection {
   service: IBrokerService;
   isActive: boolean;
   connectedAt: Date;
+}
+
+export interface ActivationResult {
+  success: boolean;
+  message: string;
+  authStep: AuthenticationStep;
+  authUrl?: string;
+  redirectUri?: string;
+  accountId?: string;
+  brokerName?: string;
+  userName?: string;
+  error?: string;
 }
 
 export class UnifiedBrokerManager {
@@ -287,35 +300,89 @@ export class UnifiedBrokerManager {
   /**
    * Auto-activate account using stored credentials
    */
-  async autoActivateAccount(userId: string, accountId: string): Promise<boolean> {
+  async autoActivateAccount(userId: string, accountId: string): Promise<ActivationResult> {
     try {
       // Get account from database
       const account = await userDatabase.getConnectedAccountById(accountId);
       if (!account) {
         console.log(`❌ Account ${accountId} not found in database`);
-        return false;
+        return {
+          success: false,
+          message: 'Account not found in database',
+          authStep: AuthenticationStep.REAUTH_REQUIRED,
+          error: 'ACCOUNT_NOT_FOUND'
+        };
+      }
+
+      // Check if account is already active
+      const existingConnection = this.getConnection(userId, account.broker_name, account.account_id);
+      if (existingConnection && existingConnection.isActive) {
+        console.log(`✅ Account ${accountId} is already active`);
+        return {
+          success: true,
+          message: 'Account is already active',
+          authStep: AuthenticationStep.ALREADY_ACTIVE,
+          accountId: account.account_id,
+          brokerName: account.broker_name,
+          userName: account.user_name
+        };
       }
 
       // Get stored credentials
       const credentials = await userDatabase.getAccountCredentials(accountId);
       if (!credentials) {
         console.log(`❌ No credentials found for account ${accountId}`);
-        return false;
+        return {
+          success: false,
+          message: 'No credentials found for account',
+          authStep: AuthenticationStep.REAUTH_REQUIRED,
+          error: 'CREDENTIALS_NOT_FOUND'
+        };
       }
 
       // Try to connect using account-specific instance
       const result = await this.connectToBroker(userId, account.broker_name, credentials);
-      
+
       if (result.success) {
         console.log(`✅ Auto-activated account ${accountId} for user ${userId}`);
-        return true;
+        return {
+          success: true,
+          message: 'Account activated successfully',
+          authStep: AuthenticationStep.DIRECT_LOGIN,
+          accountId: account.account_id,
+          brokerName: account.broker_name,
+          userName: account.user_name
+        };
       } else {
         console.log(`⚠️ Auto-activation failed for account ${accountId}: ${result.message}`);
-        return false;
+
+        // Check if this is an OAuth flow
+        if (result.authUrl) {
+          return {
+            success: false,
+            message: result.message || 'OAuth authentication required',
+            authStep: AuthenticationStep.OAUTH_REQUIRED,
+            authUrl: result.authUrl,
+            accountId: account.account_id,
+            brokerName: account.broker_name
+          };
+        }
+
+        return {
+          success: false,
+          message: result.message || 'Failed to activate account',
+          authStep: AuthenticationStep.REAUTH_REQUIRED,
+          error: 'ACTIVATION_FAILED'
+        };
       }
     } catch (error: any) {
       console.error(`🚨 Auto-activation failed for account ${accountId}:`, error.message);
-      return false;
+      return {
+        success: false,
+        message: error.message || 'Failed to activate account',
+        authStep: AuthenticationStep.REAUTH_REQUIRED,
+        error: 'INTERNAL_ERROR'
+      };
     }
   }
 

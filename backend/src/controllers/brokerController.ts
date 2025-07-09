@@ -7,6 +7,14 @@ import orderStatusService from '../services/orderStatusService';
 import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
 import { IBrokerService } from '@copytrade/unified-broker';
 import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
+import {
+  ActivateAccountResponse,
+  AuthenticationStep,
+  ApiErrorCode,
+  createActivationResponse,
+  createErrorResponse,
+  createSuccessResponse
+} from '@copytrade/shared-types';
 
 // All broker connections now managed by UnifiedBrokerManager
 
@@ -749,9 +757,9 @@ export const activateAccount = async (
     // Use unified broker manager for account activation
     try {
       console.log(`🔄 Starting activation for account ${accountId} (user ${userId})`);
-      const success = await unifiedBrokerManager.autoActivateAccount(userId, accountId);
+      const result = await unifiedBrokerManager.autoActivateAccount(userId, accountId);
 
-      if (success) {
+      if (result.success) {
         // Add to broker account cache for fast lookups
         const account = await userDatabase.getConnectedAccountById(accountId);
         if (account) {
@@ -764,27 +772,76 @@ export const activateAccount = async (
           console.log(`✅ Account ${accountId} activated successfully for ${account.broker_name}`);
         }
 
-        res.status(200).json({
-          success: true,
-          message: `Successfully activated account`,
-          data: {
+        const response: ActivateAccountResponse = createActivationResponse(
+          true,
+          result.message,
+          {
             accountId,
             isActive: true,
-          },
-        });
+            authStep: result.authStep,
+            additionalData: {
+              ...(result.brokerName && { brokerName: result.brokerName }),
+              ...(result.userName && { userName: result.userName }),
+              exchanges: account?.exchanges ? JSON.parse(account.exchanges) : [],
+              products: account?.products ? JSON.parse(account.products) : []
+            }
+          }
+        );
+
+        res.status(200).json(response);
       } else {
-        console.log(`❌ Account ${accountId} activation failed`);
-        res.status(400).json({
-          success: false,
-          message: 'Failed to activate account. Please check credentials and try again.',
-        });
+        console.log(`❌ Account ${accountId} activation failed: ${result.message}`);
+
+        // Handle OAuth flow
+        if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
+          const response: ActivateAccountResponse = createActivationResponse(
+            false,
+            result.message,
+            {
+              accountId,
+              isActive: false,
+              authStep: result.authStep,
+              authUrl: result.authUrl,
+              additionalData: {
+                ...(result.brokerName && { brokerName: result.brokerName })
+              }
+            }
+          );
+          res.status(200).json(response); // 200 for OAuth flow, not an error
+          return;
+        }
+
+        // Handle other failures
+        const errorCode = result.error === 'CREDENTIALS_NOT_FOUND' ? ApiErrorCode.INVALID_CREDENTIALS :
+                         result.error === 'ACCOUNT_NOT_FOUND' ? ApiErrorCode.ACCOUNT_NOT_FOUND :
+                         ApiErrorCode.BROKER_ERROR;
+
+        const response: ActivateAccountResponse = createActivationResponse(
+          false,
+          result.message,
+          undefined,
+          {
+            code: errorCode,
+            message: result.message,
+            details: result.error
+          }
+        );
+
+        res.status(400).json(response);
       }
     } catch (error: any) {
       console.error('🚨 Activate account error:', error);
-      res.status(400).json({
-        success: false,
-        message: error.message || 'Failed to activate account',
-      });
+      const response: ActivateAccountResponse = createActivationResponse(
+        false,
+        'Failed to activate account',
+        undefined,
+        {
+          code: ApiErrorCode.INTERNAL_ERROR,
+          message: error.message || 'Failed to activate account',
+          details: error
+        }
+      );
+      res.status(500).json(response);
     }
   } catch (error: any) {
     console.error('🚨 Activate account error:', error);

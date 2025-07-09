@@ -151,11 +151,11 @@ export function createSuccessResponse<T>(
     message,
     timestamp: new Date().toISOString()
   };
-
+  
   if (data !== undefined) {
     response.data = data;
   }
-
+  
   return response;
 }
 
@@ -190,14 +190,14 @@ export function createActivationResponse(
     message,
     timestamp: new Date().toISOString()
   };
-
+  
   if (data !== undefined) {
     response.data = data;
   }
-
+  
   if (error !== undefined) {
     response.error = error;
   }
-
+  
   return response;
 }

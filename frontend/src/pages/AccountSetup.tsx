@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService, type ShoonyaCredentials, type FyersCredentials } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
-import { AuthenticationStep } from '../types/api-responses';
+import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 
 const SUPPORTED_BROKERS = [

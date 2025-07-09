@@ -1,6 +1,6 @@
 import api from './api';
-import type { ActivateAccountResponse } from '../types/api-responses';
-import { AuthenticationStep } from '../types/api-responses';
+import type { ActivateAccountResponse } from '@copytrade/shared-types';
+import { AuthenticationStep } from '@copytrade/shared-types';
 
 export interface ConnectedAccount {
   id: string;

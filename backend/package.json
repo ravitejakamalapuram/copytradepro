@@ -1,6 +1,6 @@
 {
   "name": "copytrade-backend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CopyTrade Pro backend application",
   "main": "dist/index.js",
   "private": true,
@@ -13,6 +13,7 @@
   "dependencies": {
     "@copytrade/broker-fyers": "^1.0.0",
     "@copytrade/broker-shoonya": "^1.0.0",
+    "@copytrade/shared-types": "^1.0.1",
     "@copytrade/unified-broker": "^1.1.2",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
