@@ -1,5 +1,4 @@
 import api from './api';
-import type { ActivateAccountResponse } from '@copytrade/shared-types';
 import { AuthenticationStep } from '@copytrade/shared-types';
 
 export interface ConnectedAccount {
@@ -81,28 +80,26 @@ export const accountService = {
     error?: string;
   }> {
     try {
-      const response = await api.post<ActivateAccountResponse>(`/broker/accounts/${accountId}/activate`);
+      const response = await api.post(`/broker/accounts/${accountId}/activate`);
 
       if (response.data.success) {
         return {
           success: true,
-          authStep: response.data.data?.authStep,
           message: response.data.message
         };
       } else {
-        // Handle OAuth flow
-        if (response.data.data?.authStep === AuthenticationStep.OAUTH_REQUIRED) {
+        // Check if OAuth URL is provided
+        if (response.data.authUrl) {
           return {
             success: false,
-            authStep: response.data.data.authStep,
-            authUrl: response.data.data.authUrl,
+            authStep: AuthenticationStep.OAUTH_REQUIRED,
+            authUrl: response.data.authUrl,
             message: response.data.message
           };
         }
 
         return {
           success: false,
-          authStep: response.data.data?.authStep,
           message: response.data.message,
           error: response.data.error?.code
         };

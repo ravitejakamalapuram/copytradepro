@@ -967,25 +967,16 @@ export const activateAccount = async (
       } else {
         console.log(`❌ Account ${accountId} activation failed: ${result.message}`);
 
-        // Handle OAuth flow - return OAuth URL for frontend popup handling
+        // Handle OAuth flow - return auth URL for redirect
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
           console.log(`🔄 OAuth authentication required for ${result.brokerName}: ${result.authUrl}`);
 
-          const response: ActivateAccountResponse = createActivationResponse(
-            false,
-            result.message || 'OAuth authentication required',
-            {
-              accountId,
-              isActive: false,
-              authStep: result.authStep,
-              authUrl: result.authUrl,
-              additionalData: {
-                ...(result.brokerName && { brokerName: result.brokerName }),
-                ...(result.userName && { userName: result.userName })
-              }
-            }
-          );
-          res.status(200).json(response); // 200 for OAuth flow, not an error
+          // Simple response with just the auth URL
+          res.status(200).json({
+            success: false,
+            authUrl: result.authUrl,
+            message: 'OAuth authentication required'
+          });
           return;
         }
 

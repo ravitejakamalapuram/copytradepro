@@ -157,8 +157,8 @@ const AccountSetup: React.FC = () => {
     try {
       console.log('🔄 Completing OAuth authentication...');
 
-      // Call backend to complete OAuth
-      const response = await fetch(`/api/broker/oauth/complete`, {
+      // Call the new OAuth completion endpoint
+      const response = await fetch('/api/broker/oauth/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
