@@ -7,12 +7,12 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import path from 'path';
 
-// Import broker plugins to register them
-import '@copytrade/broker-shoonya';
-import '@copytrade/broker-fyers';
-
 // Import unified broker system
 import { initializeUnifiedBroker } from '@copytrade/unified-broker';
+
+// Import broker plugins for manual registration
+import shoonyaBroker from '@copytrade/broker-shoonya';
+import fyersBroker from '@copytrade/broker-fyers';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
@@ -214,6 +214,12 @@ async function startServer() {
     // Initialize unified broker system
     console.log('🔧 Initializing unified broker system...');
     initializeUnifiedBroker();
+
+    // Manually register broker plugins
+    console.log('🔧 Registering broker plugins...');
+    shoonyaBroker.register();
+    fyersBroker.register();
+
     console.log('✅ Unified broker system initialized');
 
     // Initialize broker account cache

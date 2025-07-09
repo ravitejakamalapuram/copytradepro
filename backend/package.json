@@ -11,10 +11,10 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@copytrade/broker-fyers": "^1.0.0",
-    "@copytrade/broker-shoonya": "^1.0.0",
-    "@copytrade/shared-types": "^1.0.1",
-    "@copytrade/unified-broker": "^1.1.2",
+    "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",
+    "@copytrade/broker-shoonya": "file:../dev-packages/broker-shoonya",
+    "@copytrade/shared-types": "file:../dev-packages/shared-types",
+    "@copytrade/unified-broker": "file:../dev-packages/unified-broker",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
     "better-sqlite3": "^12.2.0",
