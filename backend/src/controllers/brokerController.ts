@@ -465,7 +465,7 @@ export const getConnectedAccounts = async (
             isReallyActive = false;
           }
 
-          return {
+          const accountData = {
             id: dbAccount.id.toString(),
             brokerName: dbAccount.broker_name,
             accountId: dbAccount.account_id,
@@ -473,13 +473,19 @@ export const getConnectedAccounts = async (
             userName: dbAccount.user_name,
             email: dbAccount.email,
             brokerDisplayName: dbAccount.broker_display_name,
-            exchanges: JSON.parse(dbAccount.exchanges),
-            products: JSON.parse(dbAccount.products),
+            exchanges: JSON.parse(dbAccount.exchanges || '[]'),
+            products: JSON.parse(dbAccount.products || '[]'),
             isActive: isReallyActive, // Pure real-time validated status
             createdAt: dbAccount.created_at,
           };
+
+          console.log('🔍 DEBUG: Returning account data:', accountData);
+          return accountData;
         })
       );
+
+      // Debug: List all connections
+      unifiedBrokerManager.debugListConnections();
 
       res.status(200).json({
         success: true,
@@ -742,6 +748,7 @@ export const activateAccount = async (
 
     // Use unified broker manager for account activation
     try {
+      console.log(`🔄 Starting activation for account ${accountId} (user ${userId})`);
       const success = await unifiedBrokerManager.autoActivateAccount(userId, accountId);
 
       if (success) {
@@ -754,6 +761,7 @@ export const activateAccount = async (
             account.broker_name,
             account.user_name
           );
+          console.log(`✅ Account ${accountId} activated successfully for ${account.broker_name}`);
         }
 
         res.status(200).json({
@@ -765,6 +773,7 @@ export const activateAccount = async (
           },
         });
       } else {
+        console.log(`❌ Account ${accountId} activation failed`);
         res.status(400).json({
           success: false,
           message: 'Failed to activate account. Please check credentials and try again.',

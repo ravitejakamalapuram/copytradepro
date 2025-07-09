@@ -53,12 +53,12 @@ export class UnifiedBrokerManager {
         throw new Error(`Broker ${brokerName} is not available`);
       }
 
-      // Create broker instance
-      const brokerService = this.brokerRegistry.getBroker(brokerName);
-      
+      // Create temporary broker instance for login
+      const tempBrokerService = this.brokerRegistry.createBroker(brokerName);
+
       // Attempt login
-      const loginResult: LoginResponse = await brokerService.login(credentials);
-      
+      const loginResult: LoginResponse = await tempBrokerService.login(credentials);
+
       if (!loginResult.success) {
         // Check if this is an OAuth flow that needs auth URL
         if (loginResult.data?.authUrl) {
@@ -72,18 +72,29 @@ export class UnifiedBrokerManager {
       }
 
       // Get account ID from the broker service
-      const accountId = brokerService.getAccountId();
+      const accountId = tempBrokerService.getAccountId();
       if (!accountId) {
         throw new Error('Failed to get account ID from broker');
       }
 
-      // Create connection
+      // For now, use the temp service directly as the account-specific service
+      // This avoids session transfer issues while maintaining isolation per account
+      const accountSpecificService = tempBrokerService;
+
+      // Store this instance as the account-specific instance in the registry
+      // This ensures each account gets its own isolated instance with proper session
+      const accountKey = `${brokerName.toLowerCase()}_${accountId}`;
+      (this.brokerRegistry as any).accountInstances.set(accountKey, accountSpecificService);
+
+      console.log(`✅ Using temp service as account-specific service for ${brokerName} account ${accountId}`);
+
+      // Create connection with account-specific service
       const connectionKey = this.createConnectionKey(userId, brokerName, accountId);
       const connection: BrokerConnection = {
         userId,
         brokerName,
         accountId,
-        service: brokerService,
+        service: accountSpecificService,
         isActive: true,
         connectedAt: new Date()
       };
@@ -91,6 +102,7 @@ export class UnifiedBrokerManager {
       this.connections.set(connectionKey, connection);
 
       console.log(`✅ Successfully connected to ${brokerName} for user ${userId}, account ${accountId}`);
+      console.log(`📊 Total connections: ${this.connections.size}`);
       
       return {
         success: true,
@@ -129,24 +141,33 @@ export class UnifiedBrokerManager {
         throw new Error(`Broker ${brokerName} is not available`);
       }
 
-      // Create broker instance
-      const brokerService = this.brokerRegistry.getBroker(brokerName);
+      // Create temporary broker instance for OAuth completion
+      const tempBrokerService = this.brokerRegistry.createBroker(brokerName);
       
       // Complete OAuth flow
-      const loginResult: LoginResponse = await brokerService.login({
+      const loginResult: LoginResponse = await tempBrokerService.login({
         ...credentials,
         authCode
       });
-      
+
       if (!loginResult.success) {
         throw new Error(loginResult.message || 'OAuth completion failed');
       }
 
       // Get account ID from the broker service
-      const accountId = brokerService.getAccountId();
+      const accountId = tempBrokerService.getAccountId();
       if (!accountId) {
         throw new Error('Failed to get account ID from broker');
       }
+
+      // Use the temp service directly as the account-specific service for OAuth
+      const accountSpecificService = tempBrokerService;
+
+      // Store this instance as the account-specific instance in the registry
+      const accountKey = `${brokerName.toLowerCase()}_${accountId}`;
+      (this.brokerRegistry as any).accountInstances.set(accountKey, accountSpecificService);
+
+      console.log(`✅ Using OAuth temp service as account-specific service for ${brokerName} account ${accountId}`);
 
       // Create connection
       const connectionKey = this.createConnectionKey(userId, brokerName, accountId);
@@ -154,7 +175,7 @@ export class UnifiedBrokerManager {
         userId,
         brokerName,
         accountId,
-        service: brokerService,
+        service: accountSpecificService,
         isActive: true,
         connectedAt: new Date()
       };
@@ -162,6 +183,7 @@ export class UnifiedBrokerManager {
       this.connections.set(connectionKey, connection);
 
       console.log(`✅ Successfully completed OAuth for ${brokerName}, user ${userId}, account ${accountId}`);
+      console.log(`📊 Total connections: ${this.connections.size}`);
       
       return {
         success: true,
@@ -225,16 +247,21 @@ export class UnifiedBrokerManager {
   async disconnect(userId: string, brokerName: string, accountId: string): Promise<void> {
     const connectionKey = this.createConnectionKey(userId, brokerName, accountId);
     const connection = this.connections.get(connectionKey);
-    
+
     if (connection) {
       try {
         await connection.service.logout();
       } catch (error) {
         console.error(`🚨 Logout failed for ${brokerName}:`, error);
       }
-      
+
       this.connections.delete(connectionKey);
+
+      // Clean up the account-specific broker instance
+      this.brokerRegistry.removeBrokerForAccount(brokerName, accountId);
+
       console.log(`✅ Disconnected from ${brokerName} for user ${userId}, account ${accountId}`);
+      console.log(`📊 Remaining connections: ${this.connections.size}`);
     }
   }
 
@@ -276,7 +303,7 @@ export class UnifiedBrokerManager {
         return false;
       }
 
-      // Try to connect
+      // Try to connect using account-specific instance
       const result = await this.connectToBroker(userId, account.broker_name, credentials);
       
       if (result.success) {
@@ -298,7 +325,7 @@ export class UnifiedBrokerManager {
   getStats(): { totalConnections: number; activeConnections: number; brokerCounts: Record<string, number> } {
     const connections = Array.from(this.connections.values());
     const activeConnections = connections.filter(conn => conn.isActive);
-    
+
     const brokerCounts: Record<string, number> = {};
     connections.forEach(conn => {
       brokerCounts[conn.brokerName] = (brokerCounts[conn.brokerName] || 0) + 1;
@@ -309,6 +336,17 @@ export class UnifiedBrokerManager {
       activeConnections: activeConnections.length,
       brokerCounts
     };
+  }
+
+  /**
+   * Debug method to list all connections
+   */
+  debugListConnections(): void {
+    console.log('🔍 DEBUG: Current connections:');
+    this.connections.forEach((connection, key) => {
+      console.log(`  ${key}: ${connection.brokerName} - ${connection.accountId} (${connection.isActive ? 'Active' : 'Inactive'})`);
+    });
+    console.log(`📊 Total: ${this.connections.size} connections`);
   }
 }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService, type ShoonyaCredentials, type FyersCredentials } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
+import { AuthenticationStep } from '../types/api-responses';
 import '../styles/app-theme.css';
 
 const SUPPORTED_BROKERS = [
@@ -153,10 +154,25 @@ const AccountSetup: React.FC = () => {
   const handleActivateAccount = async (accountId: string) => {
     try {
       setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-      await accountService.activateAccount(accountId);
-      // Refresh accounts
-      const connectedAccounts = await accountService.getConnectedAccounts();
-      setAccounts(connectedAccounts);
+      const result = await accountService.activateAccount(accountId);
+
+      if (result.success) {
+        console.log('✅ Account activated successfully');
+        // Refresh accounts
+        const connectedAccounts = await accountService.getConnectedAccounts();
+        setAccounts(connectedAccounts);
+      } else {
+        // Handle OAuth flow
+        if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
+          console.log('🔄 OAuth authentication required');
+          alert(`OAuth authentication required. Please complete authentication at: ${result.authUrl}`);
+          // Open OAuth URL in new window
+          window.open(result.authUrl, '_blank', 'width=600,height=700');
+        } else {
+          console.error('❌ Account activation failed:', result.message);
+          alert(`Failed to activate account: ${result.message || 'Unknown error'}`);
+        }
+      }
     } catch (error: any) {
       console.error('Failed to activate account:', error);
       alert('Failed to activate account: ' + error.message);

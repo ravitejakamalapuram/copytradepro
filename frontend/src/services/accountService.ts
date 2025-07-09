@@ -1,4 +1,6 @@
 import api from './api';
+import type { ActivateAccountResponse } from '../types/api-responses';
+import { AuthenticationStep } from '../types/api-responses';
 
 export interface ConnectedAccount {
   id: string;
@@ -71,13 +73,47 @@ export const accountService = {
   },
 
   // Activate account (re-authenticate)
-  async activateAccount(accountId: string): Promise<boolean> {
+  async activateAccount(accountId: string): Promise<{
+    success: boolean;
+    authStep?: AuthenticationStep;
+    authUrl?: string;
+    message?: string;
+    error?: string;
+  }> {
     try {
-      const response = await api.post<AccountResponse>(`/broker/accounts/${accountId}/activate`);
-      return response.data.success;
-    } catch (error) {
+      const response = await api.post<ActivateAccountResponse>(`/broker/accounts/${accountId}/activate`);
+
+      if (response.data.success) {
+        return {
+          success: true,
+          authStep: response.data.data?.authStep,
+          message: response.data.message
+        };
+      } else {
+        // Handle OAuth flow
+        if (response.data.data?.authStep === AuthenticationStep.OAUTH_REQUIRED) {
+          return {
+            success: false,
+            authStep: response.data.data.authStep,
+            authUrl: response.data.data.authUrl,
+            message: response.data.message
+          };
+        }
+
+        return {
+          success: false,
+          authStep: response.data.data?.authStep,
+          message: response.data.message,
+          error: response.data.error?.code
+        };
+      }
+    } catch (error: any) {
       console.error('Failed to activate account:', error);
-      return false;
+      return {
+        success: false,
+        message: error.response?.data?.message || 'Failed to activate account',
+        error: error.response?.data?.error?.code || 'NETWORK_ERROR'
+      };
     }
   },
 

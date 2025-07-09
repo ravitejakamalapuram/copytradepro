@@ -61,6 +61,7 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
+        console.log('🔍 DEBUG: Fetched accounts:', accounts);
         setConnectedAccounts(accounts);
 
         // Auto-select all active accounts by default
@@ -595,29 +596,37 @@ const TradeSetup: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {connectedAccounts.map(account => (
-                        <div
-                          key={account.id}
-                          style={{
-                            padding: '0.75rem',
-                            border: orderForm.selectedAccounts.includes(account.id)
-                              ? '2px solid var(--kite-primary)'
-                              : '1px solid var(--kite-border)',
-                            borderRadius: 'var(--kite-radius-sm)',
-                            backgroundColor: orderForm.selectedAccounts.includes(account.id)
-                              ? 'var(--kite-bg-primary-light)'
-                              : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease'
-                          }}
-                        >
-                          <Checkbox
-                            checked={orderForm.selectedAccounts.includes(account.id)}
-                            onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            label={`${account.brokerName} (${account.isActive ? 'Active' : 'Inactive'})`}
-                            size="base"
-                          />
-                        </div>
-                      ))}
+                      {connectedAccounts.map(account => {
+                        console.log('🔍 DEBUG: Rendering account:', account);
+                        return (
+                          <div
+                            key={account.id}
+                            style={{
+                              padding: '0.75rem',
+                              border: orderForm.selectedAccounts.includes(account.id)
+                                ? '2px solid var(--color-primary-500)'
+                                : '1px solid var(--border-primary)',
+                              borderRadius: 'var(--radius-sm)',
+                              backgroundColor: orderForm.selectedAccounts.includes(account.id)
+                                ? 'var(--bg-secondary)'
+                                : 'var(--bg-surface)',
+                              transition: 'all 0.2s ease',
+                              minHeight: '60px' // Ensure minimum height for debugging
+                            }}
+                          >
+                            <Checkbox
+                              checked={orderForm.selectedAccounts.includes(account.id)}
+                              onChange={(checked) => handleAccountSelection(account.id, checked)}
+                              label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
+                              size="base"
+                            />
+                            {/* Debug info */}
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
+                              ID: {account.id} | User: {account.userName || 'N/A'} | Account: {account.accountId || 'N/A'}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
