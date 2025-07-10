@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
+import { IBrokerService } from '@copytrade/unified-broker';
 import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
 
 // Type definitions
@@ -112,16 +112,22 @@ export class BrokerConnectionHelper {
    * @returns Promise<boolean> indicating if connection is valid
    */
   static async validateConnection(
-    connection: BrokerService, 
-    brokerName: string, 
+    connection: BrokerService,
+    brokerName: string,
     accountId: string
   ): Promise<boolean> {
     try {
-      if (brokerName === 'shoonya') {
-        return await (connection as any).validateSession(accountId);
-      } else if (brokerName === 'fyers') {
-        return await (connection as any).validateSession();
+      // Use unified broker interface - all brokers implement validateSession
+      // The broker service handles the specific validation logic internally
+      const result = await connection.validateSession(accountId);
+
+      // Handle both boolean and object responses
+      if (typeof result === 'boolean') {
+        return result;
+      } else if (result && typeof result === 'object' && 'isValid' in result) {
+        return (result as any).isValid;
       }
+
       return false;
     } catch (error) {
       console.error(`🚨 Connection validation failed for ${brokerName} account ${accountId}:`, error);

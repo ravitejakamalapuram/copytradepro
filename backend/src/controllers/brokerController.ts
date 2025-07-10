@@ -10,7 +10,6 @@ import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerM
 
 import {
   ActivateAccountResponse,
-  AuthenticationStep,
   ApiErrorCode,
   createActivationResponse
 } from '@copytrade/shared-types';
@@ -35,14 +34,22 @@ async function logoutFromBroker(userId: string, brokerName: string, accountId: s
 async function placeBrokerOrder(
   userId: string,
   brokerName: string,
-  accountId: string,
+  databaseAccountId: string,
   orderRequest: any
 ): Promise<any> {
   try {
-    const brokerService = enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, accountId);
+    // Get account details from database to find the broker's account ID
+    const account = await userDatabase.getConnectedAccountById(databaseAccountId);
+    if (!account) {
+      throw new Error(`Account ${databaseAccountId} not found in database`);
+    }
+
+    // Use the broker's account ID (not the database account ID) for the connection lookup
+    const brokerAccountId = account.account_id;
+    const brokerService = enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, brokerAccountId);
 
     if (!brokerService) {
-      throw new Error(`No active connection found for ${brokerName} account ${accountId}`);
+      throw new Error(`No active connection found for ${brokerName} account ${brokerAccountId} (database ID: ${databaseAccountId})`);
     }
 
     return await brokerService.placeOrder(orderRequest);
@@ -106,20 +113,32 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
       return false;
     }
 
-    // For now, skip auto-reactivation - user needs to manually activate
+    // Actually connect to the broker through enhanced unified broker manager
     try {
-      console.log(`⚠️ Account ${accountId} needs manual reactivation`);
+      console.log(`🔄 Connecting to ${account.broker_name} for account ${accountId}...`);
 
-      // Add to broker account cache for fast lookups
-      addToBrokerAccountCache(
-        account.account_id, // broker account ID
-        userId, // user ID
-        account.broker_name, // broker name
-        account.user_name // user display name
+      // Connect to broker using enhanced unified broker manager
+      const connectionResult = await enhancedUnifiedBrokerManager.connectToBroker(
+        userId,
+        account.broker_name,
+        credentials
       );
 
-      console.log(`✅ Successfully auto-reactivated ${account.broker_name} account ${accountId}`);
-      return true;
+      if (connectionResult.success) {
+        // Add to broker account cache for fast lookups
+        addToBrokerAccountCache(
+          account.account_id, // broker account ID
+          userId, // user ID
+          account.broker_name, // broker name
+          account.user_name // user display name
+        );
+
+        console.log(`✅ Successfully auto-reactivated ${account.broker_name} account ${accountId}`);
+        return true;
+      } else {
+        console.log(`❌ Failed to connect to ${account.broker_name}: ${connectionResult.message}`);
+        return false;
+      }
     } catch (error: any) {
       console.log(`❌ Failed to auto-reactivate ${account.broker_name} account ${accountId}:`, error.message);
       return false;
@@ -779,8 +798,18 @@ export const getConnectedAccounts = async (
           let shouldShowActivateButton = false;
           let shouldShowDeactivateButton = false;
 
+          // Get token info from broker connection if available
+          let tokenInfo = null;
+          if (connection) {
+            try {
+              tokenInfo = connection.service.getTokenInfo();
+            } catch (error) {
+              console.warn(`⚠️ Could not get token info for ${dbAccount.broker_name}:`, error);
+            }
+          }
+
           if (dbAccount.token_expiry_time) {
-            // Token has an expiry time (Fyers)
+            // Token has an expiry time (most brokers like Fyers)
             const expiryTime = new Date(dbAccount.token_expiry_time);
             isTokenExpired = now > expiryTime;
 
@@ -793,12 +822,14 @@ export const getConnectedAccounts = async (
               shouldShowDeactivateButton = true;
             }
           } else {
-            // Token has no expiry (Shoonya - infinity)
-            if (dbAccount.broker_name === 'shoonya') {
+            // Token has no expiry (infinity tokens like Shoonya)
+            // Use token info from broker to determine UI behavior
+            if (tokenInfo && tokenInfo.expiryTime === null && !tokenInfo.canRefresh) {
+              // Infinity token that doesn't need refresh (like Shoonya)
               shouldShowActivateButton = false;
-              shouldShowDeactivateButton = false; // Shoonya doesn't show deactivate button
+              shouldShowDeactivateButton = false; // Don't show deactivate for infinity tokens
             } else {
-              // Other brokers without expiry time
+              // Other brokers without expiry time or unknown token behavior
               shouldShowActivateButton = !isReallyActive;
               shouldShowDeactivateButton = isReallyActive;
             }
@@ -1394,8 +1425,8 @@ export const placeOrder = async (
     let orderResponse: any;
 
     try {
-      // Use the unified broker interface
-      orderResponse = await placeBrokerOrder(userId, brokerName, account.account_id, unifiedOrderRequest);
+      // Use the unified broker interface - use database account ID, not broker account ID
+      orderResponse = await placeBrokerOrder(userId, brokerName, accountId, unifiedOrderRequest);
 
       // Handle session expiry with auto-retry
       if (!orderResponse.success && orderResponse.data?.errorType === 'SESSION_EXPIRED') {
@@ -1405,13 +1436,14 @@ export const placeOrder = async (
         const reactivated = await ensureAccountActive(userId, accountId);
         if (reactivated) {
           console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
-          orderResponse = await placeBrokerOrder(userId, brokerName, account.account_id, unifiedOrderRequest);
+          orderResponse = await placeBrokerOrder(userId, brokerName, accountId, unifiedOrderRequest);
         } else {
           throw new Error(`Session expired and auto-reactivation failed for account ${account.account_id}. Please check your credentials.`);
         }
       }
-    // Handle unified response
-    if (orderResponse.success) {
+
+      // Handle unified response
+      if (orderResponse.success) {
       // Save order to history with PLACED status
       // Note: Status is 'PLACED' because broker API success only means order was submitted,
       // not that it was executed. Actual execution depends on market conditions.
@@ -1489,14 +1521,14 @@ export const placeOrder = async (
         message: orderResponse.message || 'Failed to place order',
       });
     }
-  } catch (error: any) {
-    console.error('🚨 Place order error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to place order',
-    });
-  }
 
+    } catch (error: any) {
+      console.error('🚨 Place order error:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Failed to place order',
+      });
+    }
   } catch (error: any) {
     console.error('🚨 Place order error:', error);
     res.status(500).json({

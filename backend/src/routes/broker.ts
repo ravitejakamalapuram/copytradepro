@@ -83,8 +83,9 @@ const connectBrokerValidation = [
 // Validation rules for placing orders
 const placeOrderValidation = [
   body('accountId')
-    .isMongoId()
-    .withMessage('Valid account ID is required'),
+    .trim()
+    .isLength({ min: 1 })
+    .withMessage('Account ID is required'),
   body('symbol')
     .trim()
     .isLength({ min: 1 })

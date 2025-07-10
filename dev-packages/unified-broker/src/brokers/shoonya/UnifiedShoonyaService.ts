@@ -263,7 +263,73 @@ export class UnifiedShoonyaService implements IUnifiedBrokerService {
     if (!this.isConnectedFlag) {
       throw new Error('Not connected to Shoonya. Please authenticate first.');
     }
-    return this.shoonyaService.placeOrder(orderRequest);
+
+    // Transform unified order request to Shoonya format
+    const shoonyaOrderRequest = {
+      userId: this.accountInfo?.accountId || '',
+      buyOrSell: orderRequest.action === 'BUY' ? 'B' as const : 'S' as const,
+      productType: this.mapProductType(orderRequest.productType),
+      exchange: orderRequest.exchange || 'NSE',
+      tradingSymbol: orderRequest.symbol, // Map symbol to tradingSymbol
+      quantity: orderRequest.quantity,
+      discloseQty: 0,
+      priceType: this.mapOrderType(orderRequest.orderType),
+      price: orderRequest.price || 0,
+      triggerPrice: orderRequest.triggerPrice || 0,
+      retention: orderRequest.validity || 'DAY',
+      amo: 'NO' as const,
+      remarks: orderRequest.remarks || 'Order via CopyTrade Pro'
+    };
+
+    try {
+      const shoonyaResponse = await this.shoonyaService.placeOrder(shoonyaOrderRequest);
+
+      // Transform Shoonya response to unified format
+      if (shoonyaResponse.stat === 'Ok') {
+        return {
+          success: true,
+          message: 'Order placed successfully',
+          data: {
+            brokerOrderId: shoonyaResponse.norenordno,
+            orderId: shoonyaResponse.norenordno,
+            status: 'PLACED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: shoonyaResponse.emsg || 'Order placement failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Order placement failed',
+        data: null
+      };
+    }
+  }
+
+  private mapProductType(productType: string): string {
+    const mapping: { [key: string]: string } = {
+      'CNC': 'C',
+      'MIS': 'M',
+      'NRML': 'M',
+      'BO': 'B',
+      'CO': 'H'
+    };
+    return mapping[productType] || 'C'; // Default to CNC
+  }
+
+  private mapOrderType(orderType: string): 'LMT' | 'MKT' | 'SL-LMT' | 'SL-MKT' {
+    const mapping: { [key: string]: 'LMT' | 'MKT' | 'SL-LMT' | 'SL-MKT' } = {
+      'MARKET': 'MKT',
+      'LIMIT': 'LMT',
+      'SL-LIMIT': 'SL-LMT',
+      'SL-MARKET': 'SL-MKT'
+    };
+    return mapping[orderType] || 'MKT'; // Default to MARKET
   }
 
   async getOrderStatus(accountId: string, orderId: string): Promise<any> {

@@ -376,7 +376,70 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
     if (!this.isConnected()) {
       throw new Error('Not connected to Fyers. Please authenticate first.');
     }
-    return this.fyersService.placeOrder(orderRequest);
+
+    // Transform unified order request to Fyers format
+    const fyersOrderRequest = {
+      symbol: orderRequest.symbol,
+      qty: orderRequest.quantity,
+      type: this.mapOrderType(orderRequest.orderType),
+      side: orderRequest.action as 'BUY' | 'SELL',
+      productType: this.mapProductType(orderRequest.productType),
+      limitPrice: orderRequest.price || 0,
+      stopPrice: orderRequest.triggerPrice || 0,
+      validity: orderRequest.validity || 'DAY',
+      disclosedQty: 0,
+      offlineOrder: false
+    };
+
+    try {
+      const fyersResponse = await this.fyersService.placeOrder(fyersOrderRequest);
+
+      // Transform Fyers response to unified format
+      if (fyersResponse.s === 'ok') {
+        return {
+          success: true,
+          message: 'Order placed successfully',
+          data: {
+            brokerOrderId: fyersResponse.id,
+            orderId: fyersResponse.id,
+            status: 'PLACED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: fyersResponse.message || 'Order placement failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        message: error.message || 'Order placement failed',
+        data: null
+      };
+    }
+  }
+
+  private mapProductType(productType: string): 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO' {
+    const mapping: { [key: string]: 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO' } = {
+      'CNC': 'CNC',
+      'MIS': 'INTRADAY',
+      'NRML': 'MARGIN',
+      'BO': 'BO',
+      'CO': 'CO'
+    };
+    return mapping[productType] || 'CNC'; // Default to CNC
+  }
+
+  private mapOrderType(orderType: string): 'LIMIT' | 'MARKET' | 'SL' | 'SL-M' {
+    const mapping: { [key: string]: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M' } = {
+      'MARKET': 'MARKET',
+      'LIMIT': 'LIMIT',
+      'SL-LIMIT': 'SL',
+      'SL-MARKET': 'SL-M'
+    };
+    return mapping[orderType] || 'MARKET'; // Default to MARKET
   }
 
   async getOrderStatus(accountId: string, orderId: string): Promise<any> {

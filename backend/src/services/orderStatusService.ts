@@ -217,27 +217,45 @@ class OrderStatusService extends EventEmitter {
       let newStatus = order.status;
 
       // Try to get real status from broker API first
-      if (brokerConnectionManager && order.broker_name === 'shoonya') {
+      if (brokerConnectionManager) {
         try {
           // Get the broker connection for the user
           const brokerService = brokerConnectionManager.getBrokerConnection(brokerAccountId, order.broker_name);
 
           if (brokerService) {
-            logger.debug(`Getting real order status from Shoonya API for order ${order.broker_order_id}`);
+            logger.debug(`Getting real order status from ${order.broker_name} API for order ${order.broker_order_id}`);
 
             // Try to get order status from broker API
             logger.debug(`Calling broker API for order status: ${order.broker_order_id}`);
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
             logger.debug(`Broker API response:`, brokerStatus);
 
-            if (brokerStatus && (brokerStatus as any).stat === 'Ok') {
-              const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
-              if (mappedStatus !== order.status) {
-                newStatus = mappedStatus;
-                logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+            // Handle different broker response formats
+            if (brokerStatus) {
+              let statusValue = '';
+
+              // Handle unified response format
+              if ((brokerStatus as any).success && (brokerStatus as any).data) {
+                statusValue = (brokerStatus as any).data.status;
               }
-            } else {
-              logger.warn(`Failed to get order status from Shoonya API: ${(brokerStatus as any)?.emsg || 'Unknown error'}`);
+              // Handle legacy Shoonya format
+              else if ((brokerStatus as any).stat === 'Ok') {
+                statusValue = (brokerStatus as any).status;
+              }
+              // Handle direct OrderStatus format
+              else if (brokerStatus.status) {
+                statusValue = brokerStatus.status;
+              }
+
+              if (statusValue) {
+                const mappedStatus = this.mapBrokerStatus(statusValue, order.broker_name);
+                if (mappedStatus !== order.status) {
+                  newStatus = mappedStatus;
+                  logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+                }
+              } else {
+                logger.warn(`Failed to get order status from broker API: ${(brokerStatus as any)?.emsg || 'Unknown error'}`);
+              }
             }
           } else {
             logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);
@@ -317,14 +335,31 @@ class OrderStatusService extends EventEmitter {
       const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
       if (brokerService && brokerService.isLoggedIn()) {
-        // For Shoonya, the broker account ID is the user ID
-        if (order.broker_name === 'shoonya') {
-          const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
-          const userId = brokerServiceTyped.getUserId && brokerServiceTyped.getUserId();
-          if (userId) {
-            logger.debug(`Found broker account ID from active connection: ${userId}`);
-            return userId; // This is the broker account ID (e.g., "FN135006")
-          }
+        // Try to get broker account ID from the service
+        const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+
+        // Try different methods to get the account ID based on broker capabilities
+        let accountId = null;
+
+        // Method 1: getUserId (Shoonya-style)
+        if (brokerServiceTyped.getUserId && typeof brokerServiceTyped.getUserId === 'function') {
+          accountId = brokerServiceTyped.getUserId();
+        }
+
+        // Method 2: getAccountInfo (Unified interface)
+        if (!accountId && brokerServiceTyped.getAccountInfo && typeof brokerServiceTyped.getAccountInfo === 'function') {
+          const accountInfo = brokerServiceTyped.getAccountInfo();
+          accountId = accountInfo?.accountId;
+        }
+
+        // Method 3: Direct accountId property
+        if (!accountId && brokerServiceTyped.accountId) {
+          accountId = brokerServiceTyped.accountId;
+        }
+
+        if (accountId) {
+          logger.debug(`Found broker account ID from active connection: ${accountId}`);
+          return accountId;
         }
       }
 
@@ -337,10 +372,11 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
-   * Map Shoonya status to our standard status
+   * Map broker-specific status to our standard status
    */
-  private mapShoonyaStatus(shoonyaStatus: string): string {
-    const statusMap: { [key: string]: string } = {
+  private mapBrokerStatus(brokerStatus: string, brokerName: string): string {
+    // Shoonya status mapping
+    const shoonyaStatusMap: { [key: string]: string } = {
       'PENDING': 'PENDING',
       'OPEN': 'PLACED',
       'COMPLETE': 'EXECUTED',
@@ -350,7 +386,31 @@ class OrderStatusService extends EventEmitter {
       'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
     };
 
-    return statusMap[shoonyaStatus] || shoonyaStatus;
+    // Fyers status mapping
+    const fyersStatusMap: { [key: string]: string } = {
+      'PENDING': 'PENDING',
+      'OPEN': 'PLACED',
+      'FILLED': 'EXECUTED',
+      'CANCELLED': 'CANCELLED',
+      'REJECTED': 'REJECTED',
+      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+    };
+
+    // Select appropriate mapping based on broker
+    let statusMap: { [key: string]: string };
+    switch (brokerName.toLowerCase()) {
+      case 'shoonya':
+        statusMap = shoonyaStatusMap;
+        break;
+      case 'fyers':
+        statusMap = fyersStatusMap;
+        break;
+      default:
+        // For unknown brokers, return status as-is
+        return brokerStatus;
+    }
+
+    return statusMap[brokerStatus] || brokerStatus;
   }
 
 
