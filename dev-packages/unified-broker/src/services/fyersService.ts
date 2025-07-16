@@ -174,10 +174,11 @@ export class FyersService {
     }
 
     try {
+      // Fyers API v3 expects specific payload structure
       const payload = {
         symbol: orderData.symbol,
-        qty: orderData.qty,
-        type: orderData.type === 'MARKET' ? 2 : 1, // 1=LIMIT, 2=MARKET
+        qty: Math.abs(orderData.qty), // Ensure quantity is positive
+        type: this.getOrderTypeCode(orderData.type),
         side: orderData.side === 'BUY' ? 1 : -1, // 1=BUY, -1=SELL
         productType: this.getProductTypeCode(orderData.productType),
         limitPrice: orderData.limitPrice || 0,
@@ -189,11 +190,13 @@ export class FyersService {
         takeProfit: orderData.takeProfit || 0,
       };
 
+      console.log('🔄 Placing Fyers order with payload:', JSON.stringify(payload, null, 2));
+
       const response = await this.fyers.place_order(payload);
-      console.log('✅ Order placed successfully:', response);
+      console.log('✅ Fyers order response:', response);
       return response;
     } catch (error: any) {
-      console.error('🚨 Failed to place order:', error);
+      console.error('🚨 Failed to place Fyers order:', error);
       throw new Error(error.message || 'Order placement failed');
     }
   }
@@ -269,6 +272,17 @@ export class FyersService {
       console.error('🚨 Failed to get profile:', error);
       throw new Error(error.message || 'Failed to get profile');
     }
+  }
+
+  // Helper method to convert order type to code
+  private getOrderTypeCode(orderType: string): number {
+    const orderTypeMap: { [key: string]: number } = {
+      'LIMIT': 1,
+      'MARKET': 2,
+      'SL': 3,      // Stop Loss
+      'SL-M': 4,    // Stop Loss Market
+    };
+    return orderTypeMap[orderType] || 2; // Default to MARKET
   }
 
   // Helper method to convert product type to code

@@ -395,8 +395,8 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
 
     // Transform unified order request to Fyers format
     const fyersOrderRequest = {
-      symbol: orderRequest.symbol,
-      qty: orderRequest.quantity,
+      symbol: this.formatSymbolForFyers(orderRequest.symbol, orderRequest.exchange),
+      qty: Math.abs(orderRequest.quantity), // Ensure positive quantity
       type: this.mapOrderType(orderRequest.orderType),
       side: orderRequest.action as 'BUY' | 'SELL',
       productType: this.mapProductType(orderRequest.productType),
@@ -408,6 +408,8 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
     };
 
     try {
+      console.log('🔄 Placing Fyers order with request:', JSON.stringify(fyersOrderRequest, null, 2));
+      
       const fyersResponse = await this.fyersService.placeOrder(fyersOrderRequest);
 
       // Transform Fyers response to unified format
@@ -429,12 +431,25 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
         };
       }
     } catch (error: any) {
+      console.error('🚨 Fyers order placement error:', error);
       return {
         success: false,
         message: error.message || 'Order placement failed',
         data: null
       };
     }
+  }
+
+  private formatSymbolForFyers(symbol: string, exchange: string): string {
+    // Fyers expects format: EXCHANGE:SYMBOL
+    // e.g., NSE:RELIANCE-EQ, BSE:RELIANCE
+    if (symbol.includes(':')) {
+      // Already formatted
+      return symbol;
+    }
+    
+    // Format as EXCHANGE:SYMBOL
+    return `${exchange}:${symbol}`;
   }
 
   private mapProductType(productType: string): 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO' {
