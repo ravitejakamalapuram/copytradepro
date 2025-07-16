@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
-import { brokerService, type PlaceOrderRequest } from '../services/brokerService';
+import OrderResultDisplay, { type OrderResultSummary } from '../components/OrderResultDisplay';
+import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
+import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
 import '../styles/app-theme.css';
 
@@ -53,6 +55,8 @@ const TradeSetup: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [orderResult, setOrderResult] = useState<OrderResultSummary | null>(null);
+  const [showOrderResult, setShowOrderResult] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -218,54 +222,44 @@ const TradeSetup: React.FC = () => {
       setSubmitting(true);
       setError(null);
 
-      // Place orders across all selected accounts
-      const orderPromises = orderForm.selectedAccounts.map(async (accountId) => {
-        const account = connectedAccounts.find(acc => acc.id === accountId);
-        if (!account) {
-          throw new Error(`Account not found: ${accountId}`);
-        }
+      // Use the new multi-account order placement service
+      const orderRequest: PlaceMultiAccountOrderRequest = {
+        selectedAccounts: orderForm.selectedAccounts,
+        symbol: orderForm.symbol,
+        action: orderForm.action,
+        quantity: parseInt(orderForm.quantity),
+        orderType: orderForm.orderType,
+        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+        triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
+          ? parseFloat(orderForm.triggerPrice)
+          : undefined,
+        exchange: orderForm.exchange,
+        productType: orderForm.product,
+        remarks: `${orderForm.validity} order placed via CopyTrade Pro`
+      };
 
-        const orderRequest: PlaceOrderRequest = {
-          brokerName: account.brokerName,
-          accountId: accountId,
-          symbol: orderForm.symbol,
-          action: orderForm.action,
-          quantity: parseInt(orderForm.quantity),
-          price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
-          orderType: orderForm.orderType,
-          exchange: orderForm.exchange,
-          productType: orderForm.product,
-          triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
-            ? parseFloat(orderForm.triggerPrice)
-            : undefined,
-          remarks: `${orderForm.validity} order`
-        };
-
-        return brokerService.placeOrder(orderRequest);
+      const response = await brokerService.placeMultiAccountOrder(orderRequest);
+      
+      // Transform the response to OrderResultSummary format
+      const orderResultSummary = transformBrokerResponseToOrderResult(response, {
+        symbol: orderForm.symbol,
+        action: orderForm.action,
+        quantity: parseInt(orderForm.quantity),
+        orderType: orderForm.orderType,
+        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+        triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
+          ? parseFloat(orderForm.triggerPrice)
+          : undefined,
+        exchange: orderForm.exchange,
+        productType: orderForm.product
       });
 
-      const results = await Promise.allSettled(orderPromises);
+      // Show the order result display
+      setOrderResult(orderResultSummary);
+      setShowOrderResult(true);
 
-      // Process results
-      const successful = results.filter(result =>
-        result.status === 'fulfilled' && result.value.success
-      );
-      const failed = results.filter(result =>
-        result.status === 'rejected' ||
-        (result.status === 'fulfilled' && !result.value.success)
-      );
-
-      if (successful.length > 0) {
-        const successCount = successful.length;
-        const totalCount = orderForm.selectedAccounts.length;
-
-        if (failed.length === 0) {
-          alert(`🎉 All orders placed successfully! (${successCount}/${totalCount} accounts)`);
-        } else {
-          alert(`⚠️ Partial success: ${successCount}/${totalCount} orders placed successfully`);
-        }
-
-        // Reset form
+      // If all orders were successful, reset the form
+      if (orderResultSummary.failedAccounts === 0) {
         setOrderForm(prev => ({
           ...prev,
           symbol: '',
@@ -273,11 +267,6 @@ const TradeSetup: React.FC = () => {
           price: '',
           triggerPrice: ''
         }));
-
-        // Navigate to orders page
-        navigate('/orders');
-      } else {
-        setError(`Failed to place orders on all ${orderForm.selectedAccounts.length} accounts`);
       }
 
     } catch (error: any) {
@@ -285,6 +274,31 @@ const TradeSetup: React.FC = () => {
       setError(error.message || 'Failed to place orders');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRetryFailedOrders = async (failedResults: any[]) => {
+    // Extract account IDs from failed results and retry the order
+    const failedAccountIds = failedResults.map(result => result.accountId);
+    
+    // Update the form to only select failed accounts
+    setOrderForm(prev => ({
+      ...prev,
+      selectedAccounts: failedAccountIds
+    }));
+    
+    // Close the result display and let user modify if needed
+    setShowOrderResult(false);
+    setError('Ready to retry failed orders. You can modify the order details if needed, then click Place Order again.');
+  };
+
+  const handleCloseOrderResult = () => {
+    setShowOrderResult(false);
+    setOrderResult(null);
+    
+    // If there were successful orders, navigate to orders page
+    if (orderResult && orderResult.successfulAccounts > 0) {
+      navigate('/orders');
     }
   };
 
@@ -802,6 +816,37 @@ const TradeSetup: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Order Result Display Modal/Overlay */}
+      {showOrderResult && orderResult && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem'
+        }}>
+          <div style={{
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflowY: 'auto'
+          }}>
+            <OrderResultDisplay
+              summary={orderResult}
+              onClose={handleCloseOrderResult}
+              onRetryFailed={handleRetryFailedOrders}
+              showRetryOption={true}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
