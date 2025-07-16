@@ -61,7 +61,7 @@ export const useAccountStatus = () => {
       reconnectAttempts.current++;
       initializeConnection();
     }, delay);
-  }, []);
+  }, [getReconnectDelay]);
 
   // Update account status in local state
   const updateAccountStatus = useCallback((
