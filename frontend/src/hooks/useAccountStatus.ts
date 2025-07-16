@@ -63,6 +63,49 @@ export const useAccountStatus = () => {
     }, delay);
   }, []);
 
+  // Update account status in local state
+  const updateAccountStatus = useCallback((
+    accountId: string, 
+    isActive: boolean, 
+    _status?: string, 
+    message?: string
+  ) => {
+    setAccounts(prevAccounts => 
+      prevAccounts.map(account => 
+        account.id === accountId 
+          ? { 
+              ...account, 
+              isActive,
+              accountStatus: isActive ? 'ACTIVE' : 'INACTIVE',
+              // Add status message if provided
+              ...(message && { statusMessage: message })
+            }
+          : account
+      )
+    );
+  }, []);
+
+  // Handle connection events
+  const handleConnectionEvent = useCallback((event: AccountConnectionEvent) => {
+    const { accountId, event: eventType, message } = event;
+    
+    switch (eventType) {
+      case 'connected':
+        updateAccountStatus(accountId, true, 'active', message);
+        break;
+      case 'disconnected':
+        updateAccountStatus(accountId, false, 'inactive', message);
+        break;
+      case 'error':
+        updateAccountStatus(accountId, false, 'error', message);
+        break;
+      case 'token_refresh':
+        // Token refreshed successfully, ensure account is active
+        updateAccountStatus(accountId, true, 'active', message);
+        break;
+    }
+  }, [updateAccountStatus]);
+
   // Initialize WebSocket connection with enhanced error handling
   const initializeConnection = useCallback(() => {
     const token = localStorage.getItem('token');
@@ -197,49 +240,6 @@ export const useAccountStatus = () => {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
-
-  // Update account status in local state
-  const updateAccountStatus = useCallback((
-    accountId: string, 
-    isActive: boolean, 
-    _status?: string, 
-    message?: string
-  ) => {
-    setAccounts(prevAccounts => 
-      prevAccounts.map(account => 
-        account.id === accountId 
-          ? { 
-              ...account, 
-              isActive,
-              accountStatus: isActive ? 'ACTIVE' : 'INACTIVE',
-              // Add status message if provided
-              ...(message && { statusMessage: message })
-            }
-          : account
-      )
-    );
-  }, []);
-
-  // Handle connection events
-  const handleConnectionEvent = useCallback((event: AccountConnectionEvent) => {
-    const { accountId, event: eventType, message } = event;
-    
-    switch (eventType) {
-      case 'connected':
-        updateAccountStatus(accountId, true, 'active', message);
-        break;
-      case 'disconnected':
-        updateAccountStatus(accountId, false, 'inactive', message);
-        break;
-      case 'error':
-        updateAccountStatus(accountId, false, 'error', message);
-        break;
-      case 'token_refresh':
-        // Token refreshed successfully, ensure account is active
-        updateAccountStatus(accountId, true, 'active', message);
-        break;
-    }
-  }, [updateAccountStatus]);
 
   // Activate account
   const activateAccount = useCallback(async (accountId: string) => {
