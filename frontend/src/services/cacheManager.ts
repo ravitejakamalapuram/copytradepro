@@ -221,16 +221,22 @@ class CacheManager {
   getStats(): CacheStats {
     const totalRequests = this.hitCount + this.missCount;
     const entries = Array.from(this.cache.values());
+    const totalSize = entries.reduce((sum, entry) => sum + entry.size, 0);
+    
+    // Calculate memory pressure directly here to avoid recursion
+    const sizeRatio = totalSize / this.config.maxSize;
+    const entryRatio = this.cache.size / this.config.maxEntries;
+    const memoryPressure = Math.max(sizeRatio, entryRatio);
     
     return {
       totalEntries: this.cache.size,
-      totalSize: entries.reduce((sum, entry) => sum + entry.size, 0),
+      totalSize,
       hitRate: totalRequests > 0 ? this.hitCount / totalRequests : 0,
       missRate: totalRequests > 0 ? this.missCount / totalRequests : 0,
       evictionCount: this.evictionCount,
       oldestEntry: entries.length > 0 ? new Date(Math.min(...entries.map(e => e.timestamp.getTime()))) : null,
       newestEntry: entries.length > 0 ? new Date(Math.max(...entries.map(e => e.timestamp.getTime()))) : null,
-      memoryPressure: this.calculateMemoryPressure()
+      memoryPressure
     };
   }
 
@@ -478,15 +484,16 @@ class CacheManager {
     return data;
   }
 
-  private decompress(data: any): any {
+  private decompress(data: any): unknown {
     // Simple decompression placeholder
     return data;
   }
 
   private calculateMemoryPressure(): number {
-    const stats = this.getStats();
-    const sizeRatio = stats.totalSize / this.config.maxSize;
-    const entryRatio = stats.totalEntries / this.config.maxEntries;
+    // Calculate directly without calling getStats() to avoid recursion
+    const totalSize = Array.from(this.cache.values()).reduce((sum, entry) => sum + entry.size, 0);
+    const sizeRatio = totalSize / this.config.maxSize;
+    const entryRatio = this.cache.size / this.config.maxEntries;
     return Math.max(sizeRatio, entryRatio);
   }
 
