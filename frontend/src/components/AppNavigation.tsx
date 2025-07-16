@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
 import useRealTimeData from '../hooks/useRealTimeData';
@@ -18,6 +19,7 @@ const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -69,6 +71,9 @@ const AppNavigation: React.FC = () => {
       fetchMarketData();
       fetchPortfolioData();
     }, 30000);
+
+    // Register interval for cleanup
+    registerInterval(interval);
 
     return () => clearInterval(interval);
   }, []);

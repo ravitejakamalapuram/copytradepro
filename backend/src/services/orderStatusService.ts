@@ -6,6 +6,9 @@ import { notificationService, OrderNotificationData } from './notificationServic
 // Import unified broker manager
 import { unifiedBrokerManager } from './unifiedBrokerManager';
 
+// Import WebSocket service for real-time updates
+import websocketService from './websocketService';
+
 // Broker connection manager interface
 interface BrokerConnectionManager {
   getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
@@ -456,7 +459,31 @@ class OrderStatusService extends EventEmitter {
 
       logger.info(`Order ${order.id} status updated: ${oldStatus} → ${newStatus}`);
 
-      // WebSocket broadcasting removed - using manual refresh only
+      // Broadcast real-time update via WebSocket
+      try {
+        const orderUpdateData = {
+          orderId: order.id,
+          brokerOrderId: order.broker_order_id,
+          symbol: order.symbol,
+          action: order.action,
+          quantity: order.quantity,
+          price: order.price,
+          oldStatus,
+          newStatus,
+          brokerName: order.broker_name,
+          exchange: order.exchange,
+          orderType: order.order_type,
+          timestamp: now,
+          executionData: executionData || {}
+        };
+
+        // Emit to user-specific room
+        websocketService.sendToUser(order.user_id.toString(), 'orderStatusUpdate', orderUpdateData);
+        logger.info(`📡 WebSocket update sent for order ${order.id} status change`);
+      } catch (wsError: any) {
+        logger.error(`Failed to send WebSocket update for order ${order.id}:`, wsError.message);
+        // Don't fail the entire operation if WebSocket fails
+      }
 
       // Send push notification for order status change
       try {
@@ -500,6 +527,156 @@ class OrderStatusService extends EventEmitter {
 
     } catch (error: any) {
       logger.error(`🚨 Failed to add order ${order.id} to monitoring:`, error.message);
+    }
+  }
+
+  /**
+   * Manually refresh order status for all pending orders
+   */
+  async refreshAllOrderStatus(userId?: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      totalOrders: number;
+      updatedOrders: number;
+      errors: string[];
+    };
+  }> {
+    try {
+      logger.info(`🔄 Manual order status refresh requested${userId ? ` for user ${userId}` : ' for all users'}`);
+
+      // Get all pending orders
+      let pendingOrders = await this.getPendingOrders();
+      
+      // Filter by user if specified
+      if (userId) {
+        pendingOrders = pendingOrders.filter(order => order.user_id.toString() === userId);
+      }
+
+      logger.info(`Found ${pendingOrders.length} pending orders to check`);
+
+      const errors: string[] = [];
+      let updatedCount = 0;
+
+      // Check status for each order
+      for (const order of pendingOrders) {
+        try {
+          const oldStatus = order.status;
+          await this.checkOrderStatus(order);
+          
+          // Check if status was updated
+          if (order.status !== oldStatus) {
+            updatedCount++;
+          }
+        } catch (error: any) {
+          const errorMsg = `Failed to check order ${order.id}: ${error.message}`;
+          logger.error(errorMsg);
+          errors.push(errorMsg);
+        }
+      }
+
+      const result = {
+        success: true,
+        message: `Order status refresh completed. ${updatedCount} orders updated.`,
+        data: {
+          totalOrders: pendingOrders.length,
+          updatedOrders: updatedCount,
+          errors
+        }
+      };
+
+      logger.info(`✅ Order status refresh completed: ${updatedCount}/${pendingOrders.length} orders updated`);
+      return result;
+
+    } catch (error: any) {
+      logger.error('🚨 Failed to refresh order status:', error);
+      return {
+        success: false,
+        message: 'Failed to refresh order status',
+        data: {
+          totalOrders: 0,
+          updatedOrders: 0,
+          errors: [error.message]
+        }
+      };
+    }
+  }
+
+  /**
+   * Manually refresh order status for a specific order
+   */
+  async refreshOrderStatus(orderId: string, userId: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      orderId: string;
+      oldStatus: string;
+      newStatus: string;
+      updated: boolean;
+    };
+  }> {
+    try {
+      logger.info(`🔄 Manual order status refresh requested for order ${orderId}`);
+
+      // Find the order in database
+      const orderHistory = await userDatabase.getOrderHistoryById(parseInt(orderId));
+      if (!orderHistory) {
+        return {
+          success: false,
+          message: 'Order not found'
+        };
+      }
+
+      // Verify user owns the order
+      if (orderHistory.user_id.toString() !== userId) {
+        return {
+          success: false,
+          message: 'Access denied'
+        };
+      }
+
+      // Convert to Order format
+      const order: Order = {
+        id: orderHistory.id.toString(),
+        user_id: orderHistory.user_id,
+        account_id: orderHistory.account_id,
+        symbol: orderHistory.symbol,
+        action: orderHistory.action,
+        quantity: orderHistory.quantity,
+        price: orderHistory.price,
+        status: orderHistory.status,
+        broker_name: orderHistory.broker_name,
+        broker_order_id: orderHistory.broker_order_id,
+        order_type: orderHistory.order_type,
+        exchange: orderHistory.exchange,
+        product_type: orderHistory.product_type,
+        remarks: orderHistory.remarks,
+        created_at: orderHistory.created_at,
+        updated_at: orderHistory.created_at,
+        executed_at: orderHistory.executed_at
+      };
+
+      const oldStatus = order.status;
+      await this.checkOrderStatus(order);
+      const updated = order.status !== oldStatus;
+
+      return {
+        success: true,
+        message: updated ? 'Order status updated' : 'Order status unchanged',
+        data: {
+          orderId: order.id,
+          oldStatus,
+          newStatus: order.status,
+          updated
+        }
+      };
+
+    } catch (error: any) {
+      logger.error(`🚨 Failed to refresh order ${orderId} status:`, error);
+      return {
+        success: false,
+        message: 'Failed to refresh order status'
+      };
     }
   }
 

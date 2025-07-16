@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { IBrokerService } from '@copytrade/unified-broker';
 import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
+import { logger } from '../utils/logger';
 
 // Type definitions
 export type BrokerService = IBrokerService;
@@ -130,7 +131,12 @@ export class BrokerConnectionHelper {
 
       return false;
     } catch (error) {
-      console.error(`🚨 Connection validation failed for ${brokerName} account ${accountId}:`, error);
+      logger.error('Connection validation failed', {
+        component: 'BROKER_CONNECTION_HELPER',
+        operation: 'VALIDATE_CONNECTION',
+        brokerName,
+        accountId
+      }, error);
       return false;
     }
   }

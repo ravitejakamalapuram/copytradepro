@@ -21,6 +21,23 @@ import {
   Input
 } from '../components/ui';
 import { advancedOrderService, type OrderTemplate, type AdvancedOrder } from '../services/advancedOrderService';
+import { useFormValidation, commonValidationRules } from '../hooks/useFormValidation';
+
+interface AdvancedOrderFormData {
+  symbol: string;
+  action: 'BUY' | 'SELL';
+  quantity: string;
+  price: string;
+  stop_loss: string;
+  take_profit: string;
+  iceberg_quantity: string;
+  trigger_price: string;
+  trail_amount: string;
+  trail_percent: string;
+  exchange: string;
+  product_type: string;
+  validity: 'DAY' | 'IOC' | 'GTD';
+}
 
 const AdvancedOrderManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'templates' | 'advanced-orders' | 'create'>('templates');
@@ -32,21 +49,108 @@ const AdvancedOrderManagement: React.FC = () => {
 
   // Form states for creating orders
   const [orderType, setOrderType] = useState<'bracket' | 'iceberg' | 'trailing-stop'>('bracket');
-  const [formData, setFormData] = useState({
-    symbol: '',
-    action: 'BUY' as 'BUY' | 'SELL',
-    quantity: '',
-    price: '',
-    stop_loss: '',
-    take_profit: '',
-    iceberg_quantity: '',
-    trigger_price: '',
-    trail_amount: '',
-    trail_percent: '',
-    exchange: 'NSE',
-    product_type: 'C',
-    validity: 'DAY' as 'DAY' | 'IOC' | 'GTD'
-  });
+
+  // Form validation hook
+  const {
+    values: formData,
+    errors: formErrors,
+    touched,
+    handleChange,
+    handleBlur,
+    reset: resetForm
+  } = useFormValidation<AdvancedOrderFormData>(
+    {
+      symbol: '',
+      action: 'BUY',
+      quantity: '',
+      price: '',
+      stop_loss: '',
+      take_profit: '',
+      iceberg_quantity: '',
+      trigger_price: '',
+      trail_amount: '',
+      trail_percent: '',
+      exchange: 'NSE',
+      product_type: 'C',
+      validity: 'DAY'
+    },
+    {
+      symbol: commonValidationRules.symbol,
+      quantity: commonValidationRules.quantity,
+      price: {
+        ...commonValidationRules.price,
+        custom: (value: string) => {
+          if (orderType === 'bracket' || orderType === 'iceberg') {
+            return commonValidationRules.price.custom!(value);
+          }
+          return null; // Not required for trailing-stop
+        }
+      },
+      stop_loss: {
+        ...commonValidationRules.price,
+        custom: (value: string) => {
+          if (orderType === 'bracket' && (!value || parseFloat(value) <= 0)) {
+            return 'Stop loss price is required for bracket orders';
+          }
+          return null;
+        }
+      },
+      take_profit: {
+        ...commonValidationRules.price,
+        custom: (value: string) => {
+          if (orderType === 'bracket' && (!value || parseFloat(value) <= 0)) {
+            return 'Take profit price is required for bracket orders';
+          }
+          return null;
+        }
+      },
+      iceberg_quantity: {
+        ...commonValidationRules.quantity,
+        custom: (value: string) => {
+          if (orderType === 'iceberg') {
+            const icebergQty = parseInt(value);
+            const totalQty = parseInt(formData.quantity);
+            if (!value || icebergQty <= 0) {
+              return 'Iceberg quantity is required for iceberg orders';
+            }
+            if (icebergQty >= totalQty) {
+              return 'Iceberg quantity must be less than total quantity';
+            }
+          }
+          return null;
+        }
+      },
+      trigger_price: {
+        ...commonValidationRules.price,
+        custom: (value: string) => {
+          if (orderType === 'trailing-stop' && (!value || parseFloat(value) <= 0)) {
+            return 'Trigger price is required for trailing stop orders';
+          }
+          return null;
+        }
+      },
+      trail_amount: {
+        min: 0.01,
+        custom: (value: string) => {
+          if (orderType === 'trailing-stop' && !formData.trail_percent && (!value || parseFloat(value) <= 0)) {
+            return 'Either trail amount or trail percent is required';
+          }
+          return null;
+        }
+      },
+      trail_percent: {
+        min: 0.1,
+        max: 100,
+        custom: (value: string) => {
+          if (orderType === 'trailing-stop' && !formData.trail_amount && (!value || parseFloat(value) <= 0)) {
+            return 'Either trail amount or trail percent is required';
+          }
+          return null;
+        }
+      }
+    },
+    { validateOnChange: true, validateOnBlur: true, debounceMs: 500 }
+  );
 
   useEffect(() => {
     if (activeTab === 'templates') {
@@ -87,10 +191,7 @@ const AdvancedOrderManagement: React.FC = () => {
   };
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    handleChange(field, value);
   };
 
   const handleCreateAdvancedOrder = async () => {
@@ -122,21 +223,7 @@ const AdvancedOrderManagement: React.FC = () => {
         setSuccessMessage(`Bracket order created successfully! Order Group ID: ${result.order_group_id}`);
         
         // Reset form
-        setFormData({
-          symbol: '',
-          action: 'BUY',
-          quantity: '',
-          price: '',
-          stop_loss: '',
-          take_profit: '',
-          iceberg_quantity: '',
-          trigger_price: '',
-          trail_amount: '',
-          trail_percent: '',
-          exchange: 'NSE',
-          product_type: 'C',
-          validity: 'DAY'
-        });
+        resetForm();
 
       } else if (orderType === 'iceberg') {
         const orderData = {
@@ -432,7 +519,11 @@ const AdvancedOrderManagement: React.FC = () => {
                       <Input
                         value={formData.symbol}
                         onChange={(e) => handleInputChange('symbol', e.target.value)}
+                        onBlur={() => handleBlur('symbol')}
                         placeholder="e.g., RELIANCE"
+                        state={formErrors.symbol ? 'error' : 'default'}
+                        error={touched.symbol ? formErrors.symbol : ''}
+                        required
                       />
                     </div>
                     <div>
@@ -455,7 +546,11 @@ const AdvancedOrderManagement: React.FC = () => {
                         type="number"
                         value={formData.quantity}
                         onChange={(e) => handleInputChange('quantity', e.target.value)}
+                        onBlur={() => handleBlur('quantity')}
                         placeholder="100"
+                        state={formErrors.quantity ? 'error' : 'default'}
+                        error={touched.quantity ? formErrors.quantity : ''}
+                        required
                       />
                     </div>
                   </Grid>
@@ -618,23 +713,7 @@ const AdvancedOrderManagement: React.FC = () => {
 
                   {/* Action Buttons */}
                   <Flex justify="end" gap={3}>
-                    <Button variant="outline" onClick={() => {
-                      setFormData({
-                        symbol: '',
-                        action: 'BUY',
-                        quantity: '',
-                        price: '',
-                        stop_loss: '',
-                        take_profit: '',
-                        iceberg_quantity: '',
-                        trigger_price: '',
-                        trail_amount: '',
-                        trail_percent: '',
-                        exchange: 'NSE',
-                        product_type: 'C',
-                        validity: 'DAY'
-                      });
-                    }}>
+                    <Button variant="outline" onClick={() => resetForm()}>
                       Reset
                     </Button>
                     <Button 

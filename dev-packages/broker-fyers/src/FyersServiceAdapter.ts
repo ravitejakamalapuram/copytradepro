@@ -102,155 +102,267 @@ export class FyersServiceAdapter extends IBrokerService {
   }
 
   async placeOrder(orderRequest: OrderRequest): Promise<OrderResponse> {
-    try {
-      // Map unified order type to Fyers-specific format
-      let fyersOrderType: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M';
-      switch (orderRequest.orderType) {
-        case 'LIMIT':
-          fyersOrderType = 'LIMIT';
-          break;
-        case 'MARKET':
-          fyersOrderType = 'MARKET';
-          break;
-        case 'SL-LIMIT':
-          fyersOrderType = 'SL';
-          break;
-        case 'SL-MARKET':
-          fyersOrderType = 'SL-M';
-          break;
-        default:
-          fyersOrderType = 'MARKET';
-      }
+    const maxRetries = 3;
+    let lastError: any = null;
 
-      // Map unified product type to Fyers format
-      const productTypeMap: { [key: string]: string } = {
-        'CNC': 'CNC',
-        'MIS': 'INTRADAY',
-        'NRML': 'MARGIN',
-        'BO': 'BO',
-        'C': 'CNC',
-        'M': 'INTRADAY',
-        'H': 'MARGIN',
-        'B': 'BO'
-      };
-      const fyersProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Map unified order type to Fyers-specific format
+        let fyersOrderType: 'LIMIT' | 'MARKET' | 'SL' | 'SL-M';
+        switch (orderRequest.orderType) {
+          case 'LIMIT':
+            fyersOrderType = 'LIMIT';
+            break;
+          case 'MARKET':
+            fyersOrderType = 'MARKET';
+            break;
+          case 'SL-LIMIT':
+            fyersOrderType = 'SL';
+            break;
+          case 'SL-MARKET':
+            fyersOrderType = 'SL-M';
+            break;
+          default:
+            fyersOrderType = 'MARKET';
+        }
 
-      // Transform to Fyers-specific order format
-      const fyersOrderRequest = {
-        symbol: `${orderRequest.exchange}:${orderRequest.symbol}`,
-        qty: orderRequest.quantity,
-        type: fyersOrderType,
-        side: orderRequest.action, // Keep as 'BUY' | 'SELL' string
-        productType: fyersProductType as 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO',
-        limitPrice: orderRequest.price || 0,
-        stopPrice: orderRequest.triggerPrice || 0,
-        validity: (orderRequest.validity === 'GTD' ? 'DAY' : orderRequest.validity) as 'DAY' | 'IOC',
-        disclosedQty: 0,
-        offlineOrder: false,
-        stopLoss: 0,
-        takeProfit: 0
-      };
+        // Map unified product type to Fyers format
+        const productTypeMap: { [key: string]: string } = {
+          'CNC': 'CNC',
+          'MIS': 'INTRADAY',
+          'NRML': 'MARGIN',
+          'BO': 'BO',
+          'C': 'CNC',
+          'M': 'INTRADAY',
+          'H': 'MARGIN',
+          'B': 'BO'
+        };
+        const fyersProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
-      const response = await this.fyersService.placeOrder(fyersOrderRequest);
+        // Transform to Fyers-specific order format
+        const fyersOrderRequest = {
+          symbol: `${orderRequest.exchange}:${orderRequest.symbol}`,
+          qty: orderRequest.quantity,
+          type: fyersOrderType,
+          side: orderRequest.action, // Keep as 'BUY' | 'SELL' string
+          productType: fyersProductType as 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO',
+          limitPrice: orderRequest.price || 0,
+          stopPrice: orderRequest.triggerPrice || 0,
+          validity: (orderRequest.validity === 'GTD' ? 'DAY' : orderRequest.validity) as 'DAY' | 'IOC',
+          disclosedQty: 0,
+          offlineOrder: false,
+          stopLoss: 0,
+          takeProfit: 0
+        };
 
-      // Fyers response format: { s: 'ok'/'error', message: string, id?: string }
-      if (response.s === 'ok') {
-        return this.createSuccessResponse('Order placed successfully', {
-          orderId: response.id,
-          message: response.message,
-          brokerOrderId: response.id,
-          status: 'PLACED'
+        const response = await this.fyersService.placeOrder(fyersOrderRequest);
+
+        // Fyers response format: { s: 'ok'/'error', message: string, id?: string }
+        if (response.s === 'ok') {
+          return this.createSuccessResponse('Order placed successfully', {
+            orderId: response.id,
+            message: response.message,
+            brokerOrderId: response.id,
+            status: 'PLACED'
+          });
+        } else {
+          // Check if this is a retryable error
+          const isRetryable = this.isRetryableError(response.message);
+          
+          if (isRetryable && attempt < maxRetries) {
+            console.log(`⚠️ Fyers order placement failed (attempt ${attempt}/${maxRetries}): ${response.message}. Retrying...`);
+            lastError = new Error(response.message);
+            await this.delay(1000 * attempt); // Exponential backoff
+            continue;
+          }
+          
+          return this.createErrorResponse(
+            this.transformErrorMessage(response.message || 'Order placement failed'),
+            {
+              errorType: this.categorizeError(response.message),
+              originalError: response.message,
+              attempt: attempt
+            }
+          );
+        }
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if this is a retryable error
+        const isRetryable = this.isRetryableError(error.message);
+        
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`⚠️ Fyers order placement error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying...`);
+          await this.delay(1000 * attempt); // Exponential backoff
+          continue;
+        }
+
+        // Handle specific error types
+        const errorType = this.categorizeError(error.message);
+        const userFriendlyMessage = this.transformErrorMessage(error.message);
+
+        return this.createErrorResponse(userFriendlyMessage, {
+          errorType: errorType,
+          originalError: error.message,
+          attempt: attempt
         });
-      } else {
-        return this.createErrorResponse(response.message || 'Order placement failed', response);
       }
-    } catch (error: any) {
-      // Handle token expiry with auto-retry logic
-      if (error.message?.includes('token') || error.message?.includes('unauthorized')) {
-        return this.createErrorResponse('Authentication expired. Please reactivate your account.', {
-          errorType: 'AUTH_EXPIRED',
-          originalError: error.message
-        });
-      }
-      return this.createErrorResponse(error.message || 'Order placement failed', error);
     }
+
+    // If we get here, all retries failed
+    return this.createErrorResponse(
+      this.transformErrorMessage(lastError?.message || 'Order placement failed after multiple attempts'),
+      {
+        errorType: this.categorizeError(lastError?.message),
+        originalError: lastError?.message,
+        maxRetriesExceeded: true
+      }
+    );
   }
 
   async getOrderStatus(accountId: string, orderId: string): Promise<OrderStatus> {
-    try {
-      // Fyers doesn't have a separate getOrderStatus method, use getOrderBook
-      const orderBook = await this.fyersService.getOrderBook();
+    const maxRetries = 2;
+    let lastError: any = null;
 
-      // orderBook is an array, not an object with orderBook property
-      if (!Array.isArray(orderBook)) {
-        throw new Error('Invalid order book response');
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Fyers doesn't have a separate getOrderStatus method, use getOrderBook
+        const orderBook = await this.fyersService.getOrderBook();
+
+        // orderBook is an array, not an object with orderBook property
+        if (!Array.isArray(orderBook)) {
+          throw new Error('Invalid order book response from Fyers');
+        }
+
+        const order = orderBook.find((o: any) => o.id === orderId);
+
+        if (order) {
+          return {
+            orderId: order.id || orderId,
+            status: order.status || 'UNKNOWN',
+            quantity: order.qty || 0,
+            filledQuantity: order.filledQty || 0,
+            price: order.limitPrice || 0,
+            averagePrice: order.avgPrice || 0,
+            timestamp: new Date(order.orderDateTime || Date.now())
+          };
+        } else {
+          throw new Error(`Order ${orderId} not found in Fyers order book`);
+        }
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if this is a retryable error
+        const isRetryable = this.isRetryableError(error.message);
+        
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`⚠️ Fyers get order status failed (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying...`);
+          await this.delay(1000 * attempt);
+          continue;
+        }
+
+        // Transform error message for user
+        const userFriendlyMessage = this.transformErrorMessage(error.message);
+        throw new Error(userFriendlyMessage);
       }
+    }
 
-      const order = orderBook.find((o: any) => o.id === orderId);
+    // If we get here, all retries failed
+    const userFriendlyMessage = this.transformErrorMessage(lastError?.message || 'Failed to get order status after multiple attempts');
+    throw new Error(userFriendlyMessage);
+  }
 
-      if (order) {
-        return {
-          orderId: order.id || orderId,
+  async getOrderHistory(accountId: string): Promise<OrderStatus[]> {
+    const maxRetries = 2;
+    let lastError: any = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Use getOrderBook for order history in Fyers
+        const response = await this.fyersService.getOrderBook();
+
+        // response is an array, not an object with orderBook property
+        if (!Array.isArray(response)) {
+          console.warn('Fyers order history response is not an array, returning empty array');
+          return [];
+        }
+
+        return response.map((order: any) => ({
+          orderId: order.id || '',
           status: order.status || 'UNKNOWN',
           quantity: order.qty || 0,
           filledQuantity: order.filledQty || 0,
           price: order.limitPrice || 0,
           averagePrice: order.avgPrice || 0,
           timestamp: new Date(order.orderDateTime || Date.now())
-        };
-      } else {
-        throw new Error(`Order ${orderId} not found`);
+        }));
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if this is a retryable error
+        const isRetryable = this.isRetryableError(error.message);
+        
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`⚠️ Fyers get order history failed (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying...`);
+          await this.delay(1000 * attempt);
+          continue;
+        }
+
+        // Transform error message for user
+        const userFriendlyMessage = this.transformErrorMessage(error.message);
+        throw new Error(userFriendlyMessage);
       }
-    } catch (error: any) {
-      throw new Error(`Failed to get order status: ${error.message}`);
     }
-  }
 
-  async getOrderHistory(accountId: string): Promise<OrderStatus[]> {
-    try {
-      // Use getOrderBook for order history in Fyers
-      const response = await this.fyersService.getOrderBook();
-
-      // response is an array, not an object with orderBook property
-      if (!Array.isArray(response)) {
-        return [];
-      }
-
-      return response.map((order: any) => ({
-        orderId: order.id || '',
-        status: order.status || 'UNKNOWN',
-        quantity: order.qty || 0,
-        filledQuantity: order.filledQty || 0,
-        price: order.limitPrice || 0,
-        averagePrice: order.avgPrice || 0,
-        timestamp: new Date(order.orderDateTime || Date.now())
-      }));
-    } catch (error: any) {
-      throw new Error(`Failed to get order history: ${error.message}`);
-    }
+    // If we get here, all retries failed
+    const userFriendlyMessage = this.transformErrorMessage(lastError?.message || 'Failed to get order history after multiple attempts');
+    throw new Error(userFriendlyMessage);
   }
 
   async getPositions(accountId: string): Promise<Position[]> {
-    try {
-      const response = await this.fyersService.getPositions();
+    const maxRetries = 2;
+    let lastError: any = null;
 
-      // response is an array, not an object with netPositions property
-      if (!Array.isArray(response)) {
-        return [];
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.fyersService.getPositions();
+
+        // response is an array, not an object with netPositions property
+        if (!Array.isArray(response)) {
+          console.warn('Fyers positions response is not an array, returning empty array');
+          return [];
+        }
+
+        return response.map((position: any) => ({
+          symbol: position.symbol || '',
+          quantity: position.netQty || 0,
+          averagePrice: position.avgPrice || 0,
+          currentPrice: position.ltp || 0,
+          pnl: position.pl || 0,
+          exchange: position.exchange || '',
+          productType: position.productType || ''
+        }));
+      } catch (error: any) {
+        lastError = error;
+        
+        // Check if this is a retryable error
+        const isRetryable = this.isRetryableError(error.message);
+        
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`⚠️ Fyers get positions failed (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying...`);
+          await this.delay(1000 * attempt);
+          continue;
+        }
+
+        // Transform error message for user
+        const userFriendlyMessage = this.transformErrorMessage(error.message);
+        throw new Error(userFriendlyMessage);
       }
-
-      return response.map((position: any) => ({
-        symbol: position.symbol || '',
-        quantity: position.netQty || 0,
-        averagePrice: position.avgPrice || 0,
-        currentPrice: position.ltp || 0,
-        pnl: position.pl || 0,
-        exchange: position.exchange || '',
-        productType: position.productType || ''
-      }));
-    } catch (error: any) {
-      throw new Error(`Failed to get positions: ${error.message}`);
     }
+
+    // If we get here, all retries failed
+    const userFriendlyMessage = this.transformErrorMessage(lastError?.message || 'Failed to get positions after multiple attempts');
+    throw new Error(userFriendlyMessage);
   }
 
   async getQuote(symbol: string, exchange: string): Promise<Quote> {
@@ -317,5 +429,79 @@ export class FyersServiceAdapter extends IBrokerService {
     } catch (error: any) {
       return this.createErrorResponse(error.message || 'Authentication failed', error);
     }
+  }
+
+  // Error handling helper methods
+  private isRetryableError(errorMessage?: string): boolean {
+    if (!errorMessage) return false;
+    
+    const message = errorMessage.toLowerCase();
+    
+    // Network-related errors that can be retried
+    if (message.includes('network') || 
+        message.includes('timeout') || 
+        message.includes('connection') ||
+        message.includes('server error') ||
+        message.includes('service unavailable') ||
+        message.includes('rate limit') ||
+        message.includes('too many requests')) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  private categorizeError(errorMessage?: string): string {
+    if (!errorMessage) return 'UNKNOWN_ERROR';
+    
+    const message = errorMessage.toLowerCase();
+    
+    if (message.includes('token') || message.includes('unauthorized') || message.includes('authentication')) {
+      return 'AUTH_ERROR';
+    } else if (message.includes('network') || message.includes('timeout') || message.includes('connection')) {
+      return 'NETWORK_ERROR';
+    } else if (message.includes('rate limit') || message.includes('too many requests')) {
+      return 'RATE_LIMIT_ERROR';
+    } else if (message.includes('insufficient') || message.includes('balance') || message.includes('margin')) {
+      return 'INSUFFICIENT_FUNDS';
+    } else if (message.includes('invalid symbol') || message.includes('symbol not found')) {
+      return 'INVALID_SYMBOL';
+    } else if (message.includes('market closed') || message.includes('trading hours')) {
+      return 'MARKET_CLOSED';
+    } else if (message.includes('order') && (message.includes('rejected') || message.includes('failed'))) {
+      return 'ORDER_REJECTED';
+    } else {
+      return 'BROKER_ERROR';
+    }
+  }
+
+  private transformErrorMessage(errorMessage?: string): string {
+    if (!errorMessage) return 'An unknown error occurred';
+    
+    const message = errorMessage.toLowerCase();
+    
+    // Transform technical errors to user-friendly messages
+    if (message.includes('token') || message.includes('unauthorized')) {
+      return 'Your session has expired. Please reconnect your Fyers account.';
+    } else if (message.includes('network') || message.includes('timeout')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    } else if (message.includes('rate limit') || message.includes('too many requests')) {
+      return 'Too many requests. Please wait a moment and try again.';
+    } else if (message.includes('insufficient') || message.includes('balance')) {
+      return 'Insufficient funds in your account to place this order.';
+    } else if (message.includes('invalid symbol') || message.includes('symbol not found')) {
+      return 'Invalid trading symbol. Please check the symbol and try again.';
+    } else if (message.includes('market closed') || message.includes('trading hours')) {
+      return 'Market is currently closed. Orders can only be placed during trading hours.';
+    } else if (message.includes('order') && message.includes('rejected')) {
+      return 'Order was rejected by the broker. Please check order parameters and try again.';
+    } else {
+      // Return original message if no specific transformation is available
+      return errorMessage;
+    }
+  }
+
+  private async delay(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }

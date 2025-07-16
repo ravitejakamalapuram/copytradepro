@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import csv from 'csv-parser';
 import * as cron from 'node-cron';
+import { logger } from '../utils/logger';
 
 interface NSESymbolData {
   symbol: string;
@@ -41,7 +42,10 @@ class NSECSVService {
   private ensureDataDirectory(): void {
     if (!fs.existsSync(this.DATA_DIR)) {
       fs.mkdirSync(this.DATA_DIR, { recursive: true });
-      console.log('📁 Created NSE data directory');
+      logger.info('Created NSE data directory', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'ENSURE_DATA_DIRECTORY'
+      });
     }
   }
 
@@ -61,14 +65,19 @@ class NSECSVService {
           this.lastDataDate = this.lastUpdated.toISOString().split('T')[0] || null;
         }
 
-        console.log(`📊 Loaded ${this.symbols.length} NSE symbols from cache`);
-        if (this.lastUpdated) {
-          console.log(`📅 Last updated: ${this.lastUpdated.toISOString()}`);
-          console.log(`📅 Data date: ${this.lastDataDate}`);
-        }
+        logger.info('Loaded NSE symbols from cache', {
+          component: 'NSE_CSV_SERVICE',
+          operation: 'LOAD_EXISTING_DATA',
+          symbolCount: this.symbols.length,
+          lastUpdated: this.lastUpdated?.toISOString(),
+          dataDate: this.lastDataDate
+        });
       }
     } catch (error) {
-      console.warn('⚠️ Failed to load existing NSE data:', error);
+      logger.warn('Failed to load existing NSE data', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'LOAD_EXISTING_DATA_ERROR'
+      }, error);
       this.symbols = [];
       this.lastUpdated = null;
     }
@@ -83,10 +92,16 @@ class NSECSVService {
                         this.isDataOlderThan24Hours();
 
     if (shouldUpdate) {
-      console.log('🔄 NSE data is missing or outdated, downloading...');
+      logger.info('NSE data is missing or outdated, downloading', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP'
+      });
       await this.downloadAndProcessCSV();
     } else {
-      console.log('✅ NSE data is up to date');
+      logger.info('NSE data is up to date', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP'
+      });
     }
   }
 
@@ -108,7 +123,11 @@ class NSECSVService {
       await this.checkForDayChange();
     }, 60 * 60 * 1000); // 1 hour
 
-    console.log('⏰ Day change monitor started (checks every hour)');
+    logger.info('Day change monitor started', {
+      component: 'NSE_CSV_SERVICE',
+      operation: 'SETUP_DAY_CHANGE_MONITOR',
+      intervalHours: 1
+    });
   }
 
   /**
@@ -119,8 +138,12 @@ class NSECSVService {
 
     // If we have data and it's from a different day, update it
     if (this.lastDataDate && this.lastDataDate !== today) {
-      console.log(`📅 Day changed from ${this.lastDataDate} to ${today}`);
-      console.log(`🔄 Updating NSE CSV data for new day...`);
+      logger.info('Day changed, updating NSE CSV data', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DAY_CHANGE_UPDATE',
+        previousDate: this.lastDataDate,
+        currentDate: today
+      });
 
       try {
         // Delete old files to force fresh download
@@ -129,9 +152,17 @@ class NSECSVService {
         // Download fresh data
         await this.downloadAndProcessCSV();
 
-        console.log(`✅ NSE CSV data updated for ${today}`);
+        logger.info('NSE CSV data updated for new day', {
+          component: 'NSE_CSV_SERVICE',
+          operation: 'DAY_CHANGE_UPDATE_SUCCESS',
+          date: today
+        });
       } catch (error) {
-        console.error(`❌ Failed to update NSE CSV for new day:`, error);
+        logger.error('Failed to update NSE CSV for new day', {
+          component: 'NSE_CSV_SERVICE',
+          operation: 'DAY_CHANGE_UPDATE_ERROR',
+          date: today
+        }, error);
       }
     } else if (!this.lastDataDate) {
       // Set initial date if not set
@@ -146,14 +177,23 @@ class NSECSVService {
     try {
       if (fs.existsSync(this.CSV_FILE_PATH)) {
         fs.unlinkSync(this.CSV_FILE_PATH);
-        console.log('🗑️ Deleted old CSV file');
+        logger.info('Deleted old CSV file', {
+          component: 'NSE_CSV_SERVICE',
+          operation: 'DELETE_OLD_FILES'
+        });
       }
       if (fs.existsSync(this.JSON_FILE_PATH)) {
         fs.unlinkSync(this.JSON_FILE_PATH);
-        console.log('🗑️ Deleted old JSON cache');
+        logger.info('Deleted old JSON cache', {
+          component: 'NSE_CSV_SERVICE',
+          operation: 'DELETE_OLD_FILES'
+        });
       }
     } catch (error) {
-      console.warn('⚠️ Failed to delete old files:', error);
+      logger.warn('Failed to delete old files', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DELETE_OLD_FILES_ERROR'
+      }, error);
     }
   }
 
@@ -163,13 +203,20 @@ class NSECSVService {
   private setupDailyCron(): void {
     // Run every day at 6:30 AM IST (after market close and before next day)
     cron.schedule('30 6 * * *', async () => {
-      console.log('⏰ Daily NSE CSV update triggered');
+      logger.info('Daily NSE CSV update triggered', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DAILY_CRON_TRIGGER'
+      });
       await this.downloadAndProcessCSV();
     }, {
       timezone: 'Asia/Kolkata'
     });
 
-    console.log('⏰ Scheduled daily NSE CSV updates at 6:30 AM IST');
+    logger.info('Scheduled daily NSE CSV updates', {
+      component: 'NSE_CSV_SERVICE',
+      operation: 'SETUP_DAILY_CRON',
+      schedule: '6:30 AM IST'
+    });
   }
 
   /**
@@ -177,12 +224,18 @@ class NSECSVService {
    */
   async downloadAndProcessCSV(): Promise<void> {
     if (this.isUpdating) {
-      console.log('🔄 NSE CSV update already in progress, skipping...');
+      logger.info('NSE CSV update already in progress, skipping', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_AND_PROCESS_CSV'
+      });
       return;
     }
 
     this.isUpdating = true;
-    console.log('📥 Starting NSE CSV download...');
+    logger.info('Starting NSE CSV download', {
+      component: 'NSE_CSV_SERVICE',
+      operation: 'DOWNLOAD_AND_PROCESS_CSV'
+    });
 
     try {
       // Download CSV file
@@ -203,7 +256,10 @@ class NSECSVService {
         writer.on('error', reject);
       });
 
-      console.log('✅ NSE CSV file downloaded successfully');
+      logger.info('NSE CSV file downloaded successfully', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_CSV_SUCCESS'
+      });
 
       // Process CSV file
       await this.processCSVFile();
@@ -211,10 +267,17 @@ class NSECSVService {
       // Save processed data
       await this.saveProcessedData();
 
-      console.log(`🎉 NSE CSV update completed! Loaded ${this.symbols.length} symbols`);
+      logger.info('NSE CSV update completed', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_AND_PROCESS_COMPLETE',
+        symbolCount: this.symbols.length
+      });
 
     } catch (error: any) {
-      console.error('❌ Failed to download NSE CSV:', error.message);
+      logger.error('Failed to download NSE CSV', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_AND_PROCESS_ERROR'
+      }, error);
       throw error;
     } finally {
       this.isUpdating = false;
@@ -234,7 +297,11 @@ class NSECSVService {
         .on('data', (row) => {
           // Debug: Log column names from first row
           if (isFirstRow) {
-            console.log('📋 CSV columns detected:', Object.keys(row));
+            logger.debug('CSV columns detected', {
+              component: 'NSE_CSV_SERVICE',
+              operation: 'PROCESS_CSV_FILE',
+              columns: Object.keys(row)
+            });
             isFirstRow = false;
           }
           try {
@@ -255,19 +322,29 @@ class NSECSVService {
             }
           } catch (error) {
             // Skip invalid rows
-            console.warn('Failed to parse CSV row:', error);
+            logger.warn('Failed to parse CSV row', {
+              component: 'NSE_CSV_SERVICE',
+              operation: 'PROCESS_CSV_ROW_ERROR'
+            }, error);
           }
         })
         .on('end', () => {
           this.symbols = symbols;
           this.lastUpdated = new Date();
           this.lastDataDate = new Date().toISOString().split('T')[0] || null;
-          console.log(`📊 Processed ${symbols.length} symbols from NSE CSV`);
-          console.log(`📅 Data date set to: ${this.lastDataDate}`);
+          logger.info('Processed symbols from NSE CSV', {
+            component: 'NSE_CSV_SERVICE',
+            operation: 'PROCESS_CSV_COMPLETE',
+            symbolCount: symbols.length,
+            dataDate: this.lastDataDate
+          });
           resolve();
         })
         .on('error', (error) => {
-          console.error('❌ Error processing CSV file:', error);
+          logger.error('Error processing CSV file', {
+            component: 'NSE_CSV_SERVICE',
+            operation: 'PROCESS_CSV_FILE_ERROR'
+          }, error);
           reject(error);
         });
     });
@@ -287,9 +364,16 @@ class NSECSVService {
       };
 
       fs.writeFileSync(this.JSON_FILE_PATH, JSON.stringify(data, null, 2));
-      console.log('💾 NSE symbol data saved to JSON file');
+      logger.info('NSE symbol data saved to JSON file', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'SAVE_PROCESSED_DATA',
+        symbolCount: this.symbols.length
+      });
     } catch (error) {
-      console.error('❌ Failed to save processed data:', error);
+      logger.error('Failed to save processed data', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'SAVE_PROCESSED_DATA_ERROR'
+      }, error);
       throw error;
     }
   }
@@ -357,7 +441,10 @@ class NSECSVService {
     if (this.dayChangeMonitor) {
       clearInterval(this.dayChangeMonitor);
       this.dayChangeMonitor = null;
-      console.log('🧹 Day change monitor stopped');
+      logger.info('Day change monitor stopped', {
+        component: 'NSE_CSV_SERVICE',
+        operation: 'CLEANUP'
+      });
     }
   }
 
@@ -365,7 +452,10 @@ class NSECSVService {
    * Force update (manual trigger)
    */
   async forceUpdate(): Promise<void> {
-    console.log('🔄 Force updating NSE CSV data...');
+    logger.info('Force updating NSE CSV data', {
+      component: 'NSE_CSV_SERVICE',
+      operation: 'FORCE_UPDATE'
+    });
     await this.downloadAndProcessCSV();
   }
 

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import api from '../services/api';
+import { useResourceCleanup } from './useResourceCleanup';
 
 export const useConnectionStatus = () => {
+  const { registerInterval } = useResourceCleanup('useConnectionStatus');
   const [isOnline, setIsOnline] = useState(true);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
-
     const checkConnection = async () => {
       try {
         await api.get('/health', { timeout: 3000 });
@@ -24,14 +24,15 @@ export const useConnectionStatus = () => {
     checkConnection();
 
     // Check every 10 seconds
-    intervalId = setInterval(checkConnection, 10000);
+    const intervalId = setInterval(checkConnection, 10000);
+    
+    // Register interval for automatic cleanup
+    registerInterval(intervalId);
 
     return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
+      clearInterval(intervalId);
     };
-  }, []);
+  }, [registerInterval]);
 
   return { isOnline, lastChecked };
 };

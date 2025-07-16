@@ -1,0 +1,143 @@
+{
+  "monitoring": {
+    "enabled": true,
+    "metricsInterval": 30000,
+    "cleanupInterval": 300000,
+    "maxMetricsHistory": 1000,
+    "maxPerformanceHistory": 5000,
+    "maxAlertsHistory": 500
+  },
+  "alertRules": [
+    {
+      "id": "high-memory-usage",
+      "name": "High Memory Usage",
+      "enabled": true,
+      "severity": "high",
+      "cooldown": 300000,
+      "threshold": {
+        "memoryPercentage": 85
+      }
+    },
+    {
+      "id": "critical-memory-usage",
+      "name": "Critical Memory Usage",
+      "enabled": true,
+      "severity": "critical",
+      "cooldown": 60000,
+      "threshold": {
+        "memoryPercentage": 95
+      }
+    },
+    {
+      "id": "high-error-rate",
+      "name": "High Error Rate",
+      "enabled": true,
+      "severity": "high",
+      "cooldown": 300000,
+      "threshold": {
+        "errorRate": 10
+      }
+    },
+    {
+      "id": "critical-error-rate",
+      "name": "Critical Error Rate",
+      "enabled": true,
+      "severity": "critical",
+      "cooldown": 60000,
+      "threshold": {
+        "errorRate": 25
+      }
+    },
+    {
+      "id": "slow-response-time",
+      "name": "Slow Response Time",
+      "enabled": true,
+      "severity": "medium",
+      "cooldown": 600000,
+      "threshold": {
+        "responseTimeP95": 5000
+      }
+    },
+    {
+      "id": "very-slow-response-time",
+      "name": "Very Slow Response Time",
+      "enabled": true,
+      "severity": "high",
+      "cooldown": 300000,
+      "threshold": {
+        "responseTimeP95": 10000
+      }
+    }
+  ],
+  "alertChannels": {
+    "email": {
+      "enabled": false,
+      "config": {
+        "smtp": {
+          "host": "smtp.gmail.com",
+          "port": 587,
+          "secure": false
+        },
+        "from": "alerts@copytrade.pro",
+        "to": ["admin@copytrade.pro"]
+      },
+      "severityFilter": ["high", "critical"]
+    },
+    "slack": {
+      "enabled": false,
+      "config": {
+        "webhookUrl": "",
+        "channel": "#alerts",
+        "username": "CopyTrade Monitor"
+      },
+      "severityFilter": ["medium", "high", "critical"]
+    },
+    "webhook": {
+      "enabled": false,
+      "config": {
+        "url": "",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "severityFilter": ["high", "critical"]
+    }
+  },
+  "healthCheck": {
+    "endpoints": [
+      {
+        "path": "/health",
+        "name": "Basic Health Check",
+        "critical": true
+      },
+      {
+        "path": "/api/health",
+        "name": "API Health Check",
+        "critical": true
+      },
+      {
+        "path": "/api/monitoring/health",
+        "name": "Monitoring Health Check",
+        "critical": false
+      }
+    ],
+    "timeout": 10000,
+    "retries": 3,
+    "retryDelay": 2000
+  },
+  "sla": {
+    "targets": {
+      "uptime": 99.9,
+      "availability": 99.5,
+      "averageResponseTime": 2000,
+      "errorRate": 1.0
+    },
+    "timeWindows": {
+      "hour": 3600000,
+      "day": 86400000,
+      "week": 604800000,
+      "month": 2592000000
+    }
+  }
+}

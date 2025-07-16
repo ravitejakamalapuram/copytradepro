@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { Button, Flex, Stack } from './ui';
 
 export interface NotificationItem {
@@ -28,6 +29,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
   maxNotifications = 5
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { registerTimeout, registerEventListener } = useResourceCleanup('NotificationDisplay');
 
   useEffect(() => {
     // Listen for service worker messages (notification clicks)
@@ -41,12 +43,17 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
       }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handleMessage);
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+      registerEventListener(navigator.serviceWorker, 'message', handleMessage);
+    }
 
     return () => {
-      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      }
     };
-  }, []);
+  }, [registerEventListener]);
 
   const addNotification = (notification: Omit<NotificationItem, 'id' | 'timestamp'>) => {
     const newNotification: NotificationItem = {
@@ -64,9 +71,12 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
 
     // Auto-close notification if enabled
     if (newNotification.autoClose) {
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         removeNotification(newNotification.id);
       }, newNotification.duration);
+      
+      // Register timeout for cleanup
+      registerTimeout(timeout);
     }
   };
 

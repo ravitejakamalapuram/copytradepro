@@ -128,10 +128,63 @@
   font-size: 0.75rem;
   margin-top: 0.25rem;
   color: #64748b;
+  min-height: 1rem;
+  transition: all 0.2s ease-in-out;
 }
 
 .enterprise-input-helper--error {
   color: #dc2626;
+  font-weight: 500;
+}
+
+.enterprise-input-helper--success {
+  color: #059669;
+}
+
+/* Real-time validation feedback */
+.enterprise-input--validating {
+  border-color: #f59e0b;
+}
+
+.enterprise-input--validating:focus {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgb(245 158 11 / 0.1);
+}
+
+/* Loading state for async validation */
+.enterprise-input-validation-spinner {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid #e2e8f0;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+@keyframes spin {
+  0% { transform: translateY(-50%) rotate(0deg); }
+  100% { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Form submission states */
+.enterprise-input--submitting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Field-level success state */
+.enterprise-input--success {
+  border-color: #10b981;
+}
+
+.enterprise-input--success:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
 }
 
 /* Select Specific Styles */

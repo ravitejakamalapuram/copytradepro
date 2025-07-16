@@ -146,7 +146,20 @@ export const accountService = {
   }> {
     try {
       const response = await api.get(`/broker/accounts/${accountId}/status`);
-      return response.data;
+      return response.data as {
+        success: boolean;
+        data?: {
+          accountId: number;
+          brokerName: string;
+          isActive: boolean;
+          sessionInfo: {
+            lastChecked: string;
+            status: 'active' | 'inactive' | 'expired' | 'error';
+            message: string;
+          };
+        };
+        message?: string;
+      };
     } catch (error) {
       console.error('Failed to check account session status:', error);
       return {

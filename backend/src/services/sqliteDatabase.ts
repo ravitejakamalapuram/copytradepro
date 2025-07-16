@@ -1031,6 +1031,7 @@ export class SQLiteUserDatabase {
       status?: string;
       symbol?: string;
       brokerName?: string;
+      accountIds?: string[]; // Array of account IDs to filter by
       startDate?: string;
       endDate?: string;
       action?: 'BUY' | 'SELL';
@@ -1040,60 +1041,104 @@ export class SQLiteUserDatabase {
     // Convert string userId to number for SQLite
     const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     let query = `
-      SELECT * FROM order_history
-      WHERE user_id = ?
+      SELECT oh.*, ca.broker_name as account_broker_name, ca.account_id as broker_account_id
+      FROM order_history oh
+      LEFT JOIN connected_accounts ca ON oh.account_id = ca.id
+      WHERE oh.user_id = ?
     `;
     const params: any[] = [numericUserId];
 
     // Add filters
     if (filters.status) {
-      query += ` AND status = ?`;
+      query += ` AND oh.status = ?`;
       params.push(filters.status);
     }
 
     if (filters.symbol) {
-      query += ` AND symbol LIKE ?`;
+      query += ` AND oh.symbol LIKE ?`;
       params.push(`%${filters.symbol}%`);
     }
 
     if (filters.brokerName) {
-      query += ` AND broker_name = ?`;
+      query += ` AND oh.broker_name = ?`;
       params.push(filters.brokerName);
     }
 
+    // Account-based filtering - filter by specific account IDs
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const accountPlaceholders = filters.accountIds.map(() => '?').join(',');
+      query += ` AND oh.account_id IN (${accountPlaceholders})`;
+      params.push(...filters.accountIds.map(id => parseInt(id)));
+    }
+
     if (filters.action) {
-      query += ` AND action = ?`;
+      query += ` AND oh.action = ?`;
       params.push(filters.action);
     }
 
+    // Improved date filtering - use both executed_at and created_at
     if (filters.startDate) {
-      query += ` AND executed_at >= ?`;
-      params.push(filters.startDate);
+      query += ` AND (oh.executed_at >= ? OR (oh.executed_at IS NULL AND oh.created_at >= ?))`;
+      params.push(filters.startDate, filters.startDate);
     }
 
     if (filters.endDate) {
-      query += ` AND executed_at <= ?`;
-      params.push(filters.endDate);
+      // Add one day to endDate to include the entire end date
+      const endDateTime = new Date(filters.endDate);
+      endDateTime.setDate(endDateTime.getDate() + 1);
+      const endDateStr = endDateTime.toISOString();
+      
+      query += ` AND (oh.executed_at < ? OR (oh.executed_at IS NULL AND oh.created_at < ?))`;
+      params.push(endDateStr, endDateStr);
     }
 
-    // Add search functionality
+    // Enhanced search functionality
     if (filters.search) {
       query += ` AND (
-        symbol LIKE ? OR
-        broker_order_id LIKE ? OR
-        CAST(id as TEXT) LIKE ?
+        oh.symbol LIKE ? OR
+        oh.broker_order_id LIKE ? OR
+        CAST(oh.id as TEXT) LIKE ? OR
+        oh.remarks LIKE ? OR
+        ca.account_id LIKE ?
       )`;
       const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    query += ` ORDER BY executed_at DESC, created_at DESC LIMIT ? OFFSET ?`;
+    // Improved ordering - prioritize recent orders
+    query += ` ORDER BY 
+      COALESCE(oh.executed_at, oh.created_at) DESC, 
+      oh.id DESC 
+      LIMIT ? OFFSET ?`;
     params.push(limit, offset);
 
     const selectOrders = this.db.prepare(query);
 
     try {
-      return selectOrders.all(...params) as OrderHistory[];
+      const results = selectOrders.all(...params) as (OrderHistory & {
+        account_broker_name?: string;
+        broker_account_id?: string;
+      })[];
+
+      // Clean up the results and ensure consistency
+      return results.map(order => ({
+        id: order.id,
+        user_id: order.user_id,
+        account_id: order.account_id,
+        broker_name: order.broker_name,
+        broker_order_id: order.broker_order_id,
+        symbol: order.symbol,
+        action: order.action,
+        quantity: order.quantity,
+        price: order.price,
+        order_type: order.order_type,
+        status: order.status,
+        exchange: order.exchange,
+        product_type: order.product_type,
+        remarks: order.remarks,
+        executed_at: order.executed_at,
+        created_at: order.created_at
+      }));
     } catch (error) {
       console.error('🚨 Failed to get filtered order history:', error);
       throw error;
@@ -1107,6 +1152,7 @@ export class SQLiteUserDatabase {
       status?: string;
       symbol?: string;
       brokerName?: string;
+      accountIds?: string[]; // Array of account IDs to filter by
       startDate?: string;
       endDate?: string;
       action?: 'BUY' | 'SELL';
@@ -1116,57 +1162,73 @@ export class SQLiteUserDatabase {
     // Convert string userId to number for SQLite
     const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     let query = `
-      SELECT COUNT(*) as count FROM order_history
-      WHERE user_id = ?
+      SELECT COUNT(*) as count FROM order_history oh
+      LEFT JOIN connected_accounts ca ON oh.account_id = ca.id
+      WHERE oh.user_id = ?
     `;
     const params: any[] = [numericUserId];
 
-    // Add same filters as above
+    // Add same filters as getOrderHistoryByUserIdWithFilters
     if (filters.status) {
-      query += ` AND status = ?`;
+      query += ` AND oh.status = ?`;
       params.push(filters.status);
     }
 
     if (filters.symbol) {
-      query += ` AND symbol LIKE ?`;
+      query += ` AND oh.symbol LIKE ?`;
       params.push(`%${filters.symbol}%`);
     }
 
     if (filters.brokerName) {
-      query += ` AND broker_name = ?`;
+      query += ` AND oh.broker_name = ?`;
       params.push(filters.brokerName);
     }
 
+    // Account-based filtering
+    if (filters.accountIds && filters.accountIds.length > 0) {
+      const accountPlaceholders = filters.accountIds.map(() => '?').join(',');
+      query += ` AND oh.account_id IN (${accountPlaceholders})`;
+      params.push(...filters.accountIds.map(id => parseInt(id)));
+    }
+
     if (filters.action) {
-      query += ` AND action = ?`;
+      query += ` AND oh.action = ?`;
       params.push(filters.action);
     }
 
+    // Improved date filtering - use both executed_at and created_at
     if (filters.startDate) {
-      query += ` AND executed_at >= ?`;
-      params.push(filters.startDate);
+      query += ` AND (oh.executed_at >= ? OR (oh.executed_at IS NULL AND oh.created_at >= ?))`;
+      params.push(filters.startDate, filters.startDate);
     }
 
     if (filters.endDate) {
-      query += ` AND executed_at <= ?`;
-      params.push(filters.endDate);
+      // Add one day to endDate to include the entire end date
+      const endDateTime = new Date(filters.endDate);
+      endDateTime.setDate(endDateTime.getDate() + 1);
+      const endDateStr = endDateTime.toISOString();
+      
+      query += ` AND (oh.executed_at < ? OR (oh.executed_at IS NULL AND oh.created_at < ?))`;
+      params.push(endDateStr, endDateStr);
     }
 
-    // Add search functionality (same as in main query)
+    // Enhanced search functionality
     if (filters.search) {
       query += ` AND (
-        symbol LIKE ? OR
-        broker_order_id LIKE ? OR
-        CAST(id as TEXT) LIKE ?
+        oh.symbol LIKE ? OR
+        oh.broker_order_id LIKE ? OR
+        CAST(oh.id as TEXT) LIKE ? OR
+        oh.remarks LIKE ? OR
+        ca.account_id LIKE ?
       )`;
       const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
-    const countOrders = this.db.prepare(query);
+    const countQuery = this.db.prepare(query);
 
     try {
-      const result = countOrders.get(...params) as { count: number };
+      const result = countQuery.get(...params) as { count: number };
       return result.count;
     } catch (error) {
       console.error('🚨 Failed to get filtered order count:', error);

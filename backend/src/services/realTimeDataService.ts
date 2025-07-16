@@ -186,16 +186,34 @@ class RealTimeDataService {
           // Cache the price
           this.priceCache.set(key, livePrice);
 
-          // Emit to all subscribers
+          // Emit to all subscribers with enhanced event data
           const subscriptions = this.subscriptions.get(key);
           if (subscriptions) {
             for (const subscription of subscriptions) {
-              this.io.to(subscription.socketId).emit('price_update', livePrice);
+              this.io.to(subscription.socketId).emit('price_update', {
+                ...livePrice,
+                eventId: `price_${symbol}_${Date.now()}`,
+                source: 'realtime_service'
+              });
             }
           }
         }
       } catch (error) {
         console.warn(`⚠️ Failed to update price for ${key}:`, error);
+        
+        // Emit error event for failed price updates
+        const subscriptions = this.subscriptions.get(key);
+        if (subscriptions) {
+          for (const subscription of subscriptions) {
+            this.io.to(subscription.socketId).emit('price_update_error', {
+              symbol: key.split(':')[0],
+              exchange: key.split(':')[1],
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: new Date(),
+              eventId: `price_error_${key}_${Date.now()}`
+            });
+          }
+        }
       }
 
       // Rate limiting - small delay between requests

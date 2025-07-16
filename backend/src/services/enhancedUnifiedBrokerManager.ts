@@ -16,26 +16,48 @@ import {
 } from '@copytrade/unified-broker';
 
 import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
+import { logger } from '../utils/logger';
 
 export interface EnhancedBrokerConnection {
   userId: string;
   brokerName: string;
   accountId: string;
+  databaseAccountId: string; // Database account ID for mapping
   service: IUnifiedBrokerService;
   isActive: boolean;
   connectedAt: Date;
+  lastActivity: Date;
   accountInfo: UnifiedAccountInfo | null;
   tokenInfo: UnifiedTokenInfo | null;
+  connectionAttempts: number;
+  lastError?: string | undefined;
+}
+
+export interface ConnectionPoolStats {
+  totalConnections: number;
+  activeConnections: number;
+  inactiveConnections: number;
+  connectionsByBroker: Record<string, number>;
+  connectionsByUser: Record<string, number>;
+  oldestConnection: Date | null;
+  newestConnection: Date | null;
 }
 
 export class EnhancedUnifiedBrokerManager {
   private static instance: EnhancedUnifiedBrokerManager;
   private connections: Map<string, EnhancedBrokerConnection> = new Map();
   private brokerFactory: UnifiedBrokerFactory;
+  private cleanupInterval: NodeJS.Timeout | null = null;
+  private readonly CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+  private readonly MAX_INACTIVE_TIME_MS = 30 * 60 * 1000; // 30 minutes
 
   private constructor() {
     this.brokerFactory = UnifiedBrokerFactory.getInstance();
-    console.log('🚀 Enhanced Unified Broker Manager initialized');
+    this.startPeriodicCleanup();
+    logger.info('Enhanced Unified Broker Manager initialized with periodic cleanup', {
+      component: 'ENHANCED_BROKER_MANAGER',
+      operation: 'INITIALIZE'
+    });
   }
 
   static getInstance(): EnhancedUnifiedBrokerManager {
@@ -55,7 +77,12 @@ export class EnhancedUnifiedBrokerManager {
     credentials: any
   ): Promise<UnifiedConnectionResponse> {
     try {
-      console.log(`🔄 Connecting to ${brokerName} for user ${userId}`);
+      logger.info('Connecting to broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'CONNECT',
+        brokerName,
+        userId
+      });
 
       // Create broker service instance
       const brokerService = this.brokerFactory.createBroker(brokerName);
@@ -71,22 +98,37 @@ export class EnhancedUnifiedBrokerManager {
           userId,
           brokerName,
           accountId: result.accountInfo.accountId,
+          databaseAccountId: '', // Will be set by caller
           service: brokerService,
           isActive: true,
           connectedAt: new Date(),
+          lastActivity: new Date(),
           accountInfo: result.accountInfo,
-          tokenInfo: result.tokenInfo || null
+          tokenInfo: result.tokenInfo || null,
+          connectionAttempts: 1,
+          lastError: undefined
         };
 
         this.connections.set(connectionKey, connection);
         
-        console.log(`✅ Successfully connected to ${brokerName} for user ${userId}, account ${result.accountInfo.accountId}`);
-        console.log(`📊 Total connections: ${this.connections.size}`);
+        logger.info('Successfully connected to broker', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'CONNECT_SUCCESS',
+          brokerName,
+          userId,
+          accountId: result.accountInfo.accountId,
+          totalConnections: this.connections.size
+        });
       }
       
       return result;
     } catch (error: any) {
-      console.error(`🚨 Failed to connect to ${brokerName}:`, error.message);
+      logger.error('Failed to connect to broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'CONNECT_FAILED',
+        brokerName,
+        userId
+      }, error);
       throw error;
     }
   }
@@ -102,7 +144,12 @@ export class EnhancedUnifiedBrokerManager {
     credentials: any
   ): Promise<UnifiedOAuthResponse> {
     try {
-      console.log(`🔄 Completing OAuth for ${brokerName} with user ${userId}`);
+      logger.info('Completing OAuth for broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'OAUTH_COMPLETE',
+        brokerName,
+        userId
+      });
 
       // Create broker service instance
       const brokerService = this.brokerFactory.createBroker(brokerName);
@@ -118,22 +165,37 @@ export class EnhancedUnifiedBrokerManager {
           userId,
           brokerName,
           accountId: result.accountInfo.accountId,
+          databaseAccountId: '', // Will be set by caller
           service: brokerService,
           isActive: true,
           connectedAt: new Date(),
+          lastActivity: new Date(),
           accountInfo: result.accountInfo,
-          tokenInfo: result.tokenInfo || null
+          tokenInfo: result.tokenInfo || null,
+          connectionAttempts: 1,
+          lastError: undefined
         };
 
         this.connections.set(connectionKey, connection);
         
-        console.log(`✅ Successfully completed OAuth for ${brokerName}, user ${userId}, account ${result.accountInfo.accountId}`);
-        console.log(`📊 Total connections: ${this.connections.size}`);
+        logger.info('Successfully completed OAuth for broker', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'OAUTH_SUCCESS',
+          brokerName,
+          userId,
+          accountId: result.accountInfo.accountId,
+          totalConnections: this.connections.size
+        });
       }
       
       return result;
     } catch (error: any) {
-      console.error(`🚨 Failed to complete OAuth for ${brokerName}:`, error.message);
+      logger.error('Failed to complete OAuth for broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'OAUTH_FAILED',
+        brokerName,
+        userId
+      }, error);
       throw error;
     }
   }
@@ -155,7 +217,12 @@ export class EnhancedUnifiedBrokerManager {
         throw new Error(`No connection found for ${brokerName} account ${accountId}`);
       }
 
-      console.log(`🔄 Refreshing token for ${brokerName} account ${accountId}`);
+      logger.info('Refreshing token for broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'TOKEN_REFRESH',
+        brokerName,
+        accountId
+      });
       
       // Refresh token - broker handles all refresh logic
       const result = await connection.service.refreshToken(credentials);
@@ -165,16 +232,31 @@ export class EnhancedUnifiedBrokerManager {
         connection.tokenInfo = result.tokenInfo;
         connection.isActive = true;
         
-        console.log(`✅ Token refreshed successfully for ${brokerName} account ${accountId}`);
+        logger.info('Token refreshed successfully', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'TOKEN_REFRESH_SUCCESS',
+          brokerName,
+          accountId
+        });
       } else {
         // Refresh failed - mark connection as inactive
         connection.isActive = false;
-        console.log(`❌ Token refresh failed for ${brokerName} account ${accountId}`);
+        logger.warn('Token refresh failed', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'TOKEN_REFRESH_FAILED',
+          brokerName,
+          accountId
+        });
       }
       
       return result;
     } catch (error: any) {
-      console.error(`🚨 Failed to refresh token for ${brokerName}:`, error.message);
+      logger.error('Failed to refresh token for broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'TOKEN_REFRESH_ERROR',
+        brokerName,
+        accountId
+      }, error);
       throw error;
     }
   }
@@ -213,7 +295,12 @@ export class EnhancedUnifiedBrokerManager {
       
       return result;
     } catch (error: any) {
-      console.error(`🚨 Failed to validate session for ${brokerName}:`, error.message);
+      logger.error('Failed to validate session for broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'SESSION_VALIDATION_ERROR',
+        brokerName,
+        accountId
+      }, error);
       
       return {
         isValid: false,
@@ -250,12 +337,24 @@ export class EnhancedUnifiedBrokerManager {
       try {
         await connection.service.disconnect();
       } catch (error) {
-        console.error(`🚨 Disconnect failed for ${brokerName}:`, error);
+        logger.error('Disconnect failed for broker', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'DISCONNECT_FAILED',
+          brokerName,
+          userId,
+          accountId
+        }, error);
       }
 
       this.connections.delete(connectionKey);
-      console.log(`✅ Disconnected from ${brokerName} for user ${userId}, account ${accountId}`);
-      console.log(`📊 Remaining connections: ${this.connections.size}`);
+      logger.info('Disconnected from broker', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'DISCONNECT_SUCCESS',
+        brokerName,
+        userId,
+        accountId,
+        remainingConnections: this.connections.size
+      });
     }
   }
 
@@ -289,18 +388,338 @@ export class EnhancedUnifiedBrokerManager {
    * Debug: List all connections
    */
   debugListConnections(): void {
-    console.log(`📊 Enhanced Unified Broker Manager - Total connections: ${this.connections.size}`);
+    logger.debug('Enhanced Unified Broker Manager connections', {
+      component: 'ENHANCED_BROKER_MANAGER',
+      operation: 'DEBUG_LIST_CONNECTIONS',
+      totalConnections: this.connections.size
+    });
     
     for (const [key, connection] of this.connections) {
-      console.log(`  🔗 ${key}: ${connection.brokerName} | Active: ${connection.isActive} | Account: ${connection.accountId}`);
+      logger.debug('Connection details', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'DEBUG_CONNECTION',
+        connectionKey: key,
+        brokerName: connection.brokerName,
+        isActive: connection.isActive,
+        accountId: connection.accountId
+      });
     }
   }
 
   /**
-   * Create connection key for internal mapping
+   * Set database account ID for a connection (for proper mapping)
+   */
+  setConnectionDatabaseId(userId: string, brokerName: string, accountId: string, databaseAccountId: string): void {
+    const connection = this.getConnection(userId, brokerName, accountId);
+    if (connection) {
+      connection.databaseAccountId = databaseAccountId;
+      logger.info('Database account ID set for connection', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'SET_DATABASE_ID',
+        brokerName,
+        accountId,
+        databaseAccountId
+      });
+    }
+  }
+
+  /**
+   * Update connection activity timestamp
+   */
+  updateConnectionActivity(userId: string, brokerName: string, accountId: string): void {
+    const connection = this.getConnection(userId, brokerName, accountId);
+    if (connection) {
+      connection.lastActivity = new Date();
+    }
+  }
+
+  /**
+   * Mark connection as having an error
+   */
+  markConnectionError(userId: string, brokerName: string, accountId: string, error: string): void {
+    const connection = this.getConnection(userId, brokerName, accountId);
+    if (connection) {
+      connection.lastError = error;
+      connection.connectionAttempts++;
+      connection.isActive = false;
+      logger.error('Connection error marked', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'MARK_CONNECTION_ERROR',
+        brokerName,
+        accountId,
+        error
+      });
+    }
+  }
+
+  /**
+   * Get connection pool statistics
+   */
+  getConnectionPoolStats(): ConnectionPoolStats {
+    const connections = Array.from(this.connections.values());
+    
+    if (connections.length === 0) {
+      return {
+        totalConnections: 0,
+        activeConnections: 0,
+        inactiveConnections: 0,
+        connectionsByBroker: {},
+        connectionsByUser: {},
+        oldestConnection: null,
+        newestConnection: null
+      };
+    }
+
+    const activeConnections = connections.filter(conn => conn.isActive).length;
+    const inactiveConnections = connections.length - activeConnections;
+
+    // Group by broker
+    const connectionsByBroker: Record<string, number> = {};
+    connections.forEach(conn => {
+      connectionsByBroker[conn.brokerName] = (connectionsByBroker[conn.brokerName] || 0) + 1;
+    });
+
+    // Group by user
+    const connectionsByUser: Record<string, number> = {};
+    connections.forEach(conn => {
+      connectionsByUser[conn.userId] = (connectionsByUser[conn.userId] || 0) + 1;
+    });
+
+    // Find oldest and newest connections
+    const sortedByDate = connections.sort((a, b) => a.connectedAt.getTime() - b.connectedAt.getTime());
+    const oldestConnection = sortedByDate[0]?.connectedAt || null;
+    const newestConnection = sortedByDate[sortedByDate.length - 1]?.connectedAt || null;
+
+    return {
+      totalConnections: connections.length,
+      activeConnections,
+      inactiveConnections,
+      connectionsByBroker,
+      connectionsByUser,
+      oldestConnection,
+      newestConnection
+    };
+  }
+
+  /**
+   * Clean up inactive connections
+   */
+  cleanupInactiveConnections(maxInactiveTimeMs: number = 30 * 60 * 1000): number {
+    const now = Date.now();
+    let cleanedCount = 0;
+    const connectionsToRemove: string[] = [];
+
+    for (const [key, connection] of this.connections.entries()) {
+      const timeSinceLastActivity = now - connection.lastActivity.getTime();
+      
+      // Clean up connections that are inactive and haven't been used recently
+      if (!connection.isActive && timeSinceLastActivity > maxInactiveTimeMs) {
+        connectionsToRemove.push(key);
+      }
+    }
+
+    // Remove inactive connections
+    for (const key of connectionsToRemove) {
+      const connection = this.connections.get(key);
+      if (connection) {
+        try {
+          // Attempt graceful disconnect
+          connection.service.disconnect().catch(() => {
+            // Ignore disconnect errors during cleanup
+          });
+        } catch (error) {
+          // Ignore errors during cleanup
+        }
+        
+        this.connections.delete(key);
+        cleanedCount++;
+        logger.info('Cleaned up inactive connection', {
+          component: 'ENHANCED_BROKER_MANAGER',
+          operation: 'CLEANUP_CONNECTION',
+          brokerName: connection.brokerName,
+          accountId: connection.accountId
+        });
+      }
+    }
+
+    if (cleanedCount > 0) {
+      logger.info('Cleaned up inactive connections', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'CLEANUP_COMPLETE',
+        cleanedCount
+      });
+    }
+
+    return cleanedCount;
+  }
+
+  /**
+   * Get connections that need attention (errors, expired tokens, etc.)
+   */
+  getConnectionsNeedingAttention(): EnhancedBrokerConnection[] {
+    const now = new Date();
+    return Array.from(this.connections.values()).filter(connection => {
+      // Connection has errors
+      if (connection.lastError) {
+        return true;
+      }
+
+      // Connection is inactive
+      if (!connection.isActive) {
+        return true;
+      }
+
+      // Token is expired or expiring soon
+      if (connection.tokenInfo?.expiryTime) {
+        const expiryTime = new Date(connection.tokenInfo.expiryTime);
+        const timeUntilExpiry = expiryTime.getTime() - now.getTime();
+        const thirtyMinutes = 30 * 60 * 1000;
+        
+        if (timeUntilExpiry <= thirtyMinutes) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+  }
+
+  /**
+   * Find connection by database account ID
+   */
+  findConnectionByDatabaseId(databaseAccountId: string): EnhancedBrokerConnection | null {
+    for (const connection of this.connections.values()) {
+      if (connection.databaseAccountId === databaseAccountId) {
+        return connection;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get all connections for a specific broker
+   */
+  getBrokerConnections(brokerName: string): EnhancedBrokerConnection[] {
+    return Array.from(this.connections.values()).filter(conn => conn.brokerName === brokerName);
+  }
+
+  /**
+   * Enhanced debug method with detailed connection information
+   */
+  debugListConnectionsDetailed(): void {
+    const stats = this.getConnectionPoolStats();
+    
+    logger.debug('Enhanced Unified Broker Manager - Connection Pool Stats', {
+      component: 'ENHANCED_BROKER_MANAGER',
+      operation: 'DEBUG_DETAILED_STATS',
+      totalConnections: stats.totalConnections,
+      activeConnections: stats.activeConnections,
+      inactiveConnections: stats.inactiveConnections,
+      connectionsByBroker: stats.connectionsByBroker,
+      connectionsByUser: stats.connectionsByUser,
+      oldestConnection: stats.oldestConnection?.toISOString(),
+      newestConnection: stats.newestConnection?.toISOString()
+    });
+
+    for (const [key, connection] of this.connections.entries()) {
+      logger.debug('Individual connection details', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'DEBUG_CONNECTION_DETAIL',
+        connectionKey: key,
+        isActive: connection.isActive,
+        brokerName: connection.brokerName,
+        accountId: connection.accountId,
+        databaseAccountId: connection.databaseAccountId,
+        connectionAttempts: connection.connectionAttempts,
+        lastError: connection.lastError,
+        connectedAt: connection.connectedAt.toISOString(),
+        lastActivity: connection.lastActivity.toISOString()
+      });
+    }
+
+    // Show connections needing attention
+    const needingAttention = this.getConnectionsNeedingAttention();
+    if (needingAttention.length > 0) {
+      logger.warn('Connections needing attention detected', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'DEBUG_ATTENTION_NEEDED',
+        count: needingAttention.length,
+        connections: needingAttention.map(conn => ({
+          brokerName: conn.brokerName,
+          accountId: conn.accountId,
+          issue: conn.lastError || 'Token expiring/expired'
+        }))
+      });
+    }
+  }
+
+  /**
+   * Start periodic cleanup of inactive connections
+   */
+  private startPeriodicCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupInactiveConnections(this.MAX_INACTIVE_TIME_MS);
+    }, this.CLEANUP_INTERVAL_MS);
+
+    logger.info('Periodic connection cleanup started', {
+      component: 'ENHANCED_BROKER_MANAGER',
+      operation: 'START_CLEANUP',
+      intervalSeconds: this.CLEANUP_INTERVAL_MS / 1000
+    });
+  }
+
+  /**
+   * Stop periodic cleanup
+   */
+  private stopPeriodicCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      logger.info('Periodic connection cleanup stopped', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'STOP_CLEANUP'
+      });
+    }
+  }
+
+  /**
+   * Destroy the manager and cleanup resources
+   */
+  destroy(): void {
+    this.stopPeriodicCleanup();
+    
+    // Disconnect all connections
+    const disconnectPromises = Array.from(this.connections.values()).map(async (connection) => {
+      try {
+        await connection.service.disconnect();
+      } catch (error) {
+        // Ignore disconnect errors during cleanup
+      }
+    });
+
+    Promise.allSettled(disconnectPromises).then(() => {
+      this.connections.clear();
+      logger.info('Enhanced Unified Broker Manager destroyed', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'DESTROY'
+      });
+    });
+  }
+
+  /**
+   * Create connection key for internal mapping with improved collision resistance
    */
   private createConnectionKey(userId: string, brokerName: string, accountId: string): string {
-    return `${userId}_${brokerName}_${accountId}`;
+    // Normalize inputs to prevent key collisions
+    const normalizedUserId = userId.toString().trim();
+    const normalizedBrokerName = brokerName.toLowerCase().trim();
+    const normalizedAccountId = accountId.toString().trim();
+    
+    return `${normalizedUserId}::${normalizedBrokerName}::${normalizedAccountId}`;
   }
 }
 

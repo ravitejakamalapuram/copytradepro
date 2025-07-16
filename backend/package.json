@@ -8,7 +8,15 @@
     "build": "tsc",
     "dev": "nodemon",
     "start": "node dist/index.js",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "health-check": "node scripts/health-check.js",
+    "deploy": "../scripts/deploy.sh deploy",
+    "rollback": "../scripts/deploy.sh rollback",
+    "monitoring:start": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.start()\"",
+    "monitoring:stop": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.stop()\""
   },
   "dependencies": {
     "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",
@@ -37,19 +45,36 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@jest/globals": "^30.0.4",
     "@types/better-sqlite3": "^7.6.13",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^20.0.0",
     "@types/uuid": "^10.0.0",
     "@types/web-push": "^3.6.4",
+    "jest": "^30.0.4",
     "nodemon": "^3.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=16.0.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": ["<rootDir>/src/tests/setup.ts"],
+    "testMatch": ["**/__tests__/**/*.test.ts", "**/?(*.)+(spec|test).ts"],
+    "collectCoverageFrom": [
+      "src/**/*.ts",
+      "!src/**/*.d.ts",
+      "!src/tests/**",
+      "!src/index.ts"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"]
   }
 }

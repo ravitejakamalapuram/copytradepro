@@ -1,74 +1,47 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useFormValidation, commonValidationRules } from '../hooks/useFormValidation';
 import { Input, Button, Stack } from './ui';
 
+interface RegisterFormData {
+  name: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+}
+
 const RegisterForm: React.FC = () => {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const { register } = useAuth();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
-  };
+  const {
+    values,
+    errors,
+    touched,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    setFieldError
+  } = useFormValidation<RegisterFormData>(
+    { name: '', email: '', password: '', confirmPassword: '' },
+    {
+      name: commonValidationRules.name,
+      email: commonValidationRules.email,
+      password: commonValidationRules.password,
+      confirmPassword: {
+        required: true,
+        custom: (value: string) => {
+          if (value !== values.password) {
+            return 'Passwords do not match';
+          }
+          return null;
+        }
+      }
+    },
+    { validateOnChange: true, validateOnBlur: true, debounceMs: 300 }
+  );
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
-    } else if (formData.name.trim().length < 2) {
-      newErrors.name = 'Name must be at least 2 characters';
-    } else if (formData.name.trim().length > 50) {
-      newErrors.name = 'Name must be less than 50 characters';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
-    }
-
-    if (!formData.confirmPassword) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrors({});
-
+  const performRegister = async (formData: RegisterFormData) => {
     try {
       await register({
         name: formData.name.trim(),
@@ -77,76 +50,82 @@ const RegisterForm: React.FC = () => {
       });
     } catch (error: any) {
       console.error('🚨 Registration error:', error);
-      setErrors({
-        general: error.message || 'Registration failed. Please try again.',
-      });
-    } finally {
-      setIsSubmitting(false);
+      
+      // Set field-specific errors based on the error message
+      if (error.message?.includes('email already exists') || error.message?.includes('email is already registered')) {
+        setFieldError('email', 'This email is already registered. Please use a different email or try logging in.');
+      } else if (error.message?.includes('password')) {
+        setFieldError('password', error.message);
+      } else if (error.message?.includes('name')) {
+        setFieldError('name', error.message);
+      } else {
+        setFieldError('email', error.message || 'Registration failed. Please try again.');
+      }
+
+      throw error;
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="auth-form">
-      {errors.general && (
-        <div className="register-error-alert">
-          {errors.general}
-        </div>
-      )}
-
+    <form onSubmit={(e) => { e.preventDefault(); handleSubmit(performRegister); }} className="auth-form">
       <Stack gap={4}>
         <Input
           type="text"
           label="Full Name"
-          name="name"
-          value={formData.name}
-          onChange={handleChange}
+          value={values.name}
+          onChange={(e) => handleChange('name', e.target.value)}
+          onBlur={() => handleBlur('name')}
           placeholder="Enter your full name"
           disabled={isSubmitting}
           autoComplete="name"
           state={errors.name ? 'error' : 'default'}
-          error={errors.name}
+          error={touched.name ? errors.name : ''}
+          required
           fullWidth
         />
 
         <Input
           type="email"
           label="Email Address"
-          name="email"
-          value={formData.email}
-          onChange={handleChange}
+          value={values.email}
+          onChange={(e) => handleChange('email', e.target.value)}
+          onBlur={() => handleBlur('email')}
           placeholder="Enter your email"
           disabled={isSubmitting}
           autoComplete="email"
           state={errors.email ? 'error' : 'default'}
-          error={errors.email}
+          error={touched.email ? errors.email : ''}
+          required
           fullWidth
         />
 
         <Input
           type="password"
           label="Password"
-          name="password"
-          value={formData.password}
-          onChange={handleChange}
+          value={values.password}
+          onChange={(e) => handleChange('password', e.target.value)}
+          onBlur={() => handleBlur('password')}
           placeholder="Create a password"
           disabled={isSubmitting}
           autoComplete="new-password"
           state={errors.password ? 'error' : 'default'}
-          error={errors.password}
+          error={touched.password ? errors.password : ''}
+          required
           fullWidth
         />
 
         <Input
           type="password"
           label="Confirm Password"
-          name="confirmPassword"
-          value={formData.confirmPassword}
-          onChange={handleChange}
+          value={values.confirmPassword}
+          onChange={(e) => handleChange('confirmPassword', e.target.value)}
+          onBlur={() => handleBlur('confirmPassword')}
           placeholder="Confirm your password"
           disabled={isSubmitting}
           autoComplete="new-password"
           state={errors.confirmPassword ? 'error' : 'default'}
-          error={errors.confirmPassword}
+          error={touched.confirmPassword ? errors.confirmPassword : ''}
+          required
           fullWidth
         />
 

@@ -1,123 +1,114 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useFormValidation, commonValidationRules } from '../hooks/useFormValidation';
 import { Input, Button, Stack } from './ui';
+
+interface LoginFormData {
+  email: string;
+  password: string;
+}
 
 const LoginForm: React.FC = () => {
   const { login } = useAuth();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEmail(e.target.value);
-    if (error) setError('');
-  };
+  const {
+    values,
+    errors,
+    touched,
+    isSubmitting,
+    handleChange,
+    handleBlur,
+    handleSubmit,
+    setFieldError
+  } = useFormValidation<LoginFormData>(
+    { email: '', password: '' },
+    {
+      email: commonValidationRules.email,
+      password: { required: true, minLength: 1 } // Less strict for login
+    },
+    { validateOnChange: true, validateOnBlur: true, debounceMs: 500 }
+  );
 
-  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value);
-    if (error) setError('');
-  };
-
-  const performLogin = () => {
-    if (loading) return;
-
-    if (!email.trim()) {
-      setError('Email is required');
-      return;
-    }
-    if (!password) {
-      setError('Password is required');
-      return;
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      setError('Please enter a valid email address');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    login({
-      email: email.trim().toLowerCase(),
-      password: password,
-    }).catch((err) => {
+  const performLogin = async (formData: LoginFormData) => {
+    try {
+      await login({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      });
+    } catch (err: any) {
       let errorMessage = 'Login failed. Please try again.';
 
       if (err?.message) {
         if (err.message.includes('Invalid email or password')) {
           errorMessage = 'Invalid email or password. If you don\'t have an account, please register first.';
+          // Set field-specific errors
+          setFieldError('email', 'Invalid credentials');
+          setFieldError('password', 'Invalid credentials');
         } else if (err.message.includes('Network error')) {
           errorMessage = 'Unable to connect to the server. Please check your internet connection.';
+          setFieldError('email', errorMessage);
         } else {
           errorMessage = err.message;
+          setFieldError('email', errorMessage);
         }
+      } else {
+        setFieldError('email', errorMessage);
       }
 
-      setError(errorMessage);
-    }).finally(() => {
-      setLoading(false);
-    });
+      throw new Error(errorMessage);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      performLogin();
+      handleSubmit(performLogin);
     }
   };
 
   return (
     <div className="auth-form">
-      {error && (
-        <div className="login-error-alert">
-          {error}
-          {error.includes('Invalid email or password') && (
-            <div className="error-help-text">
-              Don't have an account?{' '}
-              <a href="/register" className="error-link">
-                Register here
-              </a>
-            </div>
-          )}
-        </div>
-      )}
-
       <Stack gap={4}>
         <Input
           type="email"
           label="Email Address"
-          value={email}
-          onChange={handleEmailChange}
+          value={values.email}
+          onChange={(e) => handleChange('email', e.target.value)}
+          onBlur={() => handleBlur('email')}
           onKeyPress={handleKeyPress}
           placeholder="Enter your email address"
-          disabled={loading}
+          disabled={isSubmitting}
           autoComplete="email"
-          state={error && error.includes('email') ? 'error' : 'default'}
+          state={errors.email ? 'error' : 'default'}
+          error={touched.email ? errors.email : ''}
+          required
           fullWidth
         />
 
         <Input
           type="password"
           label="Password"
-          value={password}
-          onChange={handlePasswordChange}
+          value={values.password}
+          onChange={(e) => handleChange('password', e.target.value)}
+          onBlur={() => handleBlur('password')}
           onKeyPress={handleKeyPress}
           placeholder="Enter your password"
-          disabled={loading}
+          disabled={isSubmitting}
           autoComplete="current-password"
-          state={error && error.includes('password') ? 'error' : 'default'}
+          state={errors.password ? 'error' : 'default'}
+          error={touched.password ? errors.password : ''}
+          required
           fullWidth
         />
 
         <Button
           variant="primary"
           size="lg"
-          onClick={performLogin}
-          disabled={loading}
-          loading={loading}
+          onClick={() => handleSubmit(performLogin)}
+          disabled={isSubmitting}
+          loading={isSubmitting}
           fullWidth
         >
-          {loading ? 'Signing in...' : 'Sign In'}
+          {isSubmitting ? 'Signing in...' : 'Sign In'}
         </Button>
       </Stack>
     </div>

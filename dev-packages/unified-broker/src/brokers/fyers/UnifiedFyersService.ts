@@ -46,21 +46,37 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
 
       console.log('🔄 Initiating Fyers OAuth flow...');
       
+      // Validate required credentials
+      if (!fyersCredentials.clientId || !fyersCredentials.secretKey) {
+        return UnifiedResponseHelper.createErrorResponse(
+          'Client ID and Secret Key are required for Fyers authentication',
+          'VALIDATION_ERROR',
+          'INACTIVE',
+          'REAUTH_REQUIRED'
+        );
+      }
+
+      // Set default redirect URI if not provided
+      if (!fyersCredentials.redirectUri) {
+        fyersCredentials.redirectUri = process.env.FYERS_REDIRECT_URI || 'http://localhost:3001/api/broker/oauth/callback';
+      }
+      
       // Generate OAuth URL for user authentication
       const authUrl = this.fyersService.generateAuthUrl(fyersCredentials);
       
       if (authUrl) {
         console.log('✅ Fyers OAuth URL generated successfully');
+        console.log(`🔗 OAuth URL: ${authUrl}`);
         
         return UnifiedResponseHelper.createOAuthResponse(
           authUrl,
-          'Please complete OAuth authentication in the popup window'
+          'Please complete OAuth authentication. You will be redirected back after authorization.'
         );
       } else {
         console.error('❌ Failed to generate Fyers OAuth URL');
         
         return UnifiedResponseHelper.createErrorResponse(
-          'Failed to generate OAuth URL for Fyers',
+          'Failed to generate OAuth URL for Fyers. Please check your credentials.',
           'BROKER_ERROR',
           'INACTIVE',
           'REAUTH_REQUIRED'

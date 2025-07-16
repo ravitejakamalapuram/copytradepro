@@ -7,6 +7,7 @@
 import { BrokerRegistry, IBrokerService, BrokerCredentials, LoginResponse } from '@copytrade/unified-broker';
 import { userDatabase } from './databaseCompatibility';
 import { AuthenticationStep } from '@copytrade/shared-types';
+import { logger } from '../utils/logger';
 
 export interface BrokerConnection {
   userId: string;
@@ -72,7 +73,10 @@ export class UnifiedBrokerManager {
       // Attempt login
       const loginResult: LoginResponse = await tempBrokerService.login(credentials);
 
-      console.log(`🔍 DEBUG: Login result for ${brokerName}:`, {
+      logger.debug('Login result for broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'LOGIN_RESULT',
+        brokerName,
         success: loginResult.success,
         message: loginResult.message,
         hasData: !!loginResult.data,
@@ -83,14 +87,23 @@ export class UnifiedBrokerManager {
       if (!loginResult.success) {
         // Check if this is an OAuth flow that needs auth URL
         if (loginResult.data?.authUrl) {
-          console.log(`✅ OAuth URL detected: ${loginResult.data.authUrl}`);
+          logger.info('OAuth URL detected', {
+            component: 'UNIFIED_BROKER_MANAGER',
+            operation: 'OAUTH_URL_DETECTED',
+            brokerName,
+            authUrl: loginResult.data.authUrl
+          });
           return {
             success: false,
             authUrl: loginResult.data.authUrl,
             message: loginResult.message || 'Authentication URL generated'
           };
         }
-        console.log(`❌ No OAuth URL found in login result`);
+        logger.warn('No OAuth URL found in login result', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'OAUTH_URL_NOT_FOUND',
+          brokerName
+        });
         throw new Error(loginResult.message || 'Login failed');
       }
 
@@ -109,7 +122,12 @@ export class UnifiedBrokerManager {
       const accountKey = `${brokerName.toLowerCase()}_${accountId}`;
       (this.brokerRegistry as any).accountInstances.set(accountKey, accountSpecificService);
 
-      console.log(`✅ Using temp service as account-specific service for ${brokerName} account ${accountId}`);
+      logger.info('Using temp service as account-specific service', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'TEMP_SERVICE_ASSIGNED',
+        brokerName,
+        accountId
+      });
 
       // Create connection with account-specific service
       const connectionKey = this.createConnectionKey(userId, brokerName, accountId);
@@ -124,8 +142,14 @@ export class UnifiedBrokerManager {
 
       this.connections.set(connectionKey, connection);
 
-      console.log(`✅ Successfully connected to ${brokerName} for user ${userId}, account ${accountId}`);
-      console.log(`📊 Total connections: ${this.connections.size}`);
+      logger.info('Successfully connected to broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'CONNECT_SUCCESS',
+        brokerName,
+        userId,
+        accountId,
+        totalConnections: this.connections.size
+      });
       
       return {
         success: true,
@@ -134,7 +158,12 @@ export class UnifiedBrokerManager {
       };
 
     } catch (error: any) {
-      console.error(`🚨 Failed to connect to ${brokerName}:`, error.message);
+      logger.error('Failed to connect to broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'CONNECT_FAILED',
+        brokerName,
+        userId
+      }, error);
       
       // Check if error contains auth URL (for OAuth flows)
       if (error.authUrl) {
@@ -190,7 +219,12 @@ export class UnifiedBrokerManager {
       const accountKey = `${brokerName.toLowerCase()}_${accountId}`;
       (this.brokerRegistry as any).accountInstances.set(accountKey, accountSpecificService);
 
-      console.log(`✅ Using OAuth temp service as account-specific service for ${brokerName} account ${accountId}`);
+      logger.info('Using OAuth temp service as account-specific service', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'OAUTH_TEMP_SERVICE_ASSIGNED',
+        brokerName,
+        accountId
+      });
 
       // Create connection
       const connectionKey = this.createConnectionKey(userId, brokerName, accountId);
@@ -205,8 +239,14 @@ export class UnifiedBrokerManager {
 
       this.connections.set(connectionKey, connection);
 
-      console.log(`✅ Successfully completed OAuth for ${brokerName}, user ${userId}, account ${accountId}`);
-      console.log(`📊 Total connections: ${this.connections.size}`);
+      logger.info('Successfully completed OAuth for broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'OAUTH_SUCCESS',
+        brokerName,
+        userId,
+        accountId,
+        totalConnections: this.connections.size
+      });
       
       return {
         success: true,
@@ -215,7 +255,12 @@ export class UnifiedBrokerManager {
       };
 
     } catch (error: any) {
-      console.error(`🚨 Failed to complete OAuth for ${brokerName}:`, error.message);
+      logger.error('Failed to complete OAuth for broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'OAUTH_FAILED',
+        brokerName,
+        userId
+      }, error);
       throw error;
     }
   }
@@ -258,7 +303,13 @@ export class UnifiedBrokerManager {
       connection.isActive = isValid;
       return isValid;
     } catch (error) {
-      console.error(`🚨 Connection validation failed for ${brokerName}:`, error);
+      logger.error('Connection validation failed for broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'VALIDATION_FAILED',
+        brokerName,
+        userId,
+        accountId
+      }, error);
       connection.isActive = false;
       return false;
     }
@@ -275,7 +326,13 @@ export class UnifiedBrokerManager {
       try {
         await connection.service.logout();
       } catch (error) {
-        console.error(`🚨 Logout failed for ${brokerName}:`, error);
+        logger.error('Logout failed for broker', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'LOGOUT_FAILED',
+          brokerName,
+          userId,
+          accountId
+        }, error);
       }
 
       this.connections.delete(connectionKey);
@@ -283,8 +340,14 @@ export class UnifiedBrokerManager {
       // Clean up the account-specific broker instance
       this.brokerRegistry.removeBrokerForAccount(brokerName, accountId);
 
-      console.log(`✅ Disconnected from ${brokerName} for user ${userId}, account ${accountId}`);
-      console.log(`📊 Remaining connections: ${this.connections.size}`);
+      logger.info('Disconnected from broker', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'DISCONNECT_SUCCESS',
+        brokerName,
+        userId,
+        accountId,
+        remainingConnections: this.connections.size
+      });
     }
   }
 
@@ -315,7 +378,12 @@ export class UnifiedBrokerManager {
       // Get account from database
       const account = await userDatabase.getConnectedAccountById(accountId);
       if (!account) {
-        console.log(`❌ Account ${accountId} not found in database`);
+        logger.warn('Account not found in database', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'AUTO_ACTIVATE_ACCOUNT_NOT_FOUND',
+          userId,
+          accountId
+        });
         return {
           success: false,
           message: 'Account not found in database',
@@ -327,7 +395,12 @@ export class UnifiedBrokerManager {
       // Check if account is already active
       const existingConnection = this.getConnection(userId, account.broker_name, account.account_id);
       if (existingConnection && existingConnection.isActive) {
-        console.log(`✅ Account ${accountId} is already active`);
+        logger.info('Account is already active', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'AUTO_ACTIVATE_ALREADY_ACTIVE',
+          userId,
+          accountId
+        });
         return {
           success: true,
           message: 'Account is already active',
@@ -341,7 +414,12 @@ export class UnifiedBrokerManager {
       // Get stored credentials
       const credentials = await userDatabase.getAccountCredentials(accountId);
       if (!credentials) {
-        console.log(`❌ No credentials found for account ${accountId}`);
+        logger.warn('No credentials found for account', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'AUTO_ACTIVATE_NO_CREDENTIALS',
+          userId,
+          accountId
+        });
         return {
           success: false,
           message: 'No credentials found for account',
@@ -354,7 +432,12 @@ export class UnifiedBrokerManager {
       const result = await this.connectToBroker(userId, account.broker_name, credentials);
 
       if (result.success) {
-        console.log(`✅ Auto-activated account ${accountId} for user ${userId}`);
+        logger.info('Auto-activated account successfully', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'AUTO_ACTIVATE_SUCCESS',
+          userId,
+          accountId
+        });
         return {
           success: true,
           message: 'Account activated successfully',
@@ -364,11 +447,23 @@ export class UnifiedBrokerManager {
           userName: account.user_name
         };
       } else {
-        console.log(`⚠️ Auto-activation failed for account ${accountId}: ${result.message}`);
+        logger.warn('Auto-activation failed for account', {
+          component: 'UNIFIED_BROKER_MANAGER',
+          operation: 'AUTO_ACTIVATE_FAILED',
+          userId,
+          accountId,
+          message: result.message
+        });
 
         // Check if this is an OAuth flow
         if (result.authUrl) {
-          console.log(`🔄 OAuth flow required for ${account.broker_name} account ${accountId}`);
+          logger.info('OAuth flow required for account', {
+            component: 'UNIFIED_BROKER_MANAGER',
+            operation: 'AUTO_ACTIVATE_OAUTH_REQUIRED',
+            brokerName: account.broker_name,
+            accountId,
+            userId
+          });
           return {
             success: false,
             message: result.message || 'OAuth authentication required',
@@ -390,7 +485,12 @@ export class UnifiedBrokerManager {
         };
       }
     } catch (error: any) {
-      console.error(`🚨 Auto-activation failed for account ${accountId}:`, error.message);
+      logger.error('Auto-activation failed for account', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'AUTO_ACTIVATE_ERROR',
+        userId,
+        accountId
+      }, error);
       return {
         success: false,
         message: error.message || 'Failed to activate account',
@@ -423,11 +523,22 @@ export class UnifiedBrokerManager {
    * Debug method to list all connections
    */
   debugListConnections(): void {
-    console.log('🔍 DEBUG: Current connections:');
-    this.connections.forEach((connection, key) => {
-      console.log(`  ${key}: ${connection.brokerName} - ${connection.accountId} (${connection.isActive ? 'Active' : 'Inactive'})`);
+    logger.debug('Current connections debug info', {
+      component: 'UNIFIED_BROKER_MANAGER',
+      operation: 'DEBUG_LIST_CONNECTIONS',
+      totalConnections: this.connections.size
     });
-    console.log(`📊 Total: ${this.connections.size} connections`);
+    
+    this.connections.forEach((connection, key) => {
+      logger.debug('Connection details', {
+        component: 'UNIFIED_BROKER_MANAGER',
+        operation: 'DEBUG_CONNECTION',
+        connectionKey: key,
+        brokerName: connection.brokerName,
+        accountId: connection.accountId,
+        isActive: connection.isActive
+      });
+    });
   }
 
   /**

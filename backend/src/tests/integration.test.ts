@@ -1,12 +1,12 @@
 import { describe, test, expect, beforeAll } from '@jest/globals';
-import { brokerFactory } from '../factories/BrokerFactory';
-import { initializeBrokers } from '../brokers';
+import { BrokerFactory } from '@copytrade/unified-broker';
 
 describe('Unified Broker Interface Integration Tests', () => {
+  let brokerFactory: BrokerFactory;
 
   // Initialize broker plugins before running tests
   beforeAll(() => {
-    initializeBrokers();
+    brokerFactory = BrokerFactory.getInstance();
   });
 
   describe('BrokerFactory Basic Tests', () => {

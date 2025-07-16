@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { brokerService, type ShoonyaCredentials, type FyersCredentials } from '../services/brokerService';
-import { accountService, type ConnectedAccount } from '../services/accountService';
+import { accountService } from '../services/accountService';
+import { useAccountStatusContext } from '../context/AccountStatusContext';
+import AccountStatusIndicator from '../components/AccountStatusIndicator';
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 
@@ -40,11 +42,18 @@ interface FormData {
 
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const {
+    accounts,
+    activateAccount,
+    deactivateAccount,
+    removeAccount,
+    refreshAccounts,
+    isOperationInProgress
+  } = useAccountStatusContext();
+  
   const [availableBrokers, setAvailableBrokers] = useState<string[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedBroker, setSelectedBroker] = useState<string>('');
-  const [checkingStatus, setCheckingStatus] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,32 +71,26 @@ const AccountSetup: React.FC = () => {
   });
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchAvailableBrokers = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // Fetch both connected accounts and available brokers
-        const [connectedAccounts, brokers] = await Promise.all([
-          accountService.getConnectedAccounts(),
-          accountService.getAvailableBrokers()
-        ]);
-
-        setAccounts(connectedAccounts);
+        const brokers = await accountService.getAvailableBrokers();
         setAvailableBrokers(brokers);
 
         console.log('📋 Available brokers:', brokers);
-        console.log('🔗 Connected accounts:', connectedAccounts.length);
+        console.log('🔗 Connected accounts:', accounts.length);
       } catch (error: any) {
-        console.error('Failed to fetch data:', error);
-        setError('Failed to load account data');
+        console.error('Failed to fetch available brokers:', error);
+        setError('Failed to load broker data');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchData();
-  }, []);
+    fetchAvailableBrokers();
+  }, [accounts.length]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -206,9 +209,8 @@ const AccountSetup: React.FC = () => {
         console.log('✅ OAuth completed successfully');
         alert('Account activated successfully!');
 
-        // Refresh accounts
-        const connectedAccounts = await accountService.getConnectedAccounts();
-        setAccounts(connectedAccounts);
+        // Refresh accounts using context
+        await refreshAccounts();
       } else {
         console.error('❌ OAuth completion failed:', result.message);
         alert(`OAuth completion failed: ${result.message || 'Unknown error'}`);
@@ -267,9 +269,8 @@ const AccountSetup: React.FC = () => {
           try {
             await handleOAuthFlow(result.data.accountId, result.data.authUrl);
 
-            // After successful OAuth, refresh accounts
-            const connectedAccounts = await accountService.getConnectedAccounts();
-            setAccounts(connectedAccounts);
+            // After successful OAuth, refresh accounts using context
+            await refreshAccounts();
 
             // Reset form
             setShowAddForm(false);
@@ -293,9 +294,8 @@ const AccountSetup: React.FC = () => {
         } else {
           // Direct connection successful (e.g., Shoonya)
           alert('Broker connected successfully!');
-          // Refresh accounts
-          const connectedAccounts = await accountService.getConnectedAccounts();
-          setAccounts(connectedAccounts);
+          // Refresh accounts using context
+          await refreshAccounts();
           // Reset form
           setShowAddForm(false);
           setSelectedBroker('');
@@ -325,14 +325,11 @@ const AccountSetup: React.FC = () => {
 
   const handleActivateAccount = async (accountId: string) => {
     try {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-      const result = await accountService.activateAccount(accountId);
+      const result = await activateAccount(accountId);
 
       if (result.success) {
         console.log('✅ Account activated successfully');
-        // Refresh accounts
-        const connectedAccounts = await accountService.getConnectedAccounts();
-        setAccounts(connectedAccounts);
+        alert('Account activated successfully!');
       } else {
         // Handle OAuth flow
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
@@ -346,23 +343,20 @@ const AccountSetup: React.FC = () => {
     } catch (error: any) {
       console.error('Failed to activate account:', error);
       alert('Failed to activate account: ' + error.message);
-    } finally {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
     }
   };
 
   const handleDeactivateAccount = async (accountId: string) => {
     try {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-      await accountService.deactivateAccount(accountId);
-      // Refresh accounts
-      const connectedAccounts = await accountService.getConnectedAccounts();
-      setAccounts(connectedAccounts);
+      const success = await deactivateAccount(accountId);
+      if (success) {
+        alert('Account deactivated successfully!');
+      } else {
+        alert('Failed to deactivate account');
+      }
     } catch (error: any) {
       console.error('Failed to deactivate account:', error);
       alert('Failed to deactivate account: ' + error.message);
-    } finally {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
     }
   };
 
@@ -372,16 +366,15 @@ const AccountSetup: React.FC = () => {
     }
 
     try {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: true }));
-      await accountService.removeConnectedAccount(accountId);
-      // Refresh accounts
-      const connectedAccounts = await accountService.getConnectedAccounts();
-      setAccounts(connectedAccounts);
+      const success = await removeAccount(accountId);
+      if (success) {
+        alert('Account removed successfully!');
+      } else {
+        alert('Failed to remove account');
+      }
     } catch (error: any) {
       console.error('Failed to remove account:', error);
       alert('Failed to remove account: ' + error.message);
-    } finally {
-      setCheckingStatus(prev => ({ ...prev, [accountId]: false }));
     }
   };
 
@@ -523,29 +516,30 @@ const AccountSetup: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <AccountStatusIndicator accountId={account.id} showDetails={false} />
                           {account.isActive ? (
                             <button
                               className="kite-btn"
                               onClick={() => handleDeactivateAccount(account.id)}
-                              disabled={checkingStatus[account.id]}
+                              disabled={isOperationInProgress(account.id)}
                               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
-                              {checkingStatus[account.id] ? 'Deactivating...' : 'Deactivate'}
+                              {isOperationInProgress(account.id) ? 'Deactivating...' : 'Deactivate'}
                             </button>
                           ) : (
                             <button
                               className="kite-btn kite-btn-primary"
                               onClick={() => handleActivateAccount(account.id)}
-                              disabled={checkingStatus[account.id]}
+                              disabled={isOperationInProgress(account.id)}
                               style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
-                              {checkingStatus[account.id] ? 'Activating...' : 'Activate'}
+                              {isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
                             </button>
                           )}
                           <button
                             className="kite-btn kite-btn-danger"
                             onClick={() => handleRemoveAccount(account.id)}
-                            disabled={checkingStatus[account.id]}
+                            disabled={isOperationInProgress(account.id)}
                             style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                           >
                             Remove
