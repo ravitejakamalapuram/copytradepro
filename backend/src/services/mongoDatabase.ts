@@ -146,9 +146,6 @@ export class MongoDatabase implements IDatabaseAdapter {
       console.log('✅ MongoDB connected successfully');
       console.log('📊 Database:', mongoose.connection.db?.databaseName);
 
-      // Run migrations
-      await this.runMigrations();
-
       this.isInitialized = true;
     } catch (error) {
       console.error('🚨 MongoDB connection failed:', error);
@@ -156,15 +153,7 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
-  private async runMigrations(): Promise<void> {
-    try {
-      const { runMigration } = await import('../migrations/001_allow_multiple_broker_accounts');
-      await runMigration('mongodb');
-    } catch (error) {
-      console.error('🚨 Migration failed:', error);
-      // Don't throw - allow app to continue with existing schema
-    }
-  }
+
 
   async close(): Promise<void> {
     try {
@@ -274,21 +263,21 @@ export class MongoDatabase implements IDatabaseAdapter {
 
     return {
       id: (doc._id as mongoose.Types.ObjectId).toString(),
-      user_id: doc.user_id.toString(),
-      account_id: typeof doc.account_id === 'string' ? doc.account_id : doc.account_id.toString(),
-      broker_name: doc.broker_name,
-      broker_order_id: doc.broker_order_id,
-      symbol: doc.symbol,
-      action: doc.action,
-      quantity: doc.quantity,
-      price: doc.price,
-      order_type: doc.order_type,
-      status: doc.status,
-      exchange: doc.exchange,
-      product_type: doc.product_type,
-      remarks: doc.remarks,
-      executed_at: doc.executed_at.toISOString(),
-      created_at: doc.created_at.toISOString(),
+      user_id: doc.user_id ? doc.user_id.toString() : '',
+      account_id: doc.account_id ? (typeof doc.account_id === 'string' ? doc.account_id : doc.account_id.toString()) : '',
+      broker_name: doc.broker_name || '',
+      broker_order_id: doc.broker_order_id || '',
+      symbol: doc.symbol || '',
+      action: doc.action || '',
+      quantity: doc.quantity || 0,
+      price: doc.price || 0,
+      order_type: doc.order_type || '',
+      status: doc.status || '',
+      exchange: doc.exchange || '',
+      product_type: doc.product_type || '',
+      remarks: doc.remarks || '',
+      executed_at: doc.executed_at ? doc.executed_at.toISOString() : new Date().toISOString(),
+      created_at: doc.created_at ? doc.created_at.toISOString() : new Date().toISOString(),
       // Add account information if populated
       ...(accountInfo && { account_info: accountInfo })
     };

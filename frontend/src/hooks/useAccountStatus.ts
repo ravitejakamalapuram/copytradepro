@@ -197,9 +197,11 @@ export const useAccountStatus = () => {
     setSocket(newSocket);
   }, [scheduleReconnect, updateAccountStatus, handleConnectionEvent]);
 
-  // Initialize connection on mount
+  // Initialize connection on mount - DISABLED to prevent duplicate Socket.IO connections
+  // The useRealTimeData hook handles all Socket.IO communication
   useEffect(() => {
-    initializeConnection();
+    // Temporarily disabled to prevent connection loops
+    // initializeConnection();
 
     return () => {
       // Cleanup on unmount

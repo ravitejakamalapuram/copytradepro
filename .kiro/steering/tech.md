@@ -8,7 +8,7 @@
 ## Backend Stack
 - **Runtime**: Node.js 18+ with TypeScript
 - **Framework**: Express.js with comprehensive middleware
-- **Database**: SQLite (Better-SQLite3) with MongoDB support
+- **Database**: MongoDB with Mongoose ODM
 - **Authentication**: JWT with bcryptjs password hashing
 - **Real-time**: Socket.IO for WebSocket communication
 - **Security**: Helmet, CORS, rate limiting, input validation

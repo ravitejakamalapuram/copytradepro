@@ -2617,7 +2617,7 @@ export const getOrderHistory = async (
       filterOptions
     );
 
-    console.log(`📊 Found ${orderHistory.length} orders (${totalCount} total) for user ${userId}`);
+
 
     res.status(200).json({
       success: true,
@@ -2825,7 +2825,7 @@ export const checkOrderStatus = async (
       return;
     }
 
-    console.log(`📊 Found order: ${order.symbol} (${order.broker_order_id}) - Current status: ${order.status}`);
+
 
     // Use the order status service to check current status
     const orderForMonitoring = {

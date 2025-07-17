@@ -42,7 +42,7 @@ const Orders: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
 
-  const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
+  const [dateFilter, setDateFilter] = useState<'today' | 'week'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -55,6 +55,13 @@ const Orders: React.FC = () => {
     const now = new Date();
     let startDate: string | undefined;
     let endDate: string | undefined;
+
+    // Handle custom date range first
+    if (customStartDate && customEndDate) {
+      startDate = new Date(customStartDate).toISOString();
+      endDate = new Date(customEndDate + 'T23:59:59.999Z').toISOString();
+      return { startDate, endDate };
+    }
 
     switch (dateFilter) {
       case 'today': {
@@ -72,18 +79,6 @@ const Orders: React.FC = () => {
         endDate = now.toISOString();
         break;
       }
-      case 'month': {
-        // Last 30 days
-        const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-        startDate = monthAgo.toISOString();
-        endDate = now.toISOString();
-        break;
-      }
-      case 'all':
-        // All orders - no date filtering
-        startDate = undefined;
-        endDate = undefined;
-        break;
     }
 
     return { startDate, endDate };
@@ -124,10 +119,6 @@ const Orders: React.FC = () => {
       const filters: any = {};
       if (startDate) filters.startDate = startDate;
       if (endDate) filters.endDate = endDate;
-      if (customStartDate && customEndDate) {
-        filters.startDate = new Date(customStartDate).toISOString();
-        filters.endDate = new Date(customEndDate + 'T23:59:59').toISOString();
-      }
 
       // Fetch orders from broker order history with filters
       const response = await brokerService.getOrderHistory(100, 0, filters);
@@ -425,74 +416,281 @@ const Orders: React.FC = () => {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+
+        .orders-header {
+          background: var(--bg-surface);
+          border: 1px solid var(--border-primary);
+          border-radius: var(--radius-lg);
+          padding: 1rem 1.5rem;
+          margin-bottom: 1rem;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .orders-filters {
+          display: flex;
+          align-items: center;
+          gap: 1.5rem;
+          flex-wrap: wrap;
+          margin-bottom: 0.75rem;
+        }
+
+        .filter-group {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .filter-label {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--text-secondary);
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          min-width: fit-content;
+        }
+
+        .orders-table-container {
+          background: var(--bg-surface);
+          border: 1px solid var(--border-primary);
+          border-radius: var(--radius-lg);
+          overflow: hidden;
+          box-shadow: var(--shadow-sm);
+        }
+
+        .orders-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.85rem;
+        }
+
+        .orders-table th {
+          background: var(--bg-tertiary);
+          color: var(--text-secondary);
+          font-weight: 600;
+          padding: 0.75rem 0.5rem;
+          text-align: left;
+          font-size: 0.75rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          border-bottom: 1px solid var(--border-primary);
+          white-space: nowrap;
+        }
+
+        .orders-table td {
+          padding: 0.75rem 0.5rem;
+          border-bottom: 1px solid var(--border-secondary);
+          vertical-align: top;
+        }
+
+        .orders-table tr:hover {
+          background: var(--hover-bg);
+        }
+
+        .instrument-cell {
+          min-width: 140px;
+        }
+
+        .time-cell {
+          font-family: var(--font-mono);
+          font-size: 0.8rem;
+          color: var(--text-secondary);
+          min-width: 80px;
+        }
+
+        .actions-cell {
+          min-width: 120px;
+        }
+
+        .compact-info {
+          display: flex;
+          flex-direction: column;
+          gap: 0.25rem;
+        }
+
+        .symbol-row {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .account-row {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.7rem;
+          color: var(--text-secondary);
+        }
+
+        .exchange-badge {
+          font-size: 0.6rem;
+          padding: 0.1rem 0.3rem;
+          border-radius: 0.25rem;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+        }
+
+        .account-badge {
+          font-size: 0.6rem;
+          padding: 0.1rem 0.25rem;
+          background: var(--bg-secondary);
+          border-radius: 0.2rem;
+          font-weight: 500;
+          color: var(--text-primary);
+        }
+
+        .status-badge {
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.375rem;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .numeric-cell {
+          font-family: var(--font-mono);
+          text-align: right;
+          font-size: 0.8rem;
+        }
+
+        .action-buttons {
+          display: flex;
+          gap: 0.25rem;
+          flex-wrap: wrap;
+        }
+
+        .compact-button {
+          padding: 0.25rem 0.5rem;
+          font-size: 0.7rem;
+          border-radius: 0.25rem;
+          border: 1px solid var(--border-primary);
+          background: var(--bg-primary);
+          color: var(--text-primary);
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .compact-button:hover {
+          background: var(--bg-secondary);
+        }
+
+        .compact-button.danger {
+          color: var(--color-loss);
+          border-color: var(--color-loss);
+        }
+
+        .compact-button.danger:hover {
+          background: var(--color-loss);
+          color: white;
+        }
       `}</style>
       <AppNavigation />
-      
+
       <div className="app-main">
-        <div className="card">
-          <div className="card-header">
+        {/* Compact Header */}
+        <div className="orders-header">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
             <div>
-              <h2 className="card-title">Orders</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                {/* Date Filter Buttons */}
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-secondary)' }}>Date:</span>
-                  {(['today', 'week', 'month', 'all'] as const).map((filter) => (
-                    <Button
-                      key={filter}
-                      variant={dateFilter === filter ? 'primary' : 'secondary'}
-                      onClick={() => {
-                        setDateFilter(filter);
-                        setShowDatePicker(false);
-                        setCustomStartDate('');
-                        setCustomEndDate('');
-                      }}
-                      size="sm"
-                    >
-                      {filter === 'today' ? 'Today' :
-                       filter === 'week' ? 'Week' :
-                       filter === 'month' ? 'Month' : 'All'}
-                    </Button>
-                  ))}
-                  <Button
-                    variant={showDatePicker ? 'primary' : 'secondary'}
-                    onClick={() => setShowDatePicker(!showDatePicker)}
-                    size="sm"
-                  >
-                    📅 Custom
-                  </Button>
+              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Orders</h1>
+              {lastRefresh && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+                  Updated: {lastRefresh.toLocaleTimeString('en-IN')} • {getSelectedAccountsText()}
                 </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <Button variant="secondary" onClick={fetchOrders} disabled={loading} size="sm">
+                🔄 {loading ? 'Loading...' : 'Refresh'}
+              </Button>
+              <Button variant="primary" onClick={() => navigate('/trade-setup')} size="sm">
+                + Place Order
+              </Button>
+            </div>
+          </div>
 
-                {/* Account Filter Checkboxes */}
-                <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-secondary)' }}>Account:</span>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowAccountFilter(!showAccountFilter)}
-                    size="sm"
-                  >
-                    {getSelectedAccountsText()}
-                    <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
-                  </Button>
+          {/* Compact Filters */}
+          <div className="orders-filters">
+            {/* Date Filter */}
+            <div className="filter-group">
+              <span className="filter-label">Date:</span>
+              {(['today', 'week'] as const).map((filter) => (
+                <Button
+                  key={filter}
+                  variant={dateFilter === filter ? 'primary' : 'secondary'}
+                  onClick={() => {
+                    setDateFilter(filter);
+                    setShowDatePicker(false);
+                    setCustomStartDate('');
+                    setCustomEndDate('');
+                  }}
+                  size="sm"
+                >
+                  {filter === 'today' ? 'Today' : 'Week'}
+                </Button>
+              ))}
+              <Button
+                variant={showDatePicker ? 'primary' : 'secondary'}
+                onClick={() => setShowDatePicker(!showDatePicker)}
+                size="sm"
+              >
+                📅 Custom
+              </Button>
+            </div>
 
-                  {/* Account Filter Dropdown */}
-                  {showAccountFilter && (
-                    <div style={{
-                      position: 'absolute',
-                      top: '100%',
-                      left: '4rem',
-                      zIndex: 1000,
-                      backgroundColor: 'var(--bg-primary)',
-                      border: '1px solid var(--border-primary)',
-                      borderRadius: 'var(--radius-sm)',
-                      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-                      minWidth: '250px',
-                      maxHeight: '300px',
-                      overflowY: 'auto',
-                      padding: '0.5rem'
-                    }}>
-                      {/* All Accounts Option */}
-                      <label style={{
+            {/* Account Filter */}
+            <div data-account-filter className="filter-group" style={{ position: 'relative' }}>
+              <span className="filter-label">Account:</span>
+              <Button
+                variant="secondary"
+                onClick={() => setShowAccountFilter(!showAccountFilter)}
+                size="sm"
+              >
+                {getSelectedAccountsText()}
+                <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
+              </Button>
+
+              {/* Account Filter Dropdown */}
+              {showAccountFilter && (
+                <div style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '4rem',
+                  zIndex: 1000,
+                  backgroundColor: 'var(--bg-primary)',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-sm)',
+                  boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+                  minWidth: '250px',
+                  maxHeight: '300px',
+                  overflowY: 'auto',
+                  padding: '0.5rem'
+                }}>
+                  {/* All Accounts Option */}
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.5rem',
+                    cursor: 'pointer',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: '0.875rem',
+                    fontWeight: '500',
+                    backgroundColor: isAccountSelected('all') ? 'var(--bg-secondary)' : 'transparent'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={isAccountSelected('all')}
+                      onChange={() => handleAccountToggle('all')}
+                      style={{ margin: 0 }}
+                    />
+                    <span>All Accounts</span>
+                  </label>
+
+                  {/* Individual Account Options */}
+                  {availableAccounts.map((account) => (
+                    <label
+                      key={account.id}
+                      style={{
                         display: 'flex',
                         alignItems: 'center',
                         gap: '0.5rem',
@@ -500,201 +698,141 @@ const Orders: React.FC = () => {
                         cursor: 'pointer',
                         borderRadius: 'var(--radius-sm)',
                         fontSize: '0.875rem',
-                        fontWeight: '500',
-                        backgroundColor: isAccountSelected('all') ? 'var(--bg-secondary)' : 'transparent'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={isAccountSelected('all')}
-                          onChange={() => handleAccountToggle('all')}
-                          style={{ margin: 0 }}
-                        />
-                        <span>All Accounts</span>
-                      </label>
+                        backgroundColor: isAccountSelected(account.id) ? 'var(--bg-secondary)' : 'transparent'
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isAccountSelected(account.id)}
+                        onChange={() => handleAccountToggle(account.id)}
+                        style={{ margin: 0 }}
+                      />
+                      <span>{account.name}</span>
+                    </label>
+                  ))}
 
-                      {/* Individual Account Options */}
-                      {availableAccounts.map((account) => (
-                        <label
-                          key={account.id}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: '0.5rem',
-                            cursor: 'pointer',
-                            borderRadius: 'var(--radius-sm)',
-                            fontSize: '0.875rem',
-                            backgroundColor: isAccountSelected(account.id) ? 'var(--bg-secondary)' : 'transparent'
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isAccountSelected(account.id)}
-                            onChange={() => handleAccountToggle(account.id)}
-                            style={{ margin: 0 }}
-                          />
-                          <span>{account.name}</span>
-                        </label>
-                      ))}
-
-                      {availableAccounts.length === 0 && (
-                        <div style={{
-                          padding: '0.5rem',
-                          fontSize: '0.875rem',
-                          color: 'var(--text-secondary)',
-                          textAlign: 'center'
-                        }}>
-                          No accounts available
-                        </div>
-                      )}
+                  {availableAccounts.length === 0 && (
+                    <div style={{
+                      padding: '0.5rem',
+                      fontSize: '0.875rem',
+                      color: 'var(--text-secondary)',
+                      textAlign: 'center'
+                    }}>
+                      No accounts available
                     </div>
                   )}
                 </div>
-              </div>
-
-              {/* Custom Date Picker */}
-              {showDatePicker && (
-                <div style={{
-                  marginTop: '0.75rem',
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-sm)',
-                  border: '1px solid var(--border-primary)',
-                  display: 'flex',
-                  gap: '0.5rem',
-                  alignItems: 'center',
-                  flexWrap: 'wrap'
-                }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>From:</label>
-                  <input
-                    type="date"
-                    value={customStartDate}
-                    onChange={(e) => setCustomStartDate(e.target.value)}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      border: '1px solid var(--border-primary)',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '0.875rem'
-                    }}
-                  />
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>To:</label>
-                  <input
-                    type="date"
-                    value={customEndDate}
-                    onChange={(e) => setCustomEndDate(e.target.value)}
-                    style={{
-                      padding: '0.25rem 0.5rem',
-                      border: '1px solid var(--border-primary)',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '0.875rem'
-                    }}
-                  />
-                  <Button
-                    variant="primary"
-                    onClick={() => {
-                      if (customStartDate && customEndDate) {
-                        setDateFilter('today'); // Reset to trigger useEffect
-                        fetchOrders();
-                      }
-                    }}
-                    disabled={!customStartDate || !customEndDate}
-                    size="sm"
-                  >
-                    Apply
-                  </Button>
-                </div>
-              )}
-
-              {lastRefresh && (
-                <p style={{
-                  margin: '0.5rem 0 0 0',
-                  fontSize: '0.875rem',
-                  color: 'var(--text-secondary)'
-                }}>
-                  Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
-                  {dateFilter === 'today' && ' • Showing today\'s orders'}
-                  {dateFilter === 'week' && ' • Showing last 7 days'}
-                  {dateFilter === 'month' && ' • Showing last 30 days'}
-                  {dateFilter === 'all' && ' • Showing all orders'}
-                  {customStartDate && customEndDate && ` • Custom range: ${new Date(customStartDate).toLocaleDateString()} - ${new Date(customEndDate).toLocaleDateString()}`}
-                  {` • ${getSelectedAccountsText()}`}
-                </p>
-              )}
-              {statusMessage && (
-                <p style={{
-                  margin: '0.5rem 0 0 0',
-                  fontSize: '0.875rem',
-                  color: statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)',
-                  fontWeight: '500'
-                }}>
-                  {statusMessage}
-                </p>
               )}
             </div>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Button
-                variant="secondary"
-                onClick={fetchOrders}
-                disabled={loading}
-                size="sm"
-              >
-                🔄 {loading ? 'Loading...' : 'Refresh'}
-              </Button>
+
+            {/* Order Status Tabs */}
+            <div className="filter-group">
+              <span className="filter-label">Status:</span>
+              {[
+                { key: 'all', label: 'All', count: orders.length },
+                { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
+                { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
+              ].map(tab => (
+                <Button
+                  key={tab.key}
+                  variant={activeTab === tab.key ? 'primary' : 'secondary'}
+                  onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed')}
+                  size="sm"
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                >
+                  {tab.label}
+                  <span style={{
+                    backgroundColor: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
+                    padding: '0.1rem 0.3rem',
+                    borderRadius: '0.5rem',
+                    fontSize: '0.65rem',
+                    fontWeight: '600'
+                  }}>
+                    {tab.count}
+                  </span>
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Custom Date Picker */}
+          {showDatePicker && (
+            <div style={{
+              marginTop: '0.75rem',
+              padding: '0.75rem',
+              backgroundColor: 'var(--bg-secondary)',
+              borderRadius: 'var(--radius-sm)',
+              border: '1px solid var(--border-primary)',
+              display: 'flex',
+              gap: '0.5rem',
+              alignItems: 'center',
+              flexWrap: 'wrap'
+            }}>
+              <label style={{ fontSize: '0.8rem', fontWeight: '500' }}>From:</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem'
+                }}
+              />
+              <label style={{ fontSize: '0.8rem', fontWeight: '500' }}>To:</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                style={{
+                  padding: '0.25rem 0.5rem',
+                  border: '1px solid var(--border-primary)',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.8rem'
+                }}
+              />
               <Button
                 variant="primary"
-                onClick={() => navigate('/trade-setup')}
+                onClick={() => {
+                  if (customStartDate && customEndDate) {
+                    setDateFilter('today'); // Reset to trigger useEffect
+                    fetchOrders();
+                  }
+                }}
+                disabled={!customStartDate || !customEndDate}
                 size="sm"
               >
-                + Place Order
+                Apply
               </Button>
             </div>
-          </div>
+          )}
 
-          {/* Order Tabs */}
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem',
-            marginBottom: '1.5rem',
-            borderBottom: '1px solid var(--border-secondary)',
-            paddingBottom: '1rem'
-          }}>
-            {[
-              { key: 'all', label: 'All Orders', count: orders.length },
-              { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
-              { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
-            ].map(tab => (
-              <Button
-                key={tab.key}
-                variant={activeTab === tab.key ? 'primary' : ''}
-                onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed')}
-                style={{ 
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                {tab.label}
-                <span style={{ 
-                  backgroundColor: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
-                  padding: '0.125rem 0.375rem',
-                  borderRadius: '0.75rem',
-                  fontSize: '0.75rem',
-                  fontWeight: '500'
-                }}>
-                  {tab.count}
-                </span>
-              </Button>
-            ))}
-          </div>
+          {statusMessage && (
+            <div style={{
+              marginTop: '0.75rem',
+              padding: '0.5rem',
+              fontSize: '0.8rem',
+              color: statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)',
+              fontWeight: '500',
+              backgroundColor: statusMessage.includes('Failed') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+              borderRadius: 'var(--radius-sm)',
+              border: `1px solid ${statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)'}`
+            }}>
+              {statusMessage}
+            </div>
+          )}
+        </div>
 
-          {/* Orders Table */}
-          {filteredOrders.length > 0 ? (
+        {/* Optimized Orders Table */}
+        {filteredOrders.length > 0 ? (
+          <div className="orders-table-container">
             <div style={{ overflowX: 'auto' }}>
-              <table className="table table-trading">
+              <table className="orders-table">
                 <thead>
                   <tr>
-                    <th>Time</th>
-                    <th>Instrument</th>
+                    <th className="time-cell">Time</th>
+                    <th className="instrument-cell">Instrument</th>
                     <th>Type</th>
                     <th>Order Type</th>
                     <th>Qty.</th>
@@ -703,97 +841,80 @@ const Orders: React.FC = () => {
                     <th>Status</th>
                     <th>Filled</th>
                     <th>Avg. Price</th>
-                    <th>Actions</th>
+                    <th className="actions-cell">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrders.map((order) => (
                     <tr key={order.id}>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
+                      <td className="time-cell">
                         {order.time}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                          <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                            {order.symbol?.replace(/-[A-Z]+$/, '') || order.symbol}
-                          </div>
-                          {order.exchange && (
-                            <span style={{
-                              fontSize: '0.625rem',
-                              padding: '0.125rem 0.375rem',
-                              backgroundColor: order.exchange === 'NSE' ? 'var(--exchange-nse)' : 'var(--exchange-other)',
-                              color: 'white',
-                              borderRadius: '0.25rem',
-                              fontWeight: '600',
-                              letterSpacing: '0.5px'
-                            }}>
-                              {order.exchange}
+                      <td className="instrument-cell">
+                        <div className="compact-info">
+                          <div className="symbol-row">
+                            <span style={{ fontWeight: '600', color: 'var(--text-primary)' }}>
+                              {order.symbol?.replace(/-[A-Z]+$/, '') || order.symbol}
                             </span>
+                            {order.exchange && (
+                              <span className="exchange-badge" style={{
+                                backgroundColor: order.exchange === 'NSE' ? '#1e40af' : '#7c3aed',
+                                color: 'white'
+                              }}>
+                                {order.exchange}
+                              </span>
+                            )}
+                          </div>
+                          {order.accountInfo && (
+                            <div className="account-row">
+                              <span className="account-badge">
+                                {order.accountInfo.account_id}
+                              </span>
+                              <span>{order.accountInfo.user_name}</span>
+                            </div>
                           )}
                         </div>
-                        {order.accountInfo && (
-                          <div style={{
-                            fontSize: '0.75rem',
-                            color: 'var(--text-secondary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.25rem'
-                          }}>
-                            <span style={{
-                              fontSize: '0.625rem',
-                              padding: '0.125rem 0.25rem',
-                              backgroundColor: 'var(--bg-secondary)',
-                              borderRadius: '0.25rem',
-                              fontWeight: '500',
-                              color: 'var(--text-primary)'
-                            }}>
-                              {order.accountInfo.account_id}
-                            </span>
-                            <span>{order.accountInfo.user_name}</span>
-                          </div>
-                        )}
                       </td>
                       <td>
-                        <span style={{ 
+                        <span style={{
                           color: getTypeColor(order.type),
-                          fontWeight: '500',
-                          fontSize: '0.875rem'
+                          fontWeight: '600',
+                          fontSize: '0.8rem'
                         }}>
                           {order.type}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.875rem' }}>
+                      <td style={{ fontSize: '0.8rem' }}>
                         {order.orderType}
                       </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>
+                      <td className="numeric-cell">
                         {order.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>
+                      <td className="numeric-cell">
                         {order.price ? formatCurrency(order.price) : '-'}
                       </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>
+                      <td className="numeric-cell">
                         {order.triggerPrice ? formatCurrency(order.triggerPrice) : '-'}
                       </td>
                       <td>
-                        <span style={{ 
+                        <span className="status-badge" style={{
                           color: getStatusColor(order.status),
-                          fontWeight: '500',
-                          fontSize: '0.875rem'
+                          backgroundColor: `${getStatusColor(order.status)}15`
                         }}>
                           {order.status}
                         </span>
                       </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>
+                      <td className="numeric-cell">
                         {order.filledQty}/{order.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--font-mono)' }}>
+                      <td className="numeric-cell">
                         {order.avgPrice ? formatCurrency(order.avgPrice) : '-'}
                       </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          {/* Check Status button - available for all orders */}
-                          <Button
-                            variant="outline"
+                      <td className="actions-cell">
+                        <div className="action-buttons">
+                          {/* Check Status button */}
+                          <button
+                            className="compact-button"
                             onClick={() => handleCheckOrderStatus(order.id)}
                             disabled={checkingStatus.has(order.id)}
                             title="Check current order status from broker"
@@ -802,42 +923,36 @@ const Orders: React.FC = () => {
                               <>
                                 <span style={{
                                   display: 'inline-block',
-                                  width: '0.75rem',
-                                  height: '0.75rem',
+                                  width: '0.6rem',
+                                  height: '0.6rem',
                                   border: '1px solid currentColor',
                                   borderTop: '1px solid transparent',
                                   borderRadius: '50%',
                                   animation: 'spin 1s linear infinite'
                                 }}></span>
-                                Checking...
                               </>
                             ) : (
-                              <>🔄 Check</>
+                              '🔄'
                             )}
-                          </Button>
+                          </button>
 
                           {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
-                              <Button
-                                variant="outline"
+                              <button
+                                className="compact-button"
                                 onClick={() => handleModifyOrder(order.id)}
+                                title="Modify order"
                               >
                                 Modify
-                              </Button>
-                              <Button
-                                variant="danger"
+                              </button>
+                              <button
+                                className="compact-button danger"
                                 onClick={() => handleCancelOrder(order.id)}
+                                title="Cancel order"
                               >
                                 Cancel
-                              </Button>
+                              </button>
                             </>
-                          )}
-                          {order.status === 'EXECUTED' && (
-                            <Button
-                              variant="outline"
-                            >
-                              View
-                            </Button>
                           )}
                         </div>
                       </td>
@@ -846,77 +961,86 @@ const Orders: React.FC = () => {
                 </tbody>
               </table>
             </div>
-          ) : (
-            <div style={{ 
-              textAlign: 'center', 
-              padding: '3rem',
+          </div>
+        ) : (
+          <div className="orders-table-container">
+            <div style={{
+              textAlign: 'center',
+              padding: '3rem 1rem',
               color: 'var(--text-secondary)'
             }}>
-              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
-              <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
+              <div style={{ fontSize: '1rem', marginBottom: '0.5rem', fontWeight: '500' }}>
                 No {activeTab === 'all' ? '' : activeTab} orders
               </div>
-              <div style={{ fontSize: '0.875rem' }}>
-                {activeTab === 'all' 
+              <div style={{ fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+                {activeTab === 'all'
                   ? 'Place your first order to get started'
                   : `No ${activeTab} orders found`
                 }
               </div>
               <Button
                 variant="primary"
-                style={{ marginTop: '1rem' }}
                 onClick={() => navigate('/trade-setup')}
+                size="sm"
               >
                 Place Order
               </Button>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
-        {/* Order Summary */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Today's Summary</h2>
-          </div>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '1rem'
+        {/* Compact Summary */}
+        {orders.length > 0 && (
+          <div style={{
+            background: 'var(--bg-surface)',
+            border: '1px solid var(--border-primary)',
+            borderRadius: 'var(--radius-lg)',
+            padding: '1rem',
+            marginTop: '1rem',
+            boxShadow: 'var(--shadow-sm)'
           }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--text-primary)' }}>
-                {orders.length}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+              gap: '1rem',
+              textAlign: 'center'
+            }}>
+              <div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>
+                  {orders.length}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Total
+                </div>
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Total Orders
+              <div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-profit)' }}>
+                  {orders.filter(o => o.status === 'EXECUTED').length}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Executed
+                </div>
               </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-profit)' }}>
-                {orders.filter(o => o.status === 'EXECUTED').length}
+              <div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-neutral)' }}>
+                  {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Pending
+                </div>
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Executed
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-neutral)' }}>
-                {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
-              </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Pending
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-loss)' }}>
-                {orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length}
-              </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                Cancelled/Rejected
+              <div>
+                <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-loss)' }}>
+                  {orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length}
+                </div>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Failed
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

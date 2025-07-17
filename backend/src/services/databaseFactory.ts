@@ -1,6 +1,5 @@
 import { IDatabaseAdapter } from '../interfaces/IDatabaseAdapter';
 import { MongoDatabase } from './mongoDatabase';
-import { SQLiteAdapter } from './sqliteAdapter';
 
 /**
  * Database Factory
@@ -25,37 +24,19 @@ export class DatabaseFactory {
    * @returns IDatabaseAdapter instance
    */
   private static async createAdapter(): Promise<IDatabaseAdapter> {
-    const databaseType = process.env.DATABASE_TYPE?.toLowerCase() || 'mongodb';
-    
-    console.log(`🔧 Initializing ${databaseType.toUpperCase()} database adapter...`);
+    console.log('🔧 Initializing MongoDB database adapter...');
 
-    let adapter: IDatabaseAdapter;
-
-    switch (databaseType) {
-      case 'mongodb':
-      case 'mongo':
-        adapter = new MongoDatabase();
-        break;
-      
-      case 'sqlite':
-        adapter = new SQLiteAdapter();
-        break;
-      
-      default:
-        console.warn(`⚠️ Unknown database type: ${databaseType}. Falling back to MongoDB.`);
-        adapter = new MongoDatabase();
-        break;
-    }
+    const adapter = new MongoDatabase();
 
     // Initialize the adapter
     await adapter.initialize();
 
     // Verify connection
     if (!adapter.isConnected()) {
-      throw new Error(`Failed to connect to ${databaseType} database`);
+      throw new Error('Failed to connect to MongoDB database');
     }
 
-    console.log(`✅ ${databaseType.toUpperCase()} database adapter initialized successfully`);
+    console.log('✅ MongoDB database adapter initialized successfully');
     return adapter;
   }
 
@@ -78,10 +59,10 @@ export class DatabaseFactory {
   }
 
   /**
-   * Get the current database type from environment
+   * Get the current database type
    */
   static getDatabaseType(): string {
-    return process.env.DATABASE_TYPE?.toLowerCase() || 'mongodb';
+    return 'mongodb';
   }
 
   /**

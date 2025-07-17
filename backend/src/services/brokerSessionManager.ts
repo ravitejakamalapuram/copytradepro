@@ -85,7 +85,6 @@ export class BrokerSessionManager {
     };
 
     this.sessionMetrics.set(sessionKey, metrics);
-    console.log(`📊 Session registered for monitoring: ${brokerName} account ${accountId}`);
   }
 
   /**
@@ -95,9 +94,7 @@ export class BrokerSessionManager {
     const sessionKey = this.createSessionKey(userId, brokerName, accountId);
     const removed = this.sessionMetrics.delete(sessionKey);
     
-    if (removed) {
-      console.log(`📊 Session unregistered: ${brokerName} account ${accountId}`);
-    }
+    // Session removed silently
   }
 
   /**

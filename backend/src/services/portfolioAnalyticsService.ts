@@ -1,5 +1,5 @@
-import { userDatabase } from './sqliteDatabase';
-import type { OrderHistory } from './sqliteDatabase';
+import { userDatabase } from './databaseCompatibility';
+import type { OrderHistory } from '../interfaces/IDatabaseAdapter';
 import { marketDataService } from './marketDataService';
 import type { MarketPrice } from './marketDataService';
 
@@ -64,7 +64,7 @@ class PortfolioAnalyticsService {
    * Calculate portfolio positions from order history
    */
   async calculatePortfolioPositions(userId: number): Promise<PortfolioPosition[]> {
-    const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
+    const orders = await userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
 
     // Group orders by symbol
@@ -171,9 +171,9 @@ class PortfolioAnalyticsService {
    * Calculate overall portfolio metrics
    */
   async calculatePortfolioMetrics(userId: number): Promise<PortfolioMetrics> {
-    const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
+    const orders = await userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const positions = await this.calculatePortfolioPositions(userId);
-    
+
     const totalOrders = orders.length;
     const executedOrders = orders.filter(order => order.status === 'EXECUTED').length;
     const successRate = totalOrders > 0 ? (executedOrders / totalOrders) * 100 : 0;
@@ -221,8 +221,8 @@ class PortfolioAnalyticsService {
   /**
    * Calculate trading statistics
    */
-  calculateTradingStats(userId: number): TradingStats {
-    const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
+  async calculateTradingStats(userId: number): Promise<TradingStats> {
+    const orders = await userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
     
     // Group by symbol to calculate trade pairs
@@ -323,8 +323,8 @@ class PortfolioAnalyticsService {
   /**
    * Get performance data for charts
    */
-  getPerformanceData(userId: number, days: number = 30): PerformanceData[] {
-    const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
+  async getPerformanceData(userId: number, days: number = 30): Promise<PerformanceData[]> {
+    const orders = await userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
     
     const endDate = new Date();
@@ -361,8 +361,8 @@ class PortfolioAnalyticsService {
   /**
    * Get symbol-wise performance
    */
-  getSymbolPerformance(userId: number): SymbolPerformance[] {
-    const orders = userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
+  async getSymbolPerformance(userId: number): Promise<SymbolPerformance[]> {
+    const orders = await userDatabase.getOrderHistoryByUserId(userId, 1000, 0);
     const executedOrders = orders.filter(order => order.status === 'EXECUTED');
     
     const symbolStats = new Map<string, {

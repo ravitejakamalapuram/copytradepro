@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger';
-import { userDatabase } from './sqliteDatabase';
+import { userDatabase } from './databaseCompatibility';
 
 export interface NotificationPreferences {
   userId: string;
@@ -151,7 +151,7 @@ class NotificationService {
    */
   async unsubscribeFromPush(userId: string, endpoint?: string): Promise<boolean> {
     try {
-      const success = userDatabase.removePushSubscription(userId, endpoint);
+      const success = userDatabase.removePushSubscription(userId, endpoint || '');
       
       if (success) {
         logger.info(`✅ User ${userId} unsubscribed from push notifications`);
@@ -345,7 +345,7 @@ class NotificationService {
    */
   async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
     try {
-      const preferences = userDatabase.getUserNotificationPreferences(userId);
+      const preferences = await userDatabase.getUserNotificationPreferences(parseInt(userId));
       
       if (preferences) {
         return preferences;
@@ -423,9 +423,9 @@ class NotificationService {
       const currentPreferences = await this.getUserNotificationPreferences(userId);
       const updatedPreferences = { ...currentPreferences, ...preferences, userId };
       
-      const success = userDatabase.saveUserNotificationPreferences(updatedPreferences);
-      
-      if (success) {
+      const success = await userDatabase.saveUserNotificationPreferences(updatedPreferences);
+
+      if (await success) {
         logger.info(`✅ Updated notification preferences for user ${userId}`);
         return true;
       } else {
