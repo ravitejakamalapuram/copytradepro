@@ -495,3 +495,299 @@
 
 /* Spacing Utilities */
 .space-y-5 > * + * { margin-top: var(--space-5); }
+
+/* ==========================================================================
+   TRADING UI UTILITY CLASSES
+   Common patterns for trading applications
+   ========================================================================== */
+
+/* Trading Layout Utilities */
+.trading-grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+
+.trading-flex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.trading-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Trading Card Utilities */
+.trading-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition: var(--transition-base);
+}
+
+.trading-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-secondary);
+}
+
+.trading-card-compact {
+  padding: var(--space-4);
+}
+
+/* Trading Metric Display */
+.trading-metric {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.trading-metric-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.trading-metric-value {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.trading-metric-change {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  font-family: var(--font-mono);
+}
+
+/* P&L Color Utilities */
+.pnl-positive {
+  color: var(--color-profit) !important;
+}
+
+.pnl-negative {
+  color: var(--color-loss) !important;
+}
+
+.pnl-neutral {
+  color: var(--color-neutral) !important;
+}
+
+.pnl-bg-positive {
+  background-color: rgba(0, 212, 170, 0.1);
+  border-color: var(--color-profit);
+}
+
+.pnl-bg-negative {
+  background-color: rgba(255, 71, 87, 0.1);
+  border-color: var(--color-loss);
+}
+
+/* Trading Status Indicators */
+.status-active {
+  color: var(--color-success-600);
+}
+
+.status-inactive {
+  color: var(--text-secondary);
+}
+
+.status-pending {
+  color: var(--color-warning-600);
+}
+
+.status-error {
+  color: var(--color-danger-600);
+}
+
+/* Trading Button Utilities */
+.btn-trading-buy {
+  background-color: var(--color-profit);
+  color: var(--text-primary);
+  border-color: var(--color-profit);
+}
+
+.btn-trading-buy:hover:not(:disabled) {
+  background-color: var(--color-success-700);
+  border-color: var(--color-success-700);
+}
+
+.btn-trading-sell {
+  background-color: var(--color-loss);
+  color: var(--text-primary);
+  border-color: var(--color-loss);
+}
+
+.btn-trading-sell:hover:not(:disabled) {
+  background-color: var(--color-danger-700);
+  border-color: var(--color-danger-700);
+}
+
+/* Trading Table Utilities */
+.table-trading {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+}
+
+.table-trading .table-cell-numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.table-trading .table-cell-symbol {
+  font-family: var(--font-sans);
+  font-weight: var(--font-medium);
+}
+
+/* Responsive Trading Utilities */
+@media (max-width: 768px) {
+  .trading-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trading-flex {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .trading-metric-value {
+    font-size: var(--text-base);
+  }
+}
+
+/* ==========================================================================
+   INTERACTIVE STATE UTILITIES
+   Consistent hover, focus, and active states
+   ========================================================================== */
+
+/* Hover State Utilities */
+.hover-bg:hover {
+  background-color: var(--hover-bg);
+}
+
+.hover-bg-light:hover {
+  background-color: var(--hover-bg-light);
+}
+
+.hover-border:hover {
+  border-color: var(--hover-border);
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+/* Focus State Utilities */
+.focus-ring:focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.focus-ring:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.focus-ring-inset:focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: calc(-1 * var(--focus-ring-offset));
+}
+
+/* Interactive Element Base Classes */
+.interactive {
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.interactive:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--hover-border);
+}
+
+.interactive:focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.interactive:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.interactive:active {
+  background-color: var(--active-bg);
+  border-color: var(--active-border);
+  transform: translateY(0);
+}
+
+.interactive:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Card Interactive States */
+.card-interactive {
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.card-interactive:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--border-secondary);
+  transform: translateY(-2px);
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-md);
+}
+
+/* Link Interactive States */
+.link-interactive {
+  color: var(--interactive-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.link-interactive:hover {
+  color: var(--interactive-primary-hover);
+  text-decoration: underline;
+}
+
+.link-interactive:focus {
+  outline: var(--focus-ring-width) solid var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.link-interactive:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Accessibility Utilities */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  padding: 8px;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  z-index: 1000;
+}
+
+.skip-link:focus {
+  top: 6px;
+}

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CopyTrade Pro - Design System Test</title>
+    <link rel="stylesheet" href="./design-system.css">
+    <link rel="stylesheet" href="./enterprise-base.css">
+    <link rel="stylesheet" href="./components.css">
+    <link rel="stylesheet" href="./app-theme.css">
+    <style>
+        body {
+            padding: 2rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+        }
+        .test-section {
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-primary);
+            border-radius: var(--radius-lg);
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        .color-swatch {
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            text-align: center;
+            font-size: var(--text-sm);
+            font-weight: var(--font-medium);
+        }
+        .spacing-demo {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            display: inline-block;
+            margin: 0.25rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>CopyTrade Pro - Design System Test</h1>
+    <p>This page tests all design system components and tokens for consistency.</p>
+
+    <!-- Color System Test -->
+    <div class="test-section">
+        <h2>Color System</h2>
+        <div class="test-grid">
+            <div class="color-swatch" style="background: var(--color-profit); color: var(--text-primary);">
+                Profit Color<br>
+                <code>--color-profit</code>
+            </div>
+            <div class="color-swatch" style="background: var(--color-loss); color: var(--text-primary);">
+                Loss Color<br>
+                <code>--color-loss</code>
+            </div>
+            <div class="color-swatch" style="background: var(--color-neutral); color: var(--text-primary);">
+                Neutral Color<br>
+                <code>--color-neutral</code>
+            </div>
+            <div class="color-swatch" style="background: var(--interactive-primary); color: var(--text-primary);">
+                Primary Interactive<br>
+                <code>--interactive-primary</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- Typography Test -->
+    <div class="test-section">
+        <h2>Typography</h2>
+        <div style="font-size: var(--text-xs);">Extra Small Text (--text-xs)</div>
+        <div style="font-size: var(--text-sm);">Small Text (--text-sm)</div>
+        <div style="font-size: var(--text-base);">Base Text (--text-base)</div>
+        <div style="font-size: var(--text-lg);">Large Text (--text-lg)</div>
+        <div style="font-size: var(--text-xl);">Extra Large Text (--text-xl)</div>
+        <div style="font-family: var(--font-mono); margin-top: 1rem;">
+            Monospace Font: 1,234.56 (--font-mono)
+        </div>
+    </div>
+
+    <!-- Spacing Test -->
+    <div class="test-section">
+        <h2>Spacing Scale</h2>
+        <div>
+            <div class="spacing-demo" style="padding: var(--space-1);">--space-1</div>
+            <div class="spacing-demo" style="padding: var(--space-2);">--space-2</div>
+            <div class="spacing-demo" style="padding: var(--space-3);">--space-3</div>
+            <div class="spacing-demo" style="padding: var(--space-4);">--space-4</div>
+            <div class="spacing-demo" style="padding: var(--space-6);">--space-6</div>
+            <div class="spacing-demo" style="padding: var(--space-8);">--space-8</div>
+        </div>
+    </div>
+
+    <!-- Button Components Test -->
+    <div class="test-section">
+        <h2>Button Components</h2>
+        <div class="test-grid">
+            <button class="btn btn-primary">Primary Button</button>
+            <button class="btn btn-secondary">Secondary Button</button>
+            <button class="btn btn-success">Success Button</button>
+            <button class="btn btn-danger">Danger Button</button>
+            <button class="btn btn-trading-buy">Buy Button</button>
+            <button class="btn btn-trading-sell">Sell Button</button>
+        </div>
+    </div>
+
+    <!-- Badge Components Test -->
+    <div class="test-section">
+        <h2>Badge Components</h2>
+        <div class="test-grid">
+            <span class="badge badge-success">Success</span>
+            <span class="badge badge-danger">Danger</span>
+            <span class="badge badge-warning">Warning</span>
+            <span class="badge badge-info">Info</span>
+            <span class="badge badge-neutral">Neutral</span>
+        </div>
+    </div>
+
+    <!-- Trading Utilities Test -->
+    <div class="test-section">
+        <h2>Trading Utilities</h2>
+        <div class="trading-grid">
+            <div class="trading-card">
+                <div class="trading-metric">
+                    <div class="trading-metric-label">Portfolio Value</div>
+                    <div class="trading-metric-value">₹1,25,000</div>
+                    <div class="trading-metric-change pnl-positive">+2.5%</div>
+                </div>
+            </div>
+            <div class="trading-card">
+                <div class="trading-metric">
+                    <div class="trading-metric-label">Day P&L</div>
+                    <div class="trading-metric-value pnl-negative">-₹1,250</div>
+                    <div class="trading-metric-change pnl-negative">-1.2%</div>
+                </div>
+            </div>
+            <div class="trading-card">
+                <div class="trading-metric">
+                    <div class="trading-metric-label">Total Holdings</div>
+                    <div class="trading-metric-value pnl-neutral">15</div>
+                    <div class="trading-metric-change">Stocks</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactive States Test -->
+    <div class="test-section">
+        <h2>Interactive States</h2>
+        <p>Hover over and focus on these elements to test interactive states:</p>
+        <div class="test-grid">
+            <button class="btn btn-primary interactive">Hover Me</button>
+            <div class="trading-card card-interactive" style="padding: 1rem; cursor: pointer;">
+                Interactive Card
+            </div>
+            <a href="#" class="link-interactive">Interactive Link</a>
+            <input type="text" class="form-input focus-ring" placeholder="Focus me">
+        </div>
+    </div>
+
+    <!-- Table Test -->
+    <div class="test-section">
+        <h2>Table Components</h2>
+        <div class="table-container">
+            <table class="table table-trading">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th class="table-cell-numeric">Qty</th>
+                        <th class="table-cell-numeric">Price</th>
+                        <th class="table-cell-numeric">P&L</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="table-cell-symbol">RELIANCE</td>
+                        <td class="table-cell-numeric">100</td>
+                        <td class="table-cell-numeric">₹2,450.75</td>
+                        <td class="table-cell-numeric pnl-positive">+₹1,234.56</td>
+                    </tr>
+                    <tr>
+                        <td class="table-cell-symbol">TCS</td>
+                        <td class="table-cell-numeric">50</td>
+                        <td class="table-cell-numeric">₹3,125.20</td>
+                        <td class="table-cell-numeric pnl-negative">-₹567.89</td>
+                    </tr>
+                    <tr>
+                        <td class="table-cell-symbol">INFY</td>
+                        <td class="table-cell-numeric">75</td>
+                        <td class="table-cell-numeric">₹1,678.90</td>
+                        <td class="table-cell-numeric pnl-neutral">₹0.00</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Form Components Test -->
+    <div class="test-section">
+        <h2>Form Components</h2>
+        <form>
+            <div class="form-group">
+                <label class="form-label required">Symbol</label>
+                <input type="text" class="form-input focus-ring" placeholder="Enter symbol">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Order Type</label>
+                <select class="form-select focus-ring">
+                    <option>Market</option>
+                    <option>Limit</option>
+                    <option>Stop Loss</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Quantity</label>
+                <input type="number" class="form-input focus-ring" placeholder="0">
+                <div class="form-help">Enter the number of shares</div>
+            </div>
+            <button type="submit" class="btn btn-primary">Place Order</button>
+        </form>
+    </div>
+
+    <!-- Accessibility Test -->
+    <div class="test-section">
+        <h2>Accessibility Features</h2>
+        <p>Test keyboard navigation and screen reader compatibility:</p>
+        <a href="#main-content" class="skip-link">Skip to main content</a>
+        <div class="test-grid">
+            <button class="btn btn-primary focus-ring" tabindex="0">Focusable Button</button>
+            <div class="interactive focus-ring" tabindex="0" role="button">
+                Focusable Div
+            </div>
+            <input type="text" class="form-input focus-ring" aria-label="Test input">
+        </div>
+    </div>
+
+    <!-- Responsive Test -->
+    <div class="test-section">
+        <h2>Responsive Design</h2>
+        <p>Resize the window to test responsive behavior:</p>
+        <div class="trading-grid">
+            <div class="trading-card">Card 1</div>
+            <div class="trading-card">Card 2</div>
+            <div class="trading-card">Card 3</div>
+            <div class="trading-card">Card 4</div>
+        </div>
+    </div>
+
+    <script>
+        // Test JavaScript interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Design System Test Page Loaded');
+            
+            // Test focus management
+            const focusableElements = document.querySelectorAll('.focus-ring');
+            focusableElements.forEach(el => {
+                el.addEventListener('focus', () => {
+                    console.log('Focus event on:', el.tagName, el.className);
+                });
+            });
+
+            // Test interactive elements
+            const interactiveElements = document.querySelectorAll('.interactive');
+            interactiveElements.forEach(el => {
+                el.addEventListener('click', () => {
+                    console.log('Click event on interactive element');
+                });
+            });
+        });
+    </script>
+</body>
+</html>

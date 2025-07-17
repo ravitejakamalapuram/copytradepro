@@ -1,4 +1,5 @@
 import React from 'react';
+import { StatusBadge as EnterpriseStatusBadge } from './ui/Badge';
 
 interface StatusBadgeProps {
   status: string;
@@ -6,66 +7,53 @@ interface StatusBadgeProps {
 }
 
 const StatusBadge: React.FC<StatusBadgeProps> = ({ status, className = '' }) => {
-  const getStatusConfig = (status: string) => {
+  const getStatusMapping = (status: string): 'active' | 'inactive' | 'pending' | 'executed' | 'rejected' | 'cancelled' | 'error' => {
     switch (status.toUpperCase()) {
       case 'EXECUTED':
       case 'COMPLETE':
       case 'FILLED':
-        return {
-          variant: 'badge-success',
-          icon: '✅',
-          label: 'Executed'
-        };
+        return 'executed';
       
       case 'REJECTED':
       case 'FAILED':
-        return {
-          variant: 'badge-danger',
-          icon: '❌',
-          label: 'Rejected'
-        };
+        return 'rejected';
       
       case 'PENDING':
       case 'PLACED':
       case 'OPEN':
-        return {
-          variant: 'badge-warning',
-          icon: '⏳',
-          label: 'Pending'
-        };
+        return 'pending';
       
       case 'CANCELLED':
       case 'CANCELED':
-        return {
-          variant: 'badge-neutral',
-          icon: '🚫',
-          label: 'Cancelled'
-        };
+        return 'cancelled';
       
       case 'PARTIALLY_FILLED':
       case 'PARTIAL':
-        return {
-          variant: 'badge-info',
-          icon: '🔄',
-          label: 'Partial'
-        };
+        return 'pending';
+      
+      case 'ACTIVE':
+        return 'active';
+      
+      case 'INACTIVE':
+        return 'inactive';
+      
+      case 'ERROR':
+        return 'error';
       
       default:
-        return {
-          variant: 'badge-neutral',
-          icon: '⚪',
-          label: status
-        };
+        return 'inactive';
     }
   };
 
-  const config = getStatusConfig(status);
+  const mappedStatus = getStatusMapping(status);
 
   return (
-    <span className={`badge ${config.variant} ${className}`}>
-      <span className="mr-1">{config.icon}</span>
-      {config.label}
-    </span>
+    <EnterpriseStatusBadge 
+      status={mappedStatus} 
+      className={className}
+    >
+      {status}
+    </EnterpriseStatusBadge>
   );
 };
 

@@ -230,8 +230,23 @@
   /* Interactive Colors - Dark Trading Theme */
   --interactive-primary: var(--color-accent);
   --interactive-primary-hover: var(--color-accent-dark);
+  --interactive-primary-active: var(--color-accent-dark);
   --interactive-secondary: var(--color-secondary);
   --interactive-secondary-hover: var(--color-secondary-light);
+  --interactive-secondary-active: var(--color-secondary-dark);
+
+  /* Interactive State Colors */
+  --hover-bg: var(--bg-secondary);
+  --hover-bg-light: var(--bg-tertiary);
+  --hover-border: var(--border-secondary);
+  --active-bg: var(--bg-tertiary);
+  --active-border: var(--border-focus);
+
+  /* Focus State Colors */
+  --focus-ring: var(--color-accent);
+  --focus-ring-offset: 2px;
+  --focus-ring-width: 2px;
+  --focus-ring-opacity: 0.5;
 
   /* ==========================================================================
      LEGACY THEME COMPATIBILITY - Kite Theme Mappings
@@ -365,6 +380,44 @@ body {
 
 .gap-6 {
   gap: var(--space-6);
+}
+
+/* ==========================================================================
+   UTILITY CLASSES - Status and Trading Colors
+   ========================================================================== */
+
+/* Status Text Colors */
+.status-success {
+  color: var(--color-success-500);
+}
+
+.status-error {
+  color: var(--color-danger-500);
+}
+
+.status-warning {
+  color: var(--color-warning-500);
+}
+
+.status-info {
+  color: var(--color-info-500);
+}
+
+/* Status Dot Colors */
+.dot-success {
+  background-color: var(--color-success-500);
+}
+
+.dot-error {
+  background-color: var(--color-danger-500);
+}
+
+.dot-warning {
+  background-color: var(--color-warning-500);
+}
+
+.dot-info {
+  background-color: var(--color-info-500);
 }
 
 /* ==========================================================================

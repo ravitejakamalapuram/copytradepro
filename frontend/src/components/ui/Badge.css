@@ -1,6 +1,6 @@
 /**
  * ENTERPRISE BADGE COMPONENT STYLES
- * CSS-only implementation to avoid CSSStyleDeclaration issues
+ * Using unified design system tokens for consistency
  */
 
 /* Base Badge */
@@ -14,11 +14,12 @@
   border: none;
   white-space: nowrap;
   text-align: center;
+  transition: var(--transition-fast);
 }
 
 /* Badge Sizes */
 .enterprise-badge--sm {
-  padding: 0.125rem var(--space-2);
+  padding: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
   line-height: var(--leading-tight);
 }
@@ -35,43 +36,50 @@
   line-height: var(--leading-normal);
 }
 
-/* Badge Variants */
+/* Badge Variants - Using Design System Colors */
 .enterprise-badge--default {
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
+  border: 1px solid var(--border-secondary);
 }
 
 .enterprise-badge--primary {
   background-color: var(--interactive-primary);
   color: var(--text-primary);
+  border: 1px solid var(--interactive-primary);
 }
 
 .enterprise-badge--secondary {
   background-color: var(--bg-tertiary);
   color: var(--text-secondary);
+  border: 1px solid var(--border-primary);
 }
 
 .enterprise-badge--success {
-  background-color: var(--color-profit);
+  background-color: var(--color-success-500);
   color: var(--text-primary);
+  border: 1px solid var(--color-success-600);
 }
 
 .enterprise-badge--warning {
   background-color: var(--color-warning-500);
-  color: var(--text-primary);
+  color: var(--color-bg-primary);
+  border: 1px solid var(--color-warning-600);
 }
 
 .enterprise-badge--error {
-  background-color: var(--color-loss);
+  background-color: var(--color-danger-500);
   color: var(--text-primary);
+  border: 1px solid var(--color-danger-600);
 }
 
 .enterprise-badge--info {
   background-color: var(--color-info-500);
   color: var(--text-primary);
+  border: 1px solid var(--color-info-600);
 }
 
-/* Status Badge Specific Styles */
+/* Status Badge Specific Styles - Trading Optimized */
 .enterprise-status-badge {
   display: inline-flex;
   align-items: center;
@@ -81,54 +89,63 @@
   font-weight: var(--font-medium);
   border-radius: var(--radius-full);
   white-space: nowrap;
+  transition: var(--transition-fast);
+  border: 1px solid transparent;
 }
 
-/* Status Badge Variants */
+/* Status Badge Variants - Using Trading Color Conventions */
 .enterprise-status-badge--active {
-  background-color: var(--color-profit);
+  background-color: var(--color-success-500);
   color: var(--text-primary);
+  border-color: var(--color-success-600);
 }
 
 .enterprise-status-badge--inactive {
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
+  border-color: var(--border-secondary);
 }
 
 .enterprise-status-badge--pending {
   background-color: var(--color-warning-500);
-  color: var(--text-primary);
+  color: var(--color-bg-primary);
+  border-color: var(--color-warning-600);
 }
 
 .enterprise-status-badge--executed {
-  background-color: var(--color-profit);
+  background-color: var(--color-success-500);
   color: var(--text-primary);
+  border-color: var(--color-success-600);
 }
 
 .enterprise-status-badge--rejected {
-  background-color: var(--color-loss);
+  background-color: var(--color-danger-500);
   color: var(--text-primary);
+  border-color: var(--color-danger-600);
 }
 
 .enterprise-status-badge--cancelled {
   background-color: var(--bg-secondary);
   color: var(--text-secondary);
+  border-color: var(--border-secondary);
 }
 
 .enterprise-status-badge--error {
-  background-color: var(--color-loss);
+  background-color: var(--color-danger-500);
   color: var(--text-primary);
+  border-color: var(--color-danger-600);
 }
 
-/* Status Badge Icons */
+/* Status Badge Icons - Using Design System Tokens */
 .enterprise-status-badge-icon {
-  width: 0.5rem;
-  height: 0.5rem;
-  border-radius: 50%;
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
   flex-shrink: 0;
 }
 
 .enterprise-status-badge--active .enterprise-status-badge-icon {
-  background-color: var(--color-profit);
+  background-color: var(--color-success-700);
 }
 
 .enterprise-status-badge--inactive .enterprise-status-badge-icon {
@@ -136,15 +153,15 @@
 }
 
 .enterprise-status-badge--pending .enterprise-status-badge-icon {
-  background-color: var(--color-warning-500);
+  background-color: var(--color-warning-800);
 }
 
 .enterprise-status-badge--executed .enterprise-status-badge-icon {
-  background-color: var(--color-profit);
+  background-color: var(--color-success-700);
 }
 
 .enterprise-status-badge--rejected .enterprise-status-badge-icon {
-  background-color: var(--color-loss);
+  background-color: var(--color-danger-700);
 }
 
 .enterprise-status-badge--cancelled .enterprise-status-badge-icon {
@@ -152,5 +169,5 @@
 }
 
 .enterprise-status-badge--error .enterprise-status-badge-icon {
-  background-color: var(--color-loss);
+  background-color: var(--color-danger-700);
 }

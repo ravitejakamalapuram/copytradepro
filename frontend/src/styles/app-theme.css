@@ -6,19 +6,28 @@
 /* Import unified design system - contains all tokens and legacy compatibility */
 @import './design-system.css';
 
-/* Global Kite Theme Styles */
+/* Global Application Theme - Using Unified Design System */
+.app-theme {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: var(--leading-normal);
+  font-size: var(--text-sm); /* Professional trading platform font size */
+}
+
+/* Legacy Kite Theme Compatibility */
 .kite-theme {
-  background-color: var(--kite-bg-primary);
-  color: var(--kite-text-primary);
-  font-family: var(--kite-font-family);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   line-height: 1.4;
   font-size: 13px; /* Smaller base font size like professional trading platforms */
 }
 
-/* Kite Navigation */
+/* Kite Navigation - Essential for existing layouts */
 .kite-nav {
-  background-color: var(--kite-bg-secondary);
-  border-bottom: 1px solid var(--kite-border-primary);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
   padding: 0;
   height: 60px;
   display: flex;
@@ -36,23 +45,28 @@
   width: 100%;
   max-width: 1400px;
   margin: 0 auto;
-  padding: 0 var(--kite-space-lg);
+  padding: 0 var(--space-4);
+  gap: var(--space-4);
+  box-sizing: border-box;
 }
 
 .kite-logo {
   display: flex;
   align-items: center;
-  gap: var(--kite-space-sm);
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--kite-text-primary);
+  gap: var(--space-2);
+  font-size: var(--text-xl);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
   text-decoration: none;
 }
 
 .kite-nav-links {
   display: flex;
   align-items: center;
-  gap: var(--kite-space-sm);
+  gap: var(--space-2);
+  flex: 1;
+  justify-content: center;
+  max-width: 600px;
 }
 
 .kite-nav-link {
@@ -62,30 +76,45 @@
   padding: 6px 12px;
   border: none;
   background: transparent;
-  color: var(--kite-text-secondary);
-  font-size: 12px;
-  font-weight: 500;
-  border-radius: var(--kite-radius-md);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: var(--kite-transition);
+  transition: var(--transition-fast);
   text-decoration: none;
 }
 
 .kite-nav-link:hover {
-  background-color: var(--kite-bg-hover);
-  color: var(--kite-text-primary);
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
 }
 
 .kite-nav-link.active {
-  background-color: var(--kite-brand-primary);
-  color: white;
+  background-color: var(--interactive-primary);
+  color: var(--text-primary);
 }
 
-/* Kite Sidebar */
+/* Navigation Button Overrides */
+.kite-nav-links .enterprise-button {
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.nav-user-menu .enterprise-button {
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Kite Sidebar - Essential for existing layouts */
 .kite-sidebar {
   width: 280px;
-  background-color: var(--kite-bg-secondary);
-  border-right: 1px solid var(--kite-border-primary);
+  background-color: var(--bg-secondary);
+  border-right: 1px solid var(--border-primary);
   height: calc(100vh - 60px);
   overflow-y: auto;
   position: fixed;
@@ -94,210 +123,298 @@
 }
 
 .kite-sidebar-section {
-  padding: var(--kite-space-md);
-  border-bottom: 1px solid var(--kite-border-secondary);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .kite-sidebar-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--kite-text-muted);
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-tertiary);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: var(--kite-space-sm);
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
 }
 
-/* Kite Main Content */
+/* Kite Main Content - Essential for existing layouts */
 .kite-main {
   margin-left: 280px;
-  padding: var(--kite-space-lg);
+  padding: var(--space-6);
   min-height: calc(100vh - 60px);
-  background-color: var(--kite-bg-primary);
+  background-color: var(--bg-primary);
 }
 
-/* Kite Cards */
+/* Kite Cards - Essential for existing layouts */
 .kite-card {
-  background-color: var(--kite-bg-card);
-  border: 1px solid var(--kite-border-primary);
-  border-radius: var(--kite-radius-lg);
-  padding: var(--kite-space-lg);
-  margin-bottom: var(--kite-space-lg);
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-sm);
 }
 
 .kite-card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--kite-space-md);
-  padding-bottom: var(--kite-space-md);
-  border-bottom: 1px solid var(--kite-border-secondary);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .kite-card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--kite-text-primary);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
   margin: 0;
 }
 
-/* Kite Tables */
+/* ==========================================================================
+   TRADING-SPECIFIC UTILITY CLASSES
+   Using unified design system tokens
+   ========================================================================== */
+
+/* Trading P&L Text Colors - Using Design System Tokens */
+.text-profit { color: var(--color-profit); }
+.text-loss { color: var(--color-loss); }
+.text-neutral { color: var(--color-neutral); }
+
+/* Trading P&L Background Colors */
+.bg-profit-light { background-color: rgba(0, 212, 170, 0.1); }
+.bg-loss-light { background-color: rgba(255, 71, 87, 0.1); }
+
+/* Monospace Font for Trading Data */
+.font-trading-mono { font-family: var(--font-mono); }
+
+/* Kite Tables - Essential for existing layouts */
 .kite-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.875rem;
+  font-size: var(--text-sm);
 }
 
 .kite-table th {
-  background-color: var(--kite-bg-tertiary);
-  color: var(--kite-text-secondary);
-  font-weight: 500;
-  padding: var(--kite-space-md);
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  font-weight: var(--font-medium);
+  padding: var(--space-4);
   text-align: left;
-  border-bottom: 1px solid var(--kite-border-primary);
-  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-primary);
+  font-size: var(--text-xs);
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
 }
 
 .kite-table td {
-  padding: var(--kite-space-md);
-  border-bottom: 1px solid var(--kite-border-secondary);
-  color: var(--kite-text-primary);
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--border-secondary);
+  color: var(--text-primary);
 }
 
 .kite-table tr:hover {
-  background-color: var(--kite-bg-hover);
+  background-color: var(--hover-bg);
 }
 
-/* Kite Buttons */
+/* Kite Buttons - Essential for existing layouts */
 .kite-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border: 1px solid var(--kite-border-primary);
-  background-color: var(--kite-bg-tertiary);
-  color: var(--kite-text-primary);
-  font-size: 11px;
-  font-weight: 500;
-  border-radius: var(--kite-radius-md);
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-primary);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: var(--kite-transition);
+  transition: var(--transition-fast);
   text-decoration: none;
 }
 
 .kite-btn:hover {
-  background-color: var(--kite-bg-hover);
-  border-color: var(--kite-border-light);
+  background-color: var(--hover-bg);
+  border-color: var(--hover-border);
 }
 
 .kite-btn-primary {
-  background-color: var(--kite-brand-primary);
-  border-color: var(--kite-brand-primary);
-  color: white;
+  background-color: var(--interactive-primary);
+  border-color: var(--interactive-primary);
+  color: var(--text-primary);
 }
 
 .kite-btn-primary:hover {
-  background-color: var(--kite-brand-secondary);
-  border-color: var(--kite-brand-secondary);
+  background-color: var(--interactive-primary-hover);
+  border-color: var(--interactive-primary-hover);
 }
 
 .kite-btn-success {
-  background-color: var(--kite-profit);
-  border-color: var(--kite-profit);
-  color: white;
+  background-color: var(--color-profit);
+  border-color: var(--color-profit);
+  color: var(--text-primary);
 }
 
 .kite-btn-danger {
-  background-color: var(--kite-loss);
-  border-color: var(--kite-loss);
-  color: white;
+  background-color: var(--color-loss);
+  border-color: var(--color-loss);
+  color: var(--text-primary);
 }
 
-/* Kite Form Elements */
+/* Kite Form Elements - Essential for existing layouts */
 .kite-input {
   width: 100%;
-  padding: var(--kite-space-sm) var(--kite-space-md);
-  background-color: var(--kite-bg-tertiary);
-  border: 1px solid var(--kite-border-primary);
-  border-radius: var(--kite-radius-md);
-  color: var(--kite-text-primary);
-  font-size: 0.875rem;
-  transition: var(--kite-transition);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  transition: var(--transition-fast);
 }
 
 .kite-input:focus {
   outline: none;
-  border-color: var(--kite-brand-primary);
-  box-shadow: 0 0 0 2px rgba(56, 126, 209, 0.2);
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.2);
 }
 
 .kite-select {
   width: 100%;
-  padding: var(--kite-space-sm) var(--kite-space-md);
-  background-color: var(--kite-bg-tertiary);
-  border: 1px solid var(--kite-border-primary);
-  border-radius: var(--kite-radius-md);
-  color: var(--kite-text-primary);
-  font-size: 0.875rem;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
-/* Kite Utility Classes */
-.kite-text-profit {
-  color: var(--kite-profit);
+/* Legacy Kite Utility Classes for Backward Compatibility */
+.kite-text-profit { color: var(--color-profit); }
+.kite-text-loss { color: var(--color-loss); }
+.kite-text-neutral { color: var(--color-neutral); }
+.kite-bg-profit { background-color: rgba(0, 212, 170, 0.1); }
+.kite-bg-loss { background-color: rgba(255, 71, 87, 0.1); }
+.kite-font-mono { font-family: var(--font-mono); }
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
-.kite-text-loss {
-  color: var(--kite-loss);
+/* Navigation User Menu - Essential for AppNavigation component */
+.nav-user-menu {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
 }
 
-.kite-text-neutral {
-  color: var(--kite-neutral);
+.market-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
 }
 
-.kite-bg-profit {
-  background-color: var(--kite-profit-bg);
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.kite-bg-loss {
-  background-color: var(--kite-loss-bg);
+.user-info-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
 }
 
-.kite-font-mono {
-  font-family: var(--kite-font-mono);
+.user-name {
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-/* Responsive Design */
+.user-email {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+/* Watchlist and Portfolio Styles */
+.watchlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.watchlist-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.portfolio-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-sm);
+}
+
+.live-data-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border-secondary);
+}
+
+/* Responsive Design - Essential for existing layouts */
 @media (max-width: 1024px) {
   .kite-sidebar {
     transform: translateX(-100%);
     transition: transform 0.3s ease;
   }
-  
+
   .kite-main {
     margin-left: 0;
   }
-  
+
   .kite-sidebar.open {
     transform: translateX(0);
   }
-}
 
-/* Scrollbar Styling */
-::-webkit-scrollbar {
-  width: 6px;
-}
+  .nav-user-menu {
+    gap: 0.5rem;
+  }
 
-::-webkit-scrollbar-track {
-  background: var(--kite-bg-secondary);
-}
+  .market-status-indicator {
+    display: none; /* Hide on mobile to save space */
+  }
 
-::-webkit-scrollbar-thumb {
-  background: var(--kite-border-light);
-  border-radius: 3px;
-}
+  .user-info-container {
+    gap: 0.5rem;
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--kite-text-muted);
+  .user-name {
+    font-size: var(--text-xs);
+  }
 }
