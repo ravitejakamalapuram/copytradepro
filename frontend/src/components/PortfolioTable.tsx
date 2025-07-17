@@ -1,5 +1,6 @@
 import React from 'react';
 import './PortfolioTable.css';
+import Button from './ui/Button';
 
 export interface PortfolioItem {
   symbol: string;
@@ -59,12 +60,6 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({
     }).format(num);
   };
 
-  const getPnLColor = (pnl: number): string => {
-    if (pnl > 0) return 'var(--kite-profit)';
-    if (pnl < 0) return 'var(--kite-loss)';
-    return 'var(--kite-text-secondary)';
-  };
-
   const getItemIcon = (item: PortfolioItem) => {
     return item.type === 'holding' ? '📊' : '⚡';
   };
@@ -85,12 +80,11 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({
           <div className="portfolio-table__empty-icon">{emptyStateConfig.icon}</div>
           <div className="portfolio-table__empty-title">{emptyStateConfig.title}</div>
           <div className="portfolio-table__empty-description">{emptyStateConfig.description}</div>
-          <button 
-            className="portfolio-table__empty-action"
+          <Button
             onClick={emptyStateConfig.onAction}
           >
             {emptyStateConfig.actionLabel}
-          </button>
+          </Button>
         </div>
       </div>
     );
@@ -168,7 +162,9 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({
                   {formatCurrency(item.currentValue)}
                 </td>
                 <td className="portfolio-table__cell portfolio-table__cell--right portfolio-table__cell--mono portfolio-table__cell--bold">
-                  <div style={{ color: getPnLColor(item.pnl) }}>
+                  <div className={
+                    item.pnl > 0 ? 'pnl-positive' : item.pnl < 0 ? 'pnl-negative' : 'pnl-neutral'
+                  }>
                     {item.pnl >= 0 ? '+' : ''}{formatCurrency(item.pnl)}
                     <div className="portfolio-table__cell-sub">
                       ({item.pnlPercent >= 0 ? '+' : ''}{formatNumber(item.pnlPercent)}%)
@@ -176,7 +172,9 @@ const PortfolioTable: React.FC<PortfolioTableProps> = ({
                   </div>
                 </td>
                 <td className="portfolio-table__cell portfolio-table__cell--right portfolio-table__cell--mono">
-                  <div style={{ color: getPnLColor(item.dayChange) }}>
+                  <div className={
+                    item.dayChange > 0 ? 'pnl-positive' : item.dayChange < 0 ? 'pnl-negative' : 'pnl-neutral'
+                  }>
                     {item.dayChange >= 0 ? '+' : ''}{formatCurrency(item.dayChange)}
                     <div className="portfolio-table__cell-sub">
                       ({item.dayChangePercent >= 0 ? '+' : ''}{formatNumber(item.dayChangePercent)}%)

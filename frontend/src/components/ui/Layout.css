@@ -38,20 +38,20 @@
 .enterprise-page-header {
   margin-bottom: 2rem;
   padding-bottom: 1.5rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-primary);
 }
 
 .enterprise-page-header-title {
   font-size: 1.875rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1.25;
   margin: 0;
 }
 
 .enterprise-page-header-subtitle {
   font-size: 1.125rem;
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 0.5rem 0 0 0;
   line-height: 1.5;
 }

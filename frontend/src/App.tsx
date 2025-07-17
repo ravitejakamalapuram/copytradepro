@@ -257,35 +257,20 @@ const App: React.FC = () => {
     performanceMonitorService.startMonitoring();
     
     // Expose services globally for debugging
-    (window as any).memoryMonitor = memoryMonitorService;
-    (window as any).leakDetector = memoryLeakDetector;
-    (window as any).resourceManager = resourceManager;
-    (window as any).appCache = appCache;
-    (window as any).apiCache = apiCache;
-    (window as any).marketDataCache = marketDataCache;
-    (window as any).performanceMonitor = performanceMonitorService;
+    (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor = memoryMonitorService;
+    (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector = memoryLeakDetector;
+    (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager = resourceManager;
+    (window as unknown as { appCache?: typeof appCache }).appCache = appCache;
+    (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
+    (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
+    (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
     
     // Setup memory alert handling
     const unsubscribeMemoryAlert = memoryMonitorService.onAlert((alert) => {
-      if ((window as any).addNotification) {
-        (window as any).addNotification({
+      if (typeof window.addNotification === 'function') {
+        window.addNotification({
           title: `Memory ${alert.type.toUpperCase()}`,
           message: alert.message,
-          type: alert.type === 'critical' ? 'error' : 'warning',
-          autoClose: alert.type !== 'critical',
-          duration: alert.type === 'critical' ? 0 : 10000,
-          actions: alert.type === 'critical' ? [
-            {
-              label: 'Refresh Page',
-              action: () => window.location.reload(),
-              variant: 'primary' as const
-            },
-            {
-              label: 'Clear Cache',
-              action: () => memoryMonitorService.clearCaches(),
-              variant: 'secondary' as const
-            }
-          ] : undefined
         });
       }
     });
@@ -306,13 +291,13 @@ const App: React.FC = () => {
       marketDataCache.shutdown();
       
       // Clean up global references
-      delete (window as any).memoryMonitor;
-      delete (window as any).leakDetector;
-      delete (window as any).resourceManager;
-      delete (window as any).appCache;
-      delete (window as any).apiCache;
-      delete (window as any).marketDataCache;
-      delete (window as unknown).performanceMonitor;
+      delete (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor;
+      delete (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector;
+      delete (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager;
+      delete (window as unknown as { appCache?: typeof appCache }).appCache;
+      delete (window as unknown as { apiCache?: typeof apiCache }).apiCache;
+      delete (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache;
+      delete (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor;
     };
   }, []);
 

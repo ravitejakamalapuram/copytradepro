@@ -335,7 +335,7 @@ const AdvancedOrderManagement: React.FC = () => {
                             <div>
                               <div style={{ fontWeight: '600' }}>{template.name}</div>
                               {template.description && (
-                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                                   {template.description}
                                 </div>
                               )}
@@ -417,7 +417,7 @@ const AdvancedOrderManagement: React.FC = () => {
                           <TableCell>
                             <div style={{ fontWeight: '600' }}>{order.symbol}</div>
                             {order.order_group_id && (
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                                 Group: {order.order_group_id.slice(0, 8)}...
                               </div>
                             )}
@@ -433,7 +433,7 @@ const AdvancedOrderManagement: React.FC = () => {
                           <TableCell>
                             {order.quantity}
                             {order.order_type === 'ICEBERG' && order.iceberg_quantity && (
-                              <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                                 Iceberg: {order.iceberg_quantity}
                               </div>
                             )}
@@ -441,12 +441,12 @@ const AdvancedOrderManagement: React.FC = () => {
                           <TableCell>
                             {advancedOrderService.formatPrice(order.price || order.trigger_price)}
                             {order.stop_loss && (
-                              <div style={{ fontSize: '0.75rem', color: '#ef4444' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--pnl-negative)' }}>
                                 SL: {advancedOrderService.formatPrice(order.stop_loss)}
                               </div>
                             )}
                             {order.take_profit && (
-                              <div style={{ fontSize: '0.75rem', color: '#10b981' }}>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--pnl-positive)' }}>
                                 TP: {advancedOrderService.formatPrice(order.take_profit)}
                               </div>
                             )}
@@ -502,7 +502,7 @@ const AdvancedOrderManagement: React.FC = () => {
                     </label>
                     <Select
                       value={orderType}
-                      onChange={(e) => setOrderType(e.target.value as any)}
+                      onChange={(e) => setOrderType(e.target.value as unknown as 'bracket' | 'iceberg' | 'trailing-stop')}
                     >
                       <option value="bracket">Bracket Order (Entry + Stop Loss + Take Profit)</option>
                       <option value="iceberg">Iceberg Order (Hidden Quantity)</option>
@@ -621,7 +621,7 @@ const AdvancedOrderManagement: React.FC = () => {
                           onChange={(e) => handleInputChange('iceberg_quantity', e.target.value)}
                           placeholder="10"
                         />
-                        <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           Quantity to show in order book at a time
                         </div>
                       </div>
@@ -750,10 +750,10 @@ const AdvancedOrderManagement: React.FC = () => {
           {successMessage && (
             <div style={{
               padding: '0.75rem 1rem',
-              backgroundColor: '#dcfce7',
-              border: '1px solid #bbf7d0',
+              backgroundColor: 'var(--pnl-positive-bg)',
+              border: '1px solid var(--pnl-positive-border)',
               borderRadius: '0.5rem',
-              color: '#166534',
+              color: 'var(--pnl-positive)',
               fontSize: '0.875rem',
               marginBottom: '1rem'
             }}>
@@ -764,10 +764,10 @@ const AdvancedOrderManagement: React.FC = () => {
           {error && (
             <div style={{
               padding: '0.75rem 1rem',
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
+              backgroundColor: 'var(--pnl-negative-bg)',
+              border: '1px solid var(--pnl-negative-border)',
               borderRadius: '0.5rem',
-              color: '#dc2626',
+              color: 'var(--pnl-negative)',
               fontSize: '0.875rem',
               marginBottom: '1rem'
             }}>
@@ -787,7 +787,7 @@ const AdvancedOrderManagement: React.FC = () => {
                   <Button
                     key={tab.key}
                     variant={activeTab === tab.key ? 'primary' : 'ghost'}
-                    onClick={() => setActiveTab(tab.key as any)}
+                    onClick={() => setActiveTab(tab.key as unknown as 'templates' | 'advanced-orders' | 'create')}
                   >
                     {tab.label}
                   </Button>

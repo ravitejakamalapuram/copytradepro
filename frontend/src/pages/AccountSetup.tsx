@@ -7,6 +7,7 @@ import { useAccountStatusContext } from '../context/AccountStatusContext';
 import AccountStatusIndicator from '../components/AccountStatusIndicator';
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
 
 const ALL_BROKERS = [
   {
@@ -411,18 +412,18 @@ const AccountSetup: React.FC = () => {
           <div className="kite-card-header">
             <h1 className="kite-card-title">Broker Accounts</h1>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
+              <Button 
+                variant="primary"
                 onClick={() => navigate('/trade-setup')}
               >
                 📈 Start Trading
-              </button>
-              <button 
-                className="kite-btn kite-btn-primary"
+              </Button>
+              <Button 
+                variant="primary"
                 onClick={() => setShowAddForm(true)}
               >
                 + Add Broker
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -518,32 +519,29 @@ const AccountSetup: React.FC = () => {
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
                           <AccountStatusIndicator accountId={account.id} showDetails={false} />
                           {account.isActive ? (
-                            <button
-                              className="kite-btn"
+                            <Button
+                              variant="outline"
                               onClick={() => handleDeactivateAccount(account.id)}
                               disabled={isOperationInProgress(account.id)}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
                               {isOperationInProgress(account.id) ? 'Deactivating...' : 'Deactivate'}
-                            </button>
+                            </Button>
                           ) : (
-                            <button
-                              className="kite-btn kite-btn-primary"
+                            <Button
+                              variant="primary"
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={isOperationInProgress(account.id)}
-                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                             >
                               {isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
-                            </button>
+                            </Button>
                           )}
-                          <button
-                            className="kite-btn kite-btn-danger"
+                          <Button
+                            variant="danger"
                             onClick={() => handleRemoveAccount(account.id)}
                             disabled={isOperationInProgress(account.id)}
-                            style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
                           >
                             Remove
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -561,8 +559,8 @@ const AccountSetup: React.FC = () => {
               <h2 className="kite-card-title">
                 {selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
               </h2>
-              <button
-                className="kite-btn"
+              <Button
+                variant="outline"
                 onClick={() => {
                   setShowAddForm(false);
                   setSelectedBroker('');
@@ -570,7 +568,7 @@ const AccountSetup: React.FC = () => {
                 }}
               >
                 ✕ Cancel
-              </button>
+              </Button>
             </div>
 
             <div style={{ padding: '1.5rem' }}>
@@ -820,8 +818,8 @@ const AccountSetup: React.FC = () => {
                   )}
 
                   {/* Submit Button */}
-                  <button
-                    className="kite-btn kite-btn-primary"
+                  <Button
+                    variant="primary"
                     onClick={handleSubmit}
                     disabled={submitting}
                     style={{
@@ -833,7 +831,7 @@ const AccountSetup: React.FC = () => {
                     }}
                   >
                     {submitting ? 'Connecting...' : `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}`}
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -850,13 +848,13 @@ const AccountSetup: React.FC = () => {
             <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
               Connect your broker account to start trading. We support multiple brokers with secure API integration.
             </div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <Button
+              variant="primary"
               onClick={() => setShowAddForm(true)}
               style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
             >
               Connect Your First Broker
-            </button>
+            </Button>
           </div>
         )}
       </div>

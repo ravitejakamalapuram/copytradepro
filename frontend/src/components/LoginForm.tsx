@@ -35,10 +35,10 @@ const LoginForm: React.FC = () => {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = 'Login failed. Please try again.';
 
-      if (err?.message) {
+      if (err instanceof Error) {
         if (err.message.includes('Invalid email or password')) {
           errorMessage = 'Invalid email or password. If you don\'t have an account, please register first.';
           // Set field-specific errors

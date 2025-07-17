@@ -61,7 +61,7 @@ const ComponentDemo: React.FC = () => {
             <CardContent>
               <Stack gap={4}>
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Variants</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Variants</h4>
                   <Flex gap={3} wrap>
                     <Button variant="primary">Primary</Button>
                     <Button variant="secondary">Secondary</Button>
@@ -72,7 +72,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Sizes</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Sizes</h4>
                   <Flex gap={3} align="center">
                     <Button size="sm">Small</Button>
                     <Button size="base">Base</Button>
@@ -81,7 +81,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button States</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button States</h4>
                   <Flex gap={3}>
                     <Button loading>Loading</Button>
                     <Button disabled>Disabled</Button>
@@ -158,7 +158,7 @@ const ComponentDemo: React.FC = () => {
             <CardContent>
               <Stack gap={4}>
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Variants</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Badge Variants</h4>
                   <Flex gap={3} wrap>
                     <Badge variant="default">Default</Badge>
                     <Badge variant="primary">Primary</Badge>
@@ -170,7 +170,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Sizes</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Badge Sizes</h4>
                   <Flex gap={3} wrap>
                     <Badge variant="primary" size="sm">Small</Badge>
                     <Badge variant="primary" size="base">Base</Badge>
@@ -179,7 +179,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Status Badges</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Status Badges</h4>
                   <Flex gap={3} wrap>
                     <StatusBadge status="active" />
                     <StatusBadge status="inactive" />
@@ -213,7 +213,7 @@ const ComponentDemo: React.FC = () => {
                       <TableCell style={{ fontWeight: '600' }}>{row.name}</TableCell>
                       <TableCell>{row.email}</TableCell>
                       <TableCell>
-                        <StatusBadge status={row.status as any} />
+                        <StatusBadge status={row.status as 'active' | 'error' | 'inactive' | 'pending' | 'executed' | 'rejected' | 'cancelled'} />
                       </TableCell>
                       <TableCell>
                         <Badge variant={row.role === 'Admin' ? 'primary' : 'default'} size="sm">

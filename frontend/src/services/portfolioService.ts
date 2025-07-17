@@ -201,9 +201,9 @@ class PortfolioService {
    * Get color for P&L values
    */
   getPnLColor(value: number): string {
-    if (value > 0) return '#10b981'; // green
-    if (value < 0) return '#ef4444'; // red
-    return '#6b7280'; // gray
+    if (value > 0) return 'var(--color-profit)'; // green
+    if (value < 0) return 'var(--color-loss)'; // red
+    return 'var(--color-neutral)'; // gray
   }
 
   /**

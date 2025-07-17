@@ -1,5 +1,6 @@
 import React from 'react';
 import ErrorBoundary from './ErrorBoundary';
+import Button from './ui/Button';
 
 interface NavigationErrorBoundaryProps {
   children: React.ReactNode;
@@ -10,12 +11,12 @@ const NavigationFallback: React.FC = () => (
     <div className="navigation-error-content">
       <h3>Navigation Error</h3>
       <p>There was an issue loading the navigation. Please refresh the page.</p>
-      <button 
+      <Button
         onClick={() => window.location.reload()}
-        className="btn btn-primary"
+        variant="primary"
       >
         Refresh Page
-      </button>
+      </Button>
     </div>
   </div>
 );

@@ -5,6 +5,8 @@ import { Checkbox } from './ui/Checkbox';
 import type { ConnectedAccount } from '../services/accountService';
 import { brokerService } from '../services/brokerService';
 
+type SearchResult = { symbol: string; name: string };
+
 interface TradingFormData {
   symbol: string;
   quantity: string;
@@ -25,14 +27,14 @@ interface TradingFormProps {
   onOrderResult?: (result: {
     success: boolean;
     message: string;
-    data?: any;
+    data?: unknown;
   }) => void;
   loading?: boolean;
-  searchResults?: any[];
+  searchResults?: SearchResult[];
   showSearchResults?: boolean;
   searchLoading?: boolean;
   onSymbolSearch?: (searchTerm: string) => void;
-  onSymbolSelect?: (symbol: any) => void;
+  onSymbolSelect?: (symbol: unknown) => void;
 }
 
 const TradingForm: React.FC<TradingFormProps> = ({
@@ -175,37 +177,29 @@ const TradingForm: React.FC<TradingFormProps> = ({
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+    <div className="trading-form-layout">
       {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div className="trading-action-btns">
         <Button
-          variant={action === 'BUY' ? 'primary' : 'outline'}
+          className={`trading-action-btn ${action === 'BUY' ? 'trading-action-btn--buy' : ''}`}
           onClick={() => setAction('BUY')}
-          style={{
-            backgroundColor: action === 'BUY' ? '#10b981' : undefined,
-            color: action === 'BUY' ? 'white' : undefined
-          }}
         >
           BUY
         </Button>
         <Button
-          variant={action === 'SELL' ? 'primary' : 'outline'}
+          className={`trading-action-btn ${action === 'SELL' ? 'trading-action-btn--sell' : ''}`}
           onClick={() => setAction('SELL')}
-          style={{
-            backgroundColor: action === 'SELL' ? '#ef4444' : undefined,
-            color: action === 'SELL' ? 'white' : undefined
-          }}
         >
           SELL
         </Button>
       </div>
 
       {/* Symbol Search */}
-      <div style={{ position: 'relative' }}>
+      <div className="trading-symbol-search-container">
         <Input
           label="Symbol"
           value={values.symbol}
-          onChange={(e) => {
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
             handleChange('symbol', e.target.value);
             onSymbolSearch?.(e.target.value);
           }}
@@ -220,36 +214,20 @@ const TradingForm: React.FC<TradingFormProps> = ({
 
         {/* Search Results Dropdown */}
         {showSearchResults && searchResults.length > 0 && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            backgroundColor: 'white',
-            border: '1px solid #cbd5e1',
-            borderRadius: '0.5rem',
-            zIndex: 1000,
-            maxHeight: '200px',
-            overflowY: 'auto',
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
-          }}>
-            {searchResults.map((result, index) => (
+          <div className="trading-search-results-dropdown">
+            {searchResults.map((result: SearchResult, index) => (
               <div
                 key={index}
                 onClick={() => {
                   onSymbolSelect?.(result);
                   handleChange('symbol', result.symbol);
                 }}
-                style={{
-                  padding: '0.75rem',
-                  cursor: 'pointer',
-                  borderBottom: index < searchResults.length - 1 ? '1px solid #e2e8f0' : 'none'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                className={`trading-search-result-item ${index < searchResults.length - 1 ? 'trading-search-result-item--divider' : ''}`}
+                onMouseEnter={(e: React.MouseEvent) => e.currentTarget.classList.add('trading-search-result-item--hover')}
+                onMouseLeave={(e: React.MouseEvent) => e.currentTarget.classList.remove('trading-search-result-item--hover')}
               >
-                <div style={{ fontWeight: '500' }}>{result.symbol}</div>
-                <div style={{ fontSize: '0.875rem', color: '#64748b' }}>{result.name}</div>
+                <div className="trading-search-result-item__symbol">{result.symbol}</div>
+                <div className="trading-search-result-item__name">{result.name}</div>
               </div>
             ))}
           </div>
@@ -257,12 +235,12 @@ const TradingForm: React.FC<TradingFormProps> = ({
       </div>
 
       {/* Quantity and Price */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="trading-quantity-price-grid">
         <Input
           label="Quantity"
           type="number"
           value={values.quantity}
-          onChange={(e) => handleChange('quantity', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('quantity', e.target.value)}
           onBlur={() => handleBlur('quantity')}
           placeholder="0"
           state={errors.quantity ? 'error' : 'default'}
@@ -276,7 +254,7 @@ const TradingForm: React.FC<TradingFormProps> = ({
           type="number"
           step="0.05"
           value={values.price}
-          onChange={(e) => handleChange('price', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('price', e.target.value)}
           onBlur={() => handleBlur('price')}
           placeholder="0.00"
           disabled={orderType === 'MARKET'}
@@ -288,11 +266,11 @@ const TradingForm: React.FC<TradingFormProps> = ({
       </div>
 
       {/* Order Type and Product */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="trading-order-type-product-grid">
         <Select
           label="Order Type"
           value={orderType}
-          onChange={(e) => setOrderType(e.target.value as any)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setOrderType(e.target.value as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET')}
           fullWidth
         >
           <option value="MARKET">Market</option>
@@ -304,7 +282,7 @@ const TradingForm: React.FC<TradingFormProps> = ({
         <Select
           label="Product"
           value={product}
-          onChange={(e) => setProduct(e.target.value as any)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setProduct(e.target.value as 'CNC' | 'MIS' | 'NRML')}
           fullWidth
         >
           <option value="CNC">CNC (Delivery)</option>
@@ -320,7 +298,7 @@ const TradingForm: React.FC<TradingFormProps> = ({
           type="number"
           step="0.05"
           value={values.triggerPrice}
-          onChange={(e) => handleChange('triggerPrice', e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChange('triggerPrice', e.target.value)}
           onBlur={() => handleBlur('triggerPrice')}
           placeholder="0.00"
           state={errors.triggerPrice ? 'error' : 'default'}
@@ -331,11 +309,11 @@ const TradingForm: React.FC<TradingFormProps> = ({
       )}
 
       {/* Exchange and Validity */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+      <div className="trading-exchange-validity-grid">
         <Select
           label="Exchange"
           value={exchange}
-          onChange={(e) => setExchange(e.target.value as any)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setExchange(e.target.value as 'NSE' | 'BSE')}
           fullWidth
         >
           <option value="NSE">NSE</option>
@@ -345,7 +323,7 @@ const TradingForm: React.FC<TradingFormProps> = ({
         <Select
           label="Validity"
           value={validity}
-          onChange={(e) => setValidity(e.target.value as any)}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setValidity(e.target.value as 'DAY' | 'IOC')}
           fullWidth
         >
           <option value="DAY">Day</option>
@@ -354,9 +332,9 @@ const TradingForm: React.FC<TradingFormProps> = ({
       </div>
 
       {/* Account Selection */}
-      <div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-          <label style={{ fontSize: '0.875rem', fontWeight: '500' }}>
+      <div className="trading-account-selection-container">
+        <div className="trading-account-selection-header">
+          <label className="trading-account-selection-label">
             Select Trading Accounts ({selectedAccounts.length} selected)
           </label>
           {connectedAccounts.length > 1 && (
@@ -370,79 +348,40 @@ const TradingForm: React.FC<TradingFormProps> = ({
           )}
         </div>
 
-        <div style={{
-          border: '1px solid #cbd5e1',
-          borderRadius: '0.5rem',
-          padding: '1rem',
-          backgroundColor: '#f8fafc',
-          maxHeight: '300px',
-          overflowY: 'auto'
-        }}>
+        <div className="trading-account-list-container">
           {connectedAccounts.length === 0 ? (
-            <div style={{
-              color: '#64748b',
-              fontSize: '0.875rem',
-              textAlign: 'center',
-              padding: '1rem'
-            }}>
+            <div className="trading-account-list-empty">
               No active accounts found. Please activate at least one broker account.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <div className="trading-account-list">
               {connectedAccounts.map(account => (
                 <div
                   key={account.id}
-                  style={{
-                    padding: '0.75rem',
-                    border: selectedAccounts.includes(account.id)
-                      ? '2px solid #3b82f6'
-                      : '1px solid #e2e8f0',
-                    borderRadius: '0.375rem',
-                    backgroundColor: selectedAccounts.includes(account.id)
-                      ? '#eff6ff'
-                      : 'white',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`trading-account-card ${selectedAccounts.includes(account.id) ? 'trading-account-card--selected' : ''}`}
                 >
                   <Checkbox
                     checked={selectedAccounts.includes(account.id)}
-                    onChange={(checked) => handleAccountSelection(account.id, checked)}
-                    label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
-                    size="base"
+                    onChange={(checked: boolean) => handleAccountSelection(account.id, checked)}
                   />
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    Account: {account.accountId || 'N/A'} | User: {account.userName || 'N/A'}
+                  <div className="trading-account-card__details">
+                    <div className="trading-account-card__name">{account.brokerName}</div>
+                    <div className="trading-account-card__id">{account.id}</div>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-
-        {selectedAccounts.length === 0 && (
-          <div style={{
-            fontSize: '0.75rem',
-            color: '#ef4444',
-            marginTop: '0.25rem'
-          }}>
-            Please select at least one account to place orders
-          </div>
-        )}
       </div>
 
       {/* Submit Button */}
       <Button
-        variant="primary"
-        size="lg"
-        onClick={() => handleSubmit(handleFormSubmit)}
-        disabled={isSubmitting || loading || !values.symbol || !values.quantity || selectedAccounts.length === 0}
-        loading={isSubmitting || loading}
+        onClick={() => { void handleSubmit(handleFormSubmit); }}
+        loading={isSubmitting}
         fullWidth
       >
-        {isSubmitting || loading
-          ? `Placing Orders on ${selectedAccounts.length} Account${selectedAccounts.length > 1 ? 's' : ''}...`
-          : `${action} ${values.symbol || 'Stock'} on ${selectedAccounts.length} Account${selectedAccounts.length > 1 ? 's' : ''}`
-        }
+        {loading ? 'Placing Order...' : 'Place Order'}
       </Button>
     </div>
   );

@@ -1,0 +1,61 @@
+.dashboard-title {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+.dashboard-subtitle {
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+  font-size: 1rem;
+}
+.dashboard-metric-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+.dashboard-metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+.dashboard-metric-change {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  color: var(--text-secondary);
+}
+.dashboard-metric-positive {
+  color: var(--color-profit) !important;
+}
+.dashboard-metric-negative {
+  color: var(--color-loss) !important;
+}
+.dashboard-metric-neutral {
+  color: var(--text-secondary) !important;
+}
+.dashboard-metric-symbol {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.dashboard-metric-right {
+  text-align: right;
+}
+.dashboard-center {
+  text-align: center;
+  padding: 3rem;
+}
+.dashboard-error-message {
+  color: var(--color-loss);
+  margin-bottom: 1rem;
+}
+.dashboard-loading .loading-spinner {
+  margin: 0 auto 1rem;
+}
+.dashboard-error {
+  /* additional error state styles if needed */
+}
+.dashboard-empty {
+  /* additional empty state styles if needed */
+} 

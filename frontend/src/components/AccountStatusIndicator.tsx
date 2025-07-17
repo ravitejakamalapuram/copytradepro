@@ -68,40 +68,18 @@ const AccountStatusIndicator: React.FC<AccountStatusIndicatorProps> = ({
       title={`${account.brokerName} - ${statusInfo.text}${lastUpdate ? ` (Updated: ${lastUpdate.toLocaleTimeString()})` : ''}`}
     >
       <span 
-        className="status-dot"
-        style={{
-          backgroundColor: statusInfo.color,
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          display: 'inline-block',
-          marginRight: showDetails ? '0.5rem' : '0'
-        }}
+        className={`status-dot status-dot--${statusInfo.status}`}
       ></span>
       {showDetails && (
         <span 
-          className="status-text"
-          style={{
-            fontSize: '0.75rem',
-            fontWeight: '500',
-            color: statusInfo.color,
-            backgroundColor: statusInfo.bgColor,
-            padding: '0.125rem 0.375rem',
-            borderRadius: '0.25rem'
-          }}
+          className={`status-text status-text--${statusInfo.status}`}
         >
           {statusInfo.text}
         </span>
       )}
       {!connected && (
         <span 
-          className="connection-indicator"
-          style={{
-            marginLeft: '0.25rem',
-            color: '#f59e0b',
-            fontSize: '0.75rem'
-          }}
-          title="Real-time updates unavailable"
+          className="connection-indicator-warning"
         >
           ⚠️
         </span>

@@ -417,7 +417,7 @@ const CopyTradeLogin: React.FC = () => {
             onMouseEnter={(e) => {
               const isEnabled = !loading && email && password && (!isRegisterMode || (name && confirmPassword));
               if (isEnabled) {
-                e.currentTarget.style.backgroundColor = '#e67e22';
+                e.currentTarget.style.backgroundColor = 'var(--accent-color)';
               }
             }}
             onMouseLeave={(e) => {

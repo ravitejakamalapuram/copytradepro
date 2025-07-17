@@ -48,18 +48,23 @@ const RegisterForm: React.FC = () => {
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('🚨 Registration error:', error);
       
       // Set field-specific errors based on the error message
-      if (error.message?.includes('email already exists') || error.message?.includes('email is already registered')) {
-        setFieldError('email', 'This email is already registered. Please use a different email or try logging in.');
-      } else if (error.message?.includes('password')) {
-        setFieldError('password', error.message);
-      } else if (error.message?.includes('name')) {
-        setFieldError('name', error.message);
+      if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message: unknown }).message === 'string') {
+        const message = (error as { message: string }).message;
+        if (message.includes('email already exists') || message.includes('email is already registered')) {
+          setFieldError('email', 'This email is already registered. Please use a different email or try logging in.');
+        } else if (message.includes('password')) {
+          setFieldError('password', message);
+        } else if (message.includes('name')) {
+          setFieldError('name', message);
+        } else {
+          setFieldError('email', message || 'Registration failed. Please try again.');
+        }
       } else {
-        setFieldError('email', error.message || 'Registration failed. Please try again.');
+        setFieldError('email', 'Registration failed. Please try again.');
       }
 
       throw error;

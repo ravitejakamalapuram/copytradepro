@@ -1,70 +1,10 @@
-/* Kite-Inspired Trading Platform Theme */
+/* ==========================================================================
+   COPYTRADE PRO - UNIFIED THEME APPLICATION
+   Uses design system tokens for consistency
+   ========================================================================== */
 
-:root {
-  /* Kite Color Palette */
-  --kite-bg-primary: #1a1a1a;
-  --kite-bg-secondary: #2a2a2a;
-  --kite-bg-tertiary: #333333;
-  --kite-bg-card: #242424;
-  --kite-bg-hover: #2f2f2f;
-  
-  /* Text Colors */
-  --kite-text-primary: #ffffff;
-  --kite-text-secondary: #b3b3b3;
-  --kite-text-muted: #808080;
-  --kite-text-disabled: #666666;
-  
-  /* Brand Colors */
-  --kite-brand-primary: #387ed1;
-  --kite-brand-secondary: #4a90e2;
-  --kite-brand-accent: #5ba0f2;
-  --kite-primary: #387ed1;
-  --kite-primary-light: rgba(56, 126, 209, 0.1);
-  --kite-bg-primary-light: rgba(56, 126, 209, 0.05);
-  
-  /* Trading Colors */
-  --kite-profit: #00c896;
-  --kite-loss: #ff6b6b;
-  --kite-neutral: #ffa726;
-  --kite-profit-bg: rgba(0, 200, 150, 0.1);
-  --kite-loss-bg: rgba(255, 107, 107, 0.1);
-  
-  /* Border Colors */
-  --kite-border-primary: #404040;
-  --kite-border-secondary: #333333;
-  --kite-border-light: #555555;
-  --kite-border: #404040;
-  
-  /* Status Colors */
-  --kite-success: #00c896;
-  --kite-warning: #ffa726;
-  --kite-error: #ff6b6b;
-  --kite-info: #387ed1;
-  
-  /* Shadows */
-  --kite-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --kite-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
-  --kite-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
-  
-  /* Typography */
-  --kite-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --kite-font-mono: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
-  
-  /* Spacing */
-  --kite-space-xs: 0.25rem;
-  --kite-space-sm: 0.5rem;
-  --kite-space-md: 1rem;
-  --kite-space-lg: 1.5rem;
-  --kite-space-xl: 2rem;
-  
-  /* Border Radius */
-  --kite-radius-sm: 4px;
-  --kite-radius-md: 6px;
-  --kite-radius-lg: 8px;
-  
-  /* Transitions */
-  --kite-transition: all 0.2s ease;
-}
+/* Import unified design system - contains all tokens and legacy compatibility */
+@import './design-system.css';
 
 /* Global Kite Theme Styles */
 .kite-theme {

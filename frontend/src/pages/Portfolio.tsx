@@ -8,6 +8,7 @@ import SortControls from '../components/SortControls';
 import { portfolioService } from '../services/portfolioService';
 import type { PortfolioItem, SortField, SortOrder } from '../components/PortfolioTable';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
 
 // PortfolioItem interface is now imported from PortfolioTable component
 
@@ -101,9 +102,14 @@ const Portfolio: React.FC = () => {
           positionsPnL: 0
         });
       }
-    } catch (err: any) {
-      console.error('Failed to fetch portfolio data:', err);
-      setError(err.message || 'Failed to load portfolio data');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error('Failed to fetch portfolio data:', err);
+        setError(err.message || 'Failed to load portfolio data');
+      } else {
+        console.error('Failed to fetch portfolio data:', err);
+        setError('Failed to load portfolio data');
+      }
 
       // Set empty state on error
       setPortfolioItems([]);
@@ -230,12 +236,12 @@ const Portfolio: React.FC = () => {
             <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
               {error}
             </div>
-            <button 
-              className="kite-btn kite-btn-primary"
+            <Button 
+              variant="primary"
               onClick={fetchPortfolioData}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -262,20 +268,20 @@ const Portfolio: React.FC = () => {
             Portfolio
           </h1>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button
-              className="kite-btn kite-btn-primary"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={() => navigate('/trade-setup')}
-              style={{ fontSize: '11px', padding: '6px 12px' }}
             >
               + Buy/Sell
-            </button>
-            <button
-              className="kite-btn"
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={fetchPortfolioData}
-              style={{ fontSize: '11px', padding: '6px 12px' }}
             >
               🔄 Refresh
-            </button>
+            </Button>
           </div>
         </div>
 

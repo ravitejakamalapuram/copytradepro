@@ -239,14 +239,14 @@ class AdvancedOrderService {
 
   getStatusColor(status: string): string {
     const colors: Record<string, string> = {
-      'PENDING': '#f59e0b',
-      'ACTIVE': '#3b82f6',
-      'TRIGGERED': '#8b5cf6',
-      'EXECUTED': '#10b981',
-      'CANCELLED': '#6b7280',
-      'EXPIRED': '#ef4444'
+      'PENDING': 'var(--color-warning-500)',
+      'ACTIVE': 'var(--interactive-primary)',
+      'TRIGGERED': 'var(--color-accent)',
+      'EXECUTED': 'var(--color-profit)',
+      'CANCELLED': 'var(--color-neutral)',
+      'EXPIRED': 'var(--color-loss)'
     };
-    return colors[status] || '#6b7280';
+    return colors[status] || 'var(--color-neutral)';
   }
 
   getStatusDisplayName(status: string): string {

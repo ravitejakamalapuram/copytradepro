@@ -69,38 +69,25 @@ const AnimatedMarketCard: React.FC<AnimatedMarketCardProps> = ({
   };
 
   return (
-    <div 
-      className={`
-        market-index-card
-        ${isUpdating ? 'market-index-card--updating' : ''}
-        ${isFlashing ? 'animate-pulse' : ''}
-        p-4 bg-white rounded-lg border shadow-sm hover:shadow-md
-        transition-all duration-300 ease-in-out
-        ${className}
-      `}
+    <div
+      className={`market-index-card${isUpdating ? ' market-index-card--updating' : ''}${isFlashing ? ' animate-pulse' : ''} ${className}`}
     >
       {/* Header with name and trend icon */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm font-medium text-gray-600 truncate">
-          {index.name}
-        </div>
-        <div className={`trend-indicator ${getTrendClass()}`}>
-          {getTrendIcon()}
-        </div>
+      <div className="market-index-card__header">
+        <div className="market-index-card__name">{index.name}</div>
+        <div className={`market-index-card__trend ${getTrendClass()}`}>{getTrendIcon()}</div>
       </div>
-
       {/* Main value with animation */}
-      <div className="mb-2">
+      <div className="market-index-card__value">
         <AnimatedPrice
           value={index.value}
           size="lg"
           animate={true}
-          className="font-bold"
+          className="market-index-card__value-text"
         />
       </div>
-
       {/* Change values with animations */}
-      <div className="flex items-center justify-between text-sm">
+      <div className="market-index-card__changes">
         <AnimatedPrice
           value={Math.abs(index.change)}
           change={index.change}
@@ -117,32 +104,26 @@ const AnimatedMarketCard: React.FC<AnimatedMarketCardProps> = ({
           currency=""
         />
       </div>
-
       {/* Progress bar for change percentage */}
       <div className="mt-3">
         <div className="w-full bg-gray-200 rounded-full h-1">
-          <div 
-            className={`
-              h-1 rounded-full transition-all duration-500 ease-out
-              ${index.changePercent >= 0 ? 'bg-green-500' : 'bg-red-500'}
-            `}
-            style={{ 
-              width: `${Math.min(Math.abs(index.changePercent) * 10, 100)}%` 
-            }}
+          <div
+            className={`market-index-card__progress-bar ${index.changePercent >= 0 ? 'pnl-positive' : 'pnl-negative'}`}
+            style={{
+              ...({ ['--progress-width']: `${Math.min(Math.abs(index.changePercent) * 10, 100)}%` } as Record<string, string>),
+            } as React.CSSProperties}
           />
         </div>
       </div>
-
       {/* Last updated indicator */}
-      <div className="mt-2 text-xs text-gray-400 flex items-center justify-between">
+      <div className="market-index-card__updated">
         <span>Updated</span>
         <span>{new Date(index.lastUpdated).toLocaleTimeString()}</span>
       </div>
-
       {/* Live update indicator */}
       {isUpdating && (
-        <div className="absolute top-2 right-2">
-          <div className="w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+        <div className="market-index-card__live">
+          <div className="market-index-card__live-dot" />
         </div>
       )}
     </div>

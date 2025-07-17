@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button'; // Added import for Button
 
 interface Position {
   symbol: string;
@@ -130,12 +131,12 @@ const Positions: React.FC = () => {
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
             <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -152,15 +153,15 @@ const Positions: React.FC = () => {
           <div className="kite-card-header">
             <h2 className="kite-card-title">Positions ({positions.length})</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button className="kite-btn kite-btn-primary">
+              <Button variant="primary">
                 + New Position
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="secondary">
                 📊 Analytics
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="outline">
                 📥 Export
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -286,24 +287,18 @@ const Positions: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button 
-                            className="kite-btn kite-btn-success"
-                            style={{ 
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem'
-                            }}
+                          <Button 
+                            variant="success"
+                            size="sm"
                           >
                             {position.qty > 0 ? 'Sell' : 'Buy'}
-                          </button>
-                          <button 
-                            className="kite-btn"
-                            style={{ 
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem'
-                            }}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm"
                           >
                             Exit
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -320,13 +315,12 @@ const Positions: React.FC = () => {
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
               <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No positions today</div>
               <div style={{ fontSize: '0.875rem' }}>Start trading to see your positions here</div>
-              <button
-                className="kite-btn kite-btn-primary"
-                style={{ marginTop: '1rem' }}
+              <Button
+                variant="primary"
                 onClick={() => navigate('/trade-setup')}
               >
                 Place Order
-              </button>
+              </Button>
             </div>
           )}
         </div>

@@ -115,6 +115,16 @@
   margin-top: 1px;
 }
 
+.pnl-positive {
+  color: var(--color-profit);
+}
+.pnl-negative {
+  color: var(--color-loss);
+}
+.pnl-neutral {
+  color: var(--text-secondary);
+}
+
 /* Empty State */
 .portfolio-table__empty {
   text-align: center;

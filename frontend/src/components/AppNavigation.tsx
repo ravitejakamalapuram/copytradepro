@@ -6,6 +6,7 @@ import { marketDataService, type MarketIndex } from '../services/marketDataServi
 import { portfolioService } from '../services/portfolioService';
 import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
+import Button from './ui/Button';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -112,79 +113,49 @@ const AppNavigation: React.FC = () => {
         <div className="kite-nav-content">
           {/* Logo */}
           <div className="kite-logo">
-            <span style={{ color: '#387ed1' }}>📈</span>
+            <span className="logo-icon">📈</span>
             <span>CopyTrade Pro</span>
           </div>
 
           {/* Main Navigation */}
           <div className="kite-nav-links">
             {navItems.map((item) => (
-              <button
+              <Button
                 key={item.path}
+                variant="ghost"
                 className={`kite-nav-link ${location.pathname === item.path ? 'active' : ''}`}
                 onClick={() => navigate(item.path)}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* User Menu */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="nav-user-menu">
             {/* Market Status */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.75rem',
-              color: 'var(--kite-text-secondary)'
-            }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}></div>
+            <div className="market-status-indicator">
+              <div className="status-dot" style={{ backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)' }}></div>
               {marketStatus?.status || 'Market Status Unknown'}
             </div>
 
             {/* User Info */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px',
-              borderRadius: 'var(--kite-radius-md)',
-              backgroundColor: 'var(--kite-bg-tertiary)'
-            }}>
+            <div className="user-info-container">
               <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  color: 'var(--kite-text-primary)',
-                  lineHeight: '1.2'
-                }}>
+                <div className="user-name">
                   {user?.name || 'Kamalapuram'}
                 </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'var(--kite-text-secondary)',
-                  lineHeight: '1.2'
-                }}>
+                <div className="user-email text-muted">
                 </div>
               </div>
-              <button
-                className="kite-btn"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleLogout}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '10px',
-                  minHeight: 'auto'
-                }}
               >
                 Logout
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -199,52 +170,27 @@ const AppNavigation: React.FC = () => {
             {watchlistItems.map((item, index) => (
               <div
                 key={index}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.5rem',
-                  borderRadius: 'var(--kite-radius-sm)',
-                  cursor: 'pointer',
-                  transition: 'var(--kite-transition)',
-                  fontSize: '0.875rem'
-                }}
+                className="watchlist-item"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--kite-bg-hover)';
+                  e.currentTarget.classList.add('bg-hover');
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.classList.remove('bg-hover');
                 }}
               >
                 <div>
-                  <div style={{ 
-                    fontWeight: '500',
-                    color: 'var(--kite-text-primary)',
-                    fontSize: '0.75rem'
-                  }}>
+                  <div className="text-primary" style={{ fontSize: '0.75rem' }}>
                     {item.symbol}
                   </div>
-                  <div style={{ 
-                    fontSize: '0.875rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: 'var(--kite-text-primary)'
-                  }}>
+                  <div className="text-primary" style={{ fontSize: '0.875rem' }}>
                     {item.ltp.toFixed(2)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ 
-                    fontSize: '0.75rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: item.change >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                  }}>
+                  <div className={item.change >= 0 ? 'pnl-positive' : 'pnl-negative'} style={{ fontSize: '0.75rem' }}>
                     {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}
                   </div>
-                  <div style={{ 
-                    fontSize: '0.75rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: item.changePercent >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                  }}>
+                  <div className={item.changePercent >= 0 ? 'pnl-positive' : 'pnl-negative'} style={{ fontSize: '0.75rem' }}>
                     ({item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%)
                   </div>
                 </div>
@@ -254,16 +200,7 @@ const AppNavigation: React.FC = () => {
 
           {/* Live Data Indicator */}
           {lastUpdated && (
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'var(--kite-text-secondary)',
-              textAlign: 'center',
-              marginTop: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.25rem'
-            }}>
+            <div className="live-data-indicator">
               <span style={{
                 width: '6px',
                 height: '6px',
@@ -283,39 +220,21 @@ const AppNavigation: React.FC = () => {
         <div className="kite-sidebar-section">
           <div className="kite-sidebar-title">Portfolio</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Total Value
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: 'var(--kite-text-primary)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Total Value</span>
+              <span className="text-primary">
                 ₹{(portfolioSummary?.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Day's P&L
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: (portfolioSummary?.dayPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Day's P&L</span>
+              <span className={`text-primary ${portfolioSummary?.dayPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                 {(portfolioSummary?.dayPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.dayPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.dayPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.dayPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Total P&L
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: (portfolioSummary?.totalPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Total P&L</span>
+              <span className={`text-primary ${portfolioSummary?.totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                 {(portfolioSummary?.totalPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.totalPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.totalPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.totalPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
@@ -326,27 +245,24 @@ const AppNavigation: React.FC = () => {
         <div className="kite-sidebar-section">
           <div className="kite-sidebar-title">Quick Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button 
+            <Button 
               className="kite-btn kite-btn-primary"
-              style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => navigate('/trade-setup')}
             >
               Place Order
-            </button>
-            <button 
+            </Button>
+            <Button 
               className="kite-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => navigate('/advanced-orders')}
             >
               Advanced Orders
-            </button>
-            <button 
+            </Button>
+            <Button 
               className="kite-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => navigate('/portfolio')}
             >
               View Analytics
-            </button>
+            </Button>
           </div>
         </div>
       </div>

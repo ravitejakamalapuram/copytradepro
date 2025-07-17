@@ -272,8 +272,8 @@
   .skeleton-account-list__item,
   .skeleton-page__header,
   .skeleton-page__sidebar {
-    background: #1f2937;
-    border-color: #374151;
+    background: var(--bg-secondary);
+    border-color: var(--border-primary);
   }
   
   .skeleton-table__header {
@@ -281,15 +281,15 @@
   }
   
   .skeleton-table__row {
-    border-bottom-color: #4b5563;
+    border-bottom-color: var(--border-secondary);
   }
   
   .skeleton-form__actions {
-    border-top-color: #4b5563;
+    border-top-color: var(--border-secondary);
   }
   
   .skeleton-trade-history__meta {
-    border-top-color: #4b5563;
+    border-top-color: var(--border-secondary);
   }
   
   .skeleton-page {

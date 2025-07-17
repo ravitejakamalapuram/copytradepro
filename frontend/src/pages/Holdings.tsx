@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
 
 interface Holding {
   symbol: string;
@@ -130,12 +131,12 @@ const Holdings: React.FC = () => {
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
             <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -152,12 +153,12 @@ const Holdings: React.FC = () => {
           <div className="kite-card-header">
             <h2 className="kite-card-title">Holdings ({holdings.length})</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button className="kite-btn">
+              <Button variant="primary">
                 📊 Analytics
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="outline">
                 📥 Download
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -219,7 +220,7 @@ const Holdings: React.FC = () => {
                 fontFamily: 'var(--kite-font-mono)',
                 color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
               </div>
             </div>
             <div>
@@ -236,7 +237,7 @@ const Holdings: React.FC = () => {
                 fontFamily: 'var(--kite-font-mono)',
                 color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
               }}>
-                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
               </div>
             </div>
           </div>

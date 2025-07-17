@@ -4,6 +4,7 @@ import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button'; // Added import for Button
 
 interface Order {
   id: string;
@@ -324,7 +325,7 @@ const Orders: React.FC = () => {
         setOrders(prevOrders =>
           prevOrders.map(order =>
             order.id === orderId
-              ? { ...order, status: currentStatus.toUpperCase() as any }
+              ? { ...order, status: currentStatus.toUpperCase() as unknown as Order['status'] }
               : order
           )
         );
@@ -379,12 +380,12 @@ const Orders: React.FC = () => {
           <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
             <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -411,57 +412,42 @@ const Orders: React.FC = () => {
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Date:</span>
                   {(['today', 'week', 'month', 'all'] as const).map((filter) => (
-                    <button
+                    <Button
                       key={filter}
-                      className={`kite-btn ${dateFilter === filter ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                      variant={dateFilter === filter ? 'primary' : 'secondary'}
                       onClick={() => {
                         setDateFilter(filter);
                         setShowDatePicker(false);
                         setCustomStartDate('');
                         setCustomEndDate('');
                       }}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        textTransform: 'capitalize'
-                      }}
+                      size="sm"
                     >
                       {filter === 'today' ? 'Today' :
                        filter === 'week' ? 'Week' :
                        filter === 'month' ? 'Month' : 'All'}
-                    </button>
+                    </Button>
                   ))}
-                  <button
-                    className={`kite-btn ${showDatePicker ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                  <Button
+                    variant={showDatePicker ? 'primary' : 'secondary'}
                     onClick={() => setShowDatePicker(!showDatePicker)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem'
-                    }}
+                    size="sm"
                   >
                     📅 Custom
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Account Filter Checkboxes */}
                 <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
                   <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Account:</span>
-                  <button
-                    className="kite-btn kite-btn-secondary"
+                  <Button
+                    variant="secondary"
                     onClick={() => setShowAccountFilter(!showAccountFilter)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      minWidth: '140px',
-                      textAlign: 'left',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
+                    size="sm"
                   >
-                    <span>{getSelectedAccountsText()}</span>
+                    {getSelectedAccountsText()}
                     <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
-                  </button>
+                  </Button>
 
                   {/* Account Filter Dropdown */}
                   {showAccountFilter && (
@@ -577,8 +563,8 @@ const Orders: React.FC = () => {
                       fontSize: '0.875rem'
                     }}
                   />
-                  <button
-                    className="kite-btn kite-btn-primary"
+                  <Button
+                    variant="primary"
                     onClick={() => {
                       if (customStartDate && customEndDate) {
                         setDateFilter('today'); // Reset to trigger useEffect
@@ -586,13 +572,10 @@ const Orders: React.FC = () => {
                       }
                     }}
                     disabled={!customStartDate || !customEndDate}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem'
-                    }}
+                    size="sm"
                   >
                     Apply
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -623,29 +606,21 @@ const Orders: React.FC = () => {
               )}
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button
-                className="kite-btn kite-btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={fetchOrders}
                 disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
+                size="sm"
               >
                 🔄 {loading ? 'Loading...' : 'Refresh'}
-              </button>
-              <button
-                className="kite-btn kite-btn-primary"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => navigate('/trade-setup')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
+                size="sm"
               >
                 + Place Order
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -662,10 +637,10 @@ const Orders: React.FC = () => {
               { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
               { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
             ].map(tab => (
-              <button
+              <Button
                 key={tab.key}
-                className={`kite-btn ${activeTab === tab.key ? 'kite-btn-primary' : ''}`}
-                onClick={() => setActiveTab(tab.key as any)}
+                variant={activeTab === tab.key ? 'primary' : ''}
+                onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed')}
                 style={{ 
                   display: 'flex',
                   alignItems: 'center',
@@ -682,7 +657,7 @@ const Orders: React.FC = () => {
                 }}>
                   {tab.count}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -720,7 +695,7 @@ const Orders: React.FC = () => {
                             <span style={{
                               fontSize: '0.625rem',
                               padding: '0.125rem 0.375rem',
-                              backgroundColor: order.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
+                              backgroundColor: order.exchange === 'NSE' ? 'var(--exchange-nse)' : 'var(--exchange-other)',
                               color: 'white',
                               borderRadius: '0.25rem',
                               fontWeight: '600',
@@ -791,16 +766,8 @@ const Orders: React.FC = () => {
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {/* Check Status button - available for all orders */}
-                          <button
-                            className="kite-btn"
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              opacity: checkingStatus.has(order.id) ? 0.6 : 1
-                            }}
+                          <Button
+                            variant="outline"
                             onClick={() => handleCheckOrderStatus(order.id)}
                             disabled={checkingStatus.has(order.id)}
                             title="Check current order status from broker"
@@ -821,42 +788,30 @@ const Orders: React.FC = () => {
                             ) : (
                               <>🔄 Check</>
                             )}
-                          </button>
+                          </Button>
 
                           {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
-                              <button
-                                className="kite-btn"
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  fontSize: '0.75rem'
-                                }}
+                              <Button
+                                variant="outline"
                                 onClick={() => handleModifyOrder(order.id)}
                               >
                                 Modify
-                              </button>
-                              <button
-                                className="kite-btn kite-btn-danger"
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  fontSize: '0.75rem'
-                                }}
+                              </Button>
+                              <Button
+                                variant="danger"
                                 onClick={() => handleCancelOrder(order.id)}
                               >
                                 Cancel
-                              </button>
+                              </Button>
                             </>
                           )}
                           {order.status === 'EXECUTED' && (
-                            <button
-                              className="kite-btn"
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '0.75rem'
-                              }}
+                            <Button
+                              variant="outline"
                             >
                               View
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -881,13 +836,13 @@ const Orders: React.FC = () => {
                   : `No ${activeTab} orders found`
                 }
               </div>
-              <button
-                className="kite-btn kite-btn-primary"
+              <Button
+                variant="primary"
                 style={{ marginTop: '1rem' }}
                 onClick={() => navigate('/trade-setup')}
               >
                 Place Order
-              </button>
+              </Button>
             </div>
           )}
         </div>

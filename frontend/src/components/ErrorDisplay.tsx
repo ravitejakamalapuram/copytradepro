@@ -4,7 +4,7 @@ import type { UserFriendlyError } from '../utils/errorMessages';
 import './ErrorDisplay.css';
 
 interface ErrorDisplayProps {
-  error: any;
+  error: unknown;
   context?: string;
   onRetry?: () => void;
   onAction?: () => void;
@@ -110,7 +110,7 @@ const ErrorDisplay: React.FC<ErrorDisplayProps> = ({
 
 // Compact error display for inline use
 export const InlineErrorDisplay: React.FC<{
-  error: any;
+  error: unknown;
   context?: string;
   className?: string;
 }> = ({ error, context, className = '' }) => {
@@ -132,7 +132,7 @@ export const InlineErrorDisplay: React.FC<{
 
 // Toast-style error notification
 export const ErrorToast: React.FC<{
-  error: any;
+  error: unknown;
   context?: string;
   onClose: () => void;
   autoClose?: boolean;

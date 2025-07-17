@@ -8,7 +8,13 @@ import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
 import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
+import Button from '../components/ui/Button';
 import '../styles/app-theme.css';
+
+type OrderType = 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+type Product = 'CNC' | 'MIS' | 'NRML';
+type SymbolSearchResult = { symbol: string; exchange: string };
+type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
   symbol: string;
@@ -16,8 +22,8 @@ interface OrderForm {
   action: 'BUY' | 'SELL';
   quantity: string;
   price: string;
-  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  product: 'CNC' | 'MIS' | 'NRML';
+  orderType: OrderType;
+  product: Product;
   validity: 'DAY' | 'IOC';
   triggerPrice: string;
   selectedAccounts: string[]; // Changed from single brokerAccount to array of selected account IDs
@@ -76,7 +82,7 @@ const TradeSetup: React.FC = () => {
           }));
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to fetch accounts:', error);
         setError('Failed to load broker accounts');
       } finally {
@@ -98,7 +104,7 @@ const TradeSetup: React.FC = () => {
             parseFloat(orderForm.price)
           );
           setMarginInfo(margin);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to calculate margin:', error);
         }
       }
@@ -153,7 +159,7 @@ const TradeSetup: React.FC = () => {
             if (transformedResults.length === 0) {
               console.log('❌ Frontend: No results found for:', searchTerm);
             }
-          } catch (error: any) {
+          } catch (error: unknown) {
             console.error('❌ Frontend: Symbol search failed:', error);
 
             // Always show empty results on error
@@ -168,15 +174,24 @@ const TradeSetup: React.FC = () => {
     []
   );
 
-  const handleSymbolSelect = (selectedSymbol: any) => {
-    setOrderForm(prev => ({
-      ...prev,
-      symbol: selectedSymbol.symbol,
-      exchange: selectedSymbol.exchange,
-      // Don't set price from search results - user will enter manually or fetch separately
-      price: prev.price // Keep existing price
-    }));
-    setShowSearchResults(false);
+  const handleSymbolSelect = (selectedSymbol: unknown) => {
+    if (
+      typeof selectedSymbol === 'object' &&
+      selectedSymbol !== null &&
+      'symbol' in selectedSymbol &&
+      'exchange' in selectedSymbol &&
+      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string' &&
+      ((selectedSymbol as { exchange: unknown }).exchange === 'NSE' || (selectedSymbol as { exchange: unknown }).exchange === 'BSE')
+    ) {
+      const { symbol, exchange } = selectedSymbol as SymbolSearchResult & { exchange: 'NSE' | 'BSE' };
+      setOrderForm(prev => ({
+        ...prev,
+        symbol,
+        exchange,
+        price: prev.price
+      }));
+      setShowSearchResults(false);
+    }
   };
 
   const handleAccountSelection = (accountId: string, checked: boolean) => {
@@ -269,16 +284,15 @@ const TradeSetup: React.FC = () => {
         }));
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Order placement failed:', error);
-      setError(error.message || 'Failed to place orders');
+      setError((error as Error).message || 'Failed to place orders');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleRetryFailedOrders = async (failedResults: any[]) => {
-    // Extract account IDs from failed results and retry the order
+  const handleRetryFailedOrders = async (failedResults: FailedOrderResult[]) => {
     const failedAccountIds = failedResults.map(result => result.accountId);
     
     // Update the form to only select failed accounts
@@ -343,12 +357,11 @@ const TradeSetup: React.FC = () => {
             <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
               Connect and activate a broker account to start trading
             </div>
-            <button 
-              className="kite-btn kite-btn-primary"
+            <Button 
               onClick={() => navigate('/account-setup')}
             >
               Connect Broker Account
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -365,18 +378,16 @@ const TradeSetup: React.FC = () => {
           <div className="kite-card-header">
             <h1 className="kite-card-title">Place Order</h1>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
+              <Button
                 onClick={() => navigate('/orders')}
               >
                 📋 View Orders
-              </button>
-              <button 
-                className="kite-btn"
+              </Button>
+              <Button
                 onClick={() => navigate('/positions')}
               >
                 🎯 Positions
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -388,8 +399,7 @@ const TradeSetup: React.FC = () => {
             <div className="kite-card-header">
               <h2 className="kite-card-title">Order Details</h2>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  className={`kite-btn ${orderForm.action === 'BUY' ? 'kite-btn-primary' : ''}`}
+                <Button
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
                   style={{
                     backgroundColor: orderForm.action === 'BUY' ? 'var(--kite-profit)' : undefined,
@@ -397,9 +407,8 @@ const TradeSetup: React.FC = () => {
                   }}
                 >
                   BUY
-                </button>
-                <button
-                  className={`kite-btn ${orderForm.action === 'SELL' ? 'kite-btn-danger' : ''}`}
+                </Button>
+                <Button
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
                   style={{
                     backgroundColor: orderForm.action === 'SELL' ? 'var(--kite-loss)' : undefined,
@@ -407,7 +416,7 @@ const TradeSetup: React.FC = () => {
                   }}
                 >
                   SELL
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -521,7 +530,7 @@ const TradeSetup: React.FC = () => {
                   </label>
                   <select
                     value={orderForm.orderType}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as any }))}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as OrderType }))}
                     className="kite-input"
                     style={{ fontSize: '1rem' }}
                   >
@@ -538,7 +547,7 @@ const TradeSetup: React.FC = () => {
                   </label>
                   <select
                     value={orderForm.product}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as any }))}
+                    onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as Product }))}
                     className="kite-input"
                     style={{ fontSize: '1rem' }}
                   >
@@ -567,251 +576,215 @@ const TradeSetup: React.FC = () => {
                 </div>
               )}
 
-              {/* Broker Account Selection */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                    Select Trading Accounts ({orderForm.selectedAccounts.length} selected)
-                  </label>
-                  {connectedAccounts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={handleSelectAllAccounts}
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--kite-primary)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  )}
-                </div>
-                <div style={{
-                  border: '1px solid var(--kite-border)',
-                  borderRadius: 'var(--kite-radius-md)',
-                  padding: '1rem',
-                  backgroundColor: 'var(--kite-bg-primary)',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}>
-                  {connectedAccounts.length === 0 ? (
-                    <div style={{
-                      color: 'var(--kite-text-secondary)',
-                      fontSize: '0.875rem',
-                      textAlign: 'center',
-                      padding: '1rem'
-                    }}>
-                      No active accounts found. Please activate at least one broker account.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                      {connectedAccounts.map(account => {
-                        console.log('🔍 DEBUG: Rendering account:', account);
-                        return (
-                          <div
-                            key={account.id}
-                            style={{
-                              padding: '0.75rem',
-                              border: orderForm.selectedAccounts.includes(account.id)
-                                ? '2px solid var(--color-primary-500)'
-                                : '1px solid var(--border-primary)',
-                              borderRadius: 'var(--radius-sm)',
-                              backgroundColor: orderForm.selectedAccounts.includes(account.id)
-                                ? 'var(--bg-secondary)'
-                                : 'var(--bg-surface)',
-                              transition: 'all 0.2s ease',
-                              minHeight: '60px' // Ensure minimum height for debugging
-                            }}
-                          >
-                            <Checkbox
-                              checked={orderForm.selectedAccounts.includes(account.id)}
-                              onChange={(checked) => handleAccountSelection(account.id, checked)}
-                              label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
-                              size="base"
-                            />
-                            {/* Debug info */}
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '0.25rem' }}>
-                              ID: {account.id} | User: {account.userName || 'N/A'} | Account: {account.accountId || 'N/A'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                {orderForm.selectedAccounts.length === 0 && (
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--kite-loss)',
-                    marginTop: '0.25rem'
-                  }}>
-                    Please select at least one account to place orders
-                  </div>
-                )}
-              </div>
-
               {/* Error Display */}
               {error && (
-                <div style={{
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--kite-bg-danger)',
-                  border: '1px solid var(--kite-loss)',
-                  borderRadius: 'var(--kite-radius-md)',
-                  color: 'var(--kite-loss)',
-                  fontSize: '0.875rem'
-                }}>
+                <div className="kite-alert kite-alert-error">
                   {error}
                 </div>
               )}
+            </div>
 
-              {/* Place Order Button */}
-              <button
-                className="kite-btn kite-btn-primary"
+            {/* Action Bar */}
+            <div className="kite-action-bar">
+              <Button
                 onClick={handlePlaceOrder}
                 disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
-                style={{
-                  width: '100%',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  padding: '0.75rem'
-                }}
+                style={{ width: '100%', justifyContent: 'center', fontSize: '1rem', padding: '0.75rem' }}
               >
                 {submitting
                   ? `Placing Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
                   : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
                 }
-              </button>
+              </Button>
+              {connectedAccounts.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="account-select-toggle"
+                  onClick={handleSelectAllAccounts}
+                  style={{ width: '100%', justifyContent: 'center', fontSize: '1rem', padding: '0.75rem' }}
+                >
+                  {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              )}
             </div>
           </div>
 
-          {/* Order Summary & Margin Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Order Summary */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Order Summary</h3>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                {orderForm.symbol ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Exchange:</span>
-                      <span style={{
-                        fontWeight: '500',
-                        fontSize: '0.75rem',
-                        padding: '0.125rem 0.5rem',
-                        backgroundColor: orderForm.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
-                        color: 'white',
-                        borderRadius: '0.25rem',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {orderForm.exchange}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
-                      <span style={{
-                        fontWeight: '500',
-                        color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                      }}>
-                        {orderForm.action}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
-                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                        {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
-                      </span>
-                    </div>
-                    {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--kite-text-secondary)' }}>Trigger Price:</span>
-                        <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                          ₹{orderForm.triggerPrice || '0.00'}
-                        </span>
+          {/* Broker Account Selection - OUTSIDE the order form card */}
+          <div className="kite-card account-selection-section" style={{ margin: '2rem 0' }}>
+            <div className="kite-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="kite-card-title">Select Trading Accounts ({orderForm.selectedAccounts.length} selected)</span>
+              {connectedAccounts.length > 1 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="account-select-toggle"
+                  onClick={handleSelectAllAccounts}
+                >
+                  {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
+                </Button>
+              )}
+            </div>
+            <div className="account-selection">
+              {connectedAccounts.length === 0 ? (
+                <div className="no-accounts">
+                  No active accounts found. Please activate at least one broker account.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {connectedAccounts.map(account => (
+                    <div
+                      key={account.id}
+                      className={`account-card${orderForm.selectedAccounts.includes(account.id) ? ' selected' : ''}`}
+                    >
+                      <div className="account-info">
+                        <Checkbox
+                          checked={orderForm.selectedAccounts.includes(account.id)}
+                          onChange={(checked) => handleAccountSelection(account.id, checked)}
+                          label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
+                          size="base"
+                        />
                       </div>
-                    )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
+                      <div className="account-meta">
+                        ID: {account.id} | User: {account.userName || 'N/A'} | Account: {account.accountId || 'N/A'}
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
-                    </div>
-                    {orderForm.quantity && orderForm.price && (
-                      <>
-                        <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
-                          <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
-                            ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
-                          </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
-                    <div>Enter order details to see summary</div>
+                  ))}
+                </div>
+              )}
+              {orderForm.selectedAccounts.length === 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--kite-loss)', marginTop: '0.25rem' }}>
+                  Please select at least one account to place orders
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Order Summary & Margin Info */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Order Summary */}
+        <div className="kite-card">
+          <div className="kite-card-header">
+            <h3 className="kite-card-title">Order Summary</h3>
+          </div>
+          <div style={{ padding: '1rem' }}>
+            {orderForm.symbol ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
+                  <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Exchange:</span>
+                  <span style={{
+                    fontWeight: '500',
+                    fontSize: '0.75rem',
+                    padding: '0.125rem 0.5rem',
+                    backgroundColor: orderForm.exchange === 'NSE' ? 'var(--exchange-nse)' : 'var(--exchange-other)',
+                    color: 'white',
+                    borderRadius: '0.25rem',
+                    letterSpacing: '0.5px'
+                  }}>
+                    {orderForm.exchange}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
+                  <span style={{
+                    fontWeight: '500',
+                    color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                  }}>
+                    {orderForm.action}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
+                  <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
+                  <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                    {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
+                  </span>
+                </div>
+                {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: 'var(--kite-text-secondary)' }}>Trigger Price:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                      ₹{orderForm.triggerPrice || '0.00'}
+                    </span>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* Margin Information */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Margin Info</h3>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
-                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                      ₹{formatCurrency(marginInfo.required)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
-                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                      ₹{formatCurrency(marginInfo.available)}
-                    </span>
-                  </div>
-                  {marginInfo.shortfall > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
+                  <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
+                  <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
+                </div>
+                {orderForm.quantity && orderForm.price && (
+                  <>
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
-                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
-                        ₹{formatCurrency(marginInfo.shortfall)}
+                      <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
+                      <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
+                        ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
                       </span>
                     </div>
-                  )}
-
-                  {marginInfo.shortfall > 0 && (
-                    <button
-                      className="kite-btn kite-btn-primary"
-                      onClick={() => navigate('/funds')}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-                    >
-                      Add Funds
-                    </button>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
+                <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
+                <div>Enter order details to see summary</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Margin Information */}
+        <div className="kite-card">
+          <div className="kite-card-header">
+            <h3 className="kite-card-title">Margin Info</h3>
+          </div>
+          <div style={{ padding: '1rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
+                <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                  ₹{formatCurrency(marginInfo.required)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
+                <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                  ₹{formatCurrency(marginInfo.available)}
+                </span>
+              </div>
+              {marginInfo.shortfall > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
+                  <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
+                    ₹{formatCurrency(marginInfo.shortfall)}
+                  </span>
+                </div>
+              )}
+
+              {marginInfo.shortfall > 0 && (
+                <Button
+                  className="kite-btn kite-btn-primary"
+                  onClick={() => navigate('/funds')}
+                  style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
+                >
+                  Add Funds
+                </Button>
+              )}
             </div>
           </div>
         </div>

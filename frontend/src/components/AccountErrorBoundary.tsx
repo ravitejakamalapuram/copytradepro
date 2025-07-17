@@ -21,7 +21,7 @@ const AccountFallback: React.FC = () => (
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            style={{ color: '#ffc107' }}
+            style={{ color: 'var(--color-warning-500)' }}
           >
             <path d="M12 2L2 7l10 5 10-5-10-5z" />
             <path d="M2 17l10 5 10-5" />
