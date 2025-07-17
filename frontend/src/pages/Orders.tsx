@@ -4,7 +4,8 @@ import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
-import Button from '../components/ui/Button'; // Added import for Button
+import Button from '../components/ui/Button';
+import { useToast } from '../components/Toast'; // Added import for Button
 
 interface Order {
   id: string;
@@ -31,6 +32,7 @@ interface Order {
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed'>('all');
   const [loading, setLoading] = useState(true);
@@ -38,6 +40,8 @@ const Orders: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
@@ -304,6 +308,8 @@ const Orders: React.FC = () => {
     }
   };
 
+
+
   const handleCheckOrderStatus = async (orderId: string) => {
     try {
       // Add to checking set to show loading state
@@ -331,16 +337,36 @@ const Orders: React.FC = () => {
         );
 
         console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+
+        if (statusChanged) {
+          showToast({
+            type: 'success',
+            title: 'Status Updated',
+            message: `Order status changed from ${previousStatus} to ${currentStatus}`
+          });
+        } else {
+          showToast({
+            type: 'info',
+            title: 'Status Checked',
+            message: `Order status confirmed: ${currentStatus}`
+          });
+        }
       } else {
-        setStatusMessage(`Failed to check status: ${response.message}`);
-        setTimeout(() => setStatusMessage(null), 5000);
+        showToast({
+          type: 'error',
+          title: 'Status Check Failed',
+          message: response.message || 'Failed to check order status.'
+        });
         console.error('Failed to check order status:', response.message);
       }
 
     } catch (error: any) {
       console.error('Failed to check order status:', error);
-      setStatusMessage('Failed to check order status. Please try again.');
-      setTimeout(() => setStatusMessage(null), 5000);
+      showToast({
+        type: 'error',
+        title: 'Status Check Error',
+        message: error.message || 'Failed to check order status.'
+      });
     } finally {
       // Remove from checking set
       setCheckingStatus(prev => {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Card from './ui/Card';
 import Badge from './ui/Badge';
 import Button from './ui/Button';
@@ -117,16 +117,44 @@ const OrderResultDisplay: React.FC<OrderResultDisplayProps> = ({
     }
   };
 
+  // Handle keyboard events for modal
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  // Handle overlay click to close modal
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget && onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <div className={`order-result-display ${className}`}>
-      <Card className="order-result-card">
+    <div
+      className="order-result-overlay"
+      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="order-result-title"
+    >
+      <div className={`order-result-display ${className}`}>
+        <Card className="order-result-card">
         {/* Header */}
         <div className="order-result-header">
           <div className="order-result-title">
             <span className="status-icon">
               {getStatusIcon(getOverallStatus())}
             </span>
-            <h3>Order Placement Results</h3>
+            <h3 id="order-result-title">Order Placement Results</h3>
             {onClose && (
               <button 
                 className="close-button"
@@ -339,6 +367,7 @@ const OrderResultDisplay: React.FC<OrderResultDisplayProps> = ({
           )}
         </div>
       </Card>
+      </div>
     </div>
   );
 };
