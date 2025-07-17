@@ -243,6 +243,19 @@ const AppContent: React.FC = () => {
   );
 };
 
+// Conditional wrapper that only provides AccountStatusProvider when authenticated
+const ConditionalAccountStatusProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+
+  // Only provide account status context when user is authenticated
+  if (isAuthenticated) {
+    return <AccountStatusProvider>{children}</AccountStatusProvider>;
+  }
+
+  // For unauthenticated users (login page), don't fetch accounts
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
   // Initialize memory monitoring and leak detection
   useEffect(() => {
@@ -306,7 +319,7 @@ const App: React.FC = () => {
     <Router>
       <ToastProvider>
         <AuthProvider>
-          <AccountStatusProvider>
+          <ConditionalAccountStatusProvider>
             <ErrorBoundary>
               <ConnectionStatus />
               <NavigationErrorBoundary>
@@ -314,7 +327,7 @@ const App: React.FC = () => {
               </NavigationErrorBoundary>
               <NotificationDisplay position="top-right" />
             </ErrorBoundary>
-          </AccountStatusProvider>
+          </ConditionalAccountStatusProvider>
         </AuthProvider>
       </ToastProvider>
     </Router>

@@ -154,7 +154,7 @@ router.get('/symbols', authenticateToken, async (req: any, res: any) => {
       });
     }
 
-    const symbolPerformance = portfolioAnalyticsService.getSymbolPerformance(userId);
+    const symbolPerformance = await portfolioAnalyticsService.getSymbolPerformance(userId);
 
     return res.json({
       success: true,
@@ -239,9 +239,9 @@ router.get('/analytics', authenticateToken, async (req: any, res: any) => {
 
     // For now, return basic analytics
     // In a full implementation, you'd filter by date range
-    const metrics = portfolioAnalyticsService.calculatePortfolioMetrics(userId);
-    const tradingStats = portfolioAnalyticsService.calculateTradingStats(userId);
-    const symbolPerformance = portfolioAnalyticsService.getSymbolPerformance(userId);
+    const metrics = await portfolioAnalyticsService.calculatePortfolioMetrics(userId);
+    const tradingStats = await portfolioAnalyticsService.calculateTradingStats(userId);
+    const symbolPerformance = await portfolioAnalyticsService.getSymbolPerformance(userId);
 
     return res.json({
       success: true,

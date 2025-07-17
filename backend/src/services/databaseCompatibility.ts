@@ -7,13 +7,12 @@ import { IDatabaseAdapter } from '../interfaces/IDatabaseAdapter';
  */
 class DatabaseCompatibilityLayer {
   private database: IDatabaseAdapter | null = null;
-  private dbType: string = 'sqlite'; // Default to sqlite
+  private dbType: string = 'mongodb'; // Always MongoDB now
 
   private async getDb(): Promise<IDatabaseAdapter> {
     if (!this.database) {
       this.database = await getDatabase();
-      // Determine database type based on the adapter instance
-      this.dbType = this.database.constructor.name.toLowerCase().includes('mongo') ? 'mongodb' : 'sqlite';
+      this.dbType = 'mongodb';
     }
     return this.database;
   }
@@ -141,12 +140,7 @@ class DatabaseCompatibilityLayer {
   async getAccountCredentials(accountId: number | string) {
     const db = await this.getDb();
 
-    // For SQLite, use the existing method that returns decrypted credentials
-    if (this.dbType === 'sqlite') {
-      return (db as any).getAccountCredentials(typeof accountId === 'string' ? parseInt(accountId) : accountId);
-    }
-
-    // For MongoDB, get account and decrypt credentials manually
+    // Get account and decrypt credentials
     const account = await db.getConnectedAccountById(accountId);
     if (!account) return null;
 
@@ -171,8 +165,24 @@ class DatabaseCompatibilityLayer {
   }
 
   getOrderSearchSuggestions(userId: number | string, query: string) {
-    // This method doesn't exist in SQLite, return empty array for now
+    // This method needs proper implementation
     console.warn('getOrderSearchSuggestions called - needs proper implementation');
+    return [];
+  }
+
+  // Push notification methods - TODO: Implement with MongoDB
+  savePushSubscription(subscriptionData: any): boolean {
+    console.warn('savePushSubscription called - needs MongoDB implementation');
+    return false;
+  }
+
+  removePushSubscription(userId: string, endpoint: string): boolean {
+    console.warn('removePushSubscription called - needs MongoDB implementation');
+    return false;
+  }
+
+  getUserPushSubscriptions(userId: string): any[] {
+    console.warn('getUserPushSubscriptions called - needs MongoDB implementation');
     return [];
   }
 

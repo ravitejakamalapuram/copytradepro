@@ -7,6 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { eventBusService } from '../services/eventBusService';
 import { useResourceCleanup } from './useResourceCleanup';
+import { useAuth } from './useAuth';
 
 interface LivePrice {
   symbol: string;
@@ -45,11 +46,20 @@ interface ConnectionHealth {
 }
 
 export const useRealTimeData = () => {
+  const { isAuthenticated } = useAuth();
   const { registerTimeout, registerInterval, registerWebSocket, registerSubscription } = useResourceCleanup('useRealTimeData');
-  
+
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+
+  // Use ref to track authentication state to avoid dependency issues
+  const isAuthenticatedRef = useRef(isAuthenticated);
+
+  // Update ref when authentication state changes
+  useEffect(() => {
+    isAuthenticatedRef.current = isAuthenticated;
+  }, [isAuthenticated]);
   const [connectionHealth, setConnectionHealth] = useState<ConnectionHealth>({
     healthScore: 0,
     lastActivity: null,
@@ -83,27 +93,148 @@ export const useRealTimeData = () => {
       return;
     }
 
+    // Prevent multiple reconnection attempts
+    if (reconnectTimeout.current) {
+      console.log('🔄 Reconnection already scheduled, skipping');
+      return;
+    }
+
     const delay = getReconnectDelay(reconnectAttempts.current);
     console.log(`🔄 Scheduling reconnect attempt ${reconnectAttempts.current + 1} in ${delay}ms`);
 
     reconnectTimeout.current = setTimeout(() => {
       reconnectAttempts.current++;
       setConnectionHealth(prev => ({ ...prev, reconnectCount: reconnectAttempts.current }));
-      initializeConnection();
+
+      // Clear the timeout reference
+      reconnectTimeout.current = null;
+
+      // Only reconnect if still authenticated and no existing connection
+      if (isAuthenticatedRef.current && !socket) {
+        console.log('🔄 Executing scheduled reconnection');
+        const token = localStorage.getItem('token');
+        if (token) {
+          createSocketConnection(token);
+        }
+      }
     }, delay);
-    
+
     // Register timeout for cleanup
     registerTimeout(reconnectTimeout.current);
-  }, [registerTimeout]);
+  }, [registerTimeout, socket]);
+
+  // Create socket connection (extracted to avoid circular dependencies)
+  const createSocketConnection = useCallback((token: string) => {
+    if (connecting) {
+      console.log('🔧 Connection already in progress, skipping');
+      return;
+    }
+
+    setConnecting(true);
+    setLastError(null);
+
+    const socketUrl = '/';
+    console.log('🔗 Creating Socket.IO connection to:', socketUrl);
+
+    const newSocket = io(socketUrl, {
+      auth: { token },
+      transports: ['websocket', 'polling'],
+      timeout: 20000,
+      forceNew: true,
+      autoConnect: true
+    });
+
+    // Register socket for cleanup
+    registerWebSocket(newSocket);
+
+    // Connection successful
+    newSocket.on('connect', () => {
+      console.log('🔄 Real-time data connected');
+      setSocket(newSocket);
+      setConnected(true);
+      setConnecting(false);
+      setLastError(null);
+      reconnectAttempts.current = 0;
+
+      // Clear any pending reconnect timeout
+      if (reconnectTimeout.current) {
+        clearTimeout(reconnectTimeout.current);
+        reconnectTimeout.current = null;
+      }
+
+      // Start health monitoring
+      startHealthMonitoring(newSocket);
+
+      // Resubscribe to previous subscriptions
+      resubscribeToAll(newSocket);
+    });
+
+    // Connection failed
+    newSocket.on('connect_error', (error) => {
+      console.error('🚨 Real-time data connection error:', error);
+      setConnecting(false);
+      setLastError(error.message);
+      scheduleReconnect();
+    });
+
+    // Disconnected
+    newSocket.on('disconnect', (reason) => {
+      console.log('❌ Real-time data disconnected:', reason);
+      setConnected(false);
+      setConnecting(false);
+
+      if (reason === 'io server disconnect') {
+        // Server disconnected, try to reconnect
+        scheduleReconnect();
+      }
+    });
+
+    // Handle connection errors from server
+    newSocket.on('connection_error', (data: { message: string; canRetry: boolean }) => {
+      console.warn('🚨 Server connection error:', data.message);
+      setLastError(data.message);
+      if (data.canRetry) {
+        scheduleReconnect();
+      }
+    });
+
+    // Set up data event handlers
+    newSocket.on('priceUpdate', (data) => {
+      eventBusService.emit('priceUpdate', data);
+    });
+
+    newSocket.on('orderUpdate', (data) => {
+      eventBusService.emit('orderUpdate', data);
+    });
+
+    newSocket.on('portfolioUpdate', (data) => {
+      eventBusService.emit('portfolioUpdate', data);
+    });
+
+  }, [connecting, registerWebSocket]);
 
   // Initialize socket connection with enhanced error handling
   const initializeConnection = useCallback(() => {
+    // Prevent multiple simultaneous connection attempts
+    if (connectionAttemptRef.current) {
+      console.log('🔧 Connection attempt already in progress, skipping');
+      return;
+    }
+
+    // Only connect if user is authenticated
+    if (!isAuthenticatedRef.current) {
+      console.log('🔧 Skipping real-time data connection - user not authenticated');
+      return;
+    }
+
     const token = localStorage.getItem('token');
     if (!token) {
       setLastError('No authentication token available');
       return;
     }
 
+    // Set flag to prevent multiple attempts
+    connectionAttemptRef.current = true;
     setConnecting(true);
     setLastError(null);
 
@@ -118,14 +249,19 @@ export const useRealTimeData = () => {
       autoConnect: true
     });
 
+    // Register socket for cleanup
+    registerWebSocket(newSocket);
+
     // Connection successful
     newSocket.on('connect', () => {
       console.log('🔄 Real-time data connected');
+      setSocket(newSocket);
       setConnected(true);
       setConnecting(false);
       setLastError(null);
       reconnectAttempts.current = 0;
-      
+      connectionAttemptRef.current = false; // Reset flag on success
+
       // Clear any pending reconnect timeout
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
@@ -144,7 +280,8 @@ export const useRealTimeData = () => {
       console.log('🔄 Real-time data disconnected:', reason);
       setConnected(false);
       setConnecting(false);
-      
+      connectionAttemptRef.current = false; // Reset flag on disconnect
+
       // Stop health monitoring
       stopHealthMonitoring();
 
@@ -205,6 +342,7 @@ export const useRealTimeData = () => {
       console.error('🚨 Real-time data connection error:', error);
       setConnecting(false);
       setLastError(error.message || 'Connection error occurred');
+      connectionAttemptRef.current = false; // Reset flag on error
       scheduleReconnect();
     });
 
@@ -226,10 +364,19 @@ export const useRealTimeData = () => {
       }
     });
 
-    setSocket(newSocket);
-    
-    // Register WebSocket for cleanup
-    registerWebSocket(newSocket);
+    // Set up data event handlers
+    newSocket.on('priceUpdate', (data) => {
+      eventBusService.emit('priceUpdate', data);
+    });
+
+    newSocket.on('orderUpdate', (data) => {
+      eventBusService.emit('orderUpdate', data);
+    });
+
+    newSocket.on('portfolioUpdate', (data) => {
+      eventBusService.emit('portfolioUpdate', data);
+    });
+
   }, [scheduleReconnect, registerWebSocket]);
 
   // Update connection activity
@@ -283,23 +430,48 @@ export const useRealTimeData = () => {
     console.log(`🔄 Resubscribed to ${subscribedSymbols.current.size} symbols and indices: ${subscribedToIndices.current}`);
   }, []);
 
-  // Initialize connection on mount
+  // Effect to initialize connection when authenticated
   useEffect(() => {
-    initializeConnection();
+    if (isAuthenticated && !socket && !connecting) {
+      console.log('🔧 Initializing real-time data connection');
+      initializeConnection();
+    }
+  }, [isAuthenticated, socket, connecting]);
 
+  // Add a flag to prevent multiple connection attempts
+  const connectionAttemptRef = useRef(false);
+
+  // Effect to cleanup when not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) {
+      // Cleanup when not authenticated
+      setConnected(false);
+      setConnecting(false);
+      setLastError(null);
+
+      if (socket) {
+        console.log('🔧 Cleaning up real-time data connection - user not authenticated');
+        socket.removeAllListeners();
+        socket.close();
+        setSocket(null);
+      }
+    }
+  }, [isAuthenticated, socket]);
+
+  // Effect for cleanup on unmount
+  useEffect(() => {
     return () => {
-      // Cleanup on unmount
+      // Cleanup timeouts and intervals
       if (reconnectTimeout.current) {
         clearTimeout(reconnectTimeout.current);
         reconnectTimeout.current = null;
       }
-      stopHealthMonitoring();
-      if (socket) {
-        socket.removeAllListeners();
-        socket.close();
+      if (healthCheckInterval.current) {
+        clearInterval(healthCheckInterval.current);
+        healthCheckInterval.current = null;
       }
     };
-  }, [initializeConnection, stopHealthMonitoring]);
+  }, []); // Empty dependency array for unmount only
 
   // Subscribe to symbol price updates
   const subscribeToSymbol = useCallback((symbol: string, exchange: string = 'NSE') => {

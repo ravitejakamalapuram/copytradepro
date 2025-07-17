@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { userDatabase } from './sqliteDatabase';
+import { userDatabase } from './databaseCompatibility';
 import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
@@ -42,7 +42,6 @@ const brokerConnectionManager: BrokerConnectionManager = {
 // Legacy function for backward compatibility
 export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
   // No longer needed as we use the direct implementation above
-  console.log('⚠️ setBrokerConnectionManager is deprecated - using direct broker connection manager');
 };
 
 // Simple logger
@@ -121,7 +120,7 @@ class OrderStatusService extends EventEmitter {
   private async getPendingOrders(): Promise<Order[]> {
     try {
       // Get all pending orders from all users
-      const orders = userDatabase.getAllOrderHistory()
+      const orders = (await userDatabase.getAllOrderHistory())
         .filter(order => ['PLACED', 'PENDING'].includes(order.status));
 
       // Convert OrderHistory to Order format
@@ -436,12 +435,12 @@ class OrderStatusService extends EventEmitter {
 
       try {
         // Use the broker_order_id to update the database
-        const updated = userDatabase.updateOrderStatus(
-          order.broker_order_id || order.id,
+        const updated = await userDatabase.updateOrderStatus(
+          parseInt(order.broker_order_id || order.id),
           newStatus as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED'
         );
 
-        if (updated) {
+        if (await updated) {
           logger.info(`✅ Database updated successfully for order ${order.id}`);
         } else {
           logger.warn(`⚠️ No rows updated in database for order ${order.id} (broker_order_id: ${order.broker_order_id})`);
