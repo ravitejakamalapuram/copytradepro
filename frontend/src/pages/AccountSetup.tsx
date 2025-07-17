@@ -57,6 +57,7 @@ const AccountSetup: React.FC = () => {
   const [selectedBroker, setSelectedBroker] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [oauthInProgress, setOauthInProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>({
     brokerName: '',
@@ -97,92 +98,137 @@ const AccountSetup: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handle OAuth flow with popup
+  // Handle OAuth flow - Debug Version to Find Root Cause
   const handleOAuthFlow = async (accountId: string, authUrl: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      console.log('🔄 Opening OAuth popup for:', authUrl);
+    setOauthInProgress(true);
 
-      // Open OAuth URL in popup
-      const popup = window.open(
-        authUrl,
-        'oauth-popup',
-        'width=600,height=700,scrollbars=yes,resizable=yes'
+    return new Promise((resolve, reject) => {
+      console.log('🔄 Starting OAuth flow...');
+      console.log('📍 Account ID:', accountId);
+      console.log('🔗 Auth URL:', authUrl);
+
+      // First, let's test if the URL is valid
+      if (!authUrl || !authUrl.startsWith('http')) {
+        console.error('❌ Invalid auth URL:', authUrl);
+        setOauthInProgress(false);
+        alert('Invalid authentication URL received. Please try again.');
+        reject(new Error('Invalid auth URL'));
+        return;
+      }
+
+      // Check if this is a Fyers API URL that might cause immediate redirect
+      if (authUrl.includes('api.fyers.in/api/v2/generate-authcode')) {
+        console.warn('⚠️ Detected Fyers API URL - this might redirect immediately');
+        console.log('🔍 Full URL:', authUrl);
+
+        // Test the URL first
+        const testChoice = confirm(
+          '⚠️ POTENTIAL ISSUE DETECTED\n\n' +
+          'The auth URL is a Fyers API endpoint that might redirect immediately.\n' +
+          'This could cause the popup to close automatically.\n\n' +
+          'Click OK to test opening this URL\n' +
+          'Click Cancel to abort and check configuration'
+        );
+
+        if (!testChoice) {
+          setOauthInProgress(false);
+          reject(new Error('User chose to abort due to URL concerns'));
+          return;
+        }
+      }
+
+      // Show debug info to user
+      const proceed = confirm(
+        '🔍 DEBUG MODE - Fyers OAuth\n\n' +
+        `Auth URL: ${authUrl.substring(0, 100)}...\n\n` +
+        'This will open the Fyers authentication page.\n' +
+        'Watch the browser console for debug information.\n\n' +
+        'Click OK to proceed, Cancel to abort.'
       );
 
-      if (!popup) {
+      if (!proceed) {
+        console.log('🚫 User cancelled OAuth flow');
+        setOauthInProgress(false);
+        reject(new Error('OAuth cancelled by user'));
+        return;
+      }
+
+      console.log('🚀 Opening authentication window...');
+
+      // Try opening in new tab first (most reliable)
+      const authWindow = window.open(authUrl, '_blank');
+
+      console.log('🪟 Window opened:', !!authWindow);
+      console.log('🪟 Window closed immediately?', authWindow?.closed);
+
+      if (!authWindow) {
+        console.error('❌ Failed to open window - popup blocked');
+        setOauthInProgress(false);
         alert('Popup blocked! Please allow popups for this site and try again.');
         reject(new Error('Popup blocked'));
         return;
       }
 
-      // Show instructions and input alert after popup opens
+      // Check if window closes immediately
       setTimeout(() => {
-        const authCode = prompt(
-          '📋 OAuth Instructions:\n\n' +
-          '1. Complete the authentication in the popup window\n' +
-          '2. After authorization, you will see a URL with "code=" parameter\n' +
-          '3. Copy the authorization code from the URL\n' +
-          '4. Paste it below and click OK\n\n' +
-          'Enter the authorization code:'
-        );
-
-        if (authCode && authCode.trim()) {
-          console.log('✅ Auth code entered manually:', authCode.trim());
-          popup.close();
-
-          // Complete OAuth authentication with manually entered code
-          completeOAuthAuth(accountId, authCode.trim())
-            .then(() => resolve())
-            .catch(reject);
-        } else if (authCode === null) {
-          // User cancelled the prompt
-          popup.close();
-          reject(new Error('OAuth cancelled by user'));
-        } else {
-          // Empty code entered
-          popup.close();
-          reject(new Error('No authorization code provided'));
-        }
-      }, 2000); // Wait 2 seconds for popup to load
-
-      // Monitor popup for auth code (fallback - automatic detection)
-      const checkClosed = setInterval(() => {
-        if (popup.closed) {
-          clearInterval(checkClosed);
-          // Don't reject here as user might have used manual input
+        console.log('🕐 After 1 second - Window closed?', authWindow.closed);
+        if (authWindow.closed) {
+          console.error('❌ Window closed automatically after 1 second!');
+          setOauthInProgress(false);
+          alert('Authentication window closed automatically. This might be due to:\n1. Popup blocker\n2. Invalid URL\n3. Browser security policy\n\nPlease check browser console for details.');
+          reject(new Error('Window closed automatically'));
           return;
-        }
-
-        try {
-          // Check if popup URL contains auth code
-          const popupUrl = popup.location.href;
-          const urlParams = new URLSearchParams(new URL(popupUrl).search);
-          const authCode = urlParams.get('code');
-
-          if (authCode) {
-            console.log('✅ Auth code detected automatically:', authCode);
-            clearInterval(checkClosed);
-            popup.close();
-
-            // Complete OAuth authentication
-            completeOAuthAuth(accountId, authCode)
-              .then(() => resolve())
-              .catch(reject);
-          }
-        } catch (error) {
-          // Cross-origin error - popup is still on OAuth provider domain
-          // This is expected, continue monitoring
         }
       }, 1000);
 
-      // Timeout after 5 minutes
+      // Check again after 3 seconds
       setTimeout(() => {
-        if (!popup.closed) {
-          clearInterval(checkClosed);
-          popup.close();
-          reject(new Error('OAuth timeout - please try again'));
+        console.log('🕐 After 3 seconds - Window closed?', authWindow.closed);
+        if (authWindow.closed) {
+          console.error('❌ Window closed automatically after 3 seconds!');
+          setOauthInProgress(false);
+          alert('Authentication window closed automatically after 3 seconds.');
+          reject(new Error('Window closed automatically'));
+          return;
         }
-      }, 300000);
+
+        // If window is still open, ask for auth code
+        const authCode = prompt(
+          '🔐 Fyers OAuth - Enter Authorization Code\n\n' +
+          'The authentication window should be open.\n' +
+          'Complete the authentication and copy the authorization code.\n\n' +
+          'Authorization Code:'
+        );
+
+        if (authCode && authCode.trim()) {
+          console.log('✅ Auth code entered:', authCode.trim());
+
+          // Try to close the window
+          try {
+            if (!authWindow.closed) {
+              authWindow.close();
+            }
+          } catch (e) {
+            console.log('ℹ️ Could not close auth window (expected for cross-origin)');
+          }
+
+          // Complete OAuth authentication
+          completeOAuthAuth(accountId, authCode.trim())
+            .then(() => {
+              setOauthInProgress(false);
+              resolve();
+            })
+            .catch((err) => {
+              console.error('❌ OAuth completion failed:', err);
+              setOauthInProgress(false);
+              reject(err);
+            });
+        } else {
+          console.log('🚫 No auth code provided');
+          setOauthInProgress(false);
+          reject(new Error('No authorization code provided'));
+        }
+      }, 5000); // Wait 5 seconds before prompting
     });
   };
 
@@ -530,9 +576,10 @@ const AccountSetup: React.FC = () => {
                             <Button
                               variant="primary"
                               onClick={() => handleActivateAccount(account.id)}
-                              disabled={isOperationInProgress(account.id)}
+                              disabled={isOperationInProgress(account.id) || oauthInProgress}
                             >
-                              {isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
+                              {oauthInProgress ? 'OAuth in Progress...' :
+                               isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
                             </Button>
                           )}
                           <Button
@@ -798,6 +845,29 @@ const AccountSetup: React.FC = () => {
                           className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* OAuth Progress Display */}
+                  {oauthInProgress && (
+                    <div style={{
+                      padding: '1rem',
+                      backgroundColor: 'var(--bg-profit-light)',
+                      border: '2px solid var(--color-profit)',
+                      borderRadius: 'var(--radius-lg)',
+                      color: 'var(--color-profit)',
+                      fontSize: '0.875rem',
+                      marginTop: '1rem',
+                      textAlign: 'center'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <div className="loading-spinner" style={{ width: '20px', height: '20px' }}></div>
+                        <strong>🔐 OAuth Authentication in Progress</strong>
+                      </div>
+                      <div style={{ fontSize: '0.8rem', lineHeight: '1.4' }}>
+                        Complete the authentication in the opened window/tab.<br/>
+                        You will be prompted to enter the authorization code shortly.
                       </div>
                     </div>
                   )}

@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Set up derivatives data models and core interfaces
+- [-] 1. Set up derivatives data models and core interfaces
   - Create TypeScript interfaces for options, futures, and derivatives-related data structures
   - Implement base classes for derivative instruments with proper inheritance hierarchy
   - Add Greeks calculation utilities and option pricing models

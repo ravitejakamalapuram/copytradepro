@@ -104,15 +104,17 @@
 }
 
 /* ==========================================================================
-   MODERN LAYOUT SYSTEM - SIMPLE SIDEBAR + MAIN CONTENT
+   MODERN LAYOUT SYSTEM - FIXED SIDEBAR + MAIN CONTENT
    ========================================================================== */
 
 .app-layout {
   min-height: 100vh;
   background-color: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
 }
 
-/* Simple layout without app-content wrapper */
+/* Fixed sidebar */
 .app-sidebar {
   width: 280px;
   background-color: var(--bg-secondary);
@@ -125,11 +127,22 @@
   z-index: 100;
 }
 
+/* Main content area - accounts for fixed sidebar */
 .app-main {
   margin-left: 280px;
   padding: var(--space-6);
   min-height: calc(100vh - 4rem);
   background-color: var(--bg-primary);
+  width: calc(100% - 280px);
+  box-sizing: border-box;
+}
+
+/* Container adjustments for pages using enterprise layout components */
+.app-layout .enterprise-container {
+  max-width: none;
+  width: 100%;
+  padding: 0;
+  margin: 0;
 }
 
 .app-sidebar-section {
@@ -480,6 +493,25 @@
   width: 100%;
 }
 
+/* ==========================================================================
+   LOADING SPINNER
+   ========================================================================== */
+
+.loading-spinner {
+  border: 2px solid var(--border-tertiary);
+  border-top: 2px solid var(--interactive-primary);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
 /* Forms */
 .form-input {
   width: 100%;
@@ -652,6 +684,21 @@
     padding: var(--space-1) var(--space-2);
     font-size: var(--text-xs);
   }
+
+  /* Responsive grid adjustments */
+  .enterprise-grid--cols-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .enterprise-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .enterprise-page-header-actions {
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 768px) {
@@ -665,5 +712,21 @@
 
   .app-nav-links {
     display: none; /* Hide nav links on mobile, show hamburger menu instead */
+  }
+
+  /* Mobile grid adjustments */
+  .enterprise-grid--cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .enterprise-hstack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .enterprise-hstack--gap-2,
+  .enterprise-hstack--gap-3,
+  .enterprise-hstack--gap-4 {
+    gap: 0.5rem;
   }
 }

@@ -65,14 +65,16 @@ export class FyersService {
     });
   }
 
-  // Generate auth URL for user to visit
+  // Generate auth URL for user to visit - Fixed to use actual login page
   generateAuthUrl(credentials: FyersCredentials): string {
     this.appId = credentials.clientId;
     this.fyers.setAppId(credentials.clientId);
     this.fyers.setRedirectUrl(credentials.redirectUri);
-    
-    const authUrl = this.fyers.generateAuthCode();
-    console.log('🔗 Auth URL generated:', authUrl);
+
+    // Use the correct Fyers login URL instead of API endpoint
+    const authUrl = `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${credentials.clientId}&redirect_uri=${encodeURIComponent(credentials.redirectUri)}&response_type=code&state=sample_state`;
+
+    console.log('🔗 Fixed Auth URL generated:', authUrl);
     return authUrl;
   }
 

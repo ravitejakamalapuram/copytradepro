@@ -99,10 +99,11 @@ export function validateCredentials(credentials: any): boolean {
 }
 
 /**
- * Generate Fyers auth URL
+ * Generate Fyers auth URL - Fixed to use actual login page
  */
 export function generateAuthUrl(appId: string, redirectUri: string): string {
-  const baseUrl = 'https://api.fyers.in/api/v2/generate-authcode';
+  // Use the correct Fyers login URL that doesn't immediately redirect
+  const baseUrl = 'https://api-t1.fyers.in/api/v3/generate-authcode';
   const params = new URLSearchParams({
     client_id: appId,
     redirect_uri: redirectUri,
