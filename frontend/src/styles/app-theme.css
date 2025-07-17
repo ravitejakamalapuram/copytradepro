@@ -302,12 +302,17 @@
   background-color: var(--hover-bg);
 }
 
-/* Buttons */
+/* ==========================================================================
+   MODERN BUTTON SYSTEM - Intuitive Color Scheme
+   ========================================================================== */
+
+/* Base Button */
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   border: 1px solid var(--border-primary);
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
@@ -315,13 +320,17 @@
   font-weight: var(--font-medium);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: var(--transition-fast);
+  transition: all var(--transition-fast);
   text-decoration: none;
+  min-height: 2.5rem;
+  white-space: nowrap;
 }
 
 .btn:hover {
   background-color: var(--hover-bg);
   border-color: var(--hover-border);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn:focus {
@@ -329,27 +338,146 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+.btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Primary Button - Blue for main actions */
 .btn-primary {
   background-color: var(--interactive-primary);
   border-color: var(--interactive-primary);
-  color: var(--text-primary);
+  color: white;
 }
 
 .btn-primary:hover {
   background-color: var(--interactive-primary-hover);
   border-color: var(--interactive-primary-hover);
+  color: white;
 }
 
+/* Secondary Button - Neutral for secondary actions */
+.btn-secondary {
+  background-color: transparent;
+  border-color: var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+}
+
+/* Success Button - Green for positive actions */
 .btn-success {
   background-color: var(--color-profit);
   border-color: var(--color-profit);
-  color: var(--text-primary);
+  color: white;
 }
 
+.btn-success:hover {
+  background-color: #00b894;
+  border-color: #00b894;
+  color: white;
+}
+
+/* Danger Button - Red for destructive actions */
 .btn-danger {
   background-color: var(--color-loss);
   border-color: var(--color-loss);
+  color: white;
+}
+
+.btn-danger:hover {
+  background-color: #e84057;
+  border-color: #e84057;
+  color: white;
+}
+
+/* Warning Button - Orange for warning actions */
+.btn-warning {
+  background-color: var(--color-warning-500);
+  border-color: var(--color-warning-500);
+  color: var(--color-bg-primary);
+}
+
+.btn-warning:hover {
+  background-color: #f39c12;
+  border-color: #f39c12;
+  color: var(--color-bg-primary);
+}
+
+/* Ghost Button - Transparent with border */
+.btn-ghost {
+  background-color: transparent;
+  border-color: transparent;
+  color: var(--text-secondary);
+}
+
+.btn-ghost:hover {
+  background-color: var(--hover-bg);
+  border-color: var(--hover-border);
   color: var(--text-primary);
+}
+
+/* ==========================================================================
+   TRADING-SPECIFIC BUTTONS
+   ========================================================================== */
+
+/* Buy Button - Green for buy orders */
+.btn-trading-buy {
+  background-color: var(--color-profit);
+  border-color: var(--color-profit);
+  color: white;
+  font-weight: var(--font-semibold);
+}
+
+.btn-trading-buy:hover {
+  background-color: #00b894;
+  border-color: #00b894;
+  color: white;
+}
+
+/* Sell Button - Red for sell orders */
+.btn-trading-sell {
+  background-color: var(--color-loss);
+  border-color: var(--color-loss);
+  color: white;
+  font-weight: var(--font-semibold);
+}
+
+.btn-trading-sell:hover {
+  background-color: #e84057;
+  border-color: #e84057;
+  color: white;
+}
+
+/* ==========================================================================
+   BUTTON SIZES
+   ========================================================================== */
+
+.btn-sm {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  min-height: 2rem;
+}
+
+.btn-lg {
+  padding: var(--space-3) var(--space-6);
+  font-size: var(--text-base);
+  min-height: 3rem;
+}
+
+.btn-full {
+  width: 100%;
 }
 
 /* Forms */

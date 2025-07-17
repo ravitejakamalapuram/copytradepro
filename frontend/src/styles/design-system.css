@@ -227,10 +227,10 @@
   --border-danger: var(--color-loss);
   --border-warning: var(--color-warning-500);
 
-  /* Interactive Colors - Dark Trading Theme */
-  --interactive-primary: var(--color-accent);
-  --interactive-primary-hover: var(--color-accent-dark);
-  --interactive-primary-active: var(--color-accent-dark);
+  /* Interactive Colors - Intuitive Button Scheme */
+  --interactive-primary: #3182ce;        /* Blue for primary actions */
+  --interactive-primary-hover: #2c5aa0;  /* Darker blue on hover */
+  --interactive-primary-active: #2a4d8d; /* Even darker blue when active */
   --interactive-secondary: var(--color-secondary);
   --interactive-secondary-hover: var(--color-secondary-light);
   --interactive-secondary-active: var(--color-secondary-dark);

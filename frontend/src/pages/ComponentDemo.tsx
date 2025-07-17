@@ -61,14 +61,18 @@ const ComponentDemo: React.FC = () => {
             <CardContent>
               <Stack gap={4}>
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Variants</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Variants - Intuitive Colors</h4>
                   <Flex gap={3} wrap>
-                    <Button variant="primary">Primary</Button>
-                    <Button variant="secondary">Secondary</Button>
+                    <Button variant="primary">Primary (Blue)</Button>
+                    <Button variant="secondary">Secondary (Gray)</Button>
                     <Button variant="outline">Outline</Button>
                     <Button variant="ghost">Ghost</Button>
-                    <Button variant="danger">Danger</Button>
+                    <Button variant="success">Success (Green)</Button>
+                    <Button variant="danger">Danger (Red)</Button>
                   </Flex>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    ✅ Blue for primary actions, Green for success, Red for danger - much more intuitive!
+                  </p>
                 </div>
 
                 <div>
@@ -87,6 +91,20 @@ const ComponentDemo: React.FC = () => {
                     <Button disabled>Disabled</Button>
                     <Button leftIcon="📊">With Icon</Button>
                   </Flex>
+                </div>
+
+                <div>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Trading Buttons</h4>
+                  <Flex gap={3}>
+                    <button className="btn btn-trading-buy">Buy Order</button>
+                    <button className="btn btn-trading-sell">Sell Order</button>
+                    <button className="btn btn-success">Execute</button>
+                    <button className="btn btn-warning">Modify</button>
+                    <button className="btn btn-danger">Cancel</button>
+                  </Flex>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Trading-specific buttons with clear visual hierarchy
+                  </p>
                 </div>
               </Stack>
             </CardContent>
