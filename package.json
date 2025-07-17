@@ -4,23 +4,16 @@
   "description": "Professional trading application with multi-broker support",
   "private": true,
   "scripts": {
-    "build": "./build.sh",
+    "install": "cd backend && npm install && cd ../frontend && npm install && cd ../e2e-tests && npm install",
     "start": "cd backend && npm start",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev": "npm run check:deps && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:force": "npm run install:deps && concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "install:backend": "cd backend && npm install",
-    "install:frontend": "cd frontend && npm install",
-    "install:all": "npm run install:backend && npm run install:frontend",
-    "install:deps": "bash install-deps.sh || npm run install:all",
-    "check:deps": "bash check-deps.sh || npm run install:all",
-    "setup": "bash setup.sh || npm run install:all",
-    "postinstall": "npm run install:all",
-    "build:frontend": "cd frontend && npm run build",
-    "build:backend": "cd backend && npm run build",
-    "clean": "rm -rf backend/dist frontend/dist backend/public",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run dev\"",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build && mkdir -p backend/public && cp -r frontend/dist/* backend/public/",
+    "clean": "rm -rf backend/dist frontend/dist backend/public e2e-tests/test-results e2e-tests/playwright-report",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "cd backend && npm test && cd ../frontend && npm test",
+    "test:e2e": "cd e2e-tests && npm test",
+    "test:e2e:headed": "cd e2e-tests && npm run test:headed",
+    "test:e2e:ui": "cd e2e-tests && npm run test:ui"
   },
   "keywords": [
     "trading",
@@ -38,13 +31,5 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
-  },
-  "workspaces": [
-    "backend",
-    "frontend"
-  ],
-  "dependencies": {
-    "@types/node-cron": "^3.0.11",
-    "node-cron": "^4.1.1"
   }
 }

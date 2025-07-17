@@ -3,6 +3,7 @@ import * as path from 'path';
 import axios from 'axios';
 import * as csv from 'csv-parser';
 import { Readable } from 'stream';
+import { logger } from '../utils/logger';
 
 // BSE Symbol Data Interface (based on BSE CSV format)
 export interface BSESymbolData {
@@ -41,7 +42,10 @@ export class BSECSVService {
     const dataDir = path.dirname(this.dataPath);
     if (!fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
-      console.log('📁 Created BSE data directory');
+      logger.info('Created BSE data directory', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'ENSURE_DATA_DIRECTORY'
+      });
     }
   }
 
@@ -55,13 +59,23 @@ export class BSECSVService {
         const parsed = JSON.parse(data);
         this.symbols = parsed.symbols || [];
         this.lastUpdated = parsed.lastUpdated ? new Date(parsed.lastUpdated) : null;
-        console.log(`📊 Loaded ${this.symbols.length} BSE symbols from cache`);
-        console.log(`📅 Last updated: ${this.lastUpdated?.toISOString() || 'Never'}`);
+        logger.info('Loaded BSE symbols from cache', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'LOAD_SYMBOLS_FROM_CACHE',
+          symbolCount: this.symbols.length,
+          lastUpdated: this.lastUpdated?.toISOString() || 'Never'
+        });
       } else {
-        console.log('📊 No BSE symbol cache found, will need to fetch data');
+        logger.info('No BSE symbol cache found, will need to fetch data', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'LOAD_SYMBOLS_FROM_CACHE'
+        });
       }
     } catch (error) {
-      console.error('❌ Error loading BSE symbols from cache:', error);
+      logger.error('Error loading BSE symbols from cache', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'LOAD_SYMBOLS_FROM_CACHE_ERROR'
+      }, error);
       this.symbols = [];
     }
   }
@@ -84,9 +98,16 @@ export class BSECSVService {
       };
 
       fs.writeFileSync(this.dataPath, JSON.stringify(data, null, 2));
-      console.log(`💾 Saved ${this.symbols.length} BSE symbols to cache`);
+      logger.info('Saved BSE symbols to cache', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'SAVE_SYMBOLS_TO_CACHE',
+        symbolCount: this.symbols.length
+      });
     } catch (error) {
-      console.error('❌ Error saving BSE symbols to cache:', error);
+      logger.error('Error saving BSE symbols to cache', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'SAVE_SYMBOLS_TO_CACHE_ERROR'
+      }, error);
     }
   }
 
@@ -110,7 +131,11 @@ export class BSECSVService {
   async downloadAndParseCSV(): Promise<BSESymbolData[]> {
     try {
       const csvUrl = this.getBSECSVUrl();
-      console.log(`🔄 Downloading BSE CSV from: ${csvUrl}`);
+      logger.info('Downloading BSE CSV', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_AND_PARSE_CSV',
+        csvUrl
+      });
 
       const response = await axios.get(csvUrl, {
         timeout: 30000,
@@ -119,7 +144,11 @@ export class BSECSVService {
         }
       });
 
-      console.log(`📊 Downloaded BSE CSV data (${response.data.length} bytes)`);
+      logger.info('Downloaded BSE CSV data', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_CSV_SUCCESS',
+        dataSize: response.data.length
+      });
 
       // Save raw CSV for debugging
       fs.writeFileSync(this.csvPath, response.data);
@@ -151,25 +180,41 @@ export class BSECSVService {
                 symbols.push(symbol);
               }
             } catch (error) {
-              console.warn('⚠️ Error parsing BSE CSV row:', error);
+              logger.warn('Error parsing BSE CSV row', {
+                component: 'BSE_CSV_SERVICE',
+                operation: 'PARSE_CSV_ROW_ERROR'
+              }, error);
             }
           })
           .on('end', () => {
-            console.log(`✅ Parsed ${symbols.length} BSE symbols from CSV`);
+            logger.info('Parsed BSE symbols from CSV', {
+              component: 'BSE_CSV_SERVICE',
+              operation: 'PARSE_CSV_SUCCESS',
+              symbolCount: symbols.length
+            });
             resolve(symbols);
           })
           .on('error', (error: any) => {
-            console.error('❌ Error parsing BSE CSV:', error);
+            logger.error('Error parsing BSE CSV', {
+              component: 'BSE_CSV_SERVICE',
+              operation: 'PARSE_CSV_ERROR'
+            }, error);
             reject(error);
           });
       });
 
     } catch (error: any) {
-      console.error('❌ Error downloading BSE CSV:', error.message);
+      logger.error('Error downloading BSE CSV', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'DOWNLOAD_CSV_ERROR'
+      }, error);
       
       // Try previous day if current day fails
       if (error.response?.status === 404) {
-        console.log('🔄 Trying previous day BSE data...');
+        logger.info('Trying previous day BSE data', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'DOWNLOAD_PREVIOUS_DAY'
+        });
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const year = yesterday.getFullYear();
@@ -187,7 +232,10 @@ export class BSECSVService {
             }
           });
 
-          console.log(`📊 Downloaded BSE CSV data from previous day`);
+          logger.info('Downloaded BSE CSV data from previous day', {
+            component: 'BSE_CSV_SERVICE',
+            operation: 'DOWNLOAD_PREVIOUS_DAY_SUCCESS'
+          });
 
           // Save raw CSV for debugging
           fs.writeFileSync(this.csvPath, response.data);
@@ -219,21 +267,34 @@ export class BSECSVService {
                     symbols.push(symbol);
                   }
                 } catch (error) {
-                  console.warn('⚠️ Error parsing BSE CSV row:', error);
+                  logger.warn('Error parsing BSE CSV row', {
+                    component: 'BSE_CSV_SERVICE',
+                    operation: 'PARSE_PREVIOUS_DAY_CSV_ROW_ERROR'
+                  }, error);
                 }
               })
               .on('end', () => {
-                console.log(`✅ Parsed ${symbols.length} BSE symbols from previous day CSV`);
+                logger.info('Parsed BSE symbols from previous day CSV', {
+                  component: 'BSE_CSV_SERVICE',
+                  operation: 'PARSE_PREVIOUS_DAY_CSV_SUCCESS',
+                  symbolCount: symbols.length
+                });
                 resolve(symbols);
               })
               .on('error', (error: any) => {
-                console.error('❌ Error parsing previous day BSE CSV:', error);
+                logger.error('Error parsing previous day BSE CSV', {
+                  component: 'BSE_CSV_SERVICE',
+                  operation: 'PARSE_PREVIOUS_DAY_CSV_ERROR'
+                }, error);
                 reject(error);
               });
           });
 
         } catch (yesterdayError) {
-          console.error('❌ Previous day BSE data also failed:', yesterdayError);
+          logger.error('Previous day BSE data also failed', {
+            component: 'BSE_CSV_SERVICE',
+            operation: 'DOWNLOAD_PREVIOUS_DAY_ERROR'
+          }, yesterdayError);
           return [];
         }
       }
@@ -247,7 +308,10 @@ export class BSECSVService {
    */
   async updateSymbols(): Promise<void> {
     try {
-      console.log('🔄 Updating BSE symbols from CSV...');
+      logger.info('Updating BSE symbols from CSV', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'UPDATE_SYMBOLS'
+      });
       
       const symbols = await this.downloadAndParseCSV();
       
@@ -255,13 +319,23 @@ export class BSECSVService {
         this.symbols = symbols;
         this.lastUpdated = new Date();
         this.saveSymbolsToCache();
-        console.log(`✅ Updated ${symbols.length} BSE symbols from CSV`);
+        logger.info('Updated BSE symbols from CSV', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'UPDATE_SYMBOLS_SUCCESS',
+          symbolCount: symbols.length
+        });
       } else {
-        console.log('⚠️ No BSE symbols downloaded, keeping existing cache');
+        logger.warn('No BSE symbols downloaded, keeping existing cache', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'UPDATE_SYMBOLS_NO_DATA'
+        });
       }
 
     } catch (error: any) {
-      console.error('❌ Error updating BSE symbols:', error.message);
+      logger.error('Error updating BSE symbols', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'UPDATE_SYMBOLS_ERROR'
+      }, error);
       throw error;
     }
   }
@@ -349,7 +423,11 @@ export class BSECSVService {
     // Schedule for 7 PM IST daily
     const cronTime = '0 19 * * 1-5'; // 7 PM IST, Monday to Friday
 
-    console.log('⏰ Scheduled daily BSE CSV updates at 7:00 PM IST');
+    logger.info('Scheduled daily BSE CSV updates', {
+      component: 'BSE_CSV_SERVICE',
+      operation: 'SETUP_DAILY_CRON',
+      schedule: '7:00 PM IST'
+    });
 
     // For now, just log the schedule - actual cron implementation would go here
     // In production, you'd use node-cron or similar
@@ -361,16 +439,28 @@ export class BSECSVService {
   private async checkAndDownloadOnStartup(): Promise<void> {
     try {
       if (this.symbols.length === 0) {
-        console.log('📊 No BSE symbols found, downloading...');
+        logger.info('No BSE symbols found, downloading', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP'
+        });
         await this.updateSymbols();
       } else if (this.needsUpdate()) {
-        console.log('📅 BSE symbols data is stale, updating...');
+        logger.info('BSE symbols data is stale, updating', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP'
+        });
         await this.updateSymbols();
       } else {
-        console.log('✅ BSE data is up to date');
+        logger.info('BSE data is up to date', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP'
+        });
       }
     } catch (error: any) {
-      console.error('❌ Failed to download BSE data on startup:', error.message);
+      logger.error('Failed to download BSE data on startup', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'CHECK_AND_DOWNLOAD_ON_STARTUP_ERROR'
+      }, error);
       // Don't throw error, allow service to work with cached data
     }
   }
@@ -380,18 +470,34 @@ export class BSECSVService {
    */
   async initialize(): Promise<void> {
     try {
-      console.log('🚀 Initializing BSE CSV Service...');
+      logger.info('Initializing BSE CSV Service', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'INITIALIZE'
+      });
 
       if (this.needsUpdate()) {
-        console.log('📅 BSE symbols data is stale, updating...');
+        logger.info('BSE symbols data is stale, updating', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'INITIALIZE_UPDATE'
+        });
         await this.updateSymbols();
       } else {
-        console.log('✅ BSE symbols data is up to date');
+        logger.info('BSE symbols data is up to date', {
+          component: 'BSE_CSV_SERVICE',
+          operation: 'INITIALIZE_UP_TO_DATE'
+        });
       }
 
-      console.log(`🚀 BSE CSV Service initialized with ${this.symbols.length} symbols`);
+      logger.info('BSE CSV Service initialized', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'INITIALIZE_COMPLETE',
+        symbolCount: this.symbols.length
+      });
     } catch (error: any) {
-      console.error('❌ Error initializing BSE CSV Service:', error.message);
+      logger.error('Error initializing BSE CSV Service', {
+        component: 'BSE_CSV_SERVICE',
+        operation: 'INITIALIZE_ERROR'
+      }, error);
       // Don't throw error, allow service to work with cached data
     }
   }

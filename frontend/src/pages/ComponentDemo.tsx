@@ -61,18 +61,22 @@ const ComponentDemo: React.FC = () => {
             <CardContent>
               <Stack gap={4}>
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Variants</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Variants - Intuitive Colors</h4>
                   <Flex gap={3} wrap>
-                    <Button variant="primary">Primary</Button>
-                    <Button variant="secondary">Secondary</Button>
+                    <Button variant="primary">Primary (Blue)</Button>
+                    <Button variant="secondary">Secondary (Gray)</Button>
                     <Button variant="outline">Outline</Button>
                     <Button variant="ghost">Ghost</Button>
-                    <Button variant="danger">Danger</Button>
+                    <Button variant="success">Success (Green)</Button>
+                    <Button variant="danger">Danger (Red)</Button>
                   </Flex>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    ✅ Blue for primary actions, Green for success, Red for danger - much more intuitive!
+                  </p>
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button Sizes</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button Sizes</h4>
                   <Flex gap={3} align="center">
                     <Button size="sm">Small</Button>
                     <Button size="base">Base</Button>
@@ -81,12 +85,26 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Button States</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Button States</h4>
                   <Flex gap={3}>
                     <Button loading>Loading</Button>
                     <Button disabled>Disabled</Button>
                     <Button leftIcon="📊">With Icon</Button>
                   </Flex>
+                </div>
+
+                <div>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Trading Buttons</h4>
+                  <Flex gap={3}>
+                    <button className="btn btn-trading-buy">Buy Order</button>
+                    <button className="btn btn-trading-sell">Sell Order</button>
+                    <button className="btn btn-success">Execute</button>
+                    <button className="btn btn-warning">Modify</button>
+                    <button className="btn btn-danger">Cancel</button>
+                  </Flex>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                    Trading-specific buttons with clear visual hierarchy
+                  </p>
                 </div>
               </Stack>
             </CardContent>
@@ -158,7 +176,7 @@ const ComponentDemo: React.FC = () => {
             <CardContent>
               <Stack gap={4}>
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Variants</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Badge Variants</h4>
                   <Flex gap={3} wrap>
                     <Badge variant="default">Default</Badge>
                     <Badge variant="primary">Primary</Badge>
@@ -170,7 +188,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Badge Sizes</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Badge Sizes</h4>
                   <Flex gap={3} wrap>
                     <Badge variant="primary" size="sm">Small</Badge>
                     <Badge variant="primary" size="base">Base</Badge>
@@ -179,7 +197,7 @@ const ComponentDemo: React.FC = () => {
                 </div>
 
                 <div>
-                  <h4 style={{ marginBottom: '1rem', color: '#334155' }}>Status Badges</h4>
+                  <h4 style={{ marginBottom: '1rem', color: 'var(--text-primary)' }}>Status Badges</h4>
                   <Flex gap={3} wrap>
                     <StatusBadge status="active" />
                     <StatusBadge status="inactive" />
@@ -213,7 +231,7 @@ const ComponentDemo: React.FC = () => {
                       <TableCell style={{ fontWeight: '600' }}>{row.name}</TableCell>
                       <TableCell>{row.email}</TableCell>
                       <TableCell>
-                        <StatusBadge status={row.status as any} />
+                        <StatusBadge status={row.status as 'active' | 'error' | 'inactive' | 'pending' | 'executed' | 'rejected' | 'cancelled'} />
                       </TableCell>
                       <TableCell>
                         <Badge variant={row.role === 'Admin' ? 'primary' : 'default'} size="sm">

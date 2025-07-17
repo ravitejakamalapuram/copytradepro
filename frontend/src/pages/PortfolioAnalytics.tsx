@@ -103,7 +103,7 @@ const PortfolioAnalyticsPage: React.FC = () => {
             <Card>
               <CardContent>
                 <div style={{ textAlign: 'center', padding: '3rem' }}>
-                  <p style={{ color: '#ef4444', marginBottom: '1rem' }}>{error}</p>
+                  <p style={{ color: 'var(--pnl-negative)', marginBottom: '1rem' }}>{error}</p>
                   <Button variant="outline" onClick={loadAnalytics}>
                     Retry
                   </Button>
@@ -133,15 +133,15 @@ const PortfolioAnalyticsPage: React.FC = () => {
               <CardContent>
                 <Grid cols={3} gap={4}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                       Max Drawdown
                     </div>
-                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: '#ef4444' }}>
+                    <div style={{ fontSize: '1.5rem', fontWeight: '700', color: 'var(--pnl-negative)' }}>
                       {analytics.analytics.riskMetrics.maxDrawdown.toFixed(2)}%
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                       Sharpe Ratio
                     </div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
@@ -149,7 +149,7 @@ const PortfolioAnalyticsPage: React.FC = () => {
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                       Volatility
                     </div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
@@ -166,7 +166,7 @@ const PortfolioAnalyticsPage: React.FC = () => {
               <CardContent>
                 <Grid cols={2} gap={4}>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                       Total Symbols
                     </div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
@@ -174,7 +174,7 @@ const PortfolioAnalyticsPage: React.FC = () => {
                     </div>
                   </div>
                   <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                       Concentration Risk
                     </div>
                     <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
@@ -278,16 +278,16 @@ const PortfolioAnalyticsPage: React.FC = () => {
                   flexDirection: 'column',
                   gap: '1rem'
                 }}>
-                  <div style={{ fontSize: '1.125rem', fontWeight: '600', color: '#64748b' }}>
+                  <div style={{ fontSize: '1.125rem', fontWeight: '600', color: 'var(--text-secondary)' }}>
                     Performance Chart
                   </div>
-                  <div style={{ fontSize: '0.875rem', color: '#64748b', textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
                     Chart visualization will be implemented with a charting library
                     <br />
                     Showing {performanceData.length} data points for {performancePeriod} days
                   </div>
                   {performanceData.length > 0 && (
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                       Latest P&L: {portfolioService.formatCurrency(performanceData[performanceData.length - 1]?.cumulativePnL || 0)}
                     </div>
                   )}
@@ -372,7 +372,7 @@ const PortfolioAnalyticsPage: React.FC = () => {
                   <Button
                     key={tab.key}
                     variant={activeTab === tab.key ? 'primary' : 'ghost'}
-                    onClick={() => setActiveTab(tab.key as any)}
+                    onClick={() => setActiveTab(tab.key as unknown as 'dashboard' | 'analytics' | 'performance' | 'positions')}
                   >
                     {tab.label}
                   </Button>

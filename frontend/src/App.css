@@ -92,7 +92,7 @@
 .logo-icon {
   width: 32px;
   height: 32px;
-  background: linear-gradient(45deg, var(--interactive-primary), #2c5aa0);
+  background: linear-gradient(45deg, var(--interactive-primary), var(--interactive-primary-hover));
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -147,7 +147,7 @@
 }
 
 .logout-btn {
-  background: #dc2626;
+  background: var(--color-loss);
   color: white;
   border: none;
   padding: 0.75rem 1.25rem;
@@ -159,7 +159,7 @@
 }
 
 .logout-btn:hover {
-  background: #b91c1c;
+  background: var(--color-danger-700);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 71, 87, 0.3);
 }

@@ -1,25 +1,25 @@
 .tabbed-navigation {
-  /* Inherit kite-card styles */
+  /* Inherit card styles */
 }
 
 .tabbed-navigation__container {
   display: flex;
-  border-bottom: 1px solid var(--kite-border-secondary);
-  margin: calc(-1 * var(--kite-space-lg)) calc(-1 * var(--kite-space-lg)) var(--kite-space-lg);
-  padding: 0 var(--kite-space-lg);
-  background: var(--kite-bg-card);
+  border-bottom: 1px solid var(--border-secondary);
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-6)) var(--space-6);
+  padding: 0 var(--space-6);
+  background: var(--bg-surface);
 }
 
 .tabbed-navigation__tab {
   background: none;
   border: none;
-  padding: 12px var(--kite-space-lg);
+  padding: 12px var(--space-6);
   cursor: pointer;
   font-size: 12px;
   font-weight: 500;
-  color: var(--kite-text-secondary);
+  color: var(--text-secondary);
   border-bottom: 2px solid transparent;
-  transition: var(--kite-transition);
+  transition: var(--transition-fast);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -30,19 +30,19 @@
 }
 
 .tabbed-navigation__tab:hover {
-  color: var(--kite-text-primary);
-  background: var(--kite-bg-hover);
+  color: var(--text-primary);
+  background: var(--hover-bg);
 }
 
 .tabbed-navigation__tab--active {
-  color: var(--kite-brand-primary);
-  border-bottom-color: var(--kite-brand-primary);
-  background: var(--kite-bg-secondary);
+  color: var(--interactive-primary);
+  border-bottom-color: var(--interactive-primary);
+  background: var(--bg-secondary);
   font-weight: 600;
 }
 
 .tabbed-navigation__tab--active:hover {
-  background: var(--kite-bg-secondary);
+  background: var(--bg-secondary);
 }
 
 .tabbed-navigation__icon {
@@ -57,8 +57,8 @@
 }
 
 .tabbed-navigation__count {
-  background: var(--kite-bg-neutral);
-  color: var(--kite-text-secondary);
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
   padding: 2px 6px;
   border-radius: 8px;
   font-size: 10px;
@@ -70,7 +70,7 @@
 }
 
 .tabbed-navigation__count--active {
-  background: var(--kite-brand-primary);
+  background: var(--interactive-primary);
   color: white;
 }
 

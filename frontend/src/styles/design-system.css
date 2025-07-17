@@ -1,67 +1,71 @@
 /* ==========================================================================
-   COPYTRADE PRO - PROFESSIONAL DESIGN SYSTEM
-   Optimized for desktop trading applications
+   COPYTRADE PRO - UNIFIED DESIGN SYSTEM
+   Dark Trading Theme - Single Source of Truth
    ========================================================================== */
 
 :root {
   /* ==========================================================================
-     COLOR PALETTE - Professional Trading Theme
+     COLOR PALETTE - Professional Dark Trading Theme
      ========================================================================== */
   
-  /* Primary Colors - Professional Blue */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-800: #1e40af;
-  --color-primary-900: #1e3a8a;
-
-  /* Neutral Colors - Professional Grays */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f1f5f9;
-  --color-neutral-200: #e2e8f0;
-  --color-neutral-300: #cbd5e1;
-  --color-neutral-400: #94a3b8;
-  --color-neutral-500: #64748b;
-  --color-neutral-600: #475569;
-  --color-neutral-700: #334155;
-  --color-neutral-800: #1e293b;
-  --color-neutral-900: #0f172a;
-
+  /* Primary Colors - Trading Platform Theme */
+  --color-primary: #1a1a2e;
+  --color-primary-light: #16213e;
+  --color-primary-dark: #0f0f1a;
+  
+  /* Secondary Colors */
+  --color-secondary: #0f3460;
+  --color-secondary-light: #1e5f8b;
+  --color-secondary-dark: #0a2847;
+  
+  /* Accent Colors */
+  --color-accent: #e94560;
+  --color-accent-light: #ff6b7d;
+  --color-accent-dark: #c73650;
+  
   /* Trading Colors */
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-200: #bbf7d0;
-  --color-success-500: #22c55e;
-  --color-success-600: #16a34a;
-  --color-success-700: #15803d;
-  --color-success-800: #166534;
+  --color-profit: #00d4aa;
+  --color-loss: #ff4757;
+  --color-neutral: #747d8c;
+  
+  /* Background Colors */
+  --color-bg-primary: #0f0f23;
+  --color-bg-secondary: #1a1a2e;
+  --color-bg-tertiary: #16213e;
+  --color-bg-card: #1e1e3f;
+  --color-bg-elevated: #252547;
+  --color-bg-trading-panel: #1a1a2e;
+  --color-bg-sidebar: #16213e;
+  --color-bg-header: #0f0f23;
+  
+  /* Text Colors */
+  --color-text-primary: #ffffff;
+  --color-text-secondary: #a4b0be;
+  --color-text-muted: #747d8c;
+  
+  /* Border Colors */
+  --color-border-primary: #2c2c54;
+  --color-border-secondary: #40407a;
+  --color-border-accent: #e94560;
 
-  --color-danger-50: #fef2f2;
-  --color-danger-100: #fee2e2;
-  --color-danger-200: #fecaca;
-  --color-danger-500: #ef4444;
-  --color-danger-600: #dc2626;
-  --color-danger-700: #b91c1c;
-  --color-danger-800: #991b1b;
+  /* Status Colors */
+  --color-success-500: var(--color-profit);
+  --color-success-600: #00b894;
+  --color-success-700: #00a085;
+  --color-success-800: #008876;
 
-  --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-200: #fde68a;
-  --color-warning-500: #f59e0b;
-  --color-warning-600: #d97706;
-  --color-warning-800: #92400e;
+  --color-danger-500: var(--color-loss);
+  --color-danger-600: #e84057;
+  --color-danger-700: #d63447;
+  --color-danger-800: #c44569;
 
-  --color-info-50: #eff6ff;
-  --color-info-100: #dbeafe;
-  --color-info-200: #bfdbfe;
-  --color-info-500: #3b82f6;
-  --color-info-600: #2563eb;
-  --color-info-800: #1e40af;
+  --color-warning-500: #FFD166;
+  --color-warning-600: #FFC300;
+  --color-warning-800: #B38600;
+
+  --color-info-500: #2D8CFF;
+  --color-info-600: #1B6ED6;
+  --color-info-800: #144A8C;
 
   /* ==========================================================================
      TYPOGRAPHY SYSTEM
@@ -123,6 +127,11 @@
   --radius-2xl: 1rem;      /* 16px */
   --radius-full: 9999px;
 
+  /* Component-specific radius tokens */
+  --card-radius: var(--radius-xl);
+  --button-radius: var(--radius-lg);
+  --input-radius: var(--radius-lg);
+
   /* ==========================================================================
      SHADOWS
      ========================================================================== */
@@ -162,42 +171,88 @@
   --sidebar-width: 16rem;
   --sidebar-width-collapsed: 4rem;
   --container-max-width: 1400px;
+
+  /* ==========================================================================
+     COMPONENT TOKENS
+     ========================================================================== */
+  
+  /* Button tokens */
+  --button-height-sm: 2rem;
+  --button-height-base: 2.5rem;
+  --button-height-lg: 3rem;
+  --button-padding-x: var(--space-4);
+  --button-padding-y: var(--space-3);
+
+  /* Input tokens */
+  --input-height: 2.5rem;
+  --input-padding-x: var(--space-3);
+  --input-padding-y: var(--space-2);
+
+  /* Card tokens */
+  --card-padding: var(--space-6);
+  --card-shadow: var(--shadow-base);
+
+  /* Table tokens */
+  --table-header-height: 3rem;
+  --table-row-height: 2.5rem;
+  --table-cell-padding: var(--space-4);
 }
 
 /* ==========================================================================
-   SEMANTIC COLOR TOKENS
+   SEMANTIC COLOR TOKENS - Dark Trading Theme
    ========================================================================== */
 
 :root {
-  /* Background Colors - Professional Light Theme */
-  --bg-primary: #f8fafc;
-  --bg-secondary: #f1f5f9;
-  --bg-tertiary: #e2e8f0;
-  --bg-surface: #ffffff;
-  --bg-overlay: rgba(0, 0, 0, 0.5);
+  /* Background Colors - Dark Trading Theme */
+  --bg-primary: var(--color-bg-primary);
+  --bg-secondary: var(--color-bg-secondary);
+  --bg-tertiary: var(--color-bg-tertiary);
+  --bg-surface: var(--color-bg-card);
+  --bg-overlay: rgba(0, 0, 0, 0.7);
 
-  /* Text Colors - High Contrast */
-  --text-primary: #1a1d23;
-  --text-secondary: #4a5568;
-  --text-tertiary: #718096;
-  --text-inverse: #ffffff;
-  --text-success: var(--color-success-700);
-  --text-danger: var(--color-danger-700);
-  --text-warning: var(--color-warning-600);
+  /* Text Colors - Dark Theme */
+  --text-primary: var(--color-text-primary);
+  --text-secondary: var(--color-text-secondary);
+  --text-tertiary: var(--color-text-muted);
+  --text-inverse: var(--color-bg-primary);
+  --text-success: var(--color-profit);
+  --text-danger: var(--color-loss);
+  --text-warning: var(--color-warning-500);
 
-  /* Border Colors - Subtle */
-  --border-primary: #e2e8f0;
-  --border-secondary: #cbd5e0;
-  --border-focus: var(--color-primary-500);
-  --border-success: var(--color-success-500);
-  --border-danger: var(--color-danger-500);
+  /* Border Colors - Dark Theme */
+  --border-primary: var(--color-border-primary);
+  --border-secondary: var(--color-border-secondary);
+  --border-focus: var(--color-accent);
+  --border-success: var(--color-profit);
+  --border-danger: var(--color-loss);
   --border-warning: var(--color-warning-500);
 
-  /* Interactive Colors - Professional Blue */
-  --interactive-primary: #3182ce;
-  --interactive-primary-hover: #2c5aa0;
-  --interactive-secondary: #4a5568;
-  --interactive-secondary-hover: #2d3748;
+  /* Interactive Colors - Intuitive Button Scheme */
+  --interactive-primary: #3182ce;        /* Blue for primary actions */
+  --interactive-primary-hover: #2c5aa0;  /* Darker blue on hover */
+  --interactive-primary-active: #2a4d8d; /* Even darker blue when active */
+  --interactive-secondary: var(--color-secondary);
+  --interactive-secondary-hover: var(--color-secondary-light);
+  --interactive-secondary-active: var(--color-secondary-dark);
+
+  /* Interactive State Colors */
+  --hover-bg: var(--bg-secondary);
+  --hover-bg-light: var(--bg-tertiary);
+  --hover-border: var(--border-secondary);
+  --active-bg: var(--bg-tertiary);
+  --active-border: var(--border-focus);
+
+  /* Focus State Colors */
+  --focus-ring: var(--color-accent);
+  --focus-ring-offset: 2px;
+  --focus-ring-width: 2px;
+  --focus-ring-opacity: 0.5;
+
+  /* ==========================================================================
+     LEGACY THEME COMPATIBILITY - Kite Theme Mappings
+     ========================================================================== */
+  
+  /* Modern design system - no legacy aliases needed */
 }
 
 /* ==========================================================================
@@ -206,9 +261,9 @@
 
 /* Base Styles */
 body {
-  font-family: var(--font-family-base);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-base);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
   color: var(--text-primary);
   background-color: var(--bg-primary);
   margin: 0;
@@ -230,7 +285,7 @@ body {
 
 .grid {
   display: grid;
-  gap: var(--spacing-6);
+  gap: var(--space-6);
 }
 
 .flex {
@@ -254,15 +309,53 @@ body {
 }
 
 .gap-2 {
-  gap: var(--spacing-2);
+  gap: var(--space-2);
 }
 
 .gap-4 {
-  gap: var(--spacing-4);
+  gap: var(--space-4);
 }
 
 .gap-6 {
-  gap: var(--spacing-6);
+  gap: var(--space-6);
+}
+
+/* ==========================================================================
+   UTILITY CLASSES - Status and Trading Colors
+   ========================================================================== */
+
+/* Status Text Colors */
+.status-success {
+  color: var(--color-success-500);
+}
+
+.status-error {
+  color: var(--color-danger-500);
+}
+
+.status-warning {
+  color: var(--color-warning-500);
+}
+
+.status-info {
+  color: var(--color-info-500);
+}
+
+/* Status Dot Colors */
+.dot-success {
+  background-color: var(--color-success-500);
+}
+
+.dot-error {
+  background-color: var(--color-danger-500);
+}
+
+.dot-warning {
+  background-color: var(--color-warning-500);
+}
+
+.dot-info {
+  background-color: var(--color-info-500);
 }
 
 /* ==========================================================================
@@ -274,7 +367,7 @@ body {
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: 12px;
-  padding: var(--spacing-6);
+  padding: var(--space-6);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: all 0.2s ease;
 }
@@ -336,21 +429,21 @@ body {
 }
 
 .status-active {
-  background: #d4edda;
-  color: #155724;
-  border: 1px solid #c3e6cb;
+  background: var(--status-active-bg, var(--color-profit));
+  color: var(--status-active-text, var(--text-primary));
+  border: 1px solid var(--status-active-border, var(--color-profit));
 }
 
 .status-inactive {
-  background: #f8d7da;
-  color: #721c24;
-  border: 1px solid #f5c6cb;
+  background: var(--status-inactive-bg, var(--bg-secondary));
+  color: var(--status-inactive-text, var(--text-secondary));
+  border: 1px solid var(--status-inactive-border, var(--border-secondary));
 }
 
 .status-pending {
-  background: #fff3cd;
-  color: #856404;
-  border: 1px solid #ffeaa7;
+  background: var(--status-pending-bg, var(--color-warning-500));
+  color: var(--status-pending-text, var(--text-primary));
+  border: 1px solid var(--status-pending-border, var(--color-warning-500));
 }
 
 /* Professional Headers */
@@ -379,7 +472,7 @@ body {
 .nav-tabs {
   display: flex;
   border-bottom: 1px solid var(--border-primary);
-  margin-bottom: var(--spacing-6);
+  margin-bottom: var(--space-6);
 }
 
 .nav-tab {
@@ -462,7 +555,7 @@ body {
 }
 
 .form-error {
-  color: #dc2626;
+  color: var(--color-loss);
   font-size: 12px;
   margin-top: 0.25rem;
   font-weight: 500;

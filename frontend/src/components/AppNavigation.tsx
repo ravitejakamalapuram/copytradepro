@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
 import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
+import Button from './ui/Button';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -18,6 +20,7 @@ const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -70,6 +73,9 @@ const AppNavigation: React.FC = () => {
       fetchPortfolioData();
     }, 30000);
 
+    // Register interval for cleanup
+    registerInterval(interval);
+
     return () => clearInterval(interval);
   }, []);
 
@@ -101,145 +107,90 @@ const AppNavigation: React.FC = () => {
   }));
 
   return (
-    <div className="kite-theme">
+    <>
       {/* Top Navigation */}
-      <nav className="kite-nav">
-        <div className="kite-nav-content">
+      <nav className="app-nav">
+        <div className="app-nav-content">
           {/* Logo */}
-          <div className="kite-logo">
-            <span style={{ color: '#387ed1' }}>📈</span>
+          <div className="app-logo">
+            <span className="logo-icon">📈</span>
             <span>CopyTrade Pro</span>
           </div>
 
           {/* Main Navigation */}
-          <div className="kite-nav-links">
+          <div className="app-nav-links">
             {navItems.map((item) => (
-              <button
+              <Button
                 key={item.path}
-                className={`kite-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                variant="ghost"
+                className={`app-nav-link ${location.pathname === item.path ? 'app-nav-link--active' : ''}`}
                 onClick={() => navigate(item.path)}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* User Menu */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div className="nav-user-menu">
             {/* Market Status */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              fontSize: '0.75rem',
-              color: 'var(--kite-text-secondary)'
-            }}>
-              <div style={{
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}></div>
+            <div className="market-status-indicator">
+              <div className="status-dot" style={{ backgroundColor: marketStatus?.isOpen ? 'var(--color-profit)' : 'var(--color-loss)' }}></div>
               {marketStatus?.status || 'Market Status Unknown'}
             </div>
 
             {/* User Info */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px',
-              borderRadius: 'var(--kite-radius-md)',
-              backgroundColor: 'var(--kite-bg-tertiary)'
-            }}>
+            <div className="user-info-container">
               <div style={{ textAlign: 'right' }}>
-                <div style={{
-                  fontSize: '11px',
-                  fontWeight: '500',
-                  color: 'var(--kite-text-primary)',
-                  lineHeight: '1.2'
-                }}>
+                <div className="user-name">
                   {user?.name || 'Kamalapuram'}
                 </div>
-                <div style={{
-                  fontSize: '10px',
-                  color: 'var(--kite-text-secondary)',
-                  lineHeight: '1.2'
-                }}>
+                <div className="user-email text-muted">
                 </div>
               </div>
-              <button
-                className="kite-btn"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={handleLogout}
-                style={{
-                  padding: '4px 8px',
-                  fontSize: '10px',
-                  minHeight: 'auto'
-                }}
               >
                 Logout
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       </nav>
 
       {/* Sidebar */}
-      <div className={`kite-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <div className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
         {/* Watchlist Section */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Watchlist</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Watchlist</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {watchlistItems.map((item, index) => (
               <div
                 key={index}
-                style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  padding: '0.5rem',
-                  borderRadius: 'var(--kite-radius-sm)',
-                  cursor: 'pointer',
-                  transition: 'var(--kite-transition)',
-                  fontSize: '0.875rem'
-                }}
+                className="watchlist-item"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--kite-bg-hover)';
+                  e.currentTarget.classList.add('bg-hover');
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.classList.remove('bg-hover');
                 }}
               >
                 <div>
-                  <div style={{ 
-                    fontWeight: '500',
-                    color: 'var(--kite-text-primary)',
-                    fontSize: '0.75rem'
-                  }}>
+                  <div className="text-primary" style={{ fontSize: '0.75rem' }}>
                     {item.symbol}
                   </div>
-                  <div style={{ 
-                    fontSize: '0.875rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: 'var(--kite-text-primary)'
-                  }}>
+                  <div className="text-primary" style={{ fontSize: '0.875rem' }}>
                     {item.ltp.toFixed(2)}
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
-                  <div style={{ 
-                    fontSize: '0.75rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: item.change >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                  }}>
+                  <div className={item.change >= 0 ? 'pnl-positive' : 'pnl-negative'} style={{ fontSize: '0.75rem' }}>
                     {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}
                   </div>
-                  <div style={{ 
-                    fontSize: '0.75rem',
-                    fontFamily: 'var(--kite-font-mono)',
-                    color: item.changePercent >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                  }}>
+                  <div className={item.changePercent >= 0 ? 'pnl-positive' : 'pnl-negative'} style={{ fontSize: '0.75rem' }}>
                     ({item.changePercent >= 0 ? '+' : ''}{item.changePercent.toFixed(2)}%)
                   </div>
                 </div>
@@ -249,20 +200,11 @@ const AppNavigation: React.FC = () => {
 
           {/* Live Data Indicator */}
           {lastUpdated && (
-            <div style={{
-              fontSize: '0.7rem',
-              color: 'var(--kite-text-secondary)',
-              textAlign: 'center',
-              marginTop: '0.5rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '0.25rem'
-            }}>
+            <div className="live-data-indicator">
               <span style={{
                 width: '6px',
                 height: '6px',
-                backgroundColor: 'var(--kite-profit)',
+                backgroundColor: 'var(--color-profit)',
                 borderRadius: '50%',
                 animation: 'pulse 2s infinite'
               }}></span>
@@ -275,42 +217,24 @@ const AppNavigation: React.FC = () => {
         </div>
 
         {/* Portfolio Summary */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Portfolio</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Portfolio</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Total Value
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: 'var(--kite-text-primary)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Total Value</span>
+              <span className="text-primary">
                 ₹{(portfolioSummary?.totalValue || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Day's P&L
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: (portfolioSummary?.dayPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Day's P&L</span>
+              <span className={`text-primary ${portfolioSummary?.dayPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                 {(portfolioSummary?.dayPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.dayPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.dayPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.dayPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: 'var(--kite-text-secondary)', fontSize: '0.75rem' }}>
-                Total P&L
-              </span>
-              <span style={{
-                fontFamily: 'var(--kite-font-mono)',
-                fontWeight: '500',
-                color: (portfolioSummary?.totalPnL || 0) >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
-              }}>
+            <div className="portfolio-summary-item">
+              <span className="text-muted">Total P&L</span>
+              <span className={`text-primary ${portfolioSummary?.totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
                 {(portfolioSummary?.totalPnL || 0) >= 0 ? '+' : ''}₹{Math.abs(portfolioSummary?.totalPnL || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })} ({(portfolioSummary?.totalPnLPercent || 0) >= 0 ? '+' : ''}{(portfolioSummary?.totalPnLPercent || 0).toFixed(2)}%)
               </span>
             </div>
@@ -318,30 +242,27 @@ const AppNavigation: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Quick Actions</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Quick Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <button 
-              className="kite-btn kite-btn-primary"
-              style={{ width: '100%', justifyContent: 'center' }}
+            <Button
+              className="btn btn-primary"
               onClick={() => navigate('/trade-setup')}
             >
               Place Order
-            </button>
-            <button 
-              className="kite-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
+            </Button>
+            <Button
+              className="btn"
               onClick={() => navigate('/advanced-orders')}
             >
               Advanced Orders
-            </button>
-            <button 
-              className="kite-btn"
-              style={{ width: '100%', justifyContent: 'center' }}
+            </Button>
+            <Button
+              className="btn"
               onClick={() => navigate('/portfolio')}
             >
               View Analytics
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -355,10 +276,10 @@ const AppNavigation: React.FC = () => {
           zIndex: 101,
           display: 'none',
           padding: '0.5rem',
-          backgroundColor: 'var(--kite-bg-secondary)',
-          border: '1px solid var(--kite-border-primary)',
-          borderRadius: 'var(--kite-radius-md)',
-          color: 'var(--kite-text-primary)',
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--text-primary)',
           cursor: 'pointer'
         }}
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -374,7 +295,7 @@ const AppNavigation: React.FC = () => {
           }
         }
       `}</style>
-    </div>
+    </>
   );
 };
 

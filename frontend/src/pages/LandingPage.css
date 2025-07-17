@@ -1,6 +1,6 @@
 .landing-page {
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
   display: flex;
   flex-direction: column;
 }
@@ -30,7 +30,7 @@
   font-size: 3.5rem;
   font-weight: 700;
   margin-bottom: 1rem;
-  background: linear-gradient(45deg, #ffffff, #e2e8f0);
+  background: linear-gradient(45deg, var(--text-primary), var(--color-bg-card));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -86,7 +86,7 @@
 
 .auth-tabs {
   display: flex;
-  background: #f7fafc;
+  background: var(--color-neutral-100);
   border-radius: 12px;
   padding: 4px;
 }
@@ -100,12 +100,12 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  color: #718096;
+  color: var(--color-neutral-600);
 }
 
 .auth-tab.active {
-  background: white;
-  color: #667eea;
+  background: var(--color-neutral-0);
+  color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
@@ -116,11 +116,11 @@
 .auth-footer {
   text-align: center;
   padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--color-neutral-200);
 }
 
 .auth-switch {
-  color: #718096;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   margin: 0;
 }
@@ -128,14 +128,14 @@
 .auth-switch-btn {
   background: none;
   border: none;
-  color: #667eea;
+  color: var(--interactive-primary);
   cursor: pointer;
   font-weight: 500;
   text-decoration: underline;
 }
 
 .auth-switch-btn:hover {
-  color: #764ba2;
+  color: var(--interactive-primary-hover);
 }
 
 /* Footer */

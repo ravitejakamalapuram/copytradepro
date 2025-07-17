@@ -1,51 +1,131 @@
 /* Professional Trade Setup Page Styles */
 
-/* Trade Form */
-.trade-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
+/* Form Elements */
 .form-label {
-  font-size: var(--text-sm);
-  font-weight: var(--font-semibold);
+  font-size: 0.875rem;
+  font-weight: 500;
   color: var(--text-primary);
   margin-bottom: 0.5rem;
+  display: block;
 }
 
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-primary);
-  margin-top: 1rem;
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--interactive-primary);
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.1);
+}
+
+.form-input:disabled {
+  background: var(--bg-secondary);
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+}
+
+/* Search Dropdown */
+.search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  z-index: 1000;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 0.25rem;
+}
+
+.search-result-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-secondary);
+  transition: background-color 0.2s;
+}
+
+.search-result-item:last-child {
+  border-bottom: none;
+}
+
+.search-result-item:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Exchange and Action Badges */
+.exchange-badge {
+  font-weight: 500;
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.exchange-badge.nse {
+  background: #1e40af;
+  color: white;
+}
+
+.exchange-badge.bse {
+  background: #dc2626;
+  color: white;
+}
+
+.action-badge {
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.action-badge.buy {
+  color: var(--color-profit);
+}
+
+.action-badge.sell {
+  color: var(--color-loss);
+}
+
+/* Alert Styles */
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.alert-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
 }
 
 /* Account Selection */
-.account-selection {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: var(--bg-secondary);
+.account-selection-section {
+  margin: 2rem 0;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.08);
   border: 1px solid var(--border-primary);
-  border-radius: var(--radius-md);
+  padding: 0;
 }
-
+.account-selection {
+  padding: 1.5rem 1.5rem 1.5rem 1.5rem;
+  background: none;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
 .loading-accounts {
   padding: 2rem;
   text-align: center;
@@ -72,7 +152,6 @@
 .no-accounts p:first-child {
   font-weight: var(--font-semibold);
 }
-}
 
 .no-accounts {
   padding: 1.5rem;
@@ -93,27 +172,56 @@
 
 /* Old checkbox styles removed - now using enterprise Checkbox component */
 
+.account-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(49,130,206,0.04);
+}
+.account-card.selected {
+  border: 2px solid var(--interactive-primary);
+  background: var(--bg-tertiary);
+  box-shadow: 0 2px 8px rgba(49,130,206,0.10);
+}
+.account-card:hover {
+  border-color: var(--interactive-primary);
+  background: var(--bg-tertiary);
+}
 .account-info {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.account-name {
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
 }
-
-.account-status {
+.account-meta {
   font-size: 0.75rem;
-  color: var(--color-success-600);
+  color: var(--text-secondary);
+  margin-left: 2rem;
+  margin-top: 0.1rem;
+  word-break: break-all;
+}
+.account-select-toggle {
+  font-size: 0.85rem;
+  color: var(--interactive-primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+  margin: 0;
   font-weight: 500;
-  background: var(--color-success-50);
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-full);
-  border: 1px solid var(--color-success-200);
+  transition: color 0.2s;
+  box-shadow: none;
+}
+.account-select-toggle:hover {
+  color: var(--interactive-primary-hover);
 }
 
 /* Trade History */
@@ -128,17 +236,17 @@
 }
 
 .trade-history-container::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: var(--bg-secondary);
   border-radius: 3px;
 }
 
 .trade-history-container::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: var(--border-secondary);
   border-radius: 3px;
 }
 
 .trade-history-container::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: var(--text-tertiary);
 }
 
 .trades-list {
@@ -240,13 +348,13 @@
 .search-section {
   padding: 1.5rem;
   border-bottom: 1px solid var(--border-color);
-  background-color: #fafbfc;
+  background-color: var(--bg-secondary);
 }
 
 /* Order History Filters */
 .filters-section {
   padding: 1.5rem;
-  background-color: #f8fafc;
+  background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
   max-height: 300px;
   overflow-y: auto;

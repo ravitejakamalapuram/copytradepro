@@ -47,7 +47,7 @@
 
 .dialog-header h3 {
   margin: 0;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 1.25rem;
   font-weight: 600;
 }
@@ -56,7 +56,7 @@
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: #6b7280;
+  color: var(--text-tertiary);
   cursor: pointer;
   padding: 0.25rem;
   border-radius: 4px;
@@ -64,8 +64,8 @@
 }
 
 .dialog-close:hover {
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
 }
 
 .dialog-close:disabled {
@@ -84,7 +84,7 @@
 
 .order-summary h4 {
   margin: 0 0 1rem 0;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -106,13 +106,13 @@
 }
 
 .summary-item .label {
-  color: #6b7280;
+  color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .summary-item .value {
-  color: #1f2937;
+  color: var(--text-primary);
   font-weight: 600;
   font-size: 0.875rem;
 }
@@ -123,7 +123,7 @@
 }
 
 .estimated-value {
-  color: #059669 !important;
+  color: var(--color-profit) !important;
   font-size: 1rem !important;
 }
 
@@ -135,13 +135,13 @@
 }
 
 .action-badge.buy {
-  background: rgba(72, 187, 120, 0.1);
-  color: #059669 !important;
+  background: rgba(0, 212, 170, 0.1);
+  color: var(--color-profit) !important;
 }
 
 .action-badge.sell {
-  background: rgba(245, 101, 101, 0.1);
-  color: #dc2626 !important;
+  background: rgba(255, 71, 87, 0.1);
+  color: var(--color-loss) !important;
 }
 
 /* Selected Accounts */
@@ -151,7 +151,7 @@
 
 .selected-accounts h4 {
   margin: 0 0 1rem 0;
-  color: #1f2937;
+  color: var(--text-primary);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -174,12 +174,12 @@
 
 .account-name {
   font-weight: 500;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .broker-badge {
-  background: #3b82f6;
-  color: white;
+  background: var(--interactive-primary);
+  color: var(--text-primary);
   padding: 0.25rem 0.5rem;
   border-radius: 12px;
   font-size: 0.75rem;
@@ -191,14 +191,14 @@
 .risk-warnings {
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: #fef3cd;
-  border: 1px solid #f59e0b;
+  background: var(--color-warning-100);
+  border: 1px solid var(--color-warning-500);
   border-radius: 8px;
 }
 
 .risk-warnings h4 {
   margin: 0 0 0.75rem 0;
-  color: #92400e;
+  color: var(--color-warning-700);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -209,7 +209,7 @@
 }
 
 .risk-warnings li {
-  color: #92400e;
+  color: var(--color-warning-700);
   font-size: 0.875rem;
   margin-bottom: 0.25rem;
 }
@@ -218,14 +218,14 @@
 .disclaimer {
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: #f3f4f6;
+  background: var(--color-neutral-100);
   border-radius: 8px;
-  border-left: 4px solid #6b7280;
+  border-left: 4px solid var(--color-neutral-600);
 }
 
 .disclaimer p {
   margin: 0;
-  color: #4b5563;
+  color: var(--color-neutral-700);
   font-size: 0.875rem;
   line-height: 1.5;
 }

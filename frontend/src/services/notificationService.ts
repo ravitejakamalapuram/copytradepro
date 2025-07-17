@@ -23,7 +23,7 @@ export interface PushNotificationPayload {
   icon?: string;
   badge?: string;
   image?: string;
-  data?: any;
+  data?: Record<string, unknown>;
   actions?: Array<{
     action: string;
     title: string;
@@ -82,14 +82,34 @@ class NotificationService {
    */
   private async registerServiceWorker(): Promise<void> {
     try {
-      this.registration = await navigator.serviceWorker.register('/sw.js');
-      console.log('Service Worker registered successfully');
-      
+      // First, unregister any existing service workers
+      await this.unregisterExistingServiceWorkers();
+
+      this.registration = await navigator.serviceWorker.register('/sw.js', {
+        scope: '/notifications/' // Only handle notification-related requests
+      });
+      console.log('Service Worker registered successfully with limited scope');
+
       // Wait for service worker to be ready
       await navigator.serviceWorker.ready;
     } catch (error) {
       console.error('Service Worker registration failed:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Unregister existing service workers to clear old scope
+   */
+  private async unregisterExistingServiceWorkers(): Promise<void> {
+    try {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+        console.log('Unregistered existing service worker');
+      }
+    } catch (error) {
+      console.warn('Failed to unregister existing service workers:', error);
     }
   }
 
@@ -262,6 +282,39 @@ class NotificationService {
   }
 
   /**
+   * Manually cleanup and re-register service worker (for debugging)
+   */
+  async forceCleanupAndReregister(): Promise<void> {
+    try {
+      console.log('🧹 Force cleaning up service workers...');
+
+      // Unregister all service workers
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const registration of registrations) {
+        await registration.unregister();
+        console.log('🗑️ Unregistered service worker:', registration.scope);
+      }
+
+      // Clear service worker cache
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(
+          cacheNames.map(cacheName => caches.delete(cacheName))
+        );
+        console.log('🗑️ Cleared service worker caches');
+      }
+
+      // Reset internal state
+      this.registration = null;
+      this.subscription = null;
+
+      console.log('✅ Service worker cleanup complete. Refresh the page to re-register with new scope.');
+    } catch (error) {
+      console.error('❌ Failed to cleanup service workers:', error);
+    }
+  }
+
+  /**
    * Get user notification preferences
    */
   async getPreferences(): Promise<NotificationPreferences | null> {
@@ -385,3 +438,8 @@ class NotificationService {
 }
 
 export const notificationService = new NotificationService();
+
+// Expose to global scope for debugging
+if (typeof window !== 'undefined') {
+  (window as any).notificationService = notificationService;
+}

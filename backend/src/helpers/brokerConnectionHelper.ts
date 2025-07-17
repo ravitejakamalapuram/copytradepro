@@ -1,10 +1,10 @@
 import { Response } from 'express';
-import { ShoonyaService } from '../services/shoonyaService';
-import { FyersService } from '../services/fyersService';
-import { userBrokerConnections } from '../controllers/brokerController';
+import { IBrokerService } from '@copytrade/unified-broker';
+import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
+import { logger } from '../utils/logger';
 
 // Type definitions
-export type BrokerService = ShoonyaService | FyersService;
+export type BrokerService = IBrokerService;
 
 export interface BrokerConnectionResult {
   success: boolean;
@@ -35,54 +35,37 @@ export class BrokerConnectionHelper {
    * @returns BrokerConnectionResult with connection or error
    */
   static findBrokerConnection(
-    userId: string, 
-    brokerName: string, 
+    userId: string,
+    brokerName: string,
     accountId?: string
   ): BrokerConnectionResult {
-    const userConnections = userBrokerConnections.get(userId);
-    
-    if (!userConnections) {
-      return {
-        success: false,
-        error: 'No connections found for user'
-      };
-    }
-
-    // If specific accountId is provided, look for that exact connection
     if (accountId) {
-      const connectionKey = `${brokerName}_${accountId}`;
-      const connection = userConnections.get(connectionKey);
-      
-      if (!connection) {
-        return {
-          success: false,
-          error: `Not connected to ${brokerName} account ${accountId}`
-        };
-      }
-      
-      return {
-        success: true,
-        connection,
-        accountId
-      };
-    }
-
-    // If no specific accountId, find the first available connection for this broker
-    for (const [connectionKey, connection] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        const extractedAccountId = connectionKey.replace(`${brokerName}_`, '');
+      // Look for specific connection
+      const connection = unifiedBrokerManager.getConnection(userId, brokerName, accountId);
+      if (connection) {
         return {
           success: true,
-          connection,
-          accountId: extractedAccountId
+          connection: connection.service,
+          accountId: connection.accountId
+        };
+      }
+    } else {
+      // Look for any connection for this broker
+      const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+      if (connections.length > 0 && connections[0]) {
+        return {
+          success: true,
+          connection: connections[0].service,
+          accountId: connections[0].accountId
         };
       }
     }
 
     return {
       success: false,
-      error: `Not connected to ${brokerName}`
+      error: 'No connections found for user'
     };
+
   }
 
   /**
@@ -92,26 +75,22 @@ export class BrokerConnectionHelper {
    * @returns MultipleBrokerConnectionsResult with all connections or error
    */
   static findAllBrokerConnections(
-    userId: string, 
+    userId: string,
     brokerName: string
   ): MultipleBrokerConnectionsResult {
-    const userConnections = userBrokerConnections.get(userId);
-    
-    if (!userConnections) {
+    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+
+    if (connections.length === 0) {
       return {
         success: false,
         error: 'No connections found for user'
       };
     }
 
-    const brokerConnections: Array<{ accountId: string; connection: BrokerService }> = [];
-
-    for (const [connectionKey, connection] of userConnections.entries()) {
-      if (connectionKey.startsWith(`${brokerName}_`)) {
-        const accountId = connectionKey.replace(`${brokerName}_`, '');
-        brokerConnections.push({ accountId, connection });
-      }
-    }
+    const brokerConnections: Array<{ accountId: string; connection: BrokerService }> = connections.map(conn => ({
+      accountId: conn.accountId,
+      connection: conn.service
+    }));
 
     if (brokerConnections.length === 0) {
       return {
@@ -134,19 +113,30 @@ export class BrokerConnectionHelper {
    * @returns Promise<boolean> indicating if connection is valid
    */
   static async validateConnection(
-    connection: BrokerService, 
-    brokerName: string, 
+    connection: BrokerService,
+    brokerName: string,
     accountId: string
   ): Promise<boolean> {
     try {
-      if (brokerName === 'shoonya') {
-        return await (connection as ShoonyaService).validateSession(accountId);
-      } else if (brokerName === 'fyers') {
-        return await (connection as FyersService).validateSession();
+      // Use unified broker interface - all brokers implement validateSession
+      // The broker service handles the specific validation logic internally
+      const result = await connection.validateSession(accountId);
+
+      // Handle both boolean and object responses
+      if (typeof result === 'boolean') {
+        return result;
+      } else if (result && typeof result === 'object' && 'isValid' in result) {
+        return (result as any).isValid;
       }
+
       return false;
     } catch (error) {
-      console.error(`🚨 Connection validation failed for ${brokerName} account ${accountId}:`, error);
+      logger.error('Connection validation failed', {
+        component: 'BROKER_CONNECTION_HELPER',
+        operation: 'VALIDATE_CONNECTION',
+        brokerName,
+        accountId
+      }, error);
       return false;
     }
   }

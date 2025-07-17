@@ -51,6 +51,16 @@ export class SQLiteAdapter implements IDatabaseAdapter {
     return Promise.resolve(this.sqliteDb.findUserByEmail(email));
   }
 
+  // Alias for backward compatibility
+  async getUserById(id: number | string): Promise<User | null> {
+    return this.findUserById(id.toString());
+  }
+
+  // Alias for backward compatibility
+  async getUserByEmail(email: string): Promise<User | null> {
+    return this.findUserByEmail(email);
+  }
+
   async updateUser(id: number | string, userData: UpdateUserData): Promise<User | null> {
     const numericId = typeof id === 'string' ? parseInt(id) : id;
     return Promise.resolve(this.sqliteDb.updateUser(numericId, userData));
@@ -98,6 +108,11 @@ export class SQLiteAdapter implements IDatabaseAdapter {
   async deleteConnectedAccount(id: number | string): Promise<boolean> {
     const numericId = typeof id === 'string' ? parseInt(id) : id;
     return Promise.resolve(this.sqliteDb.deleteConnectedAccount(numericId));
+  }
+
+  async getAccountCredentials(id: number | string): Promise<any> {
+    const numericId = typeof id === 'string' ? parseInt(id) : id;
+    return Promise.resolve(this.sqliteDb.getAccountCredentials(numericId));
   }
 
   // Order History Management
@@ -164,5 +179,14 @@ export class SQLiteAdapter implements IDatabaseAdapter {
   async getUserNotificationPreferences(userId: number | string): Promise<any> {
     const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
     return Promise.resolve(this.sqliteDb.getUserNotificationPreferences(numericUserId.toString()));
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      return this.sqliteDb.healthCheck();
+    } catch (error) {
+      console.error('🚨 SQLite health check failed:', error);
+      return false;
+    }
   }
 }

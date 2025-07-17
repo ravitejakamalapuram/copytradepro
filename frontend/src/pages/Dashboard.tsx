@@ -95,9 +95,9 @@ const Dashboard: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{
             display: 'flex',
             justifyContent: 'center',
@@ -107,7 +107,7 @@ const Dashboard: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '24px' }}>📊</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading dashboard...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading dashboard...</div>
           </div>
         </div>
       </div>
@@ -116,14 +116,14 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
+            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
             <button
-              className="kite-btn kite-btn-primary"
+              className="btn btn-primary"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -135,45 +135,40 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
-
-      <div className="kite-main">
+      <div className="app-main">
         {/* Portfolio Overview */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '16px' }}>
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Portfolio Value
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(portfolioSummary.totalValue)}
-            </div>
-            <div style={{ fontSize: '11px', color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)', marginTop: '2px' }}>
-              {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
+        <div className="trading-grid" style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="trading-card card--compact">
+            <div className="trading-metric">
+              <div className="trading-metric-label">Portfolio Value</div>
+              <div className="trading-metric-value">₹{formatCurrency(portfolioSummary.totalValue)}</div>
+              <div className={`trading-metric-change ${portfolioSummary.totalPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent >= 0 ? '+' : ''}{portfolioSummary.totalPnLPercent.toFixed(2)}%)
+              </div>
             </div>
           </div>
 
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Day's P&L
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)' }}>
-              {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
-            </div>
-            <div style={{ fontSize: '11px', color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)', marginTop: '2px' }}>
-              {portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%
+          <div className="trading-card card--compact">
+            <div className="trading-metric">
+              <div className="trading-metric-label">Day's P&L</div>
+              <div className={`trading-metric-value ${portfolioSummary.dayPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
+              </div>
+              <div className={`trading-metric-change ${portfolioSummary.dayPnL >= 0 ? 'pnl-positive' : 'pnl-negative'}`}>
+                {portfolioSummary.dayPnLPercent >= 0 ? '+' : ''}{portfolioSummary.dayPnLPercent.toFixed(2)}%
+              </div>
             </div>
           </div>
 
-          <div className="kite-card" style={{ padding: '12px' }}>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginBottom: '4px' }}>
-              Total Invested
-            </div>
-            <div style={{ fontSize: '18px', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
-              ₹{formatCurrency(portfolioSummary.totalInvested)}
-            </div>
-            <div style={{ fontSize: '11px', color: 'var(--kite-text-secondary)', marginTop: '2px' }}>
-              Current: ₹{formatCurrency(portfolioSummary.totalValue)}
+          <div className="trading-card card--compact">
+            <div className="trading-metric">
+              <div className="trading-metric-label">Total Invested</div>
+              <div className="trading-metric-value">₹{formatCurrency(portfolioSummary.totalInvested)}</div>
+              <div className="trading-metric-change text-secondary">
+                Current: ₹{formatCurrency(portfolioSummary.totalValue)}
+              </div>
             </div>
           </div>
         </div>
@@ -181,11 +176,11 @@ const Dashboard: React.FC = () => {
 
 
         {/* Today's Positions */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Recent Positions ({positions.length})</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Recent Positions ({positions.length})</h2>
             <button
-              className="kite-btn"
+              className="btn"
               onClick={() => navigate('/positions')}
             >
               View All
@@ -193,7 +188,7 @@ const Dashboard: React.FC = () => {
           </div>
           {positions.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
+              <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Instrument</th>
@@ -208,36 +203,36 @@ const Dashboard: React.FC = () => {
                   {positions.map((position, index) => (
                     <tr key={index}>
                       <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                        <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                           {position.symbol}
                         </div>
-                        <div style={{ fontSize: '10px', color: 'var(--kite-text-secondary)' }}>
+                        <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
                           {position.exchange}
                         </div>
                       </td>
                       <td style={{
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.qty > 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
+                        fontFamily: 'var(--font-mono)',
+                        color: position.qty > 0 ? 'var(--color-profit)' : 'var(--color-loss)',
                         fontWeight: '500'
                       }}>
                         {position.qty > 0 ? '+' : ''}{position.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(position.avgPrice)}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(position.ltp)}
                       </td>
                       <td style={{
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.pnl >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                        fontFamily: 'var(--font-mono)',
+                        color: position.pnl >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                       }}>
                         {position.pnl >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(position.pnl))}
                         <div style={{ fontSize: '10px' }}>
                           {position.pnlPercent >= 0 ? '+' : ''}{position.pnlPercent.toFixed(2)}%
                         </div>
                       </td>
-                      <td style={{ fontSize: '11px', color: 'var(--kite-text-secondary)' }}>
+                      <td style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
                         {position.product}
                       </td>
                     </tr>
@@ -249,13 +244,13 @@ const Dashboard: React.FC = () => {
             <div style={{
               textAlign: 'center',
               padding: '3rem',
-              color: 'var(--kite-text-secondary)'
+              color: 'var(--text-secondary)'
             }}>
               <div style={{ fontSize: '32px', marginBottom: '12px' }}>📊</div>
               <div style={{ fontSize: '14px', marginBottom: '6px' }}>No positions today</div>
               <div style={{ fontSize: '11px' }}>Start trading to see your positions here</div>
               <button
-                className="kite-btn kite-btn-primary"
+                className="btn btn-primary"
                 style={{ marginTop: '1rem' }}
                 onClick={() => navigate('/trade-setup')}
               >
@@ -264,8 +259,6 @@ const Dashboard: React.FC = () => {
             </div>
           )}
         </div>
-
-
       </div>
     </div>
   );

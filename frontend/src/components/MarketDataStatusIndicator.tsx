@@ -26,15 +26,15 @@ const MarketDataStatusIndicator: React.FC<MarketDataStatusIndicatorProps> = ({
   };
 
   const getStatusColor = () => {
-    if (!connected) return 'text-red-600';
-    if (subscribedCount > 0) return 'text-green-600';
-    return 'text-yellow-600';
+    if (!connected) return 'status-error';
+    if (subscribedCount > 0) return 'status-success';
+    return 'status-warning';
   };
 
   const getDotColor = () => {
-    if (!connected) return 'bg-red-500';
-    if (subscribedCount > 0) return 'bg-green-500';
-    return 'bg-yellow-500';
+    if (!connected) return 'dot-error';
+    if (subscribedCount > 0) return 'dot-success';
+    return 'dot-warning';
   };
 
   return (

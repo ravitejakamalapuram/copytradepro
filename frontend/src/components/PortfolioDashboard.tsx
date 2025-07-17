@@ -35,12 +35,18 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
     try {
       setLoading(true);
       setError(null);
-      
       const data = await portfolioService.getSummary();
       setSummary(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load portfolio summary:', err);
-      setError(err.message || 'Failed to load portfolio data');
+      let message = 'Failed to load portfolio data';
+      function isErrorWithMessage(e: unknown): e is { message: string } {
+        return typeof e === 'object' && e !== null && 'message' in e && typeof (e as { message: unknown }).message === 'string';
+      }
+      if (isErrorWithMessage(err)) {
+        message = err.message;
+      }
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -60,8 +66,8 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
       <div className={`portfolio-dashboard ${className}`}>
         <Card>
           <CardContent>
-            <div style={{ textAlign: 'center', padding: '3rem' }}>
-              <div className="loading-spinner" style={{ margin: '0 auto 1rem' }}></div>
+            <div className="dashboard-center dashboard-loading">
+              <div className="loading-spinner"></div>
               <p>Loading portfolio data...</p>
             </div>
           </CardContent>
@@ -75,8 +81,8 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
       <div className={`portfolio-dashboard ${className}`}>
         <Card>
           <CardContent>
-            <div style={{ textAlign: 'center', padding: '3rem' }}>
-              <p style={{ color: '#ef4444', marginBottom: '1rem' }}>{error}</p>
+            <div className="dashboard-center dashboard-error">
+              <p className="dashboard-error-message">{error}</p>
               <Button variant="outline" onClick={loadPortfolioSummary}>
                 Retry
               </Button>
@@ -92,7 +98,7 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
       <div className={`portfolio-dashboard ${className}`}>
         <Card>
           <CardContent>
-            <div style={{ textAlign: 'center', padding: '3rem' }}>
+            <div className="dashboard-center dashboard-empty">
               <p>No portfolio data available</p>
             </div>
           </CardContent>
@@ -109,12 +115,8 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
         {/* Header */}
         <Flex justify="between" align="center">
           <div>
-            <h1 style={{ fontSize: '1.875rem', fontWeight: '700', margin: 0 }}>
-              Portfolio Dashboard
-            </h1>
-            <p style={{ color: '#64748b', margin: '0.5rem 0 0 0' }}>
-              Track your trading performance and portfolio analytics
-            </p>
+            <h1 className="dashboard-title">Portfolio Dashboard</h1>
+            <p className="dashboard-subtitle">Track your trading performance and portfolio analytics</p>
           </div>
           <Button
             variant="outline"
@@ -129,76 +131,49 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
         <Grid cols={4} gap={4}>
           <Card>
             <CardContent>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                  Portfolio Value
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
-                  {portfolioService.formatCurrency(metrics.currentValue)}
-                </div>
-                <div style={{ 
-                  fontSize: '0.75rem', 
-                  color: portfolioService.getPnLColor(metrics.totalPnL),
-                  marginTop: '0.25rem'
-                }}>
+              <div className="dashboard-metric">
+                <div className="dashboard-metric-label">Portfolio Value</div>
+                <div className="dashboard-metric-value">{portfolioService.formatCurrency(metrics.currentValue)}</div>
+                <div className={
+                  metrics.totalPnL > 0 ? 'dashboard-metric-change dashboard-metric-positive' : metrics.totalPnL < 0 ? 'dashboard-metric-change dashboard-metric-negative' : 'dashboard-metric-change dashboard-metric-neutral'
+                }>
                   {portfolioService.formatPercentage(metrics.totalPnLPercentage)}
                 </div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                  Total P&L
-                </div>
-                <div style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: '700',
-                  color: portfolioService.getPnLColor(metrics.totalPnL)
-                }}>
+              <div className="dashboard-metric">
+                <div className="dashboard-metric-label">Total P&L</div>
+                <div className={
+                  metrics.totalPnL > 0 ? 'dashboard-metric-value dashboard-metric-positive' : metrics.totalPnL < 0 ? 'dashboard-metric-value dashboard-metric-negative' : 'dashboard-metric-value dashboard-metric-neutral'
+                }>
                   {portfolioService.formatCurrency(metrics.totalPnL)}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  All Time
-                </div>
+                <div className="dashboard-metric-change dashboard-metric-neutral">All Time</div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                  Day P&L
-                </div>
-                <div style={{ 
-                  fontSize: '1.5rem', 
-                  fontWeight: '700',
-                  color: portfolioService.getPnLColor(metrics.dayPnL)
-                }}>
+              <div className="dashboard-metric">
+                <div className="dashboard-metric-label">Day P&L</div>
+                <div className={
+                  metrics.dayPnL > 0 ? 'dashboard-metric-value dashboard-metric-positive' : metrics.dayPnL < 0 ? 'dashboard-metric-value dashboard-metric-negative' : 'dashboard-metric-value dashboard-metric-neutral'
+                }>
                   {portfolioService.formatCurrency(metrics.dayPnL)}
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  Today
-                </div>
+                <div className="dashboard-metric-change dashboard-metric-neutral">Today</div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardContent>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>
-                  Success Rate
-                </div>
-                <div style={{ fontSize: '1.5rem', fontWeight: '700' }}>
-                  {metrics.successRate.toFixed(1)}%
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                  {metrics.executedOrders}/{metrics.totalOrders} Orders
-                </div>
+              <div className="dashboard-metric">
+                <div className="dashboard-metric-label">Success Rate</div>
+                <div className="dashboard-metric-value">{metrics.successRate.toFixed(1)}%</div>
+                <div className="dashboard-metric-change dashboard-metric-neutral">{metrics.executedOrders}/{metrics.totalOrders} Orders</div>
               </div>
             </CardContent>
           </Card>
@@ -211,50 +186,33 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
             <CardContent>
               <Stack gap={4}>
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Win Rate</span>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: '600' }}>
-                      {tradingStats.winRate.toFixed(1)}%
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                  <span className="dashboard-metric-label">Win Rate</span>
+                  <div className="dashboard-metric-right">
+                    <div className="dashboard-metric-value">{tradingStats.winRate.toFixed(1)}%</div>
+                    <div className="dashboard-metric-change dashboard-metric-neutral">
                       {tradingStats.winningTrades}/{tradingStats.totalTrades} trades
                     </div>
                   </div>
                 </Flex>
-
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Profit Factor</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {tradingStats.profitFactor.toFixed(2)}
-                  </div>
+                  <span className="dashboard-metric-label">Profit Factor</span>
+                  <div className="dashboard-metric-value">{tradingStats.profitFactor.toFixed(2)}</div>
                 </Flex>
-
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Average Win</span>
-                  <div style={{ fontWeight: '600', color: '#10b981' }}>
-                    {portfolioService.formatCurrency(tradingStats.averageWin)}
-                  </div>
+                  <span className="dashboard-metric-label">Average Win</span>
+                  <div className="dashboard-metric-value dashboard-metric-positive">{portfolioService.formatCurrency(tradingStats.averageWin)}</div>
                 </Flex>
-
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Average Loss</span>
-                  <div style={{ fontWeight: '600', color: '#ef4444' }}>
-                    {portfolioService.formatCurrency(tradingStats.averageLoss)}
-                  </div>
+                  <span className="dashboard-metric-label">Average Loss</span>
+                  <div className="dashboard-metric-value dashboard-metric-negative">{portfolioService.formatCurrency(tradingStats.averageLoss)}</div>
                 </Flex>
-
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Max Drawdown</span>
-                  <div style={{ fontWeight: '600', color: '#ef4444' }}>
-                    {tradingStats.maxDrawdown.toFixed(2)}%
-                  </div>
+                  <span className="dashboard-metric-label">Max Drawdown</span>
+                  <div className="dashboard-metric-value dashboard-metric-negative">{tradingStats.maxDrawdown.toFixed(2)}%</div>
                 </Flex>
-
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Sharpe Ratio</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {tradingStats.sharpeRatio.toFixed(2)}
-                  </div>
+                  <span className="dashboard-metric-label">Sharpe Ratio</span>
+                  <div className="dashboard-metric-value">{tradingStats.sharpeRatio.toFixed(2)}</div>
                 </Flex>
               </Stack>
             </CardContent>
@@ -265,51 +223,37 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
             <CardContent>
               <Stack gap={4}>
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Active Positions</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {metrics.activePositions}
-                  </div>
+                  <span className="dashboard-metric-label">Active Positions</span>
+                  <div className="dashboard-metric-value">{metrics.activePositions}</div>
                 </Flex>
 
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Total Invested</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {portfolioService.formatCurrency(metrics.totalInvested)}
-                  </div>
+                  <span className="dashboard-metric-label">Total Invested</span>
+                  <div className="dashboard-metric-value">{portfolioService.formatCurrency(metrics.totalInvested)}</div>
                 </Flex>
 
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Week P&L</span>
-                  <div style={{ 
-                    fontWeight: '600',
-                    color: portfolioService.getPnLColor(metrics.weekPnL)
-                  }}>
-                    {portfolioService.formatCurrency(metrics.weekPnL)}
-                  </div>
+                  <span className="dashboard-metric-label">Week P&L</span>
+                  <div className={
+                    metrics.weekPnL > 0 ? 'dashboard-metric-value dashboard-metric-positive' : metrics.weekPnL < 0 ? 'dashboard-metric-value dashboard-metric-negative' : 'dashboard-metric-value dashboard-metric-neutral'
+                  }>{portfolioService.formatCurrency(metrics.weekPnL)}</div>
                 </Flex>
 
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Month P&L</span>
-                  <div style={{ 
-                    fontWeight: '600',
-                    color: portfolioService.getPnLColor(metrics.monthPnL)
-                  }}>
-                    {portfolioService.formatCurrency(metrics.monthPnL)}
-                  </div>
+                  <span className="dashboard-metric-label">Month P&L</span>
+                  <div className={
+                    metrics.monthPnL > 0 ? 'dashboard-metric-value dashboard-metric-positive' : metrics.monthPnL < 0 ? 'dashboard-metric-value dashboard-metric-negative' : 'dashboard-metric-value dashboard-metric-neutral'
+                  }>{portfolioService.formatCurrency(metrics.monthPnL)}</div>
                 </Flex>
 
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Total Orders</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {metrics.totalOrders}
-                  </div>
+                  <span className="dashboard-metric-label">Total Orders</span>
+                  <div className="dashboard-metric-value">{metrics.totalOrders}</div>
                 </Flex>
 
                 <Flex justify="between" align="center">
-                  <span style={{ color: '#64748b' }}>Executed Orders</span>
-                  <div style={{ fontWeight: '600' }}>
-                    {metrics.executedOrders}
-                  </div>
+                  <span className="dashboard-metric-label">Executed Orders</span>
+                  <div className="dashboard-metric-value">{metrics.executedOrders}</div>
                 </Flex>
               </Stack>
             </CardContent>
@@ -340,19 +284,19 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
                   {positions.map((position, index) => (
                     <TableRow key={index}>
                       <TableCell>
-                        <div style={{ fontWeight: '600' }}>{position.symbol}</div>
+                        <div className="dashboard-metric-symbol">{position.symbol}</div>
                       </TableCell>
                       <TableCell>{position.totalQuantity}</TableCell>
-                      <TableCell>
-                        {portfolioService.formatCurrency(position.averagePrice)}
-                      </TableCell>
-                      <TableCell>
-                        {portfolioService.formatCurrency(position.currentValue)}
-                      </TableCell>
-                      <TableCell style={{ color: portfolioService.getPnLColor(position.pnl) }}>
+                      <TableCell>{portfolioService.formatCurrency(position.averagePrice)}</TableCell>
+                      <TableCell>{portfolioService.formatCurrency(position.currentValue)}</TableCell>
+                      <TableCell className={
+                        position.pnl > 0 ? 'dashboard-metric-positive' : position.pnl < 0 ? 'dashboard-metric-negative' : 'dashboard-metric-neutral'
+                      }>
                         {portfolioService.formatCurrency(position.pnl)}
                       </TableCell>
-                      <TableCell style={{ color: portfolioService.getPnLColor(position.pnl) }}>
+                      <TableCell className={
+                        position.pnl > 0 ? 'dashboard-metric-positive' : position.pnl < 0 ? 'dashboard-metric-negative' : 'dashboard-metric-neutral'
+                      }>
                         {portfolioService.formatPercentage(position.pnlPercentage)}
                       </TableCell>
                       <TableCell>

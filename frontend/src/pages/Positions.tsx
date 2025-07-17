@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button'; // Added import for Button
 
 interface Position {
   symbol: string;
@@ -94,18 +95,18 @@ const Positions: React.FC = () => {
 
   const getProductColor = (product: string): string => {
     switch (product) {
-      case 'MIS': return 'var(--kite-neutral)';
-      case 'CNC': return 'var(--kite-profit)';
-      case 'NRML': return 'var(--kite-brand-primary)';
-      default: return 'var(--kite-text-secondary)';
+      case 'MIS': return 'var(--color-neutral)';
+      case 'CNC': return 'var(--color-profit)';
+      case 'NRML': return 'var(--interactive-primary)';
+      default: return 'var(--text-secondary)';
     }
   };
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{
             display: 'flex',
             justifyContent: 'center',
@@ -115,7 +116,7 @@ const Positions: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>🎯</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading positions...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading positions...</div>
           </div>
         </div>
       </div>
@@ -124,18 +125,18 @@ const Positions: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -143,24 +144,23 @@ const Positions: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
-      
-      <div className="kite-main">
+      <div className="app-main">
         {/* Positions Summary */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Positions ({positions.length})</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Positions ({positions.length})</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button className="kite-btn kite-btn-primary">
+              <Button variant="primary">
                 + New Position
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="secondary">
                 📊 Analytics
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="outline">
                 📥 Export
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -171,50 +171,50 @@ const Positions: React.FC = () => {
             gap: '1.5rem',
             marginBottom: '2rem',
             padding: '1rem',
-            backgroundColor: 'var(--kite-bg-tertiary)',
-            borderRadius: 'var(--kite-radius-lg)'
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: 'var(--radius-lg)'
           }}>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                 Total P&L
               </div>
               <div style={{
                 fontSize: '1.25rem',
                 fontWeight: '600',
-                fontFamily: 'var(--kite-font-mono)',
-                color: positionsSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                fontFamily: 'var(--font-mono)',
+                color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
               }}>
                 {positionsSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(positionsSummary.totalPnL))}
               </div>
               <div style={{
                 fontSize: '0.875rem',
-                color: positionsSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
+                color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)',
                 marginTop: '0.25rem'
               }}>
                 {positionsSummary.totalPnLPercent >= 0 ? '+' : ''}{positionsSummary.totalPnLPercent.toFixed(2)}%
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                 Total Value
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                 ₹{formatCurrency(positionsSummary.totalValue)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                 Long Positions
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--kite-profit)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-profit)' }}>
                 {positions.filter(p => p.qty > 0).length}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginBottom: '0.25rem' }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
                 Short Positions
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--kite-loss)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-loss)' }}>
                 {positions.filter(p => p.qty < 0).length}
               </div>
             </div>
@@ -223,7 +223,7 @@ const Positions: React.FC = () => {
           {/* Positions Table */}
           {positions.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
+              <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Instrument</th>
@@ -240,29 +240,29 @@ const Positions: React.FC = () => {
                   {positions.map((position, index) => (
                     <tr key={index}>
                       <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                        <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                           {position.symbol}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                           {position.exchange}
                         </div>
                       </td>
                       <td style={{ 
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.qty > 0 ? 'var(--kite-profit)' : 'var(--kite-loss)',
+                        fontFamily: 'var(--font-mono)',
+                        color: position.qty > 0 ? 'var(--color-profit)' : 'var(--color-loss)',
                         fontWeight: '500'
                       }}>
                         {position.qty > 0 ? '+' : ''}{position.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(position.avgPrice)}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {formatCurrency(position.ltp)}
                       </td>
                       <td style={{ 
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.pnl >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                        fontFamily: 'var(--font-mono)',
+                        color: position.pnl >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                       }}>
                         {position.pnl >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(position.pnl))}
                         <div style={{ fontSize: '0.75rem' }}>
@@ -270,8 +270,8 @@ const Positions: React.FC = () => {
                         </div>
                       </td>
                       <td style={{ 
-                        fontFamily: 'var(--kite-font-mono)',
-                        color: position.dayChange >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                        fontFamily: 'var(--font-mono)',
+                        color: position.dayChange >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                       }}>
                         {position.dayChange >= 0 ? '+' : ''}{position.dayChangePercent.toFixed(2)}%
                       </td>
@@ -286,24 +286,18 @@ const Positions: React.FC = () => {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <button 
-                            className="kite-btn kite-btn-success"
-                            style={{ 
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem'
-                            }}
+                          <Button 
+                            variant="success"
+                            size="sm"
                           >
                             {position.qty > 0 ? 'Sell' : 'Buy'}
-                          </button>
-                          <button 
-                            className="kite-btn"
-                            style={{ 
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem'
-                            }}
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm"
                           >
                             Exit
-                          </button>
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -315,26 +309,25 @@ const Positions: React.FC = () => {
             <div style={{ 
               textAlign: 'center', 
               padding: '3rem',
-              color: 'var(--kite-text-secondary)'
+              color: 'var(--text-secondary)'
             }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🎯</div>
               <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>No positions today</div>
               <div style={{ fontSize: '0.875rem' }}>Start trading to see your positions here</div>
-              <button
-                className="kite-btn kite-btn-primary"
-                style={{ marginTop: '1rem' }}
+              <Button
+                variant="primary"
                 onClick={() => navigate('/trade-setup')}
               >
                 Place Order
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {/* Risk Management */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Risk Management</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Risk Management</h2>
           </div>
           <div style={{ 
             display: 'grid', 
@@ -343,40 +336,40 @@ const Positions: React.FC = () => {
           }}>
             <div style={{ 
               padding: '1rem',
-              backgroundColor: 'var(--kite-bg-tertiary)',
-              borderRadius: 'var(--kite-radius-md)',
-              border: '1px solid var(--kite-border-secondary)'
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-secondary)'
             }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                 Available Margin
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-text-primary)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
                 ₹{formatCurrency(125000)}
               </div>
             </div>
             <div style={{ 
               padding: '1rem',
-              backgroundColor: 'var(--kite-bg-tertiary)',
-              borderRadius: 'var(--kite-radius-md)',
-              border: '1px solid var(--kite-border-secondary)'
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-secondary)'
             }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                 Used Margin
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-neutral)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
                 ₹{formatCurrency(75000)}
               </div>
             </div>
             <div style={{ 
               padding: '1rem',
-              backgroundColor: 'var(--kite-bg-tertiary)',
-              borderRadius: 'var(--kite-radius-md)',
-              border: '1px solid var(--kite-border-secondary)'
+              backgroundColor: 'var(--bg-tertiary)',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid var(--border-secondary)'
             }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)', marginBottom: '0.5rem' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
                 Margin Utilization
               </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-neutral)' }}>
+              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
                 37.5%
               </div>
             </div>

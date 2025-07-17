@@ -51,9 +51,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       if (prefs) {
         setPreferences(prefs);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to load notification settings:', error);
-      setError(error.message || 'Failed to load notification settings');
+      setError((error as Error).message || 'Failed to load notification settings');
     } finally {
       setIsLoading(false);
     }
@@ -78,9 +78,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       } else {
         throw new Error('Failed to subscribe to push notifications');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to subscribe:', error);
-      setError(error.message || 'Failed to subscribe to push notifications');
+      setError((error as Error).message || 'Failed to subscribe to push notifications');
     } finally {
       setIsSaving(false);
     }
@@ -105,15 +105,15 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       } else {
         throw new Error('Failed to unsubscribe from push notifications');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to unsubscribe:', error);
-      setError(error.message || 'Failed to unsubscribe from push notifications');
+      setError((error as Error).message || 'Failed to unsubscribe from push notifications');
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handlePreferenceChange = async (key: keyof NotificationPreferences, value: any) => {
+  const handlePreferenceChange = async (key: keyof NotificationPreferences, value: boolean) => {
     if (!preferences) return;
 
     try {
@@ -127,15 +127,15 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       if (!success) {
         throw new Error('Failed to update preferences');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update preference:', error);
-      setError(error.message || 'Failed to update preferences');
+      setError((error as Error).message || 'Failed to update preferences');
       // Revert the change
       loadSettings();
     }
   };
 
-  const handleQuietHoursChange = async (field: 'enabled' | 'startTime' | 'endTime', value: any) => {
+  const handleQuietHoursChange = async (field: 'enabled' | 'startTime' | 'endTime', value: string | boolean) => {
     if (!preferences) return;
 
     try {
@@ -150,9 +150,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       if (!success) {
         throw new Error('Failed to update quiet hours');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to update quiet hours:', error);
-      setError(error.message || 'Failed to update quiet hours');
+      setError((error as Error).message || 'Failed to update quiet hours');
       // Revert the change
       loadSettings();
     }
@@ -170,9 +170,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({ className =
       } else {
         throw new Error('Failed to send test notification');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to send test notification:', error);
-      setError(error.message || 'Failed to send test notification');
+      setError((error as Error).message || 'Failed to send test notification');
     } finally {
       setIsSaving(false);
     }

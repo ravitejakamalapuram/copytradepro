@@ -5,20 +5,20 @@
 
 /* Base Card Styles */
 .enterprise-card {
-  background-color: white;
-  border-radius: 0.75rem;
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-xl);
   transition: all 0.2s ease-in-out;
   position: relative;
 }
 
 /* Card Variants */
 .enterprise-card--default {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-primary);
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
 }
 
 .enterprise-card--outlined {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-secondary);
   box-shadow: none;
 }
 
@@ -30,7 +30,7 @@
 .enterprise-card--flat {
   border: none;
   box-shadow: none;
-  background-color: #f8fafc;
+  background-color: var(--bg-secondary);
 }
 
 /* Card Padding */
@@ -55,7 +55,7 @@
 .enterprise-card--clickable:hover {
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   transform: translateY(-2px);
-  border-color: #cbd5e1;
+  border-color: var(--border-secondary);
 }
 
 .enterprise-card--clickable {
@@ -69,21 +69,21 @@
   justify-content: space-between;
   margin-bottom: 1rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-secondary);
 }
 
 .enterprise-card-header h3 {
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1.25;
 }
 
 .enterprise-card-header p {
   margin: 0.25rem 0 0 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-secondary);
   line-height: 1.5;
 }
 
@@ -99,7 +99,7 @@
   gap: 0.75rem;
   margin-top: 1.5rem;
   padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--border-secondary);
 }
 
 .enterprise-card-footer--justify-start {
@@ -123,13 +123,13 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--text-primary);
   line-height: 1.25;
 }
 
 .enterprise-card-subtitle {
   margin: 0.25rem 0 0 0;
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-secondary);
   line-height: 1.5;
 }

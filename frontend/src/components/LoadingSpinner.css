@@ -70,7 +70,7 @@
 }
 
 .loading-spinner--gray .loading-spinner__circle {
-  border-color: #6b7280 transparent transparent transparent;
+  border-color: var(--text-tertiary) transparent transparent transparent;
 }
 
 .loading-spinner__text {
@@ -136,7 +136,7 @@
 }
 
 .dots-spinner--gray .dots-spinner__dot {
-  background-color: #6b7280;
+  background-color: var(--text-tertiary);
 }
 
 .dots-spinner__dot:nth-child(1) {
@@ -193,7 +193,7 @@
 }
 
 .pulse-spinner--gray .pulse-spinner__circle {
-  background-color: #6b7280;
+  background-color: var(--text-tertiary);
 }
 
 @keyframes pulse-spinner-pulse {
@@ -312,7 +312,7 @@
 }
 
 .button-spinner--gray .button-spinner__dot {
-  background-color: #6b7280;
+  background-color: var(--text-tertiary);
 }
 
 .button-spinner__dot:nth-child(1) {

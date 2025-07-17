@@ -15,14 +15,14 @@
 
 /* Price increase animation */
 .animated-price--up {
-  color: #16a34a !important; /* green-600 */
-  text-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+  color: var(--color-profit) !important;
+  text-shadow: 0 0 8px rgba(0, 212, 170, 0.3);
 }
 
 /* Price decrease animation */
 .animated-price--down {
-  color: #dc2626 !important; /* red-600 */
-  text-shadow: 0 0 8px rgba(239, 68, 68, 0.3);
+  color: var(--color-loss) !important;
+  text-shadow: 0 0 8px rgba(255, 71, 87, 0.3);
 }
 
 /* Keyframe animations */
@@ -33,7 +33,7 @@
   }
   50% {
     transform: scale(1.05);
-    background-color: rgba(34, 197, 94, 0.1);
+    background-color: rgba(0, 212, 170, 0.1);
     border-radius: 4px;
   }
   100% {
@@ -49,7 +49,7 @@
   }
   50% {
     transform: scale(1.05);
-    background-color: rgba(239, 68, 68, 0.1);
+    background-color: rgba(255, 71, 87, 0.1);
     border-radius: 4px;
   }
   100% {
@@ -69,19 +69,19 @@
 
 @keyframes glow {
   0%, 100% {
-    box-shadow: 0 0 5px rgba(34, 197, 94, 0.3);
+    box-shadow: 0 0 5px rgba(0, 212, 170, 0.3);
   }
   50% {
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.6);
+    box-shadow: 0 0 20px rgba(0, 212, 170, 0.6);
   }
 }
 
 @keyframes glowRed {
   0%, 100% {
-    box-shadow: 0 0 5px rgba(239, 68, 68, 0.3);
+    box-shadow: 0 0 5px rgba(255, 71, 87, 0.3);
   }
   50% {
-    box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+    box-shadow: 0 0 20px rgba(255, 71, 87, 0.6);
   }
 }
 
@@ -115,15 +115,15 @@
 }
 
 .trend-indicator--up {
-  color: #16a34a;
+  color: var(--color-profit);
 }
 
 .trend-indicator--down {
-  color: #dc2626;
+  color: var(--color-loss);
 }
 
 .trend-indicator--neutral {
-  color: #6b7280;
+  color: var(--color-neutral);
 }
 
 /* Arrow animations */
@@ -167,28 +167,72 @@
 
 /* Market index card animations */
 .market-index-card {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  box-shadow: var(--shadow-sm);
+  padding: 1rem;
+  transition: var(--transition-base);
   position: relative;
   overflow: hidden;
 }
-
 .market-index-card:hover {
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
 }
-
-.market-index-card--updating {
-  border-left: 3px solid #3b82f6;
-  animation: updatePulse 2s ease-in-out infinite;
+.market-index-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
 }
-
-@keyframes updatePulse {
-  0%, 100% {
-    border-left-color: #3b82f6;
-  }
-  50% {
-    border-left-color: #60a5fa;
-  }
+.market-index-card__name {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.market-index-card__trend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.market-index-card__value {
+  margin-bottom: 0.5rem;
+}
+.market-index-card__value-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+.market-index-card__changes {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.95rem;
+}
+.market-index-card__updated {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.market-index-card__live {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+.market-index-card__live-dot {
+  width: 8px;
+  height: 8px;
+  background: var(--color-accent);
+  border-radius: 50%;
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* Loading shimmer effect */
@@ -220,13 +264,13 @@
 }
 
 .connection-indicator--connected {
-  background-color: rgba(34, 197, 94, 0.1);
-  color: #16a34a;
+  background-color: rgba(0, 212, 170, 0.1);
+  color: var(--color-profit);
 }
 
 .connection-indicator--disconnected {
-  background-color: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  background-color: rgba(255, 71, 87, 0.1);
+  color: var(--color-loss);
 }
 
 .connection-dot {
@@ -237,12 +281,12 @@
 }
 
 .connection-dot--connected {
-  background-color: #16a34a;
+  background-color: var(--color-profit);
   animation: pulse 2s infinite;
 }
 
 .connection-dot--disconnected {
-  background-color: #dc2626;
+  background-color: var(--color-loss);
 }
 
 @keyframes pulse {
@@ -252,4 +296,16 @@
   50% {
     opacity: 0.5;
   }
+}
+
+.market-index-card__progress-bar {
+  height: 4px;
+  border-radius: 4px;
+  transition: width 0.5s ease-out;
+}
+.market-index-card__progress-bar.pnl-positive {
+  background: var(--color-profit);
+}
+.market-index-card__progress-bar.pnl-negative {
+  background: var(--color-loss);
 }

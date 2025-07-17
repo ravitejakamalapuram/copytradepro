@@ -1,40 +1,31 @@
 import React from 'react';
 
-interface Column {
+interface Column<T extends { [key: string]: any }> {
   key: string;
-  header: string;
+  label: string;
   width?: string;
   align?: 'left' | 'center' | 'right';
-  render?: (value: any, row: any) => React.ReactNode;
+  render?: (value: T[keyof T], row: T) => React.ReactNode;
   sortable?: boolean;
 }
 
-interface DataTableProps {
-  columns: Column[];
-  data: any[];
+interface DataTableProps<T extends { [key: string]: any }> {
+  columns: Column<T>[];
+  data: T[];
   loading?: boolean;
   emptyMessage?: string;
   className?: string;
-  onSort?: (key: string, direction: 'asc' | 'desc') => void;
+  onSort?: (key: string) => void;
   sortKey?: string;
   sortDirection?: 'asc' | 'desc';
 }
 
-const DataTable: React.FC<DataTableProps> = ({
-  columns,
-  data,
-  loading = false,
-  emptyMessage = 'No data available',
-  className = '',
-  onSort,
-  sortKey,
-  sortDirection
-}) => {
+function DataTable<T extends { [key: string]: any }>({ columns, data, loading = false, emptyMessage = 'No data available', className = '', onSort, sortKey, sortDirection }: DataTableProps<T>) {
   const handleSort = (key: string) => {
     if (!onSort) return;
     
     const newDirection = sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc';
-    onSort(key, newDirection);
+    onSort(key);
   };
 
   const getSortIcon = (key: string) => {
@@ -82,7 +73,7 @@ const DataTable: React.FC<DataTableProps> = ({
                 onClick={() => column.sortable && handleSort(column.key)}
               >
                 <div className="flex items-center gap-2">
-                  <span>{column.header}</span>
+                  <span>{column.label}</span>
                   {column.sortable && (
                     <span className="text-xs opacity-60">
                       {getSortIcon(column.key)}

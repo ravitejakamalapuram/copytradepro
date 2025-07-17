@@ -1,53 +1,53 @@
 .portfolio-summary {
-  /* Inherit kite-card styles, just add specific overrides */
+  /* Inherit card styles, just add specific overrides */
 }
 
 .portfolio-summary__header {
-  /* Use kite-card-header styles */
+  /* Use card-header styles */
 }
 
 .portfolio-summary__title {
-  /* Use kite-card-title styles */
+  /* Use card-title styles */
 }
 
 .portfolio-summary__content {
-  padding: 0; /* Remove padding since kite-card already has it */
+  padding: 0; /* Remove padding since card already has it */
 }
 
 .portfolio-summary__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--kite-space-lg);
+  gap: var(--space-6);
 }
 
 .portfolio-summary__item {
   text-align: center;
-  padding: var(--kite-space-lg);
-  border-radius: var(--kite-radius-md);
-  background: var(--kite-bg-secondary);
-  border: 1px solid var(--kite-border-secondary);
-  transition: var(--kite-transition);
+  padding: var(--space-6);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  transition: var(--transition-fast);
 }
 
 .portfolio-summary__item:hover {
-  border-color: var(--kite-border-light);
+  border-color: var(--border-secondary);
   transform: translateY(-1px);
-  box-shadow: var(--kite-shadow-md);
+  box-shadow: var(--shadow-md);
 }
 
 .portfolio-summary__item--primary {
-  background: var(--kite-bg-tertiary);
-  border: 2px solid var(--kite-brand-primary);
+  background: var(--bg-tertiary);
+  border: 2px solid var(--interactive-primary);
 }
 
 .portfolio-summary__item--primary:hover {
-  border-color: var(--kite-brand-primary);
-  box-shadow: var(--kite-shadow-lg);
+  border-color: var(--interactive-primary);
+  box-shadow: var(--shadow-lg);
 }
 
 .portfolio-summary__label {
   font-size: 11px;
-  color: var(--kite-text-secondary);
+  color: var(--text-secondary);
   margin-bottom: 0.25rem;
   font-weight: 500;
   display: flex;
@@ -63,9 +63,9 @@
 .portfolio-summary__value {
   font-size: 16px;
   font-weight: 600;
-  color: var(--kite-text-primary);
+  color: var(--text-primary);
   margin-bottom: 0.125rem;
-  font-family: var(--kite-font-mono);
+  font-family: var(--font-mono);
 }
 
 .portfolio-summary__value--large {
@@ -76,18 +76,28 @@
 .portfolio-summary__change {
   font-size: 11px;
   font-weight: 500;
-  font-family: var(--kite-font-mono);
+  font-family: var(--font-mono);
+}
+
+.pnl-positive {
+  color: var(--color-profit);
+}
+.pnl-negative {
+  color: var(--color-loss);
+}
+.pnl-neutral {
+  color: var(--text-secondary);
 }
 
 /* Responsive Design */
 @media (max-width: 768px) {
   .portfolio-summary__grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--kite-space-md);
+    gap: var(--space-4);
   }
 
   .portfolio-summary__item {
-    padding: var(--kite-space-md);
+    padding: var(--space-4);
   }
 
   .portfolio-summary__value {

@@ -209,7 +209,7 @@
   .nav-item:hover,
   .nav-item.active {
     border-left: none;
-    border-bottom-color: #3498db;
+    border-bottom-color: var(--primary-color);
   }
 
   .nav-icon {

@@ -128,7 +128,11 @@ const CopyTradeLogin: React.FC = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      isRegisterMode ? performRegister() : performLogin();
+      if (isRegisterMode) {
+        performRegister();
+      } else {
+        performLogin();
+      }
     }
   };
 
@@ -143,9 +147,9 @@ const CopyTradeLogin: React.FC = () => {
   };
 
   return (
-    <div className="kite-theme" style={{
+    <div className="app-theme app-layout" style={{
       minHeight: '100vh',
-      backgroundColor: 'var(--kite-bg-primary)',
+      backgroundColor: 'var(--bg-primary)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -161,7 +165,7 @@ const CopyTradeLogin: React.FC = () => {
           width: '80px',
           height: '80px',
           borderRadius: '50%',
-          backgroundColor: 'var(--kite-brand-primary)',
+          backgroundColor: 'var(--interactive-primary)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -190,7 +194,7 @@ const CopyTradeLogin: React.FC = () => {
             style={{
               background: 'none',
               border: 'none',
-              color: !isRegisterMode ? 'var(--kite-brand-primary)' : 'var(--kite-text-secondary)',
+              color: !isRegisterMode ? 'var(--interactive-primary)' : 'var(--text-secondary)',
               fontSize: '0.875rem',
               cursor: 'pointer',
               fontWeight: !isRegisterMode ? '600' : '400'
@@ -198,7 +202,7 @@ const CopyTradeLogin: React.FC = () => {
           >
             Login
           </button>
-          <span style={{ color: 'var(--kite-text-secondary)' }}>|</span>
+          <span style={{ color: 'var(--text-secondary)' }}>|</span>
           <button
             onClick={() => {
               setIsRegisterMode(true);
@@ -207,7 +211,7 @@ const CopyTradeLogin: React.FC = () => {
             style={{
               background: 'none',
               border: 'none',
-              color: isRegisterMode ? 'var(--kite-brand-primary)' : 'var(--kite-text-secondary)',
+              color: isRegisterMode ? 'var(--interactive-primary)' : 'var(--text-secondary)',
               fontSize: '0.875rem',
               cursor: 'pointer',
               fontWeight: isRegisterMode ? '600' : '400'
@@ -233,22 +237,22 @@ const CopyTradeLogin: React.FC = () => {
                   width: '100%',
                   padding: '1rem',
                   fontSize: '1rem',
-                  border: `2px solid ${error ? 'var(--kite-loss)' : 'var(--kite-border-secondary)'}`,
-                  borderRadius: 'var(--kite-radius-md)',
-                  backgroundColor: 'var(--kite-bg-secondary)',
-                  color: 'var(--kite-text-primary)',
+                  border: `2px solid ${error ? 'var(--color-loss)' : 'var(--border-secondary)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                   transition: 'border-color 0.2s ease',
                   boxSizing: 'border-box'
                 }}
                 onFocus={(e) => {
                   if (!error) {
-                    e.target.style.borderColor = 'var(--kite-brand-primary)';
+                    e.target.style.borderColor = 'var(--interactive-primary)';
                   }
                 }}
                 onBlur={(e) => {
                   if (!error) {
-                    e.target.style.borderColor = 'var(--kite-border-secondary)';
+                    e.target.style.borderColor = 'var(--border-secondary)';
                   }
                 }}
               />
@@ -268,22 +272,22 @@ const CopyTradeLogin: React.FC = () => {
                 width: '100%',
                 padding: '1rem',
                 fontSize: '1rem',
-                border: `2px solid ${error ? 'var(--kite-loss)' : 'var(--kite-border-secondary)'}`,
-                borderRadius: 'var(--kite-radius-md)',
-                backgroundColor: 'var(--kite-bg-secondary)',
-                color: 'var(--kite-text-primary)',
+                border: `2px solid ${error ? 'var(--color-loss)' : 'var(--border-secondary)'}`,
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 outline: 'none',
                 transition: 'border-color 0.2s ease',
                 boxSizing: 'border-box'
               }}
               onFocus={(e) => {
                 if (!error) {
-                  e.target.style.borderColor = 'var(--kite-brand-primary)';
+                  e.target.style.borderColor = 'var(--interactive-primary)';
                 }
               }}
               onBlur={(e) => {
                 if (!error) {
-                  e.target.style.borderColor = 'var(--kite-border-secondary)';
+                  e.target.style.borderColor = 'var(--border-secondary)';
                 }
               }}
             />
@@ -303,22 +307,22 @@ const CopyTradeLogin: React.FC = () => {
                 padding: '1rem',
                 paddingRight: '3rem',
                 fontSize: '1rem',
-                border: `2px solid ${error ? 'var(--kite-loss)' : 'var(--kite-border-secondary)'}`,
-                borderRadius: 'var(--kite-radius-md)',
-                backgroundColor: 'var(--kite-bg-secondary)',
-                color: 'var(--kite-text-primary)',
+                border: `2px solid ${error ? 'var(--color-loss)' : 'var(--border-secondary)'}`,
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 outline: 'none',
                 transition: 'border-color 0.2s ease',
                 boxSizing: 'border-box'
               }}
               onFocus={(e) => {
                 if (!error) {
-                  e.target.style.borderColor = 'var(--kite-brand-primary)';
+                  e.target.style.borderColor = 'var(--interactive-primary)';
                 }
               }}
               onBlur={(e) => {
                 if (!error) {
-                  e.target.style.borderColor = 'var(--kite-border-secondary)';
+                  e.target.style.borderColor = 'var(--border-secondary)';
                 }
               }}
             />
@@ -332,7 +336,7 @@ const CopyTradeLogin: React.FC = () => {
                 transform: 'translateY(-50%)',
                 background: 'none',
                 border: 'none',
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 cursor: 'pointer',
                 fontSize: '1.25rem'
               }}
@@ -355,22 +359,22 @@ const CopyTradeLogin: React.FC = () => {
                   width: '100%',
                   padding: '1rem',
                   fontSize: '1rem',
-                  border: `2px solid ${error ? 'var(--kite-loss)' : 'var(--kite-border-secondary)'}`,
-                  borderRadius: 'var(--kite-radius-md)',
-                  backgroundColor: 'var(--kite-bg-secondary)',
-                  color: 'var(--kite-text-primary)',
+                  border: `2px solid ${error ? 'var(--color-loss)' : 'var(--border-secondary)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  color: 'var(--text-primary)',
                   outline: 'none',
                   transition: 'border-color 0.2s ease',
                   boxSizing: 'border-box'
                 }}
                 onFocus={(e) => {
                   if (!error) {
-                    e.target.style.borderColor = 'var(--kite-brand-primary)';
+                    e.target.style.borderColor = 'var(--interactive-primary)';
                   }
                 }}
                 onBlur={(e) => {
                   if (!error) {
-                    e.target.style.borderColor = 'var(--kite-border-secondary)';
+                    e.target.style.borderColor = 'var(--border-secondary)';
                   }
                 }}
               />
@@ -381,10 +385,10 @@ const CopyTradeLogin: React.FC = () => {
           {error && (
             <div style={{
               padding: '0.75rem',
-              backgroundColor: 'var(--kite-bg-danger)',
-              border: '1px solid var(--kite-loss)',
-              borderRadius: 'var(--kite-radius-md)',
-              color: 'var(--kite-loss)',
+              backgroundColor: 'var(--bg-loss-light)',
+              border: '1px solid var(--color-loss)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--color-loss)',
               fontSize: '0.875rem',
               marginBottom: '1.5rem',
               textAlign: 'left'
@@ -403,9 +407,9 @@ const CopyTradeLogin: React.FC = () => {
               fontSize: '1rem',
               fontWeight: '600',
               border: 'none',
-              borderRadius: 'var(--kite-radius-md)',
-              backgroundColor: loading || !email || !password || (isRegisterMode && (!name || !confirmPassword)) ? 'var(--kite-bg-neutral)' : 'var(--kite-brand-secondary)',
-              color: loading || !email || !password || (isRegisterMode && (!name || !confirmPassword)) ? 'var(--kite-text-secondary)' : 'white',
+              borderRadius: 'var(--radius-md)',
+              backgroundColor: loading || !email || !password || (isRegisterMode && (!name || !confirmPassword)) ? 'var(--bg-tertiary)' : 'var(--interactive-secondary)',
+              color: loading || !email || !password || (isRegisterMode && (!name || !confirmPassword)) ? 'var(--text-secondary)' : 'white',
               cursor: loading || !email || !password || (isRegisterMode && (!name || !confirmPassword)) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s ease',
               marginBottom: '1.5rem'
@@ -413,13 +417,13 @@ const CopyTradeLogin: React.FC = () => {
             onMouseEnter={(e) => {
               const isEnabled = !loading && email && password && (!isRegisterMode || (name && confirmPassword));
               if (isEnabled) {
-                e.currentTarget.style.backgroundColor = '#e67e22';
+                e.currentTarget.style.backgroundColor = 'var(--accent-color)';
               }
             }}
             onMouseLeave={(e) => {
               const isEnabled = !loading && email && password && (!isRegisterMode || (name && confirmPassword));
               if (isEnabled) {
-                e.currentTarget.style.backgroundColor = 'var(--kite-brand-secondary)';
+                e.currentTarget.style.backgroundColor = 'var(--interactive-secondary)';
               }
             }}
           >
@@ -432,7 +436,7 @@ const CopyTradeLogin: React.FC = () => {
               style={{
                 background: 'none',
                 border: 'none',
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 fontSize: '0.875rem',
                 cursor: 'pointer'
               }}
@@ -456,7 +460,7 @@ const CopyTradeLogin: React.FC = () => {
           <span style={{
             fontSize: '1.25rem',
             fontWeight: '600',
-            color: 'var(--kite-text-primary)'
+            color: 'var(--text-primary)'
           }}>
             COPYTRADE PRO
           </span>
@@ -467,7 +471,7 @@ const CopyTradeLogin: React.FC = () => {
         {/* Footer */}
         <div style={{
           fontSize: '0.75rem',
-          color: 'var(--kite-text-secondary)',
+          color: 'var(--text-secondary)',
           textAlign: 'center',
           marginTop: '2rem'
         }}>

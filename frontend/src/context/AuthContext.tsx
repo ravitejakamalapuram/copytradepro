@@ -77,28 +77,58 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const userStr = localStorage.getItem('user');
 
         if (token && userStr) {
-          JSON.parse(userStr);
-          
-          // Verify token is still valid
-          const response = await authService.getProfile();
-          if (response.success && response.data?.user) {
-            dispatch({
-              type: 'LOGIN_SUCCESS',
-              payload: { user: response.data.user, token },
-            });
-          } else {
-            // Token is invalid, clear storage
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            dispatch({ type: 'SET_LOADING', payload: false });
-          }
+          const user = JSON.parse(userStr);
+
+          // First, optimistically set the user as authenticated
+          dispatch({
+            type: 'LOGIN_SUCCESS',
+            payload: { user, token },
+          });
+
+          // Then verify token in background with retry logic
+          const verifyToken = async (retries = 3): Promise<void> => {
+            try {
+              const response = await authService.getProfile();
+              if (response.success && response.data?.user) {
+                // Token is valid, update user data if needed
+                dispatch({
+                  type: 'LOGIN_SUCCESS',
+                  payload: { user: response.data.user, token },
+                });
+              } else {
+                // Token is invalid - check environment
+                const isDevelopment = import.meta.env.DEV;
+                if (isDevelopment) {
+                  console.warn('🔑 Token validation failed in development, keeping user logged in');
+                  // Keep user logged in during development
+                } else {
+                  console.warn('🔑 Token validation failed, logging out');
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  dispatch({ type: 'LOGOUT' });
+                }
+              }
+            } catch (error: any) {
+              console.warn(`🔄 Token verification failed (${4 - retries}/3):`, error.message);
+
+              if (retries > 1) {
+                // Retry after delay (server might be restarting)
+                setTimeout(() => verifyToken(retries - 1), 2000);
+              } else {
+                // After all retries failed, keep user logged in but show warning
+                console.warn('⚠️ Server unreachable, keeping user logged in locally');
+                // Don't logout - let user continue working
+              }
+            }
+          };
+
+          // Start background verification
+          verifyToken();
         } else {
           dispatch({ type: 'SET_LOADING', payload: false });
         }
       } catch (error) {
         console.error('🚨 Auth initialization error:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
         dispatch({ type: 'SET_LOADING', payload: false });
       }
     };

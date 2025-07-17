@@ -1,7 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { AccountStatusProvider } from './context/AccountStatusContext';
+import { ToastProvider } from './components/Toast';
 import { useAuth } from './hooks/useAuth';
+import { useConnectionStatus } from './hooks/useConnectionStatus';
+import { memoryMonitorService } from './services/memoryMonitorService';
+import { memoryLeakDetector } from './services/memoryLeakDetector';
+import { resourceManager } from './utils/resourceManager';
+import { appCache, apiCache, marketDataCache } from './services/cacheManager';
+import { performanceMonitorService } from './services/performanceMonitorService';
 import LandingPage from './pages/LandingPage';
 import CopyTradeLogin from './pages/CopyTradeLogin';
 
@@ -21,6 +29,38 @@ import AccountSetup from './pages/AccountSetup';
 import Portfolio from './pages/Portfolio';
 import MarketOverview from './pages/MarketOverview';
 import './styles/enterprise-base.css';
+
+// Error Boundaries
+import ErrorBoundary from './components/ErrorBoundary';
+import NavigationErrorBoundary from './components/NavigationErrorBoundary';
+import TradingErrorBoundary from './components/TradingErrorBoundary';
+import AccountErrorBoundary from './components/AccountErrorBoundary';
+
+// Connection Status Component
+const ConnectionStatus: React.FC = () => {
+  const { isOnline } = useConnectionStatus();
+
+  if (isOnline) return null;
+
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: '#ff6b35',
+      color: 'white',
+      padding: '0.5rem',
+      textAlign: 'center',
+      fontSize: '0.875rem',
+      fontWeight: '500',
+      zIndex: 9999,
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    }}>
+      🔌 Server connection lost. Retrying... (You can continue working offline)
+    </div>
+  );
+};
 
 // Protected Route Component
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -58,7 +98,9 @@ const AppContent: React.FC = () => {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <ErrorBoundary>
+                <Dashboard />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -66,7 +108,9 @@ const AppContent: React.FC = () => {
           path="/holdings"
           element={
             <ProtectedRoute>
-              <Holdings />
+              <ErrorBoundary>
+                <Holdings />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -74,7 +118,9 @@ const AppContent: React.FC = () => {
           path="/orders"
           element={
             <ProtectedRoute>
-              <Orders />
+              <TradingErrorBoundary>
+                <Orders />
+              </TradingErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -82,7 +128,9 @@ const AppContent: React.FC = () => {
           path="/positions"
           element={
             <ProtectedRoute>
-              <Positions />
+              <TradingErrorBoundary>
+                <Positions />
+              </TradingErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -93,7 +141,9 @@ const AppContent: React.FC = () => {
           path="/trade-setup"
           element={
             <ProtectedRoute>
-              <TradeSetup />
+              <TradingErrorBoundary>
+                <TradeSetup />
+              </TradingErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -101,7 +151,9 @@ const AppContent: React.FC = () => {
           path="/account-setup"
           element={
             <ProtectedRoute>
-              <AccountSetup />
+              <AccountErrorBoundary>
+                <AccountSetup />
+              </AccountErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -109,7 +161,9 @@ const AppContent: React.FC = () => {
           path="/portfolio"
           element={
             <ProtectedRoute>
-              <Portfolio />
+              <ErrorBoundary>
+                <Portfolio />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -119,7 +173,9 @@ const AppContent: React.FC = () => {
           path="/legacy-account-setup"
           element={
             <ProtectedRoute>
-              <AccountSetup />
+              <AccountErrorBoundary>
+                <AccountSetup />
+              </AccountErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -127,15 +183,19 @@ const AppContent: React.FC = () => {
           path="/legacy-trade-setup"
           element={
             <ProtectedRoute>
-              <TradeSetup />
+              <TradingErrorBoundary>
+                <TradeSetup />
+              </TradingErrorBoundary>
             </ProtectedRoute>
           }
         />
         <Route
-          path="/portfolio"
+          path="/portfolio-analytics"
           element={
             <ProtectedRoute>
-              <PortfolioAnalytics />
+              <ErrorBoundary>
+                <PortfolioAnalytics />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -143,7 +203,9 @@ const AppContent: React.FC = () => {
           path="/advanced-orders"
           element={
             <ProtectedRoute>
-              <AdvancedOrderManagement />
+              <TradingErrorBoundary>
+                <AdvancedOrderManagement />
+              </TradingErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -151,19 +213,27 @@ const AppContent: React.FC = () => {
           path="/settings"
           element={
             <ProtectedRoute>
-              <Settings />
+              <ErrorBoundary>
+                <Settings />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
         <Route
           path="/demo"
-          element={<ComponentDemo />}
+          element={
+            <ErrorBoundary>
+              <ComponentDemo />
+            </ErrorBoundary>
+          }
         />
         <Route
           path="/market-overview"
           element={
             <ProtectedRoute>
-              <MarketOverview />
+              <ErrorBoundary>
+                <MarketOverview />
+              </ErrorBoundary>
             </ProtectedRoute>
           }
         />
@@ -174,12 +244,79 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  // Initialize memory monitoring and leak detection
+  useEffect(() => {
+    console.log('🚀 Initializing memory monitoring services');
+    
+    // Start memory monitoring
+    memoryMonitorService.startMonitoring();
+    
+    // Start leak detection
+    memoryLeakDetector.startDetection();
+    
+    // Start performance monitoring
+    performanceMonitorService.startMonitoring();
+    
+    // Expose services globally for debugging
+    (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor = memoryMonitorService;
+    (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector = memoryLeakDetector;
+    (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager = resourceManager;
+    (window as unknown as { appCache?: typeof appCache }).appCache = appCache;
+    (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
+    (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
+    (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
+    
+    // Setup memory alert handling
+    const unsubscribeMemoryAlert = memoryMonitorService.onAlert((alert) => {
+      if (typeof window.addNotification === 'function') {
+        window.addNotification({
+          title: `Memory ${alert.type.toUpperCase()}`,
+          message: alert.message,
+        });
+      }
+    });
+    
+    // Cleanup on app unmount
+    return () => {
+      console.log('🧹 Shutting down memory monitoring services');
+      
+      unsubscribeMemoryAlert();
+      memoryMonitorService.shutdown();
+      memoryLeakDetector.shutdown();
+      resourceManager.shutdown();
+      performanceMonitorService.shutdown();
+      
+      // Shutdown cache managers
+      appCache.shutdown();
+      apiCache.shutdown();
+      marketDataCache.shutdown();
+      
+      // Clean up global references
+      delete (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor;
+      delete (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector;
+      delete (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager;
+      delete (window as unknown as { appCache?: typeof appCache }).appCache;
+      delete (window as unknown as { apiCache?: typeof apiCache }).apiCache;
+      delete (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache;
+      delete (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor;
+    };
+  }, []);
+
   return (
     <Router>
-      <AuthProvider>
-        <AppContent />
-        <NotificationDisplay position="top-right" />
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AccountStatusProvider>
+            <ErrorBoundary>
+              <ConnectionStatus />
+              <NavigationErrorBoundary>
+                <AppContent />
+              </NavigationErrorBoundary>
+              <NotificationDisplay position="top-right" />
+            </ErrorBoundary>
+          </AccountStatusProvider>
+        </AuthProvider>
+      </ToastProvider>
     </Router>
   );
 };

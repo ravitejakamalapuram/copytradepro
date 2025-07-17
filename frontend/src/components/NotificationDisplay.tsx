@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { Button, Flex, Stack } from './ui';
 
 export interface NotificationItem {
@@ -28,6 +29,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
   maxNotifications = 5
 }) => {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const { registerTimeout, registerEventListener } = useResourceCleanup('NotificationDisplay');
 
   useEffect(() => {
     // Listen for service worker messages (notification clicks)
@@ -41,12 +43,17 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
       }
     };
 
-    navigator.serviceWorker?.addEventListener('message', handleMessage);
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener('message', handleMessage);
+      registerEventListener(navigator.serviceWorker, 'message', handleMessage);
+    }
 
     return () => {
-      navigator.serviceWorker?.removeEventListener('message', handleMessage);
+      if (navigator.serviceWorker) {
+        navigator.serviceWorker.removeEventListener('message', handleMessage);
+      }
     };
-  }, []);
+  }, [registerEventListener]);
 
   const addNotification = (notification: Omit<NotificationItem, 'id' | 'timestamp'>) => {
     const newNotification: NotificationItem = {
@@ -64,9 +71,12 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
 
     // Auto-close notification if enabled
     if (newNotification.autoClose) {
-      setTimeout(() => {
+      const timeout = setTimeout(() => {
         removeNotification(newNotification.id);
       }, newNotification.duration);
+      
+      // Register timeout for cleanup
+      registerTimeout(timeout);
     }
   };
 
@@ -89,48 +99,6 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
       case 'info':
       default:
         return 'ℹ️';
-    }
-  };
-
-  const getNotificationStyles = (type: NotificationItem['type']) => {
-    const baseStyles = {
-      padding: '1rem',
-      borderRadius: '0.5rem',
-      border: '1px solid',
-      backgroundColor: '#ffffff',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      marginBottom: '0.75rem',
-      maxWidth: '400px',
-      position: 'relative' as const,
-      animation: 'slideIn 0.3s ease-out'
-    };
-
-    switch (type) {
-      case 'success':
-        return {
-          ...baseStyles,
-          borderColor: '#10b981',
-          backgroundColor: '#f0fdf4'
-        };
-      case 'error':
-        return {
-          ...baseStyles,
-          borderColor: '#ef4444',
-          backgroundColor: '#fef2f2'
-        };
-      case 'warning':
-        return {
-          ...baseStyles,
-          borderColor: '#f59e0b',
-          backgroundColor: '#fffbeb'
-        };
-      case 'info':
-      default:
-        return {
-          ...baseStyles,
-          borderColor: '#3b82f6',
-          backgroundColor: '#eff6ff'
-        };
     }
   };
 
@@ -157,9 +125,9 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
 
   // Expose addNotification function globally for use by other components
   useEffect(() => {
-    (window as any).addNotification = addNotification;
+    (window as unknown as { addNotification?: typeof addNotification }).addNotification = addNotification;
     return () => {
-      delete (window as any).addNotification;
+      delete (window as unknown as { addNotification?: typeof addNotification }).addNotification;
     };
   }, []);
 
@@ -195,7 +163,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
         `}
       </style>
       
-      <div className={`notification-display ${className}`} style={getPositionStyles()}>
+      <div className={`notification-display notification-${position}`}>
         {notifications.length > 1 && (
           <div style={{ marginBottom: '0.5rem', pointerEvents: 'auto' }}>
             <Button
@@ -218,10 +186,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
           {notifications.map((notification) => (
             <div
               key={notification.id}
-              style={{
-                ...getNotificationStyles(notification.type),
-                pointerEvents: 'auto'
-              }}
+              className={`notification notification-${notification.type}`}
             >
               <Flex align="start" gap={3}>
                 <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>
@@ -266,16 +231,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
                 
                 <button
                   onClick={() => removeNotification(notification.id)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0.25rem',
-                    color: '#9ca3af',
-                    fontSize: '1rem',
-                    lineHeight: 1,
-                    flexShrink: 0
-                  }}
+                  className="notification-close"
                   title="Close notification"
                 >
                   ×
@@ -288,7 +244,9 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
                 marginTop: '0.5rem',
                 textAlign: 'right'
               }}>
-                {notification.timestamp.toLocaleTimeString()}
+                <span className="notification-timestamp">
+                  {notification.timestamp.toLocaleTimeString()}
+                </span>
               </div>
             </div>
           ))}

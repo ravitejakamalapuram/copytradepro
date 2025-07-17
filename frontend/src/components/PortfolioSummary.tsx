@@ -35,16 +35,10 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
     }).format(num);
   };
 
-  const getPnLColor = (pnl: number): string => {
-    if (pnl > 0) return 'var(--kite-profit)';
-    if (pnl < 0) return 'var(--kite-loss)';
-    return 'var(--kite-text-secondary)';
-  };
-
   return (
-    <div className="kite-card portfolio-summary">
-      <div className="kite-card-header portfolio-summary__header">
-        <h2 className="kite-card-title portfolio-summary__title">Portfolio Summary</h2>
+    <div className="card portfolio-summary">
+      <div className="card-header portfolio-summary__header">
+        <h2 className="card-title portfolio-summary__title">Portfolio Summary</h2>
       </div>
 
       <div className="portfolio-summary__content">
@@ -56,8 +50,9 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
               {formatCurrency(data.totalValue)}
             </div>
             <div 
-              className="portfolio-summary__change"
-              style={{ color: getPnLColor(data.totalPnL) }}
+              className={
+                data.totalPnL > 0 ? 'portfolio-summary__change pnl-positive' : data.totalPnL < 0 ? 'portfolio-summary__change pnl-negative' : 'portfolio-summary__change pnl-neutral'
+              }
             >
               {data.totalPnL >= 0 ? '+' : ''}{formatCurrency(data.totalPnL)} 
               ({data.totalPnLPercent >= 0 ? '+' : ''}{formatNumber(data.totalPnLPercent)}%)
@@ -74,8 +69,9 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
               {formatCurrency(data.holdingsValue)}
             </div>
             <div 
-              className="portfolio-summary__change"
-              style={{ color: getPnLColor(data.holdingsPnL) }}
+              className={
+                data.holdingsPnL > 0 ? 'portfolio-summary__change pnl-positive' : data.holdingsPnL < 0 ? 'portfolio-summary__change pnl-negative' : 'portfolio-summary__change pnl-neutral'
+              }
             >
               {data.holdingsPnL >= 0 ? '+' : ''}{formatCurrency(data.holdingsPnL)}
             </div>
@@ -91,8 +87,9 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
               {formatCurrency(data.positionsValue)}
             </div>
             <div 
-              className="portfolio-summary__change"
-              style={{ color: getPnLColor(data.positionsPnL) }}
+              className={
+                data.positionsPnL > 0 ? 'portfolio-summary__change pnl-positive' : data.positionsPnL < 0 ? 'portfolio-summary__change pnl-negative' : 'portfolio-summary__change pnl-neutral'
+              }
             >
               {data.positionsPnL >= 0 ? '+' : ''}{formatCurrency(data.positionsPnL)}
             </div>
@@ -102,14 +99,16 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
           <div className="portfolio-summary__item">
             <div className="portfolio-summary__label">Today's P&L</div>
             <div 
-              className="portfolio-summary__value"
-              style={{ color: getPnLColor(data.dayPnL) }}
+              className={
+                data.dayPnL > 0 ? 'portfolio-summary__value pnl-positive' : data.dayPnL < 0 ? 'portfolio-summary__value pnl-negative' : 'portfolio-summary__value pnl-neutral'
+              }
             >
               {data.dayPnL >= 0 ? '+' : ''}{formatCurrency(data.dayPnL)}
             </div>
             <div 
-              className="portfolio-summary__change"
-              style={{ color: getPnLColor(data.dayPnL) }}
+              className={
+                data.dayPnL > 0 ? 'portfolio-summary__change pnl-positive' : data.dayPnL < 0 ? 'portfolio-summary__change pnl-negative' : 'portfolio-summary__change pnl-neutral'
+              }
             >
               ({data.dayPnLPercent >= 0 ? '+' : ''}{formatNumber(data.dayPnLPercent)}%)
             </div>

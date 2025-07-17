@@ -18,25 +18,25 @@
 .enterprise-input-label {
   font-size: 0.875rem;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-primary);
   margin-bottom: 0.25rem;
 }
 
 .enterprise-input-label--required::after {
   content: ' *';
-  color: #ef4444;
+  color: var(--color-loss);
 }
 
 /* Base Input Styles */
 .enterprise-input {
   width: 100%;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans);
   font-size: 0.875rem;
   line-height: 1.5;
-  border-radius: 0.5rem;
-  border: 1px solid #cbd5e1;
-  background-color: white;
-  color: #0f172a;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-primary);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
   transition: all 0.2s ease-in-out;
   outline: none;
   position: relative;
@@ -72,37 +72,37 @@
 
 /* Input States */
 .enterprise-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+  border-color: var(--interactive-primary);
+  box-shadow: 0 0 0 3px rgba(45, 140, 255, 0.1);
 }
 
 .enterprise-input--error {
-  border-color: #ef4444;
+  border-color: var(--color-loss);
 }
 
 .enterprise-input--error:focus {
-  border-color: #ef4444;
-  box-shadow: 0 0 0 3px rgb(239 68 68 / 0.1);
+  border-color: var(--color-loss);
+  box-shadow: 0 0 0 3px rgba(255, 91, 91, 0.1);
 }
 
 .enterprise-input--success {
-  border-color: #10b981;
+  border-color: var(--color-profit);
 }
 
 .enterprise-input--success:focus {
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgb(16 185 129 / 0.1);
+  border-color: var(--color-profit);
+  box-shadow: 0 0 0 3px rgba(0, 196, 140, 0.1);
 }
 
 .enterprise-input:disabled {
-  background-color: #f1f5f9;
-  color: #64748b;
+  background-color: var(--color-neutral);
+  color: var(--text-muted);
   cursor: not-allowed;
-  border-color: #e2e8f0;
+  border-color: var(--border-secondary);
 }
 
 .enterprise-input:hover:not(:disabled):not(:focus) {
-  border-color: #94a3b8;
+  border-color: var(--border-secondary);
 }
 
 /* Input Icon Container */
@@ -110,7 +110,7 @@
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  color: #64748b;
+  color: var(--text-secondary);
   pointer-events: none;
   z-index: 1;
 }
@@ -127,12 +127,57 @@
 .enterprise-input-helper {
   font-size: 0.75rem;
   margin-top: 0.25rem;
-  color: #64748b;
+  color: var(--text-secondary);
+  min-height: 1rem;
+  transition: all 0.2s ease-in-out;
 }
 
 .enterprise-input-helper--error {
-  color: #dc2626;
+  color: var(--color-loss);
+  font-weight: 500;
 }
+
+.enterprise-input-helper--success {
+  color: var(--color-profit);
+}
+
+/* Real-time validation feedback */
+.enterprise-input--validating {
+  border-color: var(--color-warning-500);
+}
+
+.enterprise-input--validating:focus {
+  border-color: var(--color-warning-500);
+  box-shadow: 0 0 0 3px rgba(255, 209, 102, 0.1);
+}
+
+/* Loading state for async validation */
+.enterprise-input-validation-spinner {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid var(--border-primary);
+  border-top: 2px solid var(--interactive-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+@keyframes spin {
+  0% { transform: translateY(-50%) rotate(0deg); }
+  100% { transform: translateY(-50%) rotate(360deg); }
+}
+
+/* Form submission states */
+.enterprise-input--submitting {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* Duplicate definition removed - already defined above with design tokens */
 
 /* Select Specific Styles */
 .enterprise-select {

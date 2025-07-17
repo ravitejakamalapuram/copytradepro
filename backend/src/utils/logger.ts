@@ -1,54 +1,358 @@
 /**
- * Simple logger utility for the application
+ * Comprehensive logging system with context tracking and structured logging
  */
 
-export interface Logger {
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
-  debug(message: string, ...args: any[]): void;
+import { v4 as uuidv4 } from 'uuid';
+import { EnhancedError, ErrorContext } from '../types/errorTypes';
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'critical';
+
+export interface LogContext {
+  requestId?: string | undefined;
+  userId?: string | undefined;
+  brokerName?: string | undefined;
+  accountId?: string | undefined;
+  operation?: string | undefined;
+  userAgent?: string | undefined;
+  ipAddress?: string | undefined;
+  sessionId?: string | undefined;
+  component?: string | undefined;
+  method?: string | undefined;
+  duration?: number | undefined;
+  status?: number | undefined;
+  url?: string | undefined;
+  errorId?: string | undefined;
+  errorType?: string | undefined;
+  severity?: string | undefined;
+  retryCount?: number | undefined;
+  responseSize?: number | undefined;
+  [key: string]: any;
 }
 
-class SimpleLogger implements Logger {
-  private getTimestamp(): string {
-    return new Date().toISOString();
+export interface LogEntry {
+  id: string;
+  timestamp: Date;
+  level: LogLevel;
+  message: string;
+  context: LogContext;
+  data?: any;
+  error?: any;
+  stackTrace?: string;
+}
+
+export interface Logger {
+  debug(message: string, context?: LogContext, data?: any): void;
+  info(message: string, context?: LogContext, data?: any): void;
+  warn(message: string, context?: LogContext, data?: any): void;
+  error(message: string, context?: LogContext, error?: any): void;
+  critical(message: string, context?: LogContext, error?: any): void;
+  
+  // Specialized logging methods
+  logApiCall(method: string, url: string, duration: number, status: number, context?: LogContext): void;
+  logUserAction(action: string, userId: string, context?: LogContext, data?: any): void;
+  logBrokerOperation(operation: string, brokerName: string, context?: LogContext, data?: any): void;
+  logSystemEvent(event: string, context?: LogContext, data?: any): void;
+  logError(error: EnhancedError): void;
+  
+  // Context management
+  createChildLogger(context: LogContext): Logger;
+  setGlobalContext(context: LogContext): void;
+}
+
+export class EnhancedLogger implements Logger {
+  private globalContext: LogContext = {};
+  private logLevel: LogLevel;
+  private logEntries: LogEntry[] = [];
+  private maxLogEntries: number = 10000;
+
+  constructor(context: LogContext = {}) {
+    this.globalContext = context;
+    this.logLevel = this.getLogLevelFromEnv();
   }
 
-  private formatMessage(level: string, message: string, ...args: any[]): string {
-    const timestamp = this.getTimestamp();
-    const formattedArgs = args.length > 0 ? ' ' + args.map(arg =>
-      typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
-    ).join(' ') : '';
-
-    return `[${timestamp}] [${level}] ${message}${formattedArgs}`;
-  }
-
-  info(message: string, ...args: any[]): void {
-    console.log(this.formatMessage('INFO', message, ...args));
-  }
-
-  warn(message: string, ...args: any[]): void {
-    console.warn(this.formatMessage('WARN', message, ...args));
-  }
-
-  error(message: string, ...args: any[]): void {
-    console.error(this.formatMessage('ERROR', message, ...args));
-  }
-
-  debug(message: string, ...args: any[]): void {
-    if (process.env.NODE_ENV === 'development') {
-      console.debug(this.formatMessage('DEBUG', message, ...args));
+  private getLogLevelFromEnv(): LogLevel {
+    const envLevel = process.env.LOG_LEVEL?.toLowerCase() as LogLevel;
+    const validLevels: LogLevel[] = ['debug', 'info', 'warn', 'error', 'critical'];
+    
+    if (envLevel && validLevels.includes(envLevel)) {
+      return envLevel;
     }
+    
+    return process.env.NODE_ENV === 'development' ? 'debug' : 'info';
+  }
+
+  private shouldLog(level: LogLevel): boolean {
+    const levels: Record<LogLevel, number> = {
+      debug: 0,
+      info: 1,
+      warn: 2,
+      error: 3,
+      critical: 4
+    };
+    
+    return levels[level] >= levels[this.logLevel];
+  }
+
+  private createLogEntry(level: LogLevel, message: string, context: LogContext = {}, data?: any, error?: any): LogEntry {
+    const entry: LogEntry = {
+      id: uuidv4(),
+      timestamp: new Date(),
+      level,
+      message,
+      context: { ...this.globalContext, ...context },
+      data,
+      error: error ? this.serializeError(error) : undefined,
+      stackTrace: error?.stack
+    };
+
+    // Store log entry for aggregation
+    this.storeLogEntry(entry);
+    
+    return entry;
+  }
+
+  private serializeError(error: any): any {
+    if (error instanceof Error) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      };
+    }
+    return error;
+  }
+
+  private storeLogEntry(entry: LogEntry): void {
+    this.logEntries.push(entry);
+    
+    // Maintain max log entries limit
+    if (this.logEntries.length > this.maxLogEntries) {
+      this.logEntries = this.logEntries.slice(-this.maxLogEntries);
+    }
+  }
+
+  private formatLogEntry(entry: LogEntry): string {
+    const timestamp = entry.timestamp.toISOString();
+    const level = entry.level.toUpperCase().padEnd(8);
+    const contextStr = Object.keys(entry.context).length > 0 
+      ? ` [${Object.entries(entry.context)
+          .filter(([_, value]) => value !== undefined && value !== null)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(', ')}]` 
+      : '';
+    
+    let logLine = `[${timestamp}] [${level}]${contextStr} ${entry.message}`;
+    
+    if (entry.data) {
+      logLine += ` | Data: ${JSON.stringify(entry.data)}`;
+    }
+    
+    if (entry.error) {
+      logLine += ` | Error: ${JSON.stringify(entry.error)}`;
+    }
+    
+    return logLine;
+  }
+
+  private log(level: LogLevel, message: string, context: LogContext = {}, data?: any, error?: any): void {
+    if (!this.shouldLog(level)) {
+      return;
+    }
+
+    const entry = this.createLogEntry(level, message, context, data, error);
+    const formattedMessage = this.formatLogEntry(entry);
+
+    // Output to appropriate console method
+    switch (level) {
+      case 'debug':
+        console.debug(formattedMessage);
+        break;
+      case 'info':
+        console.log(formattedMessage);
+        break;
+      case 'warn':
+        console.warn(formattedMessage);
+        break;
+      case 'error':
+      case 'critical':
+        console.error(formattedMessage);
+        if (entry.stackTrace) {
+          console.error(entry.stackTrace);
+        }
+        break;
+    }
+
+    // In production, you might want to send critical errors to external logging service
+    if (level === 'critical' && process.env.NODE_ENV === 'production') {
+      this.sendToExternalLoggingService(entry);
+    }
+  }
+
+  private sendToExternalLoggingService(entry: LogEntry): void {
+    // Placeholder for external logging service integration
+    // This could be Sentry, LogRocket, CloudWatch, etc.
+    console.log('📤 Sending critical error to external logging service:', entry.id);
+  }
+
+  // Core logging methods
+  debug(message: string, context: LogContext = {}, data?: any): void {
+    this.log('debug', message, context, data);
+  }
+
+  info(message: string, context: LogContext = {}, data?: any): void {
+    this.log('info', message, context, data);
+  }
+
+  warn(message: string, context: LogContext = {}, data?: any): void {
+    this.log('warn', message, context, data);
+  }
+
+  error(message: string, contextOrError?: LogContext | any, error?: any): void {
+    // Handle backward compatibility: if second param looks like an error, treat it as such
+    if (contextOrError && (contextOrError.message || contextOrError.stack || contextOrError instanceof Error || contextOrError.name)) {
+      this.log('error', message, {}, undefined, contextOrError);
+    } else {
+      this.log('error', message, contextOrError || {}, undefined, error);
+    }
+  }
+
+  critical(message: string, context: LogContext = {}, error?: any): void {
+    this.log('critical', message, context, undefined, error);
+  }
+
+  // Specialized logging methods
+  logApiCall(method: string, url: string, duration: number, status: number, context: LogContext = {}): void {
+    const level: LogLevel = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'info';
+    const message = `API ${method.toUpperCase()} ${url} - ${status} (${duration}ms)`;
+    
+    this.log(level, message, {
+      ...context,
+      component: 'API',
+      method,
+      url,
+      duration,
+      status
+    });
+  }
+
+  logUserAction(action: string, userId: string, context: LogContext = {}, data?: any): void {
+    this.info(`User action: ${action}`, {
+      ...context,
+      component: 'USER_ACTION',
+      userId,
+      operation: action
+    }, data);
+  }
+
+  logBrokerOperation(operation: string, brokerName: string, context: LogContext = {}, data?: any): void {
+    this.info(`Broker operation: ${operation}`, {
+      ...context,
+      component: 'BROKER',
+      brokerName,
+      operation
+    }, data);
+  }
+
+  logSystemEvent(event: string, context: LogContext = {}, data?: any): void {
+    this.info(`System event: ${event}`, {
+      ...context,
+      component: 'SYSTEM',
+      operation: event
+    }, data);
+  }
+
+  logError(error: EnhancedError): void {
+    this.error(`Enhanced error: ${error.userMessage}`, {
+      requestId: error.context.requestId,
+      userId: error.context.userId,
+      brokerName: error.context.brokerName,
+      accountId: error.context.accountId,
+      operation: error.context.operation,
+      component: 'ERROR_HANDLER',
+      errorId: error.id,
+      errorType: error.type,
+      severity: error.severity,
+      retryCount: error.retryCount
+    }, {
+      classification: error.classification,
+      originalError: error.originalError
+    });
+  }
+
+  // Context management
+  createChildLogger(context: LogContext): Logger {
+    return new EnhancedLogger({ ...this.globalContext, ...context });
+  }
+
+  setGlobalContext(context: LogContext): void {
+    this.globalContext = { ...this.globalContext, ...context };
+  }
+
+  // Log aggregation and analysis methods
+  getLogEntries(level?: LogLevel, limit?: number): LogEntry[] {
+    let entries = level ? this.logEntries.filter(entry => entry.level === level) : this.logEntries;
+    return limit ? entries.slice(-limit) : entries;
+  }
+
+  getErrorSummary(timeWindow: number = 3600000): { [key: string]: number } {
+    const cutoff = new Date(Date.now() - timeWindow);
+    const recentErrors = this.logEntries.filter(
+      entry => entry.timestamp >= cutoff && (entry.level === 'error' || entry.level === 'critical')
+    );
+
+    const summary: { [key: string]: number } = {};
+    recentErrors.forEach(entry => {
+      const key = entry.context.component || 'unknown';
+      summary[key] = (summary[key] || 0) + 1;
+    });
+
+    return summary;
+  }
+
+  clearLogs(): void {
+    this.logEntries = [];
   }
 }
 
 // Export singleton instance
-export const logger = new SimpleLogger();
+export const logger = new EnhancedLogger();
 
-// Export individual functions for convenience
-export const info = logger.info.bind(logger);
-export const warn = logger.warn.bind(logger);
-export const error = logger.error.bind(logger);
-export const debug = logger.debug.bind(logger);
+// Export individual functions for convenience (backward compatibility)
+export const info = (message: string, context?: LogContext | any, ...args: any[]) => {
+  if (context && typeof context === 'object' && !Array.isArray(context)) {
+    logger.info(message, context, args.length > 0 ? args[0] : undefined);
+  } else {
+    logger.info(message, {}, context);
+  }
+};
+
+export const warn = (message: string, context?: LogContext | any, ...args: any[]) => {
+  if (context && typeof context === 'object' && !Array.isArray(context)) {
+    logger.warn(message, context, args.length > 0 ? args[0] : undefined);
+  } else {
+    logger.warn(message, {}, context);
+  }
+};
+
+export const error = (message: string, contextOrError?: any, errorParam?: any) => {
+  // If the second parameter looks like an error (has message or stack), treat it as an error
+  if (contextOrError && (contextOrError.message || contextOrError.stack || contextOrError instanceof Error || contextOrError.name)) {
+    logger.error(message, {}, contextOrError);
+  } else if (contextOrError && typeof contextOrError === 'object' && !Array.isArray(contextOrError) && !contextOrError.message && !contextOrError.stack) {
+    // If it looks like a context object (has typical context properties), use it as context
+    logger.error(message, contextOrError, errorParam);
+  } else {
+    // Fallback: treat as error
+    logger.error(message, {}, contextOrError);
+  }
+};
+
+export const debug = (message: string, context?: LogContext | any, ...args: any[]) => {
+  if (context && typeof context === 'object' && !Array.isArray(context)) {
+    logger.debug(message, context, args.length > 0 ? args[0] : undefined);
+  } else {
+    logger.debug(message, {}, context);
+  }
+};
 
 export default logger;

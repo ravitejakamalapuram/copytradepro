@@ -1,45 +1,41 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './sqliteDatabase';
-import { ShoonyaService } from './shoonyaService';
+import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
-// Import broker connections from controller
-import { userBrokerConnections } from '../controllers/brokerController';
+// Import unified broker manager
+import { unifiedBrokerManager } from './unifiedBrokerManager';
+
+// Import WebSocket service for real-time updates
+import websocketService from './websocketService';
 
 // Broker connection manager interface
 interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null;
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
 }
 
 // Create broker connection manager implementation
 const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): ShoonyaService | null {
-    const userConnections = userBrokerConnections.get(userId);
-    if (!userConnections) {
-      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
-      console.log(`❌ No connections found for user ${userId}`);
+  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
+    console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
+
+    // Get any connection for this broker
+    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+    if (connections.length === 0) {
+      console.log(`❌ No ${brokerName} connections found for user ${userId}`);
       return null;
     }
 
-    const brokerService = userConnections.get(brokerName);
-    if (!brokerService) {
-      console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
-      console.log(`❌ No ${brokerName} connection found for user ${userId}`);
-      return null;
+    // Return the first active connection
+    const activeConnection = connections.find(conn => conn.isActive);
+    if (activeConnection) {
+      console.log(`✅ Found active ${brokerName} connection for user ${userId} (account: ${activeConnection.accountId})`);
+      return activeConnection.service;
     }
 
-    if (brokerName === 'shoonya') {
-      const shoonyaService = brokerService as ShoonyaService;
-      if (shoonyaService.isLoggedIn()) {
-        console.log(`✅ Found active ${brokerName} connection for user ${userId}`);
-        return shoonyaService;
-      } else {
-        console.log(`⚠️ Found ${brokerName} connection for user ${userId} but not logged in`);
-        return null;
-      }
-    }
-
-    return null;
+    // If no active connection, try the first one
+    console.log(`⚠️ No active ${brokerName} connection found for user ${userId}, trying first available`);
+    return connections[0]?.service || null;
   }
 };
 
@@ -224,27 +220,45 @@ class OrderStatusService extends EventEmitter {
       let newStatus = order.status;
 
       // Try to get real status from broker API first
-      if (brokerConnectionManager && order.broker_name === 'shoonya') {
+      if (brokerConnectionManager) {
         try {
           // Get the broker connection for the user
           const brokerService = brokerConnectionManager.getBrokerConnection(brokerAccountId, order.broker_name);
 
           if (brokerService) {
-            logger.debug(`Getting real order status from Shoonya API for order ${order.broker_order_id}`);
+            logger.debug(`Getting real order status from ${order.broker_name} API for order ${order.broker_order_id}`);
 
             // Try to get order status from broker API
             logger.debug(`Calling broker API for order status: ${order.broker_order_id}`);
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
             logger.debug(`Broker API response:`, brokerStatus);
 
-            if (brokerStatus && brokerStatus.stat === 'Ok') {
-              const mappedStatus = this.mapShoonyaStatus(brokerStatus.status);
-              if (mappedStatus !== order.status) {
-                newStatus = mappedStatus;
-                logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+            // Handle different broker response formats
+            if (brokerStatus) {
+              let statusValue = '';
+
+              // Handle unified response format
+              if ((brokerStatus as any).success && (brokerStatus as any).data) {
+                statusValue = (brokerStatus as any).data.status;
               }
-            } else {
-              logger.warn(`Failed to get order status from Shoonya API: ${brokerStatus?.emsg || 'Unknown error'}`);
+              // Handle legacy Shoonya format
+              else if ((brokerStatus as any).stat === 'Ok') {
+                statusValue = (brokerStatus as any).status;
+              }
+              // Handle direct OrderStatus format
+              else if (brokerStatus.status) {
+                statusValue = brokerStatus.status;
+              }
+
+              if (statusValue) {
+                const mappedStatus = this.mapBrokerStatus(statusValue, order.broker_name);
+                if (mappedStatus !== order.status) {
+                  newStatus = mappedStatus;
+                  logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+                }
+              } else {
+                logger.warn(`Failed to get order status from broker API: ${(brokerStatus as any)?.emsg || 'Unknown error'}`);
+              }
             }
           } else {
             logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);
@@ -324,14 +338,31 @@ class OrderStatusService extends EventEmitter {
       const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
       if (brokerService && brokerService.isLoggedIn()) {
-        // For Shoonya, the broker account ID is the user ID
-        if (order.broker_name === 'shoonya') {
-          const shoonyaService = brokerService as ShoonyaService;
-          const userId = shoonyaService.getUserId();
-          if (userId) {
-            logger.debug(`Found broker account ID from active connection: ${userId}`);
-            return userId; // This is the broker account ID (e.g., "FN135006")
-          }
+        // Try to get broker account ID from the service
+        const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+
+        // Try different methods to get the account ID based on broker capabilities
+        let accountId = null;
+
+        // Method 1: getUserId (Shoonya-style)
+        if (brokerServiceTyped.getUserId && typeof brokerServiceTyped.getUserId === 'function') {
+          accountId = brokerServiceTyped.getUserId();
+        }
+
+        // Method 2: getAccountInfo (Unified interface)
+        if (!accountId && brokerServiceTyped.getAccountInfo && typeof brokerServiceTyped.getAccountInfo === 'function') {
+          const accountInfo = brokerServiceTyped.getAccountInfo();
+          accountId = accountInfo?.accountId;
+        }
+
+        // Method 3: Direct accountId property
+        if (!accountId && brokerServiceTyped.accountId) {
+          accountId = brokerServiceTyped.accountId;
+        }
+
+        if (accountId) {
+          logger.debug(`Found broker account ID from active connection: ${accountId}`);
+          return accountId;
         }
       }
 
@@ -344,10 +375,11 @@ class OrderStatusService extends EventEmitter {
   }
 
   /**
-   * Map Shoonya status to our standard status
+   * Map broker-specific status to our standard status
    */
-  private mapShoonyaStatus(shoonyaStatus: string): string {
-    const statusMap: { [key: string]: string } = {
+  private mapBrokerStatus(brokerStatus: string, brokerName: string): string {
+    // Shoonya status mapping
+    const shoonyaStatusMap: { [key: string]: string } = {
       'PENDING': 'PENDING',
       'OPEN': 'PLACED',
       'COMPLETE': 'EXECUTED',
@@ -357,7 +389,31 @@ class OrderStatusService extends EventEmitter {
       'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
     };
 
-    return statusMap[shoonyaStatus] || shoonyaStatus;
+    // Fyers status mapping
+    const fyersStatusMap: { [key: string]: string } = {
+      'PENDING': 'PENDING',
+      'OPEN': 'PLACED',
+      'FILLED': 'EXECUTED',
+      'CANCELLED': 'CANCELLED',
+      'REJECTED': 'REJECTED',
+      'PARTIALLY_FILLED': 'PARTIALLY_FILLED',
+    };
+
+    // Select appropriate mapping based on broker
+    let statusMap: { [key: string]: string };
+    switch (brokerName.toLowerCase()) {
+      case 'shoonya':
+        statusMap = shoonyaStatusMap;
+        break;
+      case 'fyers':
+        statusMap = fyersStatusMap;
+        break;
+      default:
+        // For unknown brokers, return status as-is
+        return brokerStatus;
+    }
+
+    return statusMap[brokerStatus] || brokerStatus;
   }
 
 
@@ -403,7 +459,31 @@ class OrderStatusService extends EventEmitter {
 
       logger.info(`Order ${order.id} status updated: ${oldStatus} → ${newStatus}`);
 
-      // WebSocket broadcasting removed - using manual refresh only
+      // Broadcast real-time update via WebSocket
+      try {
+        const orderUpdateData = {
+          orderId: order.id,
+          brokerOrderId: order.broker_order_id,
+          symbol: order.symbol,
+          action: order.action,
+          quantity: order.quantity,
+          price: order.price,
+          oldStatus,
+          newStatus,
+          brokerName: order.broker_name,
+          exchange: order.exchange,
+          orderType: order.order_type,
+          timestamp: now,
+          executionData: executionData || {}
+        };
+
+        // Emit to user-specific room
+        websocketService.sendToUser(order.user_id.toString(), 'orderStatusUpdate', orderUpdateData);
+        logger.info(`📡 WebSocket update sent for order ${order.id} status change`);
+      } catch (wsError: any) {
+        logger.error(`Failed to send WebSocket update for order ${order.id}:`, wsError.message);
+        // Don't fail the entire operation if WebSocket fails
+      }
 
       // Send push notification for order status change
       try {
@@ -447,6 +527,156 @@ class OrderStatusService extends EventEmitter {
 
     } catch (error: any) {
       logger.error(`🚨 Failed to add order ${order.id} to monitoring:`, error.message);
+    }
+  }
+
+  /**
+   * Manually refresh order status for all pending orders
+   */
+  async refreshAllOrderStatus(userId?: string): Promise<{
+    success: boolean;
+    message: string;
+    data: {
+      totalOrders: number;
+      updatedOrders: number;
+      errors: string[];
+    };
+  }> {
+    try {
+      logger.info(`🔄 Manual order status refresh requested${userId ? ` for user ${userId}` : ' for all users'}`);
+
+      // Get all pending orders
+      let pendingOrders = await this.getPendingOrders();
+      
+      // Filter by user if specified
+      if (userId) {
+        pendingOrders = pendingOrders.filter(order => order.user_id.toString() === userId);
+      }
+
+      logger.info(`Found ${pendingOrders.length} pending orders to check`);
+
+      const errors: string[] = [];
+      let updatedCount = 0;
+
+      // Check status for each order
+      for (const order of pendingOrders) {
+        try {
+          const oldStatus = order.status;
+          await this.checkOrderStatus(order);
+          
+          // Check if status was updated
+          if (order.status !== oldStatus) {
+            updatedCount++;
+          }
+        } catch (error: any) {
+          const errorMsg = `Failed to check order ${order.id}: ${error.message}`;
+          logger.error(errorMsg);
+          errors.push(errorMsg);
+        }
+      }
+
+      const result = {
+        success: true,
+        message: `Order status refresh completed. ${updatedCount} orders updated.`,
+        data: {
+          totalOrders: pendingOrders.length,
+          updatedOrders: updatedCount,
+          errors
+        }
+      };
+
+      logger.info(`✅ Order status refresh completed: ${updatedCount}/${pendingOrders.length} orders updated`);
+      return result;
+
+    } catch (error: any) {
+      logger.error('🚨 Failed to refresh order status:', error);
+      return {
+        success: false,
+        message: 'Failed to refresh order status',
+        data: {
+          totalOrders: 0,
+          updatedOrders: 0,
+          errors: [error.message]
+        }
+      };
+    }
+  }
+
+  /**
+   * Manually refresh order status for a specific order
+   */
+  async refreshOrderStatus(orderId: string, userId: string): Promise<{
+    success: boolean;
+    message: string;
+    data?: {
+      orderId: string;
+      oldStatus: string;
+      newStatus: string;
+      updated: boolean;
+    };
+  }> {
+    try {
+      logger.info(`🔄 Manual order status refresh requested for order ${orderId}`);
+
+      // Find the order in database
+      const orderHistory = await userDatabase.getOrderHistoryById(parseInt(orderId));
+      if (!orderHistory) {
+        return {
+          success: false,
+          message: 'Order not found'
+        };
+      }
+
+      // Verify user owns the order
+      if (orderHistory.user_id.toString() !== userId) {
+        return {
+          success: false,
+          message: 'Access denied'
+        };
+      }
+
+      // Convert to Order format
+      const order: Order = {
+        id: orderHistory.id.toString(),
+        user_id: orderHistory.user_id,
+        account_id: orderHistory.account_id,
+        symbol: orderHistory.symbol,
+        action: orderHistory.action,
+        quantity: orderHistory.quantity,
+        price: orderHistory.price,
+        status: orderHistory.status,
+        broker_name: orderHistory.broker_name,
+        broker_order_id: orderHistory.broker_order_id,
+        order_type: orderHistory.order_type,
+        exchange: orderHistory.exchange,
+        product_type: orderHistory.product_type,
+        remarks: orderHistory.remarks,
+        created_at: orderHistory.created_at,
+        updated_at: orderHistory.created_at,
+        executed_at: orderHistory.executed_at
+      };
+
+      const oldStatus = order.status;
+      await this.checkOrderStatus(order);
+      const updated = order.status !== oldStatus;
+
+      return {
+        success: true,
+        message: updated ? 'Order status updated' : 'Order status unchanged',
+        data: {
+          orderId: order.id,
+          oldStatus,
+          newStatus: order.status,
+          updated
+        }
+      };
+
+    } catch (error: any) {
+      logger.error(`🚨 Failed to refresh order ${orderId} status:`, error);
+      return {
+        success: false,
+        message: 'Failed to refresh order status'
+      };
     }
   }
 

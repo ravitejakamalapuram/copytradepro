@@ -4,6 +4,8 @@ import AppNavigation from '../components/AppNavigation';
 import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
+import { useToast } from '../components/Toast'; // Added import for Button
 
 interface Order {
   id: string;
@@ -30,6 +32,7 @@ interface Order {
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed'>('all');
   const [loading, setLoading] = useState(true);
@@ -37,6 +40,8 @@ const Orders: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'month' | 'all'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
@@ -52,25 +57,28 @@ const Orders: React.FC = () => {
     let endDate: string | undefined;
 
     switch (dateFilter) {
-      case 'today':
+      case 'today': {
         // Today's orders - set start and end of today
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
         const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
         startDate = startOfDay.toISOString();
         endDate = endOfDay.toISOString();
         break;
-      case 'week':
+      }
+      case 'week': {
         // Last 7 days
         const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         startDate = weekAgo.toISOString();
         endDate = now.toISOString();
         break;
-      case 'month':
+      }
+      case 'month': {
         // Last 30 days
         const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         startDate = monthAgo.toISOString();
         endDate = now.toISOString();
         break;
+      }
       case 'all':
         // All orders - no date filtering
         startDate = undefined;
@@ -270,18 +278,18 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'PLACED': return 'var(--kite-neutral)';
-      case 'PENDING': return 'var(--kite-neutral)';
-      case 'EXECUTED': return 'var(--kite-profit)';
-      case 'PARTIALLY_FILLED': return 'var(--kite-neutral)';
-      case 'CANCELLED': return 'var(--kite-text-secondary)';
-      case 'REJECTED': return 'var(--kite-loss)';
-      default: return 'var(--kite-text-primary)';
+      case 'PLACED': return 'var(--color-neutral)';
+      case 'PENDING': return 'var(--color-neutral)';
+      case 'EXECUTED': return 'var(--color-profit)';
+      case 'PARTIALLY_FILLED': return 'var(--color-neutral)';
+      case 'CANCELLED': return 'var(--text-secondary)';
+      case 'REJECTED': return 'var(--color-loss)';
+      default: return 'var(--text-primary)';
     }
   };
 
   const getTypeColor = (type: string): string => {
-    return type === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)';
+    return type === 'BUY' ? 'var(--color-profit)' : 'var(--color-loss)';
   };
 
   const handleModifyOrder = (orderId: string) => {
@@ -299,6 +307,8 @@ const Orders: React.FC = () => {
       console.error('Failed to cancel order:', error);
     }
   };
+
+
 
   const handleCheckOrderStatus = async (orderId: string) => {
     try {
@@ -321,22 +331,42 @@ const Orders: React.FC = () => {
         setOrders(prevOrders =>
           prevOrders.map(order =>
             order.id === orderId
-              ? { ...order, status: currentStatus.toUpperCase() as any }
+              ? { ...order, status: currentStatus.toUpperCase() as unknown as Order['status'] }
               : order
           )
         );
 
         console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+
+        if (statusChanged) {
+          showToast({
+            type: 'success',
+            title: 'Status Updated',
+            message: `Order status changed from ${previousStatus} to ${currentStatus}`
+          });
+        } else {
+          showToast({
+            type: 'info',
+            title: 'Status Checked',
+            message: `Order status confirmed: ${currentStatus}`
+          });
+        }
       } else {
-        setStatusMessage(`Failed to check status: ${response.message}`);
-        setTimeout(() => setStatusMessage(null), 5000);
+        showToast({
+          type: 'error',
+          title: 'Status Check Failed',
+          message: response.message || 'Failed to check order status.'
+        });
         console.error('Failed to check order status:', response.message);
       }
 
     } catch (error: any) {
       console.error('Failed to check order status:', error);
-      setStatusMessage('Failed to check order status. Please try again.');
-      setTimeout(() => setStatusMessage(null), 5000);
+      showToast({
+        type: 'error',
+        title: 'Status Check Error',
+        message: error.message || 'Failed to check order status.'
+      });
     } finally {
       // Remove from checking set
       setCheckingStatus(prev => {
@@ -349,9 +379,9 @@ const Orders: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{
             display: 'flex',
             justifyContent: 'center',
@@ -361,7 +391,7 @@ const Orders: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>📋</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading orders...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading orders...</div>
           </div>
         </div>
       </div>
@@ -370,18 +400,18 @@ const Orders: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -389,7 +419,7 @@ const Orders: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <style>{`
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -398,67 +428,52 @@ const Orders: React.FC = () => {
       `}</style>
       <AppNavigation />
       
-      <div className="kite-main">
-        <div className="kite-card">
-          <div className="kite-card-header">
+      <div className="app-main">
+        <div className="card">
+          <div className="card-header">
             <div>
-              <h2 className="kite-card-title">Orders</h2>
+              <h2 className="card-title">Orders</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
                 {/* Date Filter Buttons */}
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Date:</span>
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-secondary)' }}>Date:</span>
                   {(['today', 'week', 'month', 'all'] as const).map((filter) => (
-                    <button
+                    <Button
                       key={filter}
-                      className={`kite-btn ${dateFilter === filter ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                      variant={dateFilter === filter ? 'primary' : 'secondary'}
                       onClick={() => {
                         setDateFilter(filter);
                         setShowDatePicker(false);
                         setCustomStartDate('');
                         setCustomEndDate('');
                       }}
-                      style={{
-                        fontSize: '0.75rem',
-                        padding: '0.25rem 0.5rem',
-                        textTransform: 'capitalize'
-                      }}
+                      size="sm"
                     >
                       {filter === 'today' ? 'Today' :
                        filter === 'week' ? 'Week' :
                        filter === 'month' ? 'Month' : 'All'}
-                    </button>
+                    </Button>
                   ))}
-                  <button
-                    className={`kite-btn ${showDatePicker ? 'kite-btn-primary' : 'kite-btn-secondary'}`}
+                  <Button
+                    variant={showDatePicker ? 'primary' : 'secondary'}
                     onClick={() => setShowDatePicker(!showDatePicker)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem'
-                    }}
+                    size="sm"
                   >
                     📅 Custom
-                  </button>
+                  </Button>
                 </div>
 
                 {/* Account Filter Checkboxes */}
                 <div data-account-filter style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', position: 'relative' }}>
-                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-secondary)' }}>Account:</span>
-                  <button
-                    className="kite-btn kite-btn-secondary"
+                  <span style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-secondary)' }}>Account:</span>
+                  <Button
+                    variant="secondary"
                     onClick={() => setShowAccountFilter(!showAccountFilter)}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem',
-                      minWidth: '140px',
-                      textAlign: 'left',
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center'
-                    }}
+                    size="sm"
                   >
-                    <span>{getSelectedAccountsText()}</span>
+                    {getSelectedAccountsText()}
                     <span style={{ marginLeft: '0.5rem' }}>{showAccountFilter ? '▲' : '▼'}</span>
-                  </button>
+                  </Button>
 
                   {/* Account Filter Dropdown */}
                   {showAccountFilter && (
@@ -467,9 +482,9 @@ const Orders: React.FC = () => {
                       top: '100%',
                       left: '4rem',
                       zIndex: 1000,
-                      backgroundColor: 'var(--kite-bg-primary)',
-                      border: '1px solid var(--kite-border)',
-                      borderRadius: 'var(--kite-radius-sm)',
+                      backgroundColor: 'var(--bg-primary)',
+                      border: '1px solid var(--border-primary)',
+                      borderRadius: 'var(--radius-sm)',
                       boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
                       minWidth: '250px',
                       maxHeight: '300px',
@@ -483,10 +498,10 @@ const Orders: React.FC = () => {
                         gap: '0.5rem',
                         padding: '0.5rem',
                         cursor: 'pointer',
-                        borderRadius: 'var(--kite-radius-sm)',
+                        borderRadius: 'var(--radius-sm)',
                         fontSize: '0.875rem',
                         fontWeight: '500',
-                        backgroundColor: isAccountSelected('all') ? 'var(--kite-bg-secondary)' : 'transparent'
+                        backgroundColor: isAccountSelected('all') ? 'var(--bg-secondary)' : 'transparent'
                       }}>
                         <input
                           type="checkbox"
@@ -507,9 +522,9 @@ const Orders: React.FC = () => {
                             gap: '0.5rem',
                             padding: '0.5rem',
                             cursor: 'pointer',
-                            borderRadius: 'var(--kite-radius-sm)',
+                            borderRadius: 'var(--radius-sm)',
                             fontSize: '0.875rem',
-                            backgroundColor: isAccountSelected(account.id) ? 'var(--kite-bg-secondary)' : 'transparent'
+                            backgroundColor: isAccountSelected(account.id) ? 'var(--bg-secondary)' : 'transparent'
                           }}
                         >
                           <input
@@ -526,7 +541,7 @@ const Orders: React.FC = () => {
                         <div style={{
                           padding: '0.5rem',
                           fontSize: '0.875rem',
-                          color: 'var(--kite-text-secondary)',
+                          color: 'var(--text-secondary)',
                           textAlign: 'center'
                         }}>
                           No accounts available
@@ -542,9 +557,9 @@ const Orders: React.FC = () => {
                 <div style={{
                   marginTop: '0.75rem',
                   padding: '0.75rem',
-                  backgroundColor: 'var(--kite-bg-secondary)',
-                  borderRadius: 'var(--kite-radius-sm)',
-                  border: '1px solid var(--kite-border)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-primary)',
                   display: 'flex',
                   gap: '0.5rem',
                   alignItems: 'center',
@@ -557,8 +572,8 @@ const Orders: React.FC = () => {
                     onChange={(e) => setCustomStartDate(e.target.value)}
                     style={{
                       padding: '0.25rem 0.5rem',
-                      border: '1px solid var(--kite-border)',
-                      borderRadius: 'var(--kite-radius-sm)',
+                      border: '1px solid var(--border-primary)',
+                      borderRadius: 'var(--radius-sm)',
                       fontSize: '0.875rem'
                     }}
                   />
@@ -569,13 +584,13 @@ const Orders: React.FC = () => {
                     onChange={(e) => setCustomEndDate(e.target.value)}
                     style={{
                       padding: '0.25rem 0.5rem',
-                      border: '1px solid var(--kite-border)',
-                      borderRadius: 'var(--kite-radius-sm)',
+                      border: '1px solid var(--border-primary)',
+                      borderRadius: 'var(--radius-sm)',
                       fontSize: '0.875rem'
                     }}
                   />
-                  <button
-                    className="kite-btn kite-btn-primary"
+                  <Button
+                    variant="primary"
                     onClick={() => {
                       if (customStartDate && customEndDate) {
                         setDateFilter('today'); // Reset to trigger useEffect
@@ -583,13 +598,10 @@ const Orders: React.FC = () => {
                       }
                     }}
                     disabled={!customStartDate || !customEndDate}
-                    style={{
-                      fontSize: '0.75rem',
-                      padding: '0.25rem 0.5rem'
-                    }}
+                    size="sm"
                   >
                     Apply
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -597,7 +609,7 @@ const Orders: React.FC = () => {
                 <p style={{
                   margin: '0.5rem 0 0 0',
                   fontSize: '0.875rem',
-                  color: 'var(--kite-text-secondary)'
+                  color: 'var(--text-secondary)'
                 }}>
                   Last updated: {lastRefresh.toLocaleTimeString('en-IN')}
                   {dateFilter === 'today' && ' • Showing today\'s orders'}
@@ -612,7 +624,7 @@ const Orders: React.FC = () => {
                 <p style={{
                   margin: '0.5rem 0 0 0',
                   fontSize: '0.875rem',
-                  color: statusMessage.includes('Failed') ? 'var(--kite-loss)' : 'var(--kite-profit)',
+                  color: statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)',
                   fontWeight: '500'
                 }}>
                   {statusMessage}
@@ -620,29 +632,21 @@ const Orders: React.FC = () => {
               )}
             </div>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button
-                className="kite-btn kite-btn-secondary"
+              <Button
+                variant="secondary"
                 onClick={fetchOrders}
                 disabled={loading}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
+                size="sm"
               >
                 🔄 {loading ? 'Loading...' : 'Refresh'}
-              </button>
-              <button
-                className="kite-btn kite-btn-primary"
+              </Button>
+              <Button
+                variant="primary"
                 onClick={() => navigate('/trade-setup')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
+                size="sm"
               >
                 + Place Order
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -651,7 +655,7 @@ const Orders: React.FC = () => {
             display: 'flex', 
             gap: '0.5rem',
             marginBottom: '1.5rem',
-            borderBottom: '1px solid var(--kite-border-secondary)',
+            borderBottom: '1px solid var(--border-secondary)',
             paddingBottom: '1rem'
           }}>
             {[
@@ -659,10 +663,10 @@ const Orders: React.FC = () => {
               { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
               { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
             ].map(tab => (
-              <button
+              <Button
                 key={tab.key}
-                className={`kite-btn ${activeTab === tab.key ? 'kite-btn-primary' : ''}`}
-                onClick={() => setActiveTab(tab.key as any)}
+                variant={activeTab === tab.key ? 'primary' : ''}
+                onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed')}
                 style={{ 
                   display: 'flex',
                   alignItems: 'center',
@@ -671,7 +675,7 @@ const Orders: React.FC = () => {
               >
                 {tab.label}
                 <span style={{ 
-                  backgroundColor: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--kite-bg-tertiary)',
+                  backgroundColor: activeTab === tab.key ? 'rgba(255,255,255,0.2)' : 'var(--bg-tertiary)',
                   padding: '0.125rem 0.375rem',
                   borderRadius: '0.75rem',
                   fontSize: '0.75rem',
@@ -679,14 +683,14 @@ const Orders: React.FC = () => {
                 }}>
                   {tab.count}
                 </span>
-              </button>
+              </Button>
             ))}
           </div>
 
           {/* Orders Table */}
           {filteredOrders.length > 0 ? (
             <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
+              <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Time</th>
@@ -705,19 +709,19 @@ const Orders: React.FC = () => {
                 <tbody>
                   {filteredOrders.map((order) => (
                     <tr key={order.id}>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)', fontSize: '0.875rem' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.875rem' }}>
                         {order.time}
                       </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-                          <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                          <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                             {order.symbol?.replace(/-[A-Z]+$/, '') || order.symbol}
                           </div>
                           {order.exchange && (
                             <span style={{
                               fontSize: '0.625rem',
                               padding: '0.125rem 0.375rem',
-                              backgroundColor: order.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
+                              backgroundColor: order.exchange === 'NSE' ? 'var(--exchange-nse)' : 'var(--exchange-other)',
                               color: 'white',
                               borderRadius: '0.25rem',
                               fontWeight: '600',
@@ -730,7 +734,7 @@ const Orders: React.FC = () => {
                         {order.accountInfo && (
                           <div style={{
                             fontSize: '0.75rem',
-                            color: 'var(--kite-text-secondary)',
+                            color: 'var(--text-secondary)',
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.25rem'
@@ -738,10 +742,10 @@ const Orders: React.FC = () => {
                             <span style={{
                               fontSize: '0.625rem',
                               padding: '0.125rem 0.25rem',
-                              backgroundColor: 'var(--kite-bg-secondary)',
+                              backgroundColor: 'var(--bg-secondary)',
                               borderRadius: '0.25rem',
                               fontWeight: '500',
-                              color: 'var(--kite-text-primary)'
+                              color: 'var(--text-primary)'
                             }}>
                               {order.accountInfo.account_id}
                             </span>
@@ -761,13 +765,13 @@ const Orders: React.FC = () => {
                       <td style={{ fontSize: '0.875rem' }}>
                         {order.orderType}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {order.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {order.price ? formatCurrency(order.price) : '-'}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {order.triggerPrice ? formatCurrency(order.triggerPrice) : '-'}
                       </td>
                       <td>
@@ -779,25 +783,17 @@ const Orders: React.FC = () => {
                           {order.status}
                         </span>
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {order.filledQty}/{order.qty}
                       </td>
-                      <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                      <td style={{ fontFamily: 'var(--font-mono)' }}>
                         {order.avgPrice ? formatCurrency(order.avgPrice) : '-'}
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                           {/* Check Status button - available for all orders */}
-                          <button
-                            className="kite-btn"
-                            style={{
-                              padding: '0.25rem 0.5rem',
-                              fontSize: '0.75rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              opacity: checkingStatus.has(order.id) ? 0.6 : 1
-                            }}
+                          <Button
+                            variant="outline"
                             onClick={() => handleCheckOrderStatus(order.id)}
                             disabled={checkingStatus.has(order.id)}
                             title="Check current order status from broker"
@@ -818,42 +814,30 @@ const Orders: React.FC = () => {
                             ) : (
                               <>🔄 Check</>
                             )}
-                          </button>
+                          </Button>
 
                           {['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status) && (
                             <>
-                              <button
-                                className="kite-btn"
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  fontSize: '0.75rem'
-                                }}
+                              <Button
+                                variant="outline"
                                 onClick={() => handleModifyOrder(order.id)}
                               >
                                 Modify
-                              </button>
-                              <button
-                                className="kite-btn kite-btn-danger"
-                                style={{
-                                  padding: '0.25rem 0.5rem',
-                                  fontSize: '0.75rem'
-                                }}
+                              </Button>
+                              <Button
+                                variant="danger"
                                 onClick={() => handleCancelOrder(order.id)}
                               >
                                 Cancel
-                              </button>
+                              </Button>
                             </>
                           )}
                           {order.status === 'EXECUTED' && (
-                            <button
-                              className="kite-btn"
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '0.75rem'
-                              }}
+                            <Button
+                              variant="outline"
                             >
                               View
-                            </button>
+                            </Button>
                           )}
                         </div>
                       </td>
@@ -866,7 +850,7 @@ const Orders: React.FC = () => {
             <div style={{ 
               textAlign: 'center', 
               padding: '3rem',
-              color: 'var(--kite-text-secondary)'
+              color: 'var(--text-secondary)'
             }}>
               <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📋</div>
               <div style={{ fontSize: '1.125rem', marginBottom: '0.5rem' }}>
@@ -878,21 +862,21 @@ const Orders: React.FC = () => {
                   : `No ${activeTab} orders found`
                 }
               </div>
-              <button
-                className="kite-btn kite-btn-primary"
+              <Button
+                variant="primary"
                 style={{ marginTop: '1rem' }}
                 onClick={() => navigate('/trade-setup')}
               >
                 Place Order
-              </button>
+              </Button>
             </div>
           )}
         </div>
 
         {/* Order Summary */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Today's Summary</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Today's Summary</h2>
           </div>
           <div style={{ 
             display: 'grid', 
@@ -900,34 +884,34 @@ const Orders: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-text-primary)' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--text-primary)' }}>
                 {orders.length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 Total Orders
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-profit)' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-profit)' }}>
                 {orders.filter(o => o.status === 'EXECUTED').length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 Executed
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-neutral)' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-neutral)' }}>
                 {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 Pending
               </div>
             </div>
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--kite-loss)' }}>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', color: 'var(--color-loss)' }}>
                 {orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length}
               </div>
-              <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                 Cancelled/Rejected
               </div>
             </div>

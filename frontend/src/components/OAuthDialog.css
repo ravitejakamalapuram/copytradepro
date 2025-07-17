@@ -1,0 +1,230 @@
+/* OAuth Dialog Overlay */
+.oauth-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+/* OAuth Dialog Container */
+.oauth-dialog {
+  background: var(--bg-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-primary);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: oauth-dialog-appear 0.2s ease-out;
+}
+
+@keyframes oauth-dialog-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Dialog Header */
+.oauth-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.oauth-dialog-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: var(--font-semibold);
+}
+
+.oauth-dialog-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+}
+
+.oauth-dialog-close:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+/* Dialog Content */
+.oauth-dialog-content {
+  padding: 1.5rem;
+}
+
+/* OAuth Steps */
+.oauth-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.oauth-step {
+  display: flex;
+  gap: 1rem;
+  opacity: 0.6;
+  transition: var(--transition-fast);
+}
+
+.oauth-step.active {
+  opacity: 1;
+}
+
+.step-number {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background-color: var(--bg-tertiary);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--font-semibold);
+  font-size: 0.875rem;
+  border: 2px solid var(--border-secondary);
+  transition: var(--transition-fast);
+}
+
+.oauth-step.active .step-number {
+  background-color: var(--interactive-primary);
+  color: white;
+  border-color: var(--interactive-primary);
+}
+
+.step-content {
+  flex: 1;
+}
+
+.step-content h4 {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: var(--font-semibold);
+}
+
+.step-content p {
+  margin: 0 0 1rem 0;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+/* OAuth URL Section */
+.oauth-url-section {
+  margin-top: 1rem;
+}
+
+.oauth-url {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  word-break: break-all;
+  margin-bottom: 0.75rem;
+  user-select: all;
+}
+
+.oauth-url-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+/* OAuth Input Section */
+.oauth-input-section {
+  margin-top: 1rem;
+}
+
+.oauth-code-input {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  font-family: var(--font-mono);
+}
+
+.oauth-input-help {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.oauth-input-help code {
+  background-color: var(--bg-secondary);
+  padding: 0.125rem 0.25rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+/* Dialog Footer */
+.oauth-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid var(--border-secondary);
+  background-color: var(--bg-secondary);
+}
+
+/* Responsive Design */
+@media (max-width: 640px) {
+  .oauth-dialog-overlay {
+    padding: 0.5rem;
+  }
+  
+  .oauth-dialog {
+    max-height: 95vh;
+  }
+  
+  .oauth-dialog-header,
+  .oauth-dialog-content,
+  .oauth-dialog-footer {
+    padding: 1rem;
+  }
+  
+  .oauth-step {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .step-number {
+    align-self: flex-start;
+  }
+  
+  .oauth-url-actions {
+    flex-direction: column;
+  }
+  
+  .oauth-dialog-footer {
+    flex-direction: column-reverse;
+  }
+  
+  .oauth-dialog-footer .btn {
+    width: 100%;
+  }
+}

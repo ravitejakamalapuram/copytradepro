@@ -1,7 +1,7 @@
 /* Navigation Styles */
 .navigation {
-  background: white;
-  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-primary);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
   position: sticky;
   top: 0;
@@ -21,7 +21,7 @@
 /* Brand */
 .nav-brand h2 {
   margin: 0;
-  color: var(--primary-color);
+  color: var(--text-primary);
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -39,7 +39,7 @@
   padding: 0.75rem 1rem;
   border: none;
   background: none;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   transition: all 0.2s ease;
   color: var(--text-secondary);
@@ -48,13 +48,13 @@
 }
 
 .nav-link:hover {
-  background: var(--background-light);
-  color: var(--primary-color);
+  background: var(--bg-tertiary);
+  color: var(--interactive-primary);
 }
 
 .nav-link.active {
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: white;
+  background: var(--interactive-primary);
+  color: var(--text-primary);
 }
 
 .nav-icon {
@@ -92,18 +92,18 @@
 
 .logout-btn {
   padding: 0.5rem 1rem;
-  border: 2px solid var(--error-color);
-  background: white;
-  color: var(--error-color);
-  border-radius: 6px;
+  border: 2px solid var(--color-loss);
+  background: var(--bg-surface);
+  color: var(--color-loss);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 500;
   transition: all 0.2s ease;
 }
 
 .logout-btn:hover {
-  background: var(--error-color);
-  color: white;
+  background: var(--color-loss);
+  color: var(--text-primary);
 }
 
 /* Responsive Design */

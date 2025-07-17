@@ -1,12 +1,29 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
-import { brokerService, type PlaceOrderRequest } from '../services/brokerService';
+import OrderResultDisplay, { type OrderResultSummary } from '../components/OrderResultDisplay';
+import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
+import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
+import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card';
+import { PageHeader, Grid, Stack, HStack, Flex } from '../components/ui/Layout';
 import '../styles/app-theme.css';
+import './TradeSetup.css';
+
+type OrderType = 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
+type Product = 'CNC' | 'MIS' | 'NRML';
+type SymbolSearchResult = { 
+  symbol: string; 
+  exchange: string; 
+  name: string;
+  token?: string | null;
+  ltp?: number;
+};
+type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
   symbol: string;
@@ -14,8 +31,8 @@ interface OrderForm {
   action: 'BUY' | 'SELL';
   quantity: string;
   price: string;
-  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  product: 'CNC' | 'MIS' | 'NRML';
+  orderType: OrderType;
+  product: Product;
   validity: 'DAY' | 'IOC';
   triggerPrice: string;
   selectedAccounts: string[]; // Changed from single brokerAccount to array of selected account IDs
@@ -40,7 +57,7 @@ const TradeSetup: React.FC = () => {
     product: 'CNC',
     validity: 'DAY',
     triggerPrice: '',
-    selectedAccounts: [] // Initialize as empty array
+    selectedAccounts: []
   });
   const [marginInfo, setMarginInfo] = useState<MarginInfo>({
     required: 0,
@@ -50,9 +67,11 @@ const TradeSetup: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [orderResult, setOrderResult] = useState<OrderResultSummary | null>(null);
+  const [showOrderResult, setShowOrderResult] = useState(false);
 
   useEffect(() => {
     const fetchAccounts = async () => {
@@ -61,6 +80,7 @@ const TradeSetup: React.FC = () => {
         setError(null);
 
         const accounts = await accountService.getConnectedAccounts();
+        console.log('🔍 DEBUG: Fetched accounts:', accounts);
         setConnectedAccounts(accounts);
 
         // Auto-select all active accounts by default
@@ -71,7 +91,7 @@ const TradeSetup: React.FC = () => {
           }));
         }
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Failed to fetch accounts:', error);
         setError('Failed to load broker accounts');
       } finally {
@@ -93,7 +113,7 @@ const TradeSetup: React.FC = () => {
             parseFloat(orderForm.price)
           );
           setMarginInfo(margin);
-        } catch (error) {
+        } catch (error: unknown) {
           console.error('Failed to calculate margin:', error);
         }
       }
@@ -105,73 +125,70 @@ const TradeSetup: React.FC = () => {
   }, [orderForm.symbol, orderForm.quantity, orderForm.price, orderForm.orderType]);
 
   // Debounced symbol search
-  const handleSymbolSearch = React.useCallback(
-    React.useMemo(() => {
-      let timeoutId: NodeJS.Timeout;
-      return (searchTerm: string) => {
-        clearTimeout(timeoutId);
+  const handleSymbolSearch = React.useCallback((searchTerm: string) => {
+    if (searchTerm.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      setSearchLoading(false);
+      return;
+    }
 
-        if (searchTerm.length < 2) {
-          setSearchResults([]);
-          setShowSearchResults(false);
-          setSearchLoading(false);
-          return;
+    setSearchLoading(true);
+    const timeoutId = setTimeout(async () => {
+      try {
+        console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
+
+        const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
+        console.log(`📊 Frontend: Received response:`, response);
+
+        const results = response.success ? response.data.results : [];
+
+        const transformedResults = results.map((result: { symbol: string; name: string; exchange: string; token?: string }) => ({
+          symbol: result.symbol,
+          name: result.name,
+          exchange: result.exchange,
+          ltp: 0,
+          token: result.token || null
+        }));
+
+        console.log(`✅ Frontend: Transformed results:`, transformedResults);
+
+        setSearchResults(transformedResults);
+        setShowSearchResults(transformedResults.length > 0);
+
+        if (transformedResults.length === 0) {
+          console.log('❌ Frontend: No results found for:', searchTerm);
         }
+      } catch (error: unknown) {
+        console.error('❌ Frontend: Symbol search failed:', error);
+        setSearchResults([]);
+        setShowSearchResults(false);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 300);
 
-        setSearchLoading(true);
-        timeoutId = setTimeout(async () => {
-          try {
-            console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
+    return () => clearTimeout(timeoutId);
+  }, [orderForm.exchange]);
 
-            // Use NSE API search (broker-independent)
-            const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
-
-            console.log(`📊 Frontend: Received response:`, response);
-
-            // Handle the new response format
-            const results = response.success ? response.data.results : [];
-
-            // Transform results to match expected format (no prices for fast search)
-            const transformedResults = results.map((result: any) => ({
-              symbol: result.symbol,
-              name: result.name,
-              exchange: result.exchange,
-              ltp: 0, // No price in search results for speed
-              token: result.token || null
-            }));
-
-            console.log(`✅ Frontend: Transformed results:`, transformedResults);
-
-            setSearchResults(transformedResults);
-            setShowSearchResults(transformedResults.length > 0);
-
-            if (transformedResults.length === 0) {
-              console.log('❌ Frontend: No results found for:', searchTerm);
-            }
-          } catch (error: any) {
-            console.error('❌ Frontend: Symbol search failed:', error);
-
-            // Always show empty results on error
-            setSearchResults([]);
-            setShowSearchResults(false);
-          } finally {
-            setSearchLoading(false);
-          }
-        }, 300); // 300ms debounce
-      };
-    }, []),
-    []
-  );
-
-  const handleSymbolSelect = (selectedSymbol: any) => {
-    setOrderForm(prev => ({
-      ...prev,
-      symbol: selectedSymbol.symbol,
-      exchange: selectedSymbol.exchange,
-      // Don't set price from search results - user will enter manually or fetch separately
-      price: prev.price // Keep existing price
-    }));
-    setShowSearchResults(false);
+  const handleSymbolSelect = (selectedSymbol: unknown) => {
+    if (
+      typeof selectedSymbol === 'object' &&
+      selectedSymbol !== null &&
+      'symbol' in selectedSymbol &&
+      'exchange' in selectedSymbol &&
+      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string' &&
+      ((selectedSymbol as { exchange: unknown }).exchange === 'NSE' || (selectedSymbol as { exchange: unknown }).exchange === 'BSE')
+    ) {
+      const { symbol, exchange } = selectedSymbol as SymbolSearchResult & { exchange: 'NSE' | 'BSE' };
+      setOrderForm(prev => ({
+        ...prev,
+        symbol,
+        exchange,
+        price: prev.price
+      }));
+      setShowSearchResults(false);
+    }
   };
 
   const handleAccountSelection = (accountId: string, checked: boolean) => {
@@ -217,54 +234,40 @@ const TradeSetup: React.FC = () => {
       setSubmitting(true);
       setError(null);
 
-      // Place orders across all selected accounts
-      const orderPromises = orderForm.selectedAccounts.map(async (accountId) => {
-        const account = connectedAccounts.find(acc => acc.id === accountId);
-        if (!account) {
-          throw new Error(`Account not found: ${accountId}`);
-        }
+      const orderRequest: PlaceMultiAccountOrderRequest = {
+        selectedAccounts: orderForm.selectedAccounts,
+        symbol: orderForm.symbol,
+        action: orderForm.action,
+        quantity: parseInt(orderForm.quantity),
+        orderType: orderForm.orderType,
+        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+        triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
+          ? parseFloat(orderForm.triggerPrice)
+          : undefined,
+        exchange: orderForm.exchange,
+        productType: orderForm.product,
+        remarks: `${orderForm.validity} order placed via CopyTrade Pro`
+      };
 
-        const orderRequest: PlaceOrderRequest = {
-          brokerName: account.brokerName,
-          accountId: accountId,
-          symbol: orderForm.symbol,
-          action: orderForm.action,
-          quantity: parseInt(orderForm.quantity),
-          price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
-          orderType: orderForm.orderType,
-          exchange: orderForm.exchange,
-          productType: orderForm.product,
-          triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
-            ? parseFloat(orderForm.triggerPrice)
-            : undefined,
-          remarks: `${orderForm.validity} order`
-        };
-
-        return brokerService.placeOrder(orderRequest);
+      const response = await brokerService.placeMultiAccountOrder(orderRequest);
+      
+      const orderResultSummary = transformBrokerResponseToOrderResult(response, {
+        symbol: orderForm.symbol,
+        action: orderForm.action,
+        quantity: parseInt(orderForm.quantity),
+        orderType: orderForm.orderType,
+        price: orderForm.orderType === 'MARKET' ? undefined : parseFloat(orderForm.price),
+        triggerPrice: (orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET')
+          ? parseFloat(orderForm.triggerPrice)
+          : undefined,
+        exchange: orderForm.exchange,
+        productType: orderForm.product
       });
 
-      const results = await Promise.allSettled(orderPromises);
+      setOrderResult(orderResultSummary);
+      setShowOrderResult(true);
 
-      // Process results
-      const successful = results.filter(result =>
-        result.status === 'fulfilled' && result.value.success
-      );
-      const failed = results.filter(result =>
-        result.status === 'rejected' ||
-        (result.status === 'fulfilled' && !result.value.success)
-      );
-
-      if (successful.length > 0) {
-        const successCount = successful.length;
-        const totalCount = orderForm.selectedAccounts.length;
-
-        if (failed.length === 0) {
-          alert(`🎉 All orders placed successfully! (${successCount}/${totalCount} accounts)`);
-        } else {
-          alert(`⚠️ Partial success: ${successCount}/${totalCount} orders placed successfully`);
-        }
-
-        // Reset form
+      if (orderResultSummary.failedAccounts === 0) {
         setOrderForm(prev => ({
           ...prev,
           symbol: '',
@@ -272,18 +275,34 @@ const TradeSetup: React.FC = () => {
           price: '',
           triggerPrice: ''
         }));
-
-        // Navigate to orders page
-        navigate('/orders');
-      } else {
-        setError(`Failed to place orders on all ${orderForm.selectedAccounts.length} accounts`);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Order placement failed:', error);
-      setError(error.message || 'Failed to place orders');
+      setError((error as Error).message || 'Failed to place orders');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRetryFailedOrders = async (failedResults: FailedOrderResult[]) => {
+    const failedAccountIds = failedResults.map(result => result.accountId);
+    
+    setOrderForm(prev => ({
+      ...prev,
+      selectedAccounts: failedAccountIds
+    }));
+    
+    setShowOrderResult(false);
+    setError('Ready to retry failed orders. You can modify the order details if needed, then click Place Order again.');
+  };
+
+  const handleCloseOrderResult = () => {
+    setShowOrderResult(false);
+    setOrderResult(null);
+    
+    if (orderResult && orderResult.successfulAccounts > 0) {
+      navigate('/orders');
     }
   };
 
@@ -296,9 +315,9 @@ const TradeSetup: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{ 
             display: 'flex', 
             justifyContent: 'center', 
@@ -308,7 +327,7 @@ const TradeSetup: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>📈</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading trading setup...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading trading setup...</div>
           </div>
         </div>
       </div>
@@ -317,517 +336,375 @@ const TradeSetup: React.FC = () => {
 
   if (connectedAccounts.length === 0) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div className="app-main">
+          <Card padding="lg" style={{ textAlign: 'center' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
             <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem' }}>
               No Active Broker Accounts
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
               Connect and activate a broker account to start trading
             </div>
-            <button 
-              className="kite-btn kite-btn-primary"
-              onClick={() => navigate('/account-setup')}
-            >
+            <Button onClick={() => navigate('/account-setup')}>
               Connect Broker Account
-            </button>
-          </div>
+            </Button>
+          </Card>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
       
-      <div className="kite-main">
-        {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Place Order</h1>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button 
-                className="kite-btn"
-                onClick={() => navigate('/orders')}
-              >
-                📋 View Orders
-              </button>
-              <button 
-                className="kite-btn"
-                onClick={() => navigate('/positions')}
-              >
-                🎯 Positions
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Order Form */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
-          {/* Main Order Form */}
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">Order Details</h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button
-                  className={`kite-btn ${orderForm.action === 'BUY' ? 'kite-btn-primary' : ''}`}
-                  onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
-                  style={{
-                    backgroundColor: orderForm.action === 'BUY' ? 'var(--kite-profit)' : undefined,
-                    color: orderForm.action === 'BUY' ? 'white' : undefined
-                  }}
-                >
-                  BUY
-                </button>
-                <button
-                  className={`kite-btn ${orderForm.action === 'SELL' ? 'kite-btn-danger' : ''}`}
-                  onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
-                  style={{
-                    backgroundColor: orderForm.action === 'SELL' ? 'var(--kite-loss)' : undefined,
-                    color: orderForm.action === 'SELL' ? 'white' : undefined
-                  }}
-                >
-                  SELL
-                </button>
-              </div>
-            </div>
-
-            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Symbol Search */}
-              <div style={{ position: 'relative' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                  Symbol *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    placeholder="Search stocks (e.g., RELIANCE, TCS)"
-                    value={orderForm.symbol}
-                    onChange={(e) => {
-                      setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
-                      handleSymbolSearch(e.target.value);
-                    }}
-                    className="kite-input"
-                    style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
+      <div className="app-main">
+        <Stack gap={6}>
+          {/* Main Content Grid */}
+          <Grid cols={3} gap={6}>
+            {/* Order Form - Takes 2 columns */}
+            <div style={{ gridColumn: 'span 2' }}>
+              <Stack gap={4}>
+                {/* Order Details Card */}
+                <Card>
+                  <CardHeader
+                    title="Order Details"
+                    action={
+                      <HStack gap={2}>
+                        <Button
+                          onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
+                          style={{
+                            backgroundColor: orderForm.action === 'BUY' ? 'var(--color-profit)' : undefined,
+                            color: orderForm.action === 'BUY' ? 'white' : undefined
+                          }}
+                        >
+                          BUY
+                        </Button>
+                        <Button
+                          onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
+                          style={{
+                            backgroundColor: orderForm.action === 'SELL' ? 'var(--color-loss)' : undefined,
+                            color: orderForm.action === 'SELL' ? 'white' : undefined
+                          }}
+                        >
+                          SELL
+                        </Button>
+                      </HStack>
+                    }
                   />
-                  {searchLoading && (
-                    <div style={{
-                      position: 'absolute',
-                      right: '0.75rem',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: '0.875rem'
-                    }}>
-                      ⏳
-                    </div>
-                  )}
-                </div>
 
-                {/* Search Results Dropdown */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: 0,
-                    right: 0,
-                    backgroundColor: 'var(--kite-bg-secondary)',
-                    border: '1px solid var(--kite-border-primary)',
-                    borderRadius: 'var(--kite-radius-md)',
-                    zIndex: 1000,
-                    maxHeight: '200px',
-                    overflowY: 'auto'
-                  }}>
-                    {searchResults.map((result, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleSymbolSelect(result)}
-                        style={{
-                          padding: '0.75rem',
-                          cursor: 'pointer',
-                          borderBottom: index < searchResults.length - 1 ? '1px solid var(--kite-border-secondary)' : 'none'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                      >
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                          {result.symbol}
+                  <CardContent>
+                    <Stack gap={5}>
+                      {/* Symbol Search */}
+                      <div style={{ position: 'relative' }}>
+                        <label className="form-label">Symbol *</label>
+                        <div style={{ position: 'relative' }}>
+                          <input
+                            type="text"
+                            placeholder="Search stocks (e.g., RELIANCE, TCS)"
+                            value={orderForm.symbol}
+                            onChange={(e) => {
+                              setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
+                              handleSymbolSearch(e.target.value);
+                            }}
+                            className="form-input"
+                            style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
+                          />
+                          {searchLoading && (
+                            <div style={{
+                              position: 'absolute',
+                              right: '0.75rem',
+                              top: '50%',
+                              transform: 'translateY(-50%)',
+                              fontSize: '0.875rem'
+                            }}>
+                              ⏳
+                            </div>
+                          )}
                         </div>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
-                          {result.name}
-                        </div>
+
+                        {/* Search Results Dropdown */}
+                        {showSearchResults && searchResults.length > 0 && (
+                          <div className="search-dropdown">
+                            {searchResults.map((result, index) => (
+                              <div
+                                key={index}
+                                onClick={() => handleSymbolSelect(result)}
+                                className="search-result-item"
+                              >
+                                <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+                                  {result.symbol}
+                                </div>
+                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                  {result.name}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
 
-              {/* Quantity and Price */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                    Quantity *
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    value={orderForm.quantity}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
-                    className="kite-input"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
+                      {/* Quantity and Price */}
+                      <Grid cols={2} gap={4}>
+                        <div>
+                          <label className="form-label">Quantity *</label>
+                          <input
+                            type="number"
+                            placeholder="0"
+                            value={orderForm.quantity}
+                            onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
+                            className="form-input"
+                          />
+                        </div>
 
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                    Price {orderForm.orderType === 'MARKET' ? '(Market)' : '*'}
-                  </label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    placeholder="0.00"
-                    value={orderForm.price}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
-                    className="kite-input"
-                    style={{ fontSize: '1rem' }}
-                    disabled={orderForm.orderType === 'MARKET'}
-                  />
-                </div>
-              </div>
+                        <div>
+                          <label className="form-label">
+                            Price {orderForm.orderType === 'MARKET' ? '(Market)' : '*'}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            placeholder="0.00"
+                            value={orderForm.price}
+                            onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
+                            className="form-input"
+                            disabled={orderForm.orderType === 'MARKET'}
+                          />
+                        </div>
+                      </Grid>
 
-              {/* Order Type and Product */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                    Order Type
-                  </label>
-                  <select
-                    value={orderForm.orderType}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as any }))}
-                    className="kite-input"
-                    style={{ fontSize: '1rem' }}
-                  >
-                    <option value="MARKET">Market</option>
-                    <option value="LIMIT">Limit</option>
-                    <option value="SL-LIMIT">Stop Loss Limit</option>
-                    <option value="SL-MARKET">Stop Loss Market</option>
-                  </select>
-                </div>
+                      {/* Order Type and Product */}
+                      <Grid cols={2} gap={4}>
+                        <div>
+                          <label className="form-label">Order Type</label>
+                          <select
+                            value={orderForm.orderType}
+                            onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as OrderType }))}
+                            className="form-input"
+                          >
+                            <option value="MARKET">Market</option>
+                            <option value="LIMIT">Limit</option>
+                            <option value="SL-LIMIT">Stop Loss Limit</option>
+                            <option value="SL-MARKET">Stop Loss Market</option>
+                          </select>
+                        </div>
 
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                    Product
-                  </label>
-                  <select
-                    value={orderForm.product}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as any }))}
-                    className="kite-input"
-                    style={{ fontSize: '1rem' }}
-                  >
-                    <option value="CNC">CNC (Delivery)</option>
-                    <option value="MIS">MIS (Intraday)</option>
-                    <option value="NRML">NRML (Normal)</option>
-                  </select>
-                </div>
-              </div>
+                        <div>
+                          <label className="form-label">Product</label>
+                          <select
+                            value={orderForm.product}
+                            onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as Product }))}
+                            className="form-input"
+                          >
+                            <option value="CNC">CNC (Delivery)</option>
+                            <option value="MIS">MIS (Intraday)</option>
+                            <option value="NRML">NRML (Normal)</option>
+                          </select>
+                        </div>
+                      </Grid>
 
-              {/* Trigger Price for Stop Loss Orders */}
-              {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
-                <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
-                    Trigger Price *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.05"
-                    placeholder="0.00"
-                    value={orderForm.triggerPrice}
-                    onChange={(e) => setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }))}
-                    className="kite-input"
-                    style={{ fontSize: '1rem' }}
-                  />
-                </div>
-              )}
+                      {/* Trigger Price for Stop Loss Orders */}
+                      {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                        <div>
+                          <label className="form-label">Trigger Price *</label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            placeholder="0.00"
+                            value={orderForm.triggerPrice}
+                            onChange={(e) => setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }))}
+                            className="form-input"
+                          />
+                        </div>
+                      )}
 
-              {/* Broker Account Selection */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)' }}>
-                    Select Trading Accounts ({orderForm.selectedAccounts.length} selected)
-                  </label>
-                  {connectedAccounts.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={handleSelectAllAccounts}
-                      style={{
-                        fontSize: '0.75rem',
-                        color: 'var(--kite-primary)',
-                        background: 'none',
-                        border: 'none',
-                        cursor: 'pointer',
-                        textDecoration: 'underline'
-                      }}
+                      {/* Error Display */}
+                      {error && (
+                        <div className="alert alert-error">
+                          {error}
+                        </div>
+                      )}
+                    </Stack>
+                  </CardContent>
+
+                  <CardFooter>
+                    <Button
+                      onClick={handlePlaceOrder}
+                      disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
+                      style={{ width: '100%' }}
                     >
-                      {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  )}
-                </div>
-                <div style={{
-                  border: '1px solid var(--kite-border)',
-                  borderRadius: 'var(--kite-radius-md)',
-                  padding: '1rem',
-                  backgroundColor: 'var(--kite-bg-primary)',
-                  maxHeight: '300px',
-                  overflowY: 'auto',
-                  boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.1)'
-                }}>
-                  {connectedAccounts.length === 0 ? (
-                    <div style={{
-                      color: 'var(--kite-text-secondary)',
-                      fontSize: '0.875rem',
-                      textAlign: 'center',
-                      padding: '1rem'
-                    }}>
-                      No active accounts found. Please activate at least one broker account.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {submitting
+                        ? `Placing Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
+                        : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
+                      }
+                    </Button>
+                  </CardFooter>
+                </Card>
+
+                {/* Account Selection */}
+                <Card>
+                  <CardHeader
+                    title={`Trading Accounts (${orderForm.selectedAccounts.length} selected)`}
+                    action={
+                      connectedAccounts.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleSelectAllAccounts}
+                        >
+                          {orderForm.selectedAccounts.length === connectedAccounts.length ? 'Deselect All' : 'Select All'}
+                        </Button>
+                      )
+                    }
+                  />
+                  <CardContent>
+                    <Stack gap={3}>
                       {connectedAccounts.map(account => (
                         <div
                           key={account.id}
-                          style={{
-                            padding: '0.75rem',
-                            border: orderForm.selectedAccounts.includes(account.id)
-                              ? '2px solid var(--kite-primary)'
-                              : '1px solid var(--kite-border)',
-                            borderRadius: 'var(--kite-radius-sm)',
-                            backgroundColor: orderForm.selectedAccounts.includes(account.id)
-                              ? 'var(--kite-bg-primary-light)'
-                              : 'var(--kite-bg-primary)',
-                            transition: 'all 0.2s ease'
-                          }}
+                          className={`account-card${orderForm.selectedAccounts.includes(account.id) ? ' selected' : ''}`}
                         >
-                          <Checkbox
-                            checked={orderForm.selectedAccounts.includes(account.id)}
-                            onChange={(checked) => handleAccountSelection(account.id, checked)}
-                            label={
-                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginLeft: '0.5rem' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                  <span style={{
-                                    fontWeight: '600',
-                                    fontSize: '0.875rem',
-                                    color: 'var(--kite-text-primary)'
-                                  }}>
-                                    {account.brokerName.toUpperCase()}
-                                  </span>
-                                  <span style={{
-                                    fontSize: '0.75rem',
-                                    padding: '0.125rem 0.375rem',
-                                    backgroundColor: account.isActive ? 'var(--kite-profit)' : 'var(--kite-text-secondary)',
-                                    color: 'white',
-                                    borderRadius: '0.25rem',
-                                    fontWeight: '500'
-                                  }}>
-                                    {account.isActive ? 'ACTIVE' : 'INACTIVE'}
-                                  </span>
-                                </div>
-                                <span style={{
-                                  fontSize: '0.875rem',
-                                  fontWeight: '500',
-                                  color: 'var(--kite-text-primary)'
-                                }}>
-                                  Account: {account.userId}
-                                </span>
-                                <span style={{
-                                  fontSize: '0.75rem',
-                                  color: 'var(--kite-text-secondary)'
-                                }}>
-                                  {account.userName} • {account.email}
-                                </span>
-                              </div>
-                            }
-                            size="base"
-                          />
+                          <div className="account-info">
+                            <Checkbox
+                              checked={orderForm.selectedAccounts.includes(account.id)}
+                              onChange={(checked) => handleAccountSelection(account.id, checked)}
+                              label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
+                              size="base"
+                            />
+                          </div>
+                          <div className="account-meta">
+                            ID: {account.id} | User: {account.userName || 'N/A'} | Account: {account.accountId || 'N/A'}
+                          </div>
                         </div>
                       ))}
-                    </div>
-                  )}
-                </div>
-                {orderForm.selectedAccounts.length === 0 && (
-                  <div style={{
-                    fontSize: '0.75rem',
-                    color: 'var(--kite-loss)',
-                    marginTop: '0.25rem'
-                  }}>
-                    Please select at least one account to place orders
-                  </div>
-                )}
-              </div>
-
-              {/* Error Display */}
-              {error && (
-                <div style={{
-                  padding: '0.75rem',
-                  backgroundColor: 'var(--kite-bg-danger)',
-                  border: '1px solid var(--kite-loss)',
-                  borderRadius: 'var(--kite-radius-md)',
-                  color: 'var(--kite-loss)',
-                  fontSize: '0.875rem'
-                }}>
-                  {error}
-                </div>
-              )}
-
-              {/* Place Order Button */}
-              <button
-                className="kite-btn kite-btn-primary"
-                onClick={handlePlaceOrder}
-                disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
-                style={{
-                  width: '100%',
-                  justifyContent: 'center',
-                  fontSize: '1rem',
-                  padding: '0.75rem'
-                }}
-              >
-                {submitting
-                  ? `Placing Orders on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}...`
-                  : `${orderForm.action} ${orderForm.symbol || 'Stock'} on ${orderForm.selectedAccounts.length} Account${orderForm.selectedAccounts.length > 1 ? 's' : ''}`
-                }
-              </button>
+                      {orderForm.selectedAccounts.length === 0 && (
+                        <div style={{ fontSize: '0.875rem', color: 'var(--color-loss)' }}>
+                          Please select at least one account to place orders
+                        </div>
+                      )}
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </Stack>
             </div>
-          </div>
 
-          {/* Order Summary & Margin Info */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {/* Order Summary */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Order Summary</h3>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                {orderForm.symbol ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Exchange:</span>
-                      <span style={{
-                        fontWeight: '500',
-                        fontSize: '0.75rem',
-                        padding: '0.125rem 0.5rem',
-                        backgroundColor: orderForm.exchange === 'NSE' ? '#1f77b4' : '#ff7f0e',
-                        color: 'white',
-                        borderRadius: '0.25rem',
-                        letterSpacing: '0.5px'
-                      }}>
-                        {orderForm.exchange}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
-                      <span style={{
-                        fontWeight: '500',
-                        color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
-                      }}>
-                        {orderForm.action}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
-                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                        {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
-                      </span>
-                    </div>
-                    {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span style={{ color: 'var(--kite-text-secondary)' }}>Trigger Price:</span>
-                        <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                          ₹{orderForm.triggerPrice || '0.00'}
-                        </span>
+            {/* Right Sidebar - Order Summary & Margin Info */}
+            <div>
+              <Stack gap={4}>
+                {/* Order Summary */}
+                <Card>
+                  <CardHeader title="Order Summary" />
+                  <CardContent>
+                    {orderForm.symbol ? (
+                      <Stack gap={3}>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Symbol:</span>
+                          <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Exchange:</span>
+                          <span className={`exchange-badge ${orderForm.exchange.toLowerCase()}`}>
+                            {orderForm.exchange}
+                          </span>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Action:</span>
+                          <span className={`action-badge ${orderForm.action.toLowerCase()}`}>
+                            {orderForm.action}
+                          </span>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
+                          <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Price:</span>
+                          <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
+                            {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
+                          </span>
+                        </Flex>
+                        {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
+                          <Flex justify="between">
+                            <span style={{ color: 'var(--text-secondary)' }}>Trigger Price:</span>
+                            <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
+                              ₹{orderForm.triggerPrice || '0.00'}
+                            </span>
+                          </Flex>
+                        )}
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Type:</span>
+                          <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Product:</span>
+                          <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
+                        </Flex>
+                        {orderForm.quantity && orderForm.price && (
+                          <>
+                            <hr style={{ border: 'none', borderTop: '1px solid var(--border-secondary)', margin: '0.5rem 0' }} />
+                            <Flex justify="between">
+                              <span style={{ color: 'var(--text-secondary)' }}>Total Value:</span>
+                              <span style={{ fontWeight: '600', fontFamily: 'var(--font-mono)' }}>
+                                ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
+                              </span>
+                            </Flex>
+                          </>
+                        )}
+                      </Stack>
+                    ) : (
+                      <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
+                        Fill order details to see summary
                       </div>
                     )}
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
-                      <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
-                    </div>
-                    {orderForm.quantity && orderForm.price && (
-                      <>
-                        <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
-                          <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
-                            ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
+                  </CardContent>
+                </Card>
+
+                {/* Margin Info */}
+                {marginInfo.required > 0 && (
+                  <Card>
+                    <CardHeader title="Margin Information" />
+                    <CardContent>
+                      <Stack gap={3}>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Required:</span>
+                          <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
+                            ₹{formatCurrency(marginInfo.required)}
                           </span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ) : (
-                  <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
-                    <div>Enter order details to see summary</div>
-                  </div>
+                        </Flex>
+                        <Flex justify="between">
+                          <span style={{ color: 'var(--text-secondary)' }}>Available:</span>
+                          <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
+                            ₹{formatCurrency(marginInfo.available)}
+                          </span>
+                        </Flex>
+                        {marginInfo.shortfall > 0 && (
+                          <Flex justify="between">
+                            <span style={{ color: 'var(--color-loss)' }}>Shortfall:</span>
+                            <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)', color: 'var(--color-loss)' }}>
+                              ₹{formatCurrency(marginInfo.shortfall)}
+                            </span>
+                          </Flex>
+                        )}
+                      </Stack>
+                    </CardContent>
+                  </Card>
                 )}
-              </div>
+              </Stack>
             </div>
-
-            {/* Margin Information */}
-            <div className="kite-card">
-              <div className="kite-card-header">
-                <h3 className="kite-card-title">Margin Info</h3>
-              </div>
-              <div style={{ padding: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
-                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                      ₹{formatCurrency(marginInfo.required)}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
-                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
-                      ₹{formatCurrency(marginInfo.available)}
-                    </span>
-                  </div>
-                  {marginInfo.shortfall > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
-                      <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
-                        ₹{formatCurrency(marginInfo.shortfall)}
-                      </span>
-                    </div>
-                  )}
-
-                  {marginInfo.shortfall > 0 && (
-                    <button
-                      className="kite-btn kite-btn-primary"
-                      onClick={() => navigate('/funds')}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
-                    >
-                      Add Funds
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+          </Grid>
+        </Stack>
       </div>
+
+      {/* Order Result Modal */}
+      {showOrderResult && orderResult && (
+        <OrderResultDisplay
+          summary={orderResult}
+          onRetryFailed={handleRetryFailedOrders}
+          onClose={handleCloseOrderResult}
+        />
+      )}
     </div>
   );
 };

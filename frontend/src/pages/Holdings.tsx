@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
 
 interface Holding {
   symbol: string;
@@ -103,9 +104,9 @@ const Holdings: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{
             display: 'flex',
             justifyContent: 'center',
@@ -115,7 +116,7 @@ const Holdings: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>📊</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading holdings...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading holdings...</div>
           </div>
         </div>
       </div>
@@ -124,18 +125,18 @@ const Holdings: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '2rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
             <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--kite-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="kite-btn kite-btn-primary"
+            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+            <Button
+              variant="primary"
               onClick={() => window.location.reload()}
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -143,21 +144,21 @@ const Holdings: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
       
-      <div className="kite-main">
+      <div className="app-main">
         {/* Portfolio Summary */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">Holdings ({holdings.length})</h2>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">Holdings ({holdings.length})</h2>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <button className="kite-btn">
+              <Button variant="primary">
                 📊 Analytics
-              </button>
-              <button className="kite-btn">
+              </Button>
+              <Button variant="outline">
                 📥 Download
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -168,13 +169,13 @@ const Holdings: React.FC = () => {
             gap: '1.5rem',
             marginBottom: '2rem',
             padding: '1rem',
-            backgroundColor: 'var(--kite-bg-tertiary)',
-            borderRadius: 'var(--kite-radius-lg)'
+            backgroundColor: 'var(--bg-tertiary)',
+            borderRadius: 'var(--radius-lg)'
           }}>
             <div>
               <div style={{ 
                 fontSize: '0.75rem', 
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 marginBottom: '0.25rem'
               }}>
                 Total Investment
@@ -182,8 +183,8 @@ const Holdings: React.FC = () => {
               <div style={{ 
                 fontSize: '1.25rem', 
                 fontWeight: '600',
-                fontFamily: 'var(--kite-font-mono)',
-                color: 'var(--kite-text-primary)'
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-primary)'
               }}>
                 ₹{formatCurrency(portfolioSummary.totalInvested)}
               </div>
@@ -191,7 +192,7 @@ const Holdings: React.FC = () => {
             <div>
               <div style={{ 
                 fontSize: '0.75rem', 
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 marginBottom: '0.25rem'
               }}>
                 Current Value
@@ -199,8 +200,8 @@ const Holdings: React.FC = () => {
               <div style={{ 
                 fontSize: '1.25rem', 
                 fontWeight: '600',
-                fontFamily: 'var(--kite-font-mono)',
-                color: 'var(--kite-text-primary)'
+                fontFamily: 'var(--font-mono)',
+                color: 'var(--text-primary)'
               }}>
                 ₹{formatCurrency(portfolioSummary.totalValue)}
               </div>
@@ -208,7 +209,7 @@ const Holdings: React.FC = () => {
             <div>
               <div style={{
                 fontSize: '0.75rem',
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 marginBottom: '0.25rem'
               }}>
                 Day's P&L
@@ -216,16 +217,16 @@ const Holdings: React.FC = () => {
               <div style={{
                 fontSize: '1.25rem',
                 fontWeight: '600',
-                fontFamily: 'var(--kite-font-mono)',
-                color: portfolioSummary.dayPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                fontFamily: 'var(--font-mono)',
+                color: portfolioSummary.dayPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
               }}>
-                {portfolioSummary.dayPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
+                {portfolioSummary.dayPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioSummary.dayPnL))}
               </div>
             </div>
             <div>
               <div style={{ 
                 fontSize: '0.75rem', 
-                color: 'var(--kite-text-secondary)',
+                color: 'var(--text-secondary)',
                 marginBottom: '0.25rem'
               }}>
                 Total P&L
@@ -233,17 +234,17 @@ const Holdings: React.FC = () => {
               <div style={{
                 fontSize: '1.25rem',
                 fontWeight: '600',
-                fontFamily: 'var(--kite-font-mono)',
-                color: portfolioSummary.totalPnL >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                fontFamily: 'var(--font-mono)',
+                color: portfolioSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
               }}>
-                {portfolioSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
+                {portfolioSummary.totalPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
               </div>
             </div>
           </div>
 
           {/* Holdings Table */}
           <div style={{ overflowX: 'auto' }}>
-            <table className="kite-table">
+            <table className="table table-trading">
               <thead>
                 <tr>
                   <th>Instrument</th>
@@ -261,28 +262,28 @@ const Holdings: React.FC = () => {
                 {holdings.map((holding, index) => (
                   <tr key={index}>
                     <td>
-                      <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                      <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                         {holding.symbol}
                       </div>
                     </td>
-                    <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {holding.qty}
                     </td>
-                    <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {formatNumber(holding.avgCost)}
                     </td>
-                    <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {formatNumber(holding.ltp)}
                     </td>
-                    <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {formatCurrency(holding.invested)}
                     </td>
-                    <td style={{ fontFamily: 'var(--kite-font-mono)' }}>
+                    <td style={{ fontFamily: 'var(--font-mono)' }}>
                       {formatCurrency(holding.currentValue)}
                     </td>
                     <td style={{ 
-                      fontFamily: 'var(--kite-font-mono)',
-                      color: holding.pnl >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                      fontFamily: 'var(--font-mono)',
+                      color: holding.pnl >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                     }}>
                       {holding.pnl >= 0 ? '+' : ''}{formatCurrency(Math.abs(holding.pnl))}
                       <div style={{ fontSize: '0.75rem' }}>
@@ -290,14 +291,14 @@ const Holdings: React.FC = () => {
                       </div>
                     </td>
                     <td style={{ 
-                      fontFamily: 'var(--kite-font-mono)',
-                      color: holding.pnl >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                      fontFamily: 'var(--font-mono)',
+                      color: holding.pnl >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                     }}>
                       {holding.pnl >= 0 ? '+' : ''}{holding.pnlPercent.toFixed(2)}%
                     </td>
                     <td style={{ 
-                      fontFamily: 'var(--kite-font-mono)',
-                      color: holding.dayChange >= 0 ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                      fontFamily: 'var(--font-mono)',
+                      color: holding.dayChange >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
                     }}>
                       {holding.dayChange >= 0 ? '+' : ''}{holding.dayChangePercent.toFixed(2)}%
                     </td>

@@ -38,6 +38,12 @@ body {
    ========================================================================== */
 
 .app {
+  min-height: 100vh;
+  background-color: var(--bg-primary);
+}
+
+/* Override for app-layout structure */
+.app-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
@@ -135,11 +141,13 @@ body {
    MAIN CONTENT LAYOUT
    ========================================================================== */
 
+/* Commented out to avoid conflict with app-theme.css layout
 .app-main {
   flex: 1;
   display: flex;
   flex-direction: column;
 }
+*/
 
 .main-container {
   flex: 1;
