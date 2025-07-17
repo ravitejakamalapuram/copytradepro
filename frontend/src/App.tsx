@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AccountStatusProvider } from './context/AccountStatusContext';
+import { ToastProvider } from './components/Toast';
 import { useAuth } from './hooks/useAuth';
 import { useConnectionStatus } from './hooks/useConnectionStatus';
 import { memoryMonitorService } from './services/memoryMonitorService';
@@ -303,17 +304,19 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <AuthProvider>
-        <AccountStatusProvider>
-          <ErrorBoundary>
-            <ConnectionStatus />
-            <NavigationErrorBoundary>
-              <AppContent />
-            </NavigationErrorBoundary>
-            <NotificationDisplay position="top-right" />
-          </ErrorBoundary>
-        </AccountStatusProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <AccountStatusProvider>
+            <ErrorBoundary>
+              <ConnectionStatus />
+              <NavigationErrorBoundary>
+                <AppContent />
+              </NavigationErrorBoundary>
+              <NotificationDisplay position="top-right" />
+            </ErrorBoundary>
+          </AccountStatusProvider>
+        </AuthProvider>
+      </ToastProvider>
     </Router>
   );
 };

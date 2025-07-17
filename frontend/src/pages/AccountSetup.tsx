@@ -8,6 +8,8 @@ import AccountStatusIndicator from '../components/AccountStatusIndicator';
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import { OAuthDialog } from '../components/OAuthDialog';
+import { useToast } from '../components/Toast';
 
 const ALL_BROKERS = [
   {
@@ -43,6 +45,7 @@ interface FormData {
 
 const AccountSetup: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const {
     accounts,
     activateAccount,
@@ -59,6 +62,19 @@ const AccountSetup: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [oauthInProgress, setOauthInProgress] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // OAuth Dialog state
+  const [oauthDialog, setOauthDialog] = useState<{
+    isOpen: boolean;
+    authUrl: string;
+    accountId: string;
+    brokerName: string;
+  }>({
+    isOpen: false,
+    authUrl: '',
+    accountId: '',
+    brokerName: ''
+  });
   const [formData, setFormData] = useState<FormData>({
     brokerName: '',
     userId: '',
@@ -98,138 +114,98 @@ const AccountSetup: React.FC = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  // Handle OAuth flow - Debug Version to Find Root Cause
+  // Handle OAuth flow - Using Custom Dialog
   const handleOAuthFlow = async (accountId: string, authUrl: string): Promise<void> => {
     setOauthInProgress(true);
 
     return new Promise((resolve, reject) => {
-      console.log('🔄 Starting OAuth flow...');
+      console.log('🔄 Starting OAuth flow with custom dialog...');
       console.log('📍 Account ID:', accountId);
       console.log('🔗 Auth URL:', authUrl);
 
-      // First, let's test if the URL is valid
+      // Validate URL
       if (!authUrl || !authUrl.startsWith('http')) {
         console.error('❌ Invalid auth URL:', authUrl);
         setOauthInProgress(false);
-        alert('Invalid authentication URL received. Please try again.');
+        setError('Invalid authentication URL received. Please try again.');
         reject(new Error('Invalid auth URL'));
         return;
       }
 
-      // Check if this is a Fyers API URL that might cause immediate redirect
-      if (authUrl.includes('api.fyers.in/api/v2/generate-authcode')) {
-        console.warn('⚠️ Detected Fyers API URL - this might redirect immediately');
-        console.log('🔍 Full URL:', authUrl);
+      // Find broker name for display
+      const account = accounts.find(acc => acc.id === accountId);
+      const brokerName = account?.brokerDisplayName || 'Broker';
 
-        // Test the URL first
-        const testChoice = confirm(
-          '⚠️ POTENTIAL ISSUE DETECTED\n\n' +
-          'The auth URL is a Fyers API endpoint that might redirect immediately.\n' +
-          'This could cause the popup to close automatically.\n\n' +
-          'Click OK to test opening this URL\n' +
-          'Click Cancel to abort and check configuration'
-        );
+      // Show OAuth dialog
+      setOauthDialog({
+        isOpen: true,
+        authUrl,
+        accountId,
+        brokerName
+      });
 
-        if (!testChoice) {
-          setOauthInProgress(false);
-          reject(new Error('User chose to abort due to URL concerns'));
-          return;
-        }
-      }
-
-      // Show debug info to user
-      const proceed = confirm(
-        '🔍 DEBUG MODE - Fyers OAuth\n\n' +
-        `Auth URL: ${authUrl.substring(0, 100)}...\n\n` +
-        'This will open the Fyers authentication page.\n' +
-        'Watch the browser console for debug information.\n\n' +
-        'Click OK to proceed, Cancel to abort.'
-      );
-
-      if (!proceed) {
-        console.log('🚫 User cancelled OAuth flow');
-        setOauthInProgress(false);
-        reject(new Error('OAuth cancelled by user'));
-        return;
-      }
-
-      console.log('🚀 Opening authentication window...');
-
-      // Try opening in new tab first (most reliable)
-      const authWindow = window.open(authUrl, '_blank');
-
-      console.log('🪟 Window opened:', !!authWindow);
-      console.log('🪟 Window closed immediately?', authWindow?.closed);
-
-      if (!authWindow) {
-        console.error('❌ Failed to open window - popup blocked');
-        setOauthInProgress(false);
-        alert('Popup blocked! Please allow popups for this site and try again.');
-        reject(new Error('Popup blocked'));
-        return;
-      }
-
-      // Check if window closes immediately
-      setTimeout(() => {
-        console.log('🕐 After 1 second - Window closed?', authWindow.closed);
-        if (authWindow.closed) {
-          console.error('❌ Window closed automatically after 1 second!');
-          setOauthInProgress(false);
-          alert('Authentication window closed automatically. This might be due to:\n1. Popup blocker\n2. Invalid URL\n3. Browser security policy\n\nPlease check browser console for details.');
-          reject(new Error('Window closed automatically'));
-          return;
-        }
-      }, 1000);
-
-      // Check again after 3 seconds
-      setTimeout(() => {
-        console.log('🕐 After 3 seconds - Window closed?', authWindow.closed);
-        if (authWindow.closed) {
-          console.error('❌ Window closed automatically after 3 seconds!');
-          setOauthInProgress(false);
-          alert('Authentication window closed automatically after 3 seconds.');
-          reject(new Error('Window closed automatically'));
-          return;
-        }
-
-        // If window is still open, ask for auth code
-        const authCode = prompt(
-          '🔐 Fyers OAuth - Enter Authorization Code\n\n' +
-          'The authentication window should be open.\n' +
-          'Complete the authentication and copy the authorization code.\n\n' +
-          'Authorization Code:'
-        );
-
-        if (authCode && authCode.trim()) {
-          console.log('✅ Auth code entered:', authCode.trim());
-
-          // Try to close the window
-          try {
-            if (!authWindow.closed) {
-              authWindow.close();
-            }
-          } catch (e) {
-            console.log('ℹ️ Could not close auth window (expected for cross-origin)');
-          }
-
-          // Complete OAuth authentication
-          completeOAuthAuth(accountId, authCode.trim())
-            .then(() => {
-              setOauthInProgress(false);
-              resolve();
-            })
-            .catch((err) => {
-              console.error('❌ OAuth completion failed:', err);
-              setOauthInProgress(false);
-              reject(err);
-            });
-        } else {
-          console.log('🚫 No auth code provided');
-          setOauthInProgress(false);
-          reject(new Error('No authorization code provided'));
-        }
-      }, 5000); // Wait 5 seconds before prompting
+      // Store resolve/reject functions for dialog callbacks
+      (window as any).oauthResolve = resolve;
+      (window as any).oauthReject = reject;
     });
+  };
+
+  // Handle OAuth dialog completion
+  const handleOAuthComplete = async (authCode: string) => {
+    console.log('✅ Auth code entered:', authCode);
+
+    try {
+      // Complete OAuth authentication
+      await completeOAuthAuth(oauthDialog.accountId, authCode);
+
+      // Close dialog and reset state
+      setOauthDialog({ isOpen: false, authUrl: '', accountId: '', brokerName: '' });
+      setOauthInProgress(false);
+
+      // Resolve the promise
+      if ((window as any).oauthResolve) {
+        (window as any).oauthResolve();
+        delete (window as any).oauthResolve;
+        delete (window as any).oauthReject;
+      }
+    } catch (err: any) {
+      console.error('❌ OAuth completion failed:', err);
+      showToast({
+        type: 'error',
+        title: 'Authentication Failed',
+        message: err.message || 'Please try again.'
+      });
+      setOauthInProgress(false);
+
+      // Reject the promise
+      if ((window as any).oauthReject) {
+        (window as any).oauthReject(err);
+        delete (window as any).oauthResolve;
+        delete (window as any).oauthReject;
+      }
+    }
+  };
+
+  // Handle OAuth dialog cancellation
+  const handleOAuthCancel = () => {
+    console.log('🚫 OAuth cancelled by user');
+
+    showToast({
+      type: 'info',
+      title: 'Authentication Cancelled',
+      message: 'OAuth authentication was cancelled.'
+    });
+
+    // Close dialog and reset state
+    setOauthDialog({ isOpen: false, authUrl: '', accountId: '', brokerName: '' });
+    setOauthInProgress(false);
+
+    // Reject the promise
+    if ((window as any).oauthReject) {
+      (window as any).oauthReject(new Error('OAuth cancelled by user'));
+      delete (window as any).oauthResolve;
+      delete (window as any).oauthReject;
+    }
   };
 
   // Complete OAuth authentication with auth code
@@ -254,17 +230,29 @@ const AccountSetup: React.FC = () => {
 
       if (result.success) {
         console.log('✅ OAuth completed successfully');
-        alert('Account activated successfully!');
+        showToast({
+          type: 'success',
+          title: 'Account Activated!',
+          message: 'Your broker account has been successfully activated.'
+        });
 
         // Refresh accounts using context
         await refreshAccounts();
       } else {
         console.error('❌ OAuth completion failed:', result.message);
-        alert(`OAuth completion failed: ${result.message || 'Unknown error'}`);
+        showToast({
+          type: 'error',
+          title: 'OAuth Failed',
+          message: result.message || 'Unknown error occurred during authentication.'
+        });
       }
     } catch (error: any) {
       console.error('🚨 OAuth completion error:', error);
-      alert(`OAuth completion failed: ${error.message || 'Network error'}`);
+      showToast({
+        type: 'error',
+        title: 'Authentication Error',
+        message: error.message || 'Network error occurred during authentication.'
+      });
     }
   };
 
@@ -340,7 +328,11 @@ const AccountSetup: React.FC = () => {
           }
         } else {
           // Direct connection successful (e.g., Shoonya)
-          alert('Broker connected successfully!');
+          showToast({
+            type: 'success',
+            title: 'Broker Connected!',
+            message: 'Your broker account has been successfully connected.'
+          });
           // Refresh accounts using context
           await refreshAccounts();
           // Reset form
@@ -376,7 +368,11 @@ const AccountSetup: React.FC = () => {
 
       if (result.success) {
         console.log('✅ Account activated successfully');
-        alert('Account activated successfully!');
+        showToast({
+          type: 'success',
+          title: 'Account Activated!',
+          message: 'Your broker account has been successfully activated.'
+        });
       } else {
         // Handle OAuth flow
         if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
@@ -384,12 +380,20 @@ const AccountSetup: React.FC = () => {
           await handleOAuthFlow(accountId, result.authUrl);
         } else {
           console.error('❌ Account activation failed:', result.message);
-          alert(`Failed to activate account: ${result.message || 'Unknown error'}`);
+          showToast({
+            type: 'error',
+            title: 'Activation Failed',
+            message: result.message || 'Unknown error occurred during activation.'
+          });
         }
       }
     } catch (error: any) {
       console.error('Failed to activate account:', error);
-      alert('Failed to activate account: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Activation Error',
+        message: error.message || 'Failed to activate account.'
+      });
     }
   };
 
@@ -397,13 +401,25 @@ const AccountSetup: React.FC = () => {
     try {
       const success = await deactivateAccount(accountId);
       if (success) {
-        alert('Account deactivated successfully!');
+        showToast({
+          type: 'success',
+          title: 'Account Deactivated',
+          message: 'Your broker account has been successfully deactivated.'
+        });
       } else {
-        alert('Failed to deactivate account');
+        showToast({
+          type: 'error',
+          title: 'Deactivation Failed',
+          message: 'Failed to deactivate the account. Please try again.'
+        });
       }
     } catch (error: any) {
       console.error('Failed to deactivate account:', error);
-      alert('Failed to deactivate account: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Deactivation Error',
+        message: error.message || 'Failed to deactivate account.'
+      });
     }
   };
 
@@ -415,13 +431,25 @@ const AccountSetup: React.FC = () => {
     try {
       const success = await removeAccount(accountId);
       if (success) {
-        alert('Account removed successfully!');
+        showToast({
+          type: 'success',
+          title: 'Account Removed',
+          message: 'Your broker account has been successfully removed.'
+        });
       } else {
-        alert('Failed to remove account');
+        showToast({
+          type: 'error',
+          title: 'Removal Failed',
+          message: 'Failed to remove the account. Please try again.'
+        });
       }
     } catch (error: any) {
       console.error('Failed to remove account:', error);
-      alert('Failed to remove account: ' + error.message);
+      showToast({
+        type: 'error',
+        title: 'Removal Error',
+        message: error.message || 'Failed to remove account.'
+      });
     }
   };
 
@@ -578,7 +606,7 @@ const AccountSetup: React.FC = () => {
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={isOperationInProgress(account.id) || oauthInProgress}
                             >
-                              {oauthInProgress ? 'OAuth in Progress...' :
+                              {oauthInProgress ? 'Authenticating...' :
                                isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
                             </Button>
                           )}
@@ -863,11 +891,11 @@ const AccountSetup: React.FC = () => {
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
                         <div className="loading-spinner" style={{ width: '20px', height: '20px' }}></div>
-                        <strong>🔐 OAuth Authentication in Progress</strong>
+                        <strong>🔐 Authentication in Progress</strong>
                       </div>
                       <div style={{ fontSize: '0.8rem', lineHeight: '1.4' }}>
-                        Complete the authentication in the opened window/tab.<br/>
-                        You will be prompted to enter the authorization code shortly.
+                        Follow the instructions in the dialog box.<br/>
+                        Complete authentication and enter the authorization code.
                       </div>
                     </div>
                   )}
@@ -928,6 +956,15 @@ const AccountSetup: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* OAuth Dialog */}
+      <OAuthDialog
+        isOpen={oauthDialog.isOpen}
+        authUrl={oauthDialog.authUrl}
+        brokerName={oauthDialog.brokerName}
+        onComplete={handleOAuthComplete}
+        onCancel={handleOAuthCancel}
+      />
     </div>
   );
 };
