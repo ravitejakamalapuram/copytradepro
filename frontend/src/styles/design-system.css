@@ -252,69 +252,7 @@
      LEGACY THEME COMPATIBILITY - Kite Theme Mappings
      ========================================================================== */
   
-  /* Legacy Kite theme aliases for backward compatibility */
-  --kite-bg-primary: var(--bg-primary);
-  --kite-bg-secondary: var(--bg-secondary);
-  --kite-bg-tertiary: var(--bg-tertiary);
-  --kite-bg-card: var(--bg-surface);
-  --kite-bg-hover: var(--bg-secondary);
-  
-  /* Text Colors */
-  --kite-text-primary: var(--text-primary);
-  --kite-text-secondary: var(--text-secondary);
-  --kite-text-muted: var(--text-tertiary);
-  --kite-text-disabled: var(--text-tertiary);
-  
-  /* Brand Colors */
-  --kite-brand-primary: var(--interactive-primary);
-  --kite-brand-secondary: var(--interactive-secondary);
-  --kite-brand-accent: var(--color-accent-light);
-  --kite-primary: var(--interactive-primary);
-  --kite-primary-light: rgba(233, 69, 96, 0.1);
-  --kite-bg-primary-light: rgba(233, 69, 96, 0.05);
-  
-  /* Trading Colors */
-  --kite-profit: var(--color-profit);
-  --kite-loss: var(--color-loss);
-  --kite-neutral: var(--color-neutral);
-  --kite-profit-bg: rgba(0, 212, 170, 0.1);
-  --kite-loss-bg: rgba(255, 71, 87, 0.1);
-  
-  /* Border Colors */
-  --kite-border-primary: var(--border-primary);
-  --kite-border-secondary: var(--border-secondary);
-  --kite-border-light: var(--border-secondary);
-  --kite-border: var(--border-primary);
-  
-  /* Status Colors */
-  --kite-success: var(--color-profit);
-  --kite-warning: var(--color-warning-500);
-  --kite-error: var(--color-loss);
-  --kite-info: var(--color-info-500);
-  
-  /* Shadows */
-  --kite-shadow-sm: var(--shadow-sm);
-  --kite-shadow-md: var(--shadow-md);
-  --kite-shadow-lg: var(--shadow-lg);
-  
-  /* Typography */
-  --kite-font-family: var(--font-sans);
-  --kite-font-mono: var(--font-mono);
-  
-  /* Spacing */
-  --kite-space-xs: var(--space-1);
-  --kite-space-sm: var(--space-2);
-  --kite-space-md: var(--space-4);
-  --kite-space-lg: var(--space-6);
-  --kite-space-xl: var(--space-8);
-  
-  /* Border Radius */
-  --kite-radius-sm: var(--radius-base);
-  --kite-radius-md: var(--radius-md);
-  --kite-radius-lg: var(--radius-lg);
-  
-  /* Transitions */
-  --kite-transition: var(--transition-base);
+  /* Modern design system - no legacy aliases needed */
 }
 
 /* ==========================================================================

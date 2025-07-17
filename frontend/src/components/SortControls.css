@@ -6,16 +6,16 @@
 
 .sort-controls__label {
   font-size: 11px;
-  color: var(--kite-text-secondary);
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .sort-controls__select {
   padding: 4px 8px;
-  border: 1px solid var(--kite-border-secondary);
-  border-radius: var(--kite-radius-sm);
-  background: var(--kite-bg-secondary);
-  color: var(--kite-text-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   font-size: 11px;
   font-weight: 500;
   cursor: pointer;
@@ -24,22 +24,22 @@
 }
 
 .sort-controls__select:hover {
-  border-color: var(--kite-border-primary);
+  border-color: var(--border-primary);
 }
 
 .sort-controls__select:focus {
   outline: none;
-  border-color: var(--kite-brand-primary);
+  border-color: var(--interactive-primary);
   box-shadow: 0 0 0 2px rgba(54, 162, 235, 0.1);
 }
 
 .sort-controls__order-btn {
-  background: var(--kite-bg-secondary);
-  border: 1px solid var(--kite-border-secondary);
-  border-radius: var(--kite-radius-sm);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-sm);
   padding: 4px 8px;
   cursor: pointer;
-  color: var(--kite-text-secondary);
+  color: var(--text-secondary);
   font-size: 11px;
   font-weight: 600;
   transition: all 0.2s ease;
@@ -50,9 +50,9 @@
 }
 
 .sort-controls__order-btn:hover {
-  border-color: var(--kite-border-primary);
-  color: var(--kite-text-primary);
-  background: var(--kite-bg-tertiary);
+  border-color: var(--border-primary);
+  color: var(--text-primary);
+  background: var(--bg-tertiary);
 }
 
 .sort-controls__order-btn:active {

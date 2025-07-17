@@ -325,9 +325,9 @@ const TradeSetup: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{ 
             display: 'flex', 
             justifyContent: 'center', 
@@ -337,7 +337,7 @@ const TradeSetup: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>📈</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading trading setup...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading trading setup...</div>
           </div>
         </div>
       </div>
@@ -346,15 +346,15 @@ const TradeSetup: React.FC = () => {
 
   if (connectedAccounts.length === 0) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗</div>
             <div style={{ fontSize: '1.25rem', fontWeight: '500', marginBottom: '1rem' }}>
               No Active Broker Accounts
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
               Connect and activate a broker account to start trading
             </div>
             <Button 
@@ -369,14 +369,14 @@ const TradeSetup: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
       
-      <div className="kite-main">
+      <div className="app-main">
         {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Place Order</h1>
+        <div className="card">
+          <div className="card-header">
+            <h1 className="card-title">Place Order</h1>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <Button
                 onClick={() => navigate('/orders')}
@@ -395,14 +395,14 @@ const TradeSetup: React.FC = () => {
         {/* Order Form */}
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
           {/* Main Order Form */}
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">Order Details</h2>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Order Details</h2>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <Button
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'BUY' }))}
                   style={{
-                    backgroundColor: orderForm.action === 'BUY' ? 'var(--kite-profit)' : undefined,
+                    backgroundColor: orderForm.action === 'BUY' ? 'var(--color-profit)' : undefined,
                     color: orderForm.action === 'BUY' ? 'white' : undefined
                   }}
                 >
@@ -411,7 +411,7 @@ const TradeSetup: React.FC = () => {
                 <Button
                   onClick={() => setOrderForm(prev => ({ ...prev, action: 'SELL' }))}
                   style={{
-                    backgroundColor: orderForm.action === 'SELL' ? 'var(--kite-loss)' : undefined,
+                    backgroundColor: orderForm.action === 'SELL' ? 'var(--color-loss)' : undefined,
                     color: orderForm.action === 'SELL' ? 'white' : undefined
                   }}
                 >
@@ -423,7 +423,7 @@ const TradeSetup: React.FC = () => {
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               {/* Symbol Search */}
               <div style={{ position: 'relative' }}>
-                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                   Symbol *
                 </label>
                 <div style={{ position: 'relative' }}>
@@ -435,7 +435,7 @@ const TradeSetup: React.FC = () => {
                       setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
                       handleSymbolSearch(e.target.value);
                     }}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem', paddingRight: searchLoading ? '2.5rem' : '1rem' }}
                   />
                   {searchLoading && (
@@ -458,9 +458,9 @@ const TradeSetup: React.FC = () => {
                     top: '100%',
                     left: 0,
                     right: 0,
-                    backgroundColor: 'var(--kite-bg-secondary)',
-                    border: '1px solid var(--kite-border-primary)',
-                    borderRadius: 'var(--kite-radius-md)',
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    borderRadius: 'var(--radius-md)',
                     zIndex: 1000,
                     maxHeight: '200px',
                     overflowY: 'auto'
@@ -472,15 +472,15 @@ const TradeSetup: React.FC = () => {
                         style={{
                           padding: '0.75rem',
                           cursor: 'pointer',
-                          borderBottom: index < searchResults.length - 1 ? '1px solid var(--kite-border-secondary)' : 'none'
+                          borderBottom: index < searchResults.length - 1 ? '1px solid var(--border-secondary)' : 'none'
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)'}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                       >
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                        <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                           {result.symbol}
                         </div>
-                        <div style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                        <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                           {result.name}
                         </div>
                       </div>
@@ -492,7 +492,7 @@ const TradeSetup: React.FC = () => {
               {/* Quantity and Price */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                     Quantity *
                   </label>
                   <input
@@ -500,13 +500,13 @@ const TradeSetup: React.FC = () => {
                     placeholder="0"
                     value={orderForm.quantity}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, quantity: e.target.value }))}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem' }}
                   />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                     Price {orderForm.orderType === 'MARKET' ? '(Market)' : '*'}
                   </label>
                   <input
@@ -515,7 +515,7 @@ const TradeSetup: React.FC = () => {
                     placeholder="0.00"
                     value={orderForm.price}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, price: e.target.value }))}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem' }}
                     disabled={orderForm.orderType === 'MARKET'}
                   />
@@ -525,13 +525,13 @@ const TradeSetup: React.FC = () => {
               {/* Order Type and Product */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                     Order Type
                   </label>
                   <select
                     value={orderForm.orderType}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, orderType: e.target.value as OrderType }))}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem' }}
                   >
                     <option value="MARKET">Market</option>
@@ -542,13 +542,13 @@ const TradeSetup: React.FC = () => {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                     Product
                   </label>
                   <select
                     value={orderForm.product}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, product: e.target.value as Product }))}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem' }}
                   >
                     <option value="CNC">CNC (Delivery)</option>
@@ -561,7 +561,7 @@ const TradeSetup: React.FC = () => {
               {/* Trigger Price for Stop Loss Orders */}
               {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
                 <div>
-                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                  <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                     Trigger Price *
                   </label>
                   <input
@@ -570,7 +570,7 @@ const TradeSetup: React.FC = () => {
                     placeholder="0.00"
                     value={orderForm.triggerPrice}
                     onChange={(e) => setOrderForm(prev => ({ ...prev, triggerPrice: e.target.value }))}
-                    className="kite-input"
+                    className="form-input"
                     style={{ fontSize: '1rem' }}
                   />
                 </div>
@@ -578,14 +578,14 @@ const TradeSetup: React.FC = () => {
 
               {/* Error Display */}
               {error && (
-                <div className="kite-alert kite-alert-error">
+                <div className="alert alert-error">
                   {error}
                 </div>
               )}
             </div>
 
             {/* Action Bar */}
-            <div className="kite-action-bar">
+            <div className="action-bar">
               <Button
                 onClick={handlePlaceOrder}
                 disabled={submitting || !orderForm.symbol || !orderForm.quantity || orderForm.selectedAccounts.length === 0}
@@ -612,9 +612,9 @@ const TradeSetup: React.FC = () => {
           </div>
 
           {/* Broker Account Selection - OUTSIDE the order form card */}
-          <div className="kite-card account-selection-section" style={{ margin: '2rem 0' }}>
-            <div className="kite-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span className="kite-card-title">Select Trading Accounts ({orderForm.selectedAccounts.length} selected)</span>
+          <div className="card account-selection-section" style={{ margin: '2rem 0' }}>
+            <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span className="card-title">Select Trading Accounts ({orderForm.selectedAccounts.length} selected)</span>
               {connectedAccounts.length > 1 && (
                 <Button
                   type="button"
@@ -655,7 +655,7 @@ const TradeSetup: React.FC = () => {
                 </div>
               )}
               {orderForm.selectedAccounts.length === 0 && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--kite-loss)', marginTop: '0.25rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--color-loss)', marginTop: '0.25rem' }}>
                   Please select at least one account to place orders
                 </div>
               )}
@@ -667,19 +667,19 @@ const TradeSetup: React.FC = () => {
       {/* Order Summary & Margin Info */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {/* Order Summary */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h3 className="kite-card-title">Order Summary</h3>
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Order Summary</h3>
           </div>
           <div style={{ padding: '1rem' }}>
             {orderForm.symbol ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Symbol:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Symbol:</span>
                   <span style={{ fontWeight: '500' }}>{orderForm.symbol}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Exchange:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Exchange:</span>
                   <span style={{
                     fontWeight: '500',
                     fontSize: '0.75rem',
@@ -693,46 +693,46 @@ const TradeSetup: React.FC = () => {
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Action:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Action:</span>
                   <span style={{
                     fontWeight: '500',
-                    color: orderForm.action === 'BUY' ? 'var(--kite-profit)' : 'var(--kite-loss)'
+                    color: orderForm.action === 'BUY' ? 'var(--color-profit)' : 'var(--color-loss)'
                   }}>
                     {orderForm.action}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Quantity:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Quantity:</span>
                   <span style={{ fontWeight: '500' }}>{orderForm.quantity || '0'}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Price:</span>
-                  <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Price:</span>
+                  <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
                     {orderForm.orderType === 'MARKET' ? 'Market' : `₹${orderForm.price || '0.00'}`}
                   </span>
                 </div>
                 {(orderForm.orderType === 'SL-LIMIT' || orderForm.orderType === 'SL-MARKET') && (
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: 'var(--kite-text-secondary)' }}>Trigger Price:</span>
-                    <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>Trigger Price:</span>
+                    <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
                       ₹{orderForm.triggerPrice || '0.00'}
                     </span>
                   </div>
                 )}
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Type:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Type:</span>
                   <span style={{ fontWeight: '500' }}>{orderForm.orderType}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-text-secondary)' }}>Product:</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Product:</span>
                   <span style={{ fontWeight: '500' }}>{orderForm.product}</span>
                 </div>
                 {orderForm.quantity && orderForm.price && (
                   <>
-                    <hr style={{ border: 'none', borderTop: '1px solid var(--kite-border-secondary)', margin: '0.5rem 0' }} />
+                    <hr style={{ border: 'none', borderTop: '1px solid var(--border-secondary)', margin: '0.5rem 0' }} />
                     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: 'var(--kite-text-secondary)' }}>Total Value:</span>
-                      <span style={{ fontWeight: '600', fontFamily: 'var(--kite-font-mono)' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>Total Value:</span>
+                      <span style={{ fontWeight: '600', fontFamily: 'var(--font-mono)' }}>
                         ₹{formatCurrency(parseInt(orderForm.quantity || '0') * parseFloat(orderForm.price || '0'))}
                       </span>
                     </div>
@@ -740,7 +740,7 @@ const TradeSetup: React.FC = () => {
                 )}
               </div>
             ) : (
-              <div style={{ textAlign: 'center', color: 'var(--kite-text-secondary)', padding: '2rem' }}>
+              <div style={{ textAlign: 'center', color: 'var(--text-secondary)', padding: '2rem' }}>
                 <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📋</div>
                 <div>Enter order details to see summary</div>
               </div>
@@ -749,28 +749,28 @@ const TradeSetup: React.FC = () => {
         </div>
 
         {/* Margin Information */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h3 className="kite-card-title">Margin Info</h3>
+        <div className="card">
+          <div className="card-header">
+            <h3 className="card-title">Margin Info</h3>
           </div>
           <div style={{ padding: '1rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--kite-text-secondary)' }}>Required:</span>
-                <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Required:</span>
+                <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
                   ₹{formatCurrency(marginInfo.required)}
                 </span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--kite-text-secondary)' }}>Available:</span>
-                <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Available:</span>
+                <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)' }}>
                   ₹{formatCurrency(marginInfo.available)}
                 </span>
               </div>
               {marginInfo.shortfall > 0 && (
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: 'var(--kite-loss)' }}>Shortfall:</span>
-                  <span style={{ fontWeight: '500', fontFamily: 'var(--kite-font-mono)', color: 'var(--kite-loss)' }}>
+                  <span style={{ color: 'var(--color-loss)' }}>Shortfall:</span>
+                  <span style={{ fontWeight: '500', fontFamily: 'var(--font-mono)', color: 'var(--color-loss)' }}>
                     ₹{formatCurrency(marginInfo.shortfall)}
                   </span>
                 </div>
@@ -778,7 +778,7 @@ const TradeSetup: React.FC = () => {
 
               {marginInfo.shortfall > 0 && (
                 <Button
-                  className="kite-btn kite-btn-primary"
+                  className="btn btn-primary"
                   onClick={() => navigate('/funds')}
                   style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem' }}
                 >

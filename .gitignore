@@ -150,5 +150,3 @@ backups/
 *.tsbuildinfo
 next-env.d.ts
 
-# Kiro IDE configuration
-.kiro/

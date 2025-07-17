@@ -383,9 +383,9 @@ const AccountSetup: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
+        <div className="app-main">
           <div style={{ 
             display: 'flex', 
             justifyContent: 'center', 
@@ -395,7 +395,7 @@ const AccountSetup: React.FC = () => {
             gap: '1rem'
           }}>
             <div style={{ fontSize: '2rem' }}>🔗</div>
-            <div style={{ color: 'var(--kite-text-secondary)' }}>Loading accounts...</div>
+            <div style={{ color: 'var(--text-secondary)' }}>Loading accounts...</div>
           </div>
         </div>
       </div>
@@ -403,14 +403,14 @@ const AccountSetup: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
       
-      <div className="kite-main">
+      <div className="app-main">
         {/* Page Header */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h1 className="kite-card-title">Broker Accounts</h1>
+        <div className="card">
+          <div className="card-header">
+            <h1 className="card-title">Broker Accounts</h1>
             <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
               <Button 
                 variant="primary"
@@ -430,12 +430,12 @@ const AccountSetup: React.FC = () => {
 
         {/* Connected Accounts */}
         {accounts.length > 0 && (
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">Connected Accounts ({accounts.length})</h2>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">Connected Accounts ({accounts.length})</h2>
             </div>
             <div style={{ overflowX: 'auto' }}>
-              <table className="kite-table">
+              <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Broker</th>
@@ -454,23 +454,23 @@ const AccountSetup: React.FC = () => {
                             {ALL_BROKERS.find(b => b.id === account.brokerName)?.logo || '🏦'}
                           </span>
                           <div>
-                            <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                            <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                               {account.brokerName.charAt(0).toUpperCase() + account.brokerName.slice(1)}
                             </div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                               {ALL_BROKERS.find(b => b.id === account.brokerName)?.description}
                             </div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <div style={{ fontWeight: '500', color: 'var(--kite-text-primary)' }}>
+                        <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
                           {account.userId}
                         </div>
                         {account.userName && (
                           <div style={{
                             fontSize: '0.75rem',
-                            color: 'var(--kite-text-secondary)',
+                            color: 'var(--text-secondary)',
                             marginTop: '0.125rem'
                           }}>
                             {account.userName}
@@ -486,22 +486,22 @@ const AccountSetup: React.FC = () => {
 
                           if (!isBrokerAvailable) {
                             status = 'BROKER INACTIVE';
-                            bgColor = 'var(--kite-bg-error)';
-                            textColor = 'var(--kite-status-error)';
+                            bgColor = 'var(--bg-loss-light)';
+                            textColor = 'var(--color-loss)';
                           } else if (isAccountActive) {
                             status = 'ACTIVE';
-                            bgColor = 'var(--kite-bg-success)';
-                            textColor = 'var(--kite-status-success)';
+                            bgColor = 'var(--bg-profit-light)';
+                            textColor = 'var(--color-profit)';
                           } else {
                             status = 'INACTIVE';
-                            bgColor = 'var(--kite-bg-neutral)';
-                            textColor = 'var(--kite-text-secondary)';
+                            bgColor = 'var(--bg-tertiary)';
+                            textColor = 'var(--text-secondary)';
                           }
 
                           return (
                             <span style={{
                               padding: '0.25rem 0.5rem',
-                              borderRadius: 'var(--kite-radius-sm)',
+                              borderRadius: 'var(--radius-sm)',
                               fontSize: '0.75rem',
                               fontWeight: '500',
                               backgroundColor: bgColor,
@@ -512,7 +512,7 @@ const AccountSetup: React.FC = () => {
                           );
                         })()}
                       </td>
-                      <td style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                      <td style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                         {new Date(account.createdAt).toLocaleDateString('en-IN')}
                       </td>
                       <td>
@@ -554,9 +554,9 @@ const AccountSetup: React.FC = () => {
 
         {/* Add Broker Form */}
         {showAddForm && (
-          <div className="kite-card">
-            <div className="kite-card-header">
-              <h2 className="kite-card-title">
+          <div className="card">
+            <div className="card-header">
+              <h2 className="card-title">
                 {selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
               </h2>
               <Button
@@ -583,24 +583,24 @@ const AccountSetup: React.FC = () => {
                       onClick={() => isAvailable ? handleBrokerSelect(broker.id) : null}
                       style={{
                         padding: '1.5rem',
-                        border: `2px solid ${isAvailable ? 'var(--kite-border-secondary)' : 'var(--kite-border-disabled)'}`,
-                        borderRadius: 'var(--kite-radius-lg)',
+                        border: `2px solid ${isAvailable ? 'var(--border-secondary)' : 'var(--border-tertiary)'}`,
+                        borderRadius: 'var(--radius-lg)',
                         cursor: isAvailable ? 'pointer' : 'not-allowed',
                         transition: 'all 0.2s ease',
-                        backgroundColor: isAvailable ? 'var(--kite-bg-secondary)' : 'var(--kite-bg-disabled)',
+                        backgroundColor: isAvailable ? 'var(--bg-secondary)' : 'var(--bg-tertiary)',
                         opacity: isAvailable ? 1 : 0.6,
                         position: 'relative'
                       }}
                       onMouseEnter={(e) => {
                         if (isAvailable) {
-                          e.currentTarget.style.borderColor = 'var(--kite-brand-primary)';
-                          e.currentTarget.style.backgroundColor = 'var(--kite-bg-tertiary)';
+                          e.currentTarget.style.borderColor = 'var(--interactive-primary)';
+                          e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (isAvailable) {
-                          e.currentTarget.style.borderColor = 'var(--kite-border-secondary)';
-                          e.currentTarget.style.backgroundColor = 'var(--kite-bg-secondary)';
+                          e.currentTarget.style.borderColor = 'var(--border-secondary)';
+                          e.currentTarget.style.backgroundColor = 'var(--bg-secondary)';
                         }
                       }}
                     >
@@ -610,10 +610,10 @@ const AccountSetup: React.FC = () => {
                           position: 'absolute',
                           top: '0.75rem',
                           right: '0.75rem',
-                          backgroundColor: 'var(--kite-status-error)',
+                          backgroundColor: 'var(--color-loss)',
                           color: 'white',
                           padding: '0.25rem 0.5rem',
-                          borderRadius: 'var(--kite-radius-sm)',
+                          borderRadius: 'var(--radius-sm)',
                           fontSize: '0.75rem',
                           fontWeight: '600'
                         }}>
@@ -628,14 +628,14 @@ const AccountSetup: React.FC = () => {
                             margin: 0,
                             fontSize: '1.25rem',
                             fontWeight: '600',
-                            color: isAvailable ? 'var(--kite-text-primary)' : 'var(--kite-text-disabled)'
+                            color: isAvailable ? 'var(--text-primary)' : 'var(--text-tertiary)'
                           }}>
                             {broker.name}
                             {isAvailable && (
                               <span style={{
                                 marginLeft: '0.5rem',
                                 fontSize: '0.75rem',
-                                color: 'var(--kite-status-success)',
+                                color: 'var(--color-profit)',
                                 fontWeight: '500'
                               }}>
                                 ● AVAILABLE
@@ -645,7 +645,7 @@ const AccountSetup: React.FC = () => {
                           <p style={{
                             margin: 0,
                             fontSize: '0.875rem',
-                            color: isAvailable ? 'var(--kite-text-secondary)' : 'var(--kite-text-disabled)'
+                            color: isAvailable ? 'var(--text-secondary)' : 'var(--text-tertiary)'
                           }}>
                             {isAvailable ? broker.description : 'Broker not initialized on server'}
                           </p>
@@ -653,7 +653,7 @@ const AccountSetup: React.FC = () => {
                       </div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                         {broker.features.map((feature, index) => (
-                          <div key={index} style={{ fontSize: '0.875rem', color: 'var(--kite-text-secondary)' }}>
+                          <div key={index} style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                             ✓ {feature}
                           </div>
                         ))}
@@ -668,7 +668,7 @@ const AccountSetup: React.FC = () => {
                   {selectedBroker === 'shoonya' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           User ID *
                         </label>
                         <input
@@ -676,13 +676,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your Shoonya User ID"
                           value={formData.userId}
                           onChange={(e) => handleInputChange('userId', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           Password *
                         </label>
                         <input
@@ -690,13 +690,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your trading password"
                           value={formData.password}
                           onChange={(e) => handleInputChange('password', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           TOTP Secret Key *
                         </label>
                         <input
@@ -704,16 +704,16 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your TOTP secret key"
                           value={formData.totpKey}
                           onChange={(e) => handleInputChange('totpKey', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
-                        <div style={{ fontSize: '0.75rem', color: 'var(--kite-text-secondary)', marginTop: '0.25rem' }}>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
                           This is used for automatic OTP generation
                         </div>
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           Vendor Code *
                         </label>
                         <input
@@ -721,13 +721,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="e.g., FN135006_U"
                           value={formData.vendorCode}
                           onChange={(e) => handleInputChange('vendorCode', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           API Secret *
                         </label>
                         <input
@@ -735,13 +735,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your API secret"
                           value={formData.apiSecret}
                           onChange={(e) => handleInputChange('apiSecret', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           IMEI *
                         </label>
                         <input
@@ -749,7 +749,7 @@ const AccountSetup: React.FC = () => {
                           placeholder="e.g., abc1234"
                           value={formData.imei}
                           onChange={(e) => handleInputChange('imei', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
@@ -759,7 +759,7 @@ const AccountSetup: React.FC = () => {
                   {selectedBroker === 'fyers' && (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           Client ID *
                         </label>
                         <input
@@ -767,13 +767,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your Fyers Client ID"
                           value={formData.clientId}
                           onChange={(e) => handleInputChange('clientId', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           Secret Key *
                         </label>
                         <input
@@ -781,13 +781,13 @@ const AccountSetup: React.FC = () => {
                           placeholder="Enter your secret key"
                           value={formData.secretKey}
                           onChange={(e) => handleInputChange('secretKey', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
 
                       <div>
-                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--kite-text-primary)', marginBottom: '0.5rem', display: 'block' }}>
+                        <label style={{ fontSize: '0.875rem', fontWeight: '500', color: 'var(--text-primary)', marginBottom: '0.5rem', display: 'block' }}>
                           Redirect URI *
                         </label>
                         <input
@@ -795,7 +795,7 @@ const AccountSetup: React.FC = () => {
                           placeholder="https://your-app.com/callback"
                           value={formData.redirectUri}
                           onChange={(e) => handleInputChange('redirectUri', e.target.value)}
-                          className="kite-input"
+                          className="form-input"
                           style={{ fontSize: '1rem' }}
                         />
                       </div>
@@ -806,10 +806,10 @@ const AccountSetup: React.FC = () => {
                   {error && (
                     <div style={{
                       padding: '0.75rem',
-                      backgroundColor: 'var(--kite-bg-danger)',
-                      border: '1px solid var(--kite-loss)',
-                      borderRadius: 'var(--kite-radius-md)',
-                      color: 'var(--kite-loss)',
+                      backgroundColor: 'var(--bg-loss-light)',
+                      border: '1px solid var(--color-loss)',
+                      borderRadius: 'var(--radius-md)',
+                      color: 'var(--color-loss)',
                       fontSize: '0.875rem',
                       marginTop: '1rem'
                     }}>
@@ -840,12 +840,12 @@ const AccountSetup: React.FC = () => {
 
         {/* Empty State */}
         {accounts.length === 0 && !showAddForm && (
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
               No Broker Accounts Connected
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
               Connect your broker account to start trading. We support multiple brokers with secure API integration.
             </div>
             <Button

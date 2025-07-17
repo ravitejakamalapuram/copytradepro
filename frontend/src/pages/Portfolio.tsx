@@ -200,9 +200,9 @@ const Portfolio: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main" style={{
+        <div className="app-main" style={{
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
@@ -210,12 +210,12 @@ const Portfolio: React.FC = () => {
         }}>
           <div style={{ 
             fontSize: '1.2rem', 
-            color: 'var(--kite-text-secondary)',
+            color: 'var(--text-secondary)',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
           }}>
-            <div className="kite-spinner"></div>
+            <div className="loading-spinner"></div>
             Loading portfolio...
           </div>
         </div>
@@ -225,15 +225,15 @@ const Portfolio: React.FC = () => {
 
   if (error) {
     return (
-      <div className="kite-theme">
+      <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="kite-main">
-          <div className="kite-card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <div className="app-main">
+          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
             <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--kite-text-primary)' }}>
+            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
               Failed to Load Portfolio
             </div>
-            <div style={{ color: 'var(--kite-text-secondary)', marginBottom: '2rem' }}>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
               {error}
             </div>
             <Button 
@@ -249,9 +249,9 @@ const Portfolio: React.FC = () => {
   }
 
   return (
-    <div className="kite-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
-      <div className="kite-main">
+      <div className="app-main">
         {/* Header */}
         <div style={{ 
           display: 'flex', 
@@ -262,7 +262,7 @@ const Portfolio: React.FC = () => {
           <h1 style={{
             fontSize: '16px',
             fontWeight: '600',
-            color: 'var(--kite-text-primary)',
+            color: 'var(--text-primary)',
             margin: 0
           }}>
             Portfolio
@@ -300,9 +300,9 @@ const Portfolio: React.FC = () => {
         />
 
         {/* Portfolio Items Table */}
-        <div className="kite-card">
-          <div className="kite-card-header">
-            <h2 className="kite-card-title">
+        <div className="card">
+          <div className="card-header">
+            <h2 className="card-title">
               {viewMode === 'all' ? 'All Items' :
                viewMode === 'holdings' ? 'Holdings' : 'Positions'}
               ({filteredItems.length})

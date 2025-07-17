@@ -107,23 +107,23 @@ const AppNavigation: React.FC = () => {
   }));
 
   return (
-    <div className="kite-theme">
+    <>
       {/* Top Navigation */}
-      <nav className="kite-nav">
-        <div className="kite-nav-content">
+      <nav className="app-nav">
+        <div className="app-nav-content">
           {/* Logo */}
-          <div className="kite-logo">
+          <div className="app-logo">
             <span className="logo-icon">📈</span>
             <span>CopyTrade Pro</span>
           </div>
 
           {/* Main Navigation */}
-          <div className="kite-nav-links">
+          <div className="app-nav-links">
             {navItems.map((item) => (
               <Button
                 key={item.path}
                 variant="ghost"
-                className={`kite-nav-link ${location.pathname === item.path ? 'active' : ''}`}
+                className={`app-nav-link ${location.pathname === item.path ? 'app-nav-link--active' : ''}`}
                 onClick={() => navigate(item.path)}
               >
                 <span>{item.icon}</span>
@@ -136,7 +136,7 @@ const AppNavigation: React.FC = () => {
           <div className="nav-user-menu">
             {/* Market Status */}
             <div className="market-status-indicator">
-              <div className="status-dot" style={{ backgroundColor: marketStatus?.isOpen ? 'var(--kite-profit)' : 'var(--kite-loss)' }}></div>
+              <div className="status-dot" style={{ backgroundColor: marketStatus?.isOpen ? 'var(--color-profit)' : 'var(--color-loss)' }}></div>
               {marketStatus?.status || 'Market Status Unknown'}
             </div>
 
@@ -162,10 +162,10 @@ const AppNavigation: React.FC = () => {
       </nav>
 
       {/* Sidebar */}
-      <div className={`kite-sidebar ${sidebarOpen ? 'open' : ''}`}>
+      <div className={`app-sidebar ${sidebarOpen ? 'open' : ''}`}>
         {/* Watchlist Section */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Watchlist</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Watchlist</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {watchlistItems.map((item, index) => (
               <div
@@ -204,7 +204,7 @@ const AppNavigation: React.FC = () => {
               <span style={{
                 width: '6px',
                 height: '6px',
-                backgroundColor: 'var(--kite-profit)',
+                backgroundColor: 'var(--color-profit)',
                 borderRadius: '50%',
                 animation: 'pulse 2s infinite'
               }}></span>
@@ -217,8 +217,8 @@ const AppNavigation: React.FC = () => {
         </div>
 
         {/* Portfolio Summary */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Portfolio</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Portfolio</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
             <div className="portfolio-summary-item">
               <span className="text-muted">Total Value</span>
@@ -242,23 +242,23 @@ const AppNavigation: React.FC = () => {
         </div>
 
         {/* Quick Actions */}
-        <div className="kite-sidebar-section">
-          <div className="kite-sidebar-title">Quick Actions</div>
+        <div className="app-sidebar-section">
+          <div className="app-sidebar-title">Quick Actions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            <Button 
-              className="kite-btn kite-btn-primary"
+            <Button
+              className="btn btn-primary"
               onClick={() => navigate('/trade-setup')}
             >
               Place Order
             </Button>
-            <Button 
-              className="kite-btn"
+            <Button
+              className="btn"
               onClick={() => navigate('/advanced-orders')}
             >
               Advanced Orders
             </Button>
-            <Button 
-              className="kite-btn"
+            <Button
+              className="btn"
               onClick={() => navigate('/portfolio')}
             >
               View Analytics
@@ -276,10 +276,10 @@ const AppNavigation: React.FC = () => {
           zIndex: 101,
           display: 'none',
           padding: '0.5rem',
-          backgroundColor: 'var(--kite-bg-secondary)',
-          border: '1px solid var(--kite-border-primary)',
-          borderRadius: 'var(--kite-radius-md)',
-          color: 'var(--kite-text-primary)',
+          backgroundColor: 'var(--bg-secondary)',
+          border: '1px solid var(--border-primary)',
+          borderRadius: 'var(--radius-md)',
+          color: 'var(--text-primary)',
           cursor: 'pointer'
         }}
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -295,7 +295,7 @@ const AppNavigation: React.FC = () => {
           }
         }
       `}</style>
-    </div>
+    </>
   );
 };
 

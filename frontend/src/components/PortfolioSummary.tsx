@@ -36,9 +36,9 @@ const PortfolioSummary: React.FC<PortfolioSummaryProps> = ({ data }) => {
   };
 
   return (
-    <div className="kite-card portfolio-summary">
-      <div className="kite-card-header portfolio-summary__header">
-        <h2 className="kite-card-title portfolio-summary__title">Portfolio Summary</h2>
+    <div className="card portfolio-summary">
+      <div className="card-header portfolio-summary__header">
+        <h2 className="card-title portfolio-summary__title">Portfolio Summary</h2>
       </div>
 
       <div className="portfolio-summary__content">
