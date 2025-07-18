@@ -1,138 +1,138 @@
 # Implementation Plan
 
-- [-] 1. Set up derivatives data models and core interfaces
+- [x] 1. Set up derivatives data models and core interfaces
   - Create TypeScript interfaces for options, futures, and derivatives-related data structures
   - Implement base classes for derivative instruments with proper inheritance hierarchy
   - Add Greeks calculation utilities and option pricing models
   - _Requirements: 1.2, 2.2, 3.4_
 
-- [ ] 1.1 Create derivatives data models
+- [x] 1.1 Create derivatives data models
   - Write TypeScript interfaces for OptionContract, FuturesContract, OptionChain, and FuturesChain
   - Implement Greeks interface with Delta, Gamma, Theta, Vega, and Rho properties
   - Create DerivativePosition base class with common properties for options and futures positions
   - _Requirements: 1.2, 2.2, 3.2_
 
-- [ ] 1.2 Implement option pricing and Greeks calculations
+- [x] 1.2 Implement option pricing and Greeks calculations
   - Create OptionPricingService with Black-Scholes model implementation
   - Implement Greeks calculation methods for real-time risk metrics
   - Add implied volatility calculation using Newton-Raphson method
   - _Requirements: 1.2, 3.2, 3.4_
 
-- [ ] 1.3 Create futures contract specifications
+- [x] 1.3 Create futures contract specifications
   - Implement FuturesContract model with contract specifications and margin requirements
   - Add contract rollover logic and expiry date handling
   - Create lot size and tick size validation utilities
   - _Requirements: 2.1, 2.2, 2.6_
 
-- [ ] 2. Extend unified broker interface for derivatives support
+- [x] 2. Extend unified broker interface for derivatives support
   - Modify IBrokerService interface to include derivatives trading methods
   - Implement derivatives-specific methods in existing broker adapters
   - Add margin calculation and validation capabilities
   - _Requirements: 5.1, 5.2, 5.4, 6.6_
 
-- [ ] 2.1 Extend broker service interface
+- [x] 2.1 Extend broker service interface
   - Add getOptionChain, placeOptionOrder, and getFuturesChain methods to IBrokerService
   - Implement calculateMargin and getDerivativesEligibility methods
   - Create DerivativesBrokerService interface extending the base interface
   - _Requirements: 5.1, 5.2, 4.2_
 
-- [ ] 2.2 Update Fyers broker adapter for derivatives
+- [x] 2.2 Update Fyers broker adapter for derivatives
   - Implement options and futures trading methods in FyersServiceAdapter
   - Add option chain retrieval and futures contract listing functionality
   - Implement margin calculation specific to Fyers API requirements
   - _Requirements: 5.1, 5.2, 4.2_
 
-- [ ] 2.3 Update Shoonya broker adapter for derivatives
+- [x] 2.3 Update Shoonya broker adapter for derivatives
   - Implement derivatives trading methods in ShoonyaServiceAdapter
   - Add proper error handling for derivatives-specific API responses
   - Implement position tracking for options and futures contracts
   - _Requirements: 5.1, 5.2, 4.2_
 
-- [ ] 2.4 Create unified derivatives response handling
+- [x] 2.4 Create unified derivatives response handling
   - Implement response normalization for different broker API formats
   - Add error handling specific to derivatives trading scenarios
   - Create unified position aggregation across multiple brokers
   - _Requirements: 5.4, 5.5, 6.6_
 
-- [ ] 3. Implement derivatives market data service
+- [x] 3. Implement derivatives market data service
   - Create DerivativesDataService for real-time options and futures data
   - Implement WebSocket subscriptions for derivatives quotes and Greeks
   - Add market data caching and efficient subscription management
   - _Requirements: 3.1, 3.2, 3.5, 3.6_
 
-- [ ] 3.1 Create derivatives data service
+- [x] 3.1 Create derivatives data service
   - Implement DerivativesDataService class with option chain and futures data methods
   - Add real-time quote subscription management for derivatives instruments
   - Create data validation and error handling for derivatives market data
   - _Requirements: 3.1, 3.2, 3.5_
 
-- [ ] 3.2 Implement real-time Greeks updates
+- [x] 3.2 Implement real-time Greeks updates
   - Add WebSocket event handlers for real-time Greeks calculations
   - Implement efficient Greeks recalculation when underlying price changes
   - Create Greeks aggregation for portfolio-level risk metrics
   - _Requirements: 3.4, 4.1, 4.4_
 
-- [ ] 3.3 Add derivatives data caching
+- [x] 3.3 Add derivatives data caching
   - Implement intelligent caching for option chains and futures contracts
   - Add cache invalidation logic based on market hours and expiry dates
   - Create efficient data retrieval with fallback to cached data
   - _Requirements: 3.5, 3.6_
 
-- [ ] 4. Create risk management engine
+- [x] 4. Create risk management engine
   - Implement portfolio risk calculation with derivatives exposure
   - Add margin requirement validation and monitoring
   - Create risk limit enforcement and alert system
   - _Requirements: 4.1, 4.2, 4.3, 4.5_
 
-- [ ] 4.1 Implement portfolio risk calculator
+- [x] 4.1 Implement portfolio risk calculator
   - Create RiskCalculator class with VaR and portfolio Greeks calculation
   - Implement concentration risk analysis for derivatives positions
   - Add correlation analysis between different derivative positions
   - _Requirements: 4.1, 4.4_
 
-- [ ] 4.2 Create margin management system
+- [x] 4.2 Create margin management system
   - Implement MarginCalculator with initial and maintenance margin calculations
   - Add real-time margin monitoring and margin call detection
   - Create margin requirement validation before order placement
   - _Requirements: 4.2, 4.5, 2.2_
 
-- [ ] 4.3 Add risk limits and alerts
+- [x] 4.3 Add risk limits and alerts
   - Implement configurable risk limits for position size and exposure
   - Create alert system for risk threshold breaches
   - Add automatic risk reduction suggestions and actions
   - _Requirements: 4.3, 4.5, 4.6_
 
-- [ ] 5. Build multi-leg strategy management
+- [x] 5. Build multi-leg strategy management
   - Create strategy builder for complex options strategies
   - Implement multi-leg order execution with simultaneous leg placement
   - Add strategy P&L tracking and performance analysis
   - _Requirements: 1.4, 6.1, 6.2, 7.2_
 
-- [ ] 5.1 Create strategy builder component
+- [x] 5.1 Create strategy builder component
   - Implement StrategyBuilder class for creating multi-leg options strategies
   - Add predefined strategy templates (spreads, straddles, strangles, collars)
   - Create strategy validation and risk analysis before execution
   - _Requirements: 1.4, 6.1_
 
-- [ ] 5.2 Implement multi-leg order execution
+- [x] 5.2 Implement multi-leg order execution
   - Create MultiLegOrderManager for simultaneous execution of strategy legs
   - Add partial fill handling and leg completion tracking
   - Implement order routing optimization for best execution across brokers
   - _Requirements: 6.1, 6.2, 6.4_
 
-- [ ] 5.3 Add strategy position tracking
+- [x] 5.3 Add strategy position tracking
   - Implement StrategyPosition model for tracking multi-leg strategy performance
   - Add real-time P&L calculation for complex strategies
   - Create strategy-level Greeks and risk metrics calculation
   - _Requirements: 7.2, 4.1, 4.4_
 
-- [ ] 6. Implement advanced order management
+- [-] 6. Implement advanced order management
   - Add bracket orders with profit targets and stop losses
   - Implement order modification and cancellation for derivatives
   - Create order slicing and iceberg order functionality
   - _Requirements: 6.2, 6.3, 6.4, 6.5_
 
-- [ ] 6.1 Create bracket order system
+- [x] 6.1 Create bracket order system
   - Implement BracketOrder class with parent-child order relationships
   - Add automatic profit target and stop loss order placement
   - Create trailing stop functionality for derivatives positions

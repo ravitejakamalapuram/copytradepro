@@ -39,5 +39,6 @@ export default {
 
 // Named exports for manual usage
 export { FyersServiceAdapter };
+export { UnifiedFyersService, FyersDerivativesService } from './UnifiedFyersService';
 export * from './types';
 export * from './helpers';

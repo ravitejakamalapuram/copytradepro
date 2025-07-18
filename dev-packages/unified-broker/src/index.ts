@@ -20,6 +20,13 @@ export { BrokerRegistry, BrokerPlugin };
 import { BrokerFactory } from './factories/BrokerFactory';
 export { BrokerFactory };
 
+// Derivatives response handler
+export * from './services/derivativesResponseHandler';
+
+// Derivatives-enabled broker services
+export { FyersDerivativesService } from './brokers/fyers/UnifiedFyersService';
+export { ShoonyaDerivativesService } from './brokers/shoonya/UnifiedShoonyaService';
+
 // Note: Broker plugins are now separate packages
 // Import @copytrade/broker-shoonya, @copytrade/broker-fyers, etc. to register brokers
 

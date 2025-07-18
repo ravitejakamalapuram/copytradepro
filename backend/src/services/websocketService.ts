@@ -194,6 +194,28 @@ class WebSocketService {
       logger.info(`Reconnection attempt ${data.attempt} for socket ${socket.id}`);
     });
 
+    // Handle Greeks subscription events
+    socket.on('subscribe_greeks', (data: { symbols: string[], updateFrequency?: number }) => {
+      this.handleGreeksSubscription(socket, data);
+    });
+
+    socket.on('unsubscribe_greeks', () => {
+      this.handleGreeksUnsubscription(socket);
+    });
+
+    socket.on('request_portfolio_greeks', () => {
+      this.handlePortfolioGreeksRequest(socket);
+    });
+
+    // Handle derivatives data subscription events
+    socket.on('subscribe_derivatives_data', (data: { symbols: string[], underlyings: string[] }) => {
+      this.handleDerivativesDataSubscription(socket, data);
+    });
+
+    socket.on('unsubscribe_derivatives_data', (data: { symbols?: string[], underlyings?: string[] }) => {
+      this.handleDerivativesDataUnsubscription(socket, data);
+    });
+
     // Handle error events
     socket.on('error', (error: Error) => {
       this.handleSocketError(socket, error);
@@ -295,11 +317,176 @@ class WebSocketService {
   }
 
   /**
+   * Handle Greeks subscription request
+   */
+  private handleGreeksSubscription(socket: AuthenticatedSocket, data: { symbols: string[], updateFrequency?: number }): void {
+    const userId = socket.userId;
+    if (!userId) return;
+
+    try {
+      // Import and use the real-time Greeks service
+      const { realTimeGreeksService } = require('./realTimeGreeksService');
+      realTimeGreeksService.subscribeToGreeks(userId, data.symbols, data.updateFrequency);
+      
+      socket.emit('greeks_subscription_success', {
+        symbols: data.symbols,
+        updateFrequency: data.updateFrequency,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.info(`Greeks subscription created for user ${userId} with ${data.symbols.length} symbols`);
+    } catch (error: any) {
+      logger.error(`Error creating Greeks subscription for user ${userId}:`, error);
+      socket.emit('greeks_subscription_error', {
+        message: 'Failed to subscribe to Greeks updates',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
+   * Handle Greeks unsubscription request
+   */
+  private handleGreeksUnsubscription(socket: AuthenticatedSocket): void {
+    const userId = socket.userId;
+    if (!userId) return;
+
+    try {
+      const { realTimeGreeksService } = require('./realTimeGreeksService');
+      realTimeGreeksService.unsubscribeFromGreeks(userId);
+      
+      socket.emit('greeks_unsubscription_success', {
+        timestamp: new Date().toISOString()
+      });
+
+      logger.info(`Greeks subscription removed for user ${userId}`);
+    } catch (error: any) {
+      logger.error(`Error removing Greeks subscription for user ${userId}:`, error);
+      socket.emit('greeks_unsubscription_error', {
+        message: 'Failed to unsubscribe from Greeks updates',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
+   * Handle portfolio Greeks request
+   */
+  private handlePortfolioGreeksRequest(socket: AuthenticatedSocket): void {
+    const userId = socket.userId;
+    if (!userId) return;
+
+    try {
+      const { realTimeGreeksService } = require('./realTimeGreeksService');
+      const portfolioGreeks = realTimeGreeksService.getPortfolioGreeks(userId);
+      
+      socket.emit('portfolio_greeks_response', {
+        portfolioGreeks,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.debug(`Portfolio Greeks sent to user ${userId}`);
+    } catch (error: any) {
+      logger.error(`Error getting portfolio Greeks for user ${userId}:`, error);
+      socket.emit('portfolio_greeks_error', {
+        message: 'Failed to get portfolio Greeks',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
+   * Handle derivatives data subscription request
+   */
+  private handleDerivativesDataSubscription(socket: AuthenticatedSocket, data: { symbols: string[], underlyings: string[] }): void {
+    const userId = socket.userId;
+    if (!userId) return;
+
+    try {
+      // Join rooms for derivatives data updates
+      data.symbols.forEach(symbol => {
+        socket.join(`derivatives:${symbol}`);
+      });
+      
+      data.underlyings.forEach(underlying => {
+        socket.join(`underlying:${underlying}`);
+      });
+
+      socket.emit('derivatives_subscription_success', {
+        symbols: data.symbols,
+        underlyings: data.underlyings,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.info(`Derivatives data subscription created for user ${userId}`);
+    } catch (error: any) {
+      logger.error(`Error creating derivatives data subscription for user ${userId}:`, error);
+      socket.emit('derivatives_subscription_error', {
+        message: 'Failed to subscribe to derivatives data',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
+   * Handle derivatives data unsubscription request
+   */
+  private handleDerivativesDataUnsubscription(socket: AuthenticatedSocket, data: { symbols?: string[], underlyings?: string[] }): void {
+    const userId = socket.userId;
+    if (!userId) return;
+
+    try {
+      // Leave rooms for derivatives data updates
+      if (data.symbols) {
+        data.symbols.forEach(symbol => {
+          socket.leave(`derivatives:${symbol}`);
+        });
+      }
+      
+      if (data.underlyings) {
+        data.underlyings.forEach(underlying => {
+          socket.leave(`underlying:${underlying}`);
+        });
+      }
+
+      socket.emit('derivatives_unsubscription_success', {
+        symbols: data.symbols,
+        underlyings: data.underlyings,
+        timestamp: new Date().toISOString()
+      });
+
+      logger.info(`Derivatives data unsubscription processed for user ${userId}`);
+    } catch (error: any) {
+      logger.error(`Error processing derivatives data unsubscription for user ${userId}:`, error);
+      socket.emit('derivatives_unsubscription_error', {
+        message: 'Failed to unsubscribe from derivatives data',
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+
+  /**
    * Handle client disconnection
    */
   handleDisconnection(socket: AuthenticatedSocket, reason: string): void {
     const userId = socket.userId;
     logger.info(`Socket.IO client disconnected: User ${userId} (${socket.id}) - ${reason}`);
+
+    // Clean up Greeks subscriptions
+    if (userId) {
+      try {
+        const { realTimeGreeksService } = require('./realTimeGreeksService');
+        realTimeGreeksService.cleanup(userId);
+      } catch (error) {
+        // Service might not be available during shutdown
+        logger.debug(`Could not cleanup Greeks service for user ${userId}`);
+      }
+    }
 
     // Clean up connection health tracking
     this.connectionHealth.delete(socket.id);
@@ -322,6 +509,52 @@ class WebSocketService {
   sendToUser(userId: string, event: string, data: any): void {
     if (!this.io) return;
     this.io.to(`user:${userId}`).emit(event, data);
+  }
+
+  /**
+   * Broadcast derivatives data update to all subscribed clients
+   */
+  broadcastDerivativesUpdate(symbol: string, data: any): void {
+    if (!this.io) return;
+    this.io.to(`derivatives:${symbol}`).emit('derivatives_data_update', {
+      symbol,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Broadcast underlying price update to all subscribed clients
+   */
+  broadcastUnderlyingUpdate(underlying: string, data: any): void {
+    if (!this.io) return;
+    this.io.to(`underlying:${underlying}`).emit('underlying_price_update', {
+      underlying,
+      data,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Send Greeks update to specific user
+   */
+  sendGreeksUpdate(userId: string, updates: any[]): void {
+    if (!this.io) return;
+    this.sendToUser(userId, 'greeks_update', {
+      updates,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Send portfolio Greeks update to specific user
+   */
+  sendPortfolioGreeksUpdate(userId: string, portfolioGreeks: any): void {
+    if (!this.io) return;
+    this.sendToUser(userId, 'portfolio_greeks_update', {
+      portfolioGreeks,
+      timestamp: new Date().toISOString()
+    });
   }
 
 

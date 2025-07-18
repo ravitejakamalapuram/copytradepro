@@ -12,6 +12,9 @@ export * from './api-responses';
 export * from './constants';
 export * from './database-interfaces';
 
+// Export derivatives types
+export * from './derivatives';
+
 // Re-export commonly used types for convenience
 export type {
   ApiError,
