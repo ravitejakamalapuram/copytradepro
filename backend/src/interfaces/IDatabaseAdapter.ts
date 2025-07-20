@@ -66,12 +66,21 @@ export interface OrderHistory {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: string;
   created_at: string;
+  // Enhanced fields for error handling and retry functionality
+  error_message?: string | undefined;
+  error_code?: string | undefined;
+  error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET' | undefined;
+  retry_count?: number | undefined;
+  max_retries?: number | undefined;
+  last_retry_at?: string | undefined;
+  is_retryable?: boolean | undefined;
+  failure_reason?: string | undefined;
   account_info?: {
     account_id: string;
     user_name: string;
@@ -89,11 +98,20 @@ export interface CreateOrderHistoryData {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status?: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange?: string;
   product_type?: string;
   remarks?: string;
   executed_at: string;
+  // Enhanced fields for error handling and retry functionality
+  error_message?: string;
+  error_code?: string;
+  error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+  retry_count?: number;
+  max_retries?: number;
+  last_retry_at?: string;
+  is_retryable?: boolean;
+  failure_reason?: string;
 }
 
 export interface OrderFilters {
@@ -142,6 +160,15 @@ export interface IDatabaseAdapter {
   getOrderHistoryByUserIdWithFilters(userId: number | string, limit?: number, offset?: number, filters?: OrderFilters): Promise<OrderHistory[]> | OrderHistory[];
   updateOrderStatus(id: number | string, status: string): Promise<boolean> | boolean;
   updateOrderStatusByBrokerOrderId(brokerOrderId: string, status: string): Promise<boolean> | boolean;
+  updateOrderWithError?(id: number | string, errorData: {
+    status: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+  }): Promise<boolean> | boolean;
+  incrementOrderRetryCount?(id: number | string): Promise<boolean> | boolean;
   deleteOrderHistory(id: number | string): Promise<boolean> | boolean;
   getAllOrderHistory(limit?: number, offset?: number): Promise<OrderHistory[]> | OrderHistory[];
   getOrderCountByUserIdWithFilters(userId: number | string, filters?: OrderFilters): Promise<number> | number;

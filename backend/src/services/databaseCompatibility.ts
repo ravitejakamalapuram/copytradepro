@@ -193,6 +193,29 @@ class DatabaseCompatibilityLayer {
       this.database = null;
     }
   }
+
+  async updateOrderWithError(id: number | string, errorData: {
+    status: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+  }) {
+    const db = await this.getDb();
+    if (db.updateOrderWithError) {
+      return await db.updateOrderWithError(id, errorData);
+    }
+    return false;
+  }
+
+  async incrementOrderRetryCount(id: number | string) {
+    const db = await this.getDb();
+    if (db.incrementOrderRetryCount) {
+      return await db.incrementOrderRetryCount(id);
+    }
+    return false;
+  }
 }
 
 // Export a singleton instance for backward compatibility

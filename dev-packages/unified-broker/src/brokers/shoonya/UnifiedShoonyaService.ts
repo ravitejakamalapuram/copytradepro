@@ -311,6 +311,80 @@ export class UnifiedShoonyaService implements IUnifiedBrokerService {
     }
   }
 
+  async cancelOrder(orderId: string): Promise<any> {
+    if (!this.isConnectedFlag) {
+      throw new Error('Not connected to Shoonya. Please authenticate first.');
+    }
+
+    try {
+      console.log('🚫 Cancelling Shoonya order:', orderId);
+
+      const shoonyaResponse = await this.shoonyaService.cancelOrder(orderId);
+
+      // Transform Shoonya response to unified format
+      if (shoonyaResponse.stat === 'Ok') {
+        return {
+          success: true,
+          message: 'Order cancelled successfully',
+          data: {
+            orderId: orderId,
+            status: 'CANCELLED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: shoonyaResponse.emsg || 'Order cancellation failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya order cancellation error:', error);
+      return {
+        success: false,
+        message: error.message || 'Order cancellation failed',
+        data: null
+      };
+    }
+  }
+
+  async modifyOrder(orderId: string, modifications: any): Promise<any> {
+    if (!this.isConnectedFlag) {
+      throw new Error('Not connected to Shoonya. Please authenticate first.');
+    }
+
+    try {
+      console.log('✏️ Modifying Shoonya order:', orderId, modifications);
+
+      const shoonyaResponse = await this.shoonyaService.modifyOrder(orderId, modifications);
+
+      // Transform Shoonya response to unified format
+      if (shoonyaResponse.stat === 'Ok') {
+        return {
+          success: true,
+          message: 'Order modified successfully',
+          data: {
+            orderId: orderId,
+            status: 'MODIFIED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: shoonyaResponse.emsg || 'Order modification failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya order modification error:', error);
+      return {
+        success: false,
+        message: error.message || 'Order modification failed',
+        data: null
+      };
+    }
+  }
+
   private mapProductType(productType: string): string {
     const mapping: { [key: string]: string } = {
       'CNC': 'C',

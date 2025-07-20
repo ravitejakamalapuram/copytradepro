@@ -140,6 +140,8 @@ export interface IUnifiedBrokerService {
   
   // Trading operations (existing interface)
   placeOrder(orderRequest: any): Promise<any>;
+  cancelOrder(orderId: string): Promise<any>;
+  modifyOrder(orderId: string, modifications: any): Promise<any>;
   getOrderStatus(accountId: string, orderId: string): Promise<any>;
   getOrderHistory(accountId: string): Promise<any>;
   getPositions(accountId: string): Promise<any>;

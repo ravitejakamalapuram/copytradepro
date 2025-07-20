@@ -16,6 +16,8 @@ import {
   createActivationResponse
 } from '@copytrade/shared-types';
 import websocketService from '../services/websocketService';
+import { OrderErrorClassifier } from '../services/orderErrorClassifier';
+import { orderRetryService } from '../services/orderRetryService';
 
 // All broker connections now managed by Enhanced Unified Broker Manager
 
@@ -25,7 +27,7 @@ import websocketService from '../services/websocketService';
 async function logoutFromBroker(userId: string, brokerName: string, accountId: string): Promise<void> {
   try {
     await enhancedUnifiedBrokerManager.disconnect(userId, brokerName, accountId);
-    
+
     // Unregister session from health monitoring
     brokerSessionManager.unregisterSession(userId, brokerName, accountId);
   } catch (error) {
@@ -436,7 +438,7 @@ export const completeOAuthAuth = async (
         console.error(`❌ OAuth completion failed for ${account.broker_name}:`, result.message);
 
         let userFriendlyMessage = result.message;
-        
+
         // Provide specific user-friendly messages based on error type
         switch (result.errorType) {
           case 'AUTH_CODE_EXPIRED':
@@ -468,10 +470,10 @@ export const completeOAuthAuth = async (
       }
     } catch (oauthError: any) {
       console.error(`🚨 OAuth completion error for ${account.broker_name}:`, oauthError);
-      
+
       // Provide user-friendly error message
       let userFriendlyMessage = 'OAuth authentication failed. Please try again.';
-      
+
       if (oauthError.message?.includes('expired')) {
         userFriendlyMessage = 'The authorization code has expired. Please try connecting again.';
       } else if (oauthError.message?.includes('invalid')) {
@@ -505,7 +507,7 @@ export const handleOAuthCallback = async (
     const { code, state, broker, error, error_description } = req.query;
     const userId = req.user?.id;
 
-    console.log(`🔄 OAuth callback received:`, { 
+    console.log(`🔄 OAuth callback received:`, {
       code: code ? `${code.toString().substring(0, 10)}...` : 'none',
       state: state ? `${state.toString().substring(0, 8)}...` : 'none',
       broker,
@@ -516,7 +518,7 @@ export const handleOAuthCallback = async (
     // Handle OAuth errors from broker
     if (error) {
       console.error(`❌ OAuth error from ${broker}:`, error, error_description);
-      
+
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
       const errorMessage = error_description || error || 'OAuth authentication failed';
       res.redirect(`${frontendUrl}/account-setup?oauth=error&message=${encodeURIComponent(errorMessage)}`);
@@ -546,7 +548,7 @@ export const handleOAuthCallback = async (
         if (storedState.userId === userId && storedState.brokerName === broker) {
           accountId = storedState.accountId;
           console.log(`✅ OAuth state validated for account ${accountId}`);
-          
+
           // Clean up state after validation
           oauthStateManager.removeState(state as string);
         } else {
@@ -564,11 +566,11 @@ export const handleOAuthCallback = async (
     if (!accountId) {
       try {
         const accounts = await userDatabase.getConnectedAccountsByUserId(userId);
-        const pendingAccount = accounts.find(acc => 
-          acc.broker_name === broker && 
+        const pendingAccount = accounts.find(acc =>
+          acc.broker_name === broker &&
           acc.account_status === 'PROCEED_TO_OAUTH'
         );
-        
+
         if (pendingAccount) {
           accountId = pendingAccount.id.toString();
           console.log(`✅ Found pending OAuth account: ${accountId}`);
@@ -676,7 +678,7 @@ export const handleOAuthCallback = async (
 
         // Provide user-friendly error message
         let userFriendlyMessage = 'OAuth authentication failed. Please try again.';
-        
+
         switch (result.errorType) {
           case 'AUTH_CODE_EXPIRED':
             userFriendlyMessage = 'The authorization code has expired. Please try connecting again.';
@@ -697,10 +699,10 @@ export const handleOAuthCallback = async (
       }
     } catch (oauthError: any) {
       console.error(`🚨 OAuth completion error for ${broker}:`, oauthError);
-      
+
       // Provide user-friendly error message
       let userFriendlyMessage = 'OAuth authentication failed. Please try again.';
-      
+
       if (oauthError.message?.includes('expired')) {
         userFriendlyMessage = 'The authorization code has expired. Please try connecting again.';
       } else if (oauthError.message?.includes('invalid')) {
@@ -1087,7 +1089,7 @@ export const getConnectedAccounts = async (
                 if (validationResult.isValid) {
                   isReallyActive = true;
                   console.log(`✅ Session valid for ${dbAccount.broker_name} account ${dbAccount.account_id}`);
-                  
+
                   // Register with session manager for future monitoring
                   brokerSessionManager.registerSession(
                     userId,
@@ -1796,7 +1798,7 @@ export const placeMultiAccountOrder = async (
           if (reactivated) {
             console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
             const retryResponse = await placeBrokerOrder(userId, account.broker_name, account.id.toString(), orderRequest);
-            
+
             if (retryResponse.success) {
               await handleSuccessfulOrder(userId, account, retryResponse, baseOrderRequest);
               successfulOrders.push({
@@ -1835,7 +1837,8 @@ export const placeMultiAccountOrder = async (
             message: orderResponse.message || 'Order placed successfully'
           });
         } else {
-          // Order placement failed
+          // Order placement failed - save to database with error details
+          await handleFailedOrder(userId, account, orderResponse, baseOrderRequest);
           failedOrders.push({
             accountId: account.id.toString(),
             brokerName: account.broker_name,
@@ -1847,6 +1850,14 @@ export const placeMultiAccountOrder = async (
 
       } catch (error: any) {
         console.error(`🚨 Order placement error for ${account.broker_name} account ${account.account_id}:`, error);
+
+        // Save failed order to database with error details
+        await handleFailedOrder(userId, account, {
+          success: false,
+          message: error.message || 'Unexpected error during order placement',
+          data: { errorType: 'SYSTEM_ERROR' }
+        }, baseOrderRequest);
+
         failedOrders.push({
           accountId: account.id.toString(),
           brokerName: account.broker_name,
@@ -1905,6 +1916,64 @@ export const placeMultiAccountOrder = async (
     });
   }
 };
+
+// Helper function to handle failed order processing
+async function handleFailedOrder(
+  userId: string,
+  account: any,
+  orderResponse: any,
+  baseOrderRequest: any
+): Promise<void> {
+  try {
+    const errorClassifier = OrderErrorClassifier.getInstance();
+    const errorClassification = errorClassifier.classifyFyersError({
+      message: orderResponse.message,
+      code: orderResponse.data?.errorCode,
+      s: orderResponse.data?.s
+    });
+
+    // Generate a unique broker order ID for failed orders
+    const failedOrderId = `FAILED_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+
+    const orderHistoryData = {
+      user_id: userId,
+      account_id: account.id.toString(),
+      broker_name: account.broker_name,
+      broker_order_id: failedOrderId,
+      symbol: baseOrderRequest.symbol,
+      action: baseOrderRequest.action as 'BUY' | 'SELL',
+      quantity: baseOrderRequest.quantity,
+      price: baseOrderRequest.price || 0,
+      order_type: baseOrderRequest.orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+      status: 'FAILED' as const,
+      exchange: baseOrderRequest.exchange || 'NSE',
+      product_type: baseOrderRequest.productType,
+      remarks: `Failed: ${orderResponse.message}`,
+      executed_at: new Date().toISOString(),
+      // Error details
+      error_message: orderResponse.message,
+      error_code: orderResponse.data?.errorCode || orderResponse.data?.s,
+      error_type: errorClassification.errorType,
+      failure_reason: errorClassification.userMessage,
+      is_retryable: errorClassification.isRetryable,
+      retry_count: 0,
+      max_retries: errorClassification.maxRetries
+    };
+
+    const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
+    console.log(`💾 Failed order saved to history: ${failedOrderId} for ${account.broker_name}`);
+
+    // Schedule automatic retry if retryable
+    if (errorClassification.isRetryable && errorClassification.maxRetries > 0) {
+      const retryDelay = errorClassifier.calculateRetryDelay(errorClassification.retryDelay, 0);
+      await orderRetryService.scheduleAutoRetry(savedOrder.id.toString(), retryDelay);
+      console.log(`⏰ Scheduled auto-retry for failed order ${failedOrderId} in ${retryDelay}ms`);
+    }
+
+  } catch (historyError: any) {
+    console.error(`⚠️ Failed to save failed order history for ${account.broker_name}:`, historyError.message);
+  }
+}
 
 // Helper function to handle successful order processing
 async function handleSuccessfulOrder(
@@ -1968,8 +2037,21 @@ async function handleSuccessfulOrder(
 export const placeOrder = async (
   req: AuthenticatedRequest,
   res: Response,
-
 ): Promise<void> => {
+  // Declare variables at function scope so they're available in catch block
+  let symbol: string | undefined;
+  let action: string | undefined;
+  let quantity: string | undefined;
+  let orderType: string | undefined;
+  let price: string | undefined;
+  let triggerPrice: string | undefined;
+  let exchange: string | undefined;
+  let rawProductType: string | undefined;
+  let remarks: string | undefined;
+  let userId: string | undefined;
+  let account: any;
+  let brokerName: string | undefined;
+
   try {
     // Check validation errors
     const validationErrors = validationResult(req);
@@ -1982,22 +2064,20 @@ export const placeOrder = async (
       return;
     }
 
-    const {
-      accountId,
-      symbol,
-      action,
-      quantity,
-      orderType,
-      price,
-      triggerPrice,
-      exchange,
-      productType: rawProductType,
-      remarks
-    } = req.body;
+    // Extract request body
+    const requestBody = req.body;
+    symbol = requestBody.symbol;
+    action = requestBody.action;
+    quantity = requestBody.quantity;
+    orderType = requestBody.orderType;
+    price = requestBody.price;
+    triggerPrice = requestBody.triggerPrice;
+    exchange = requestBody.exchange;
+    rawProductType = requestBody.productType;
+    remarks = requestBody.remarks;
+    const accountId = requestBody.accountId;
 
-    // Product type will be handled by the broker adapter
-    
-    const userId = req.user?.id;
+    userId = req.user?.id;
 
     if (!userId) {
       res.status(401).json({
@@ -2007,8 +2087,17 @@ export const placeOrder = async (
       return;
     }
 
+    // Validate required fields
+    if (!symbol || !action || !quantity || !orderType) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required fields: symbol, action, quantity, orderType',
+      });
+      return;
+    }
+
     // Validate that the user owns the specified account
-    const account = await userDatabase.getConnectedAccountById(accountId);
+    account = await userDatabase.getConnectedAccountById(accountId);
     if (!account || account.user_id.toString() !== userId.toString()) {
       res.status(404).json({
         success: false,
@@ -2017,7 +2106,7 @@ export const placeOrder = async (
       return;
     }
 
-    const brokerName = account.broker_name;
+    brokerName = account.broker_name;
 
     // Ensure account is active (auto-reactivate if needed)
     const isAccountActive = await ensureAccountActive(userId, accountId);
@@ -2044,35 +2133,30 @@ export const placeOrder = async (
       accountId: account.account_id
     };
 
-    let orderResponse: any;
+    // Use the unified broker interface - use database account ID, not broker account ID
+    let orderResponse = await placeBrokerOrder(userId!, brokerName!, accountId, unifiedOrderRequest);
 
-    try {
-      // Use the unified broker interface - use database account ID, not broker account ID
-      orderResponse = await placeBrokerOrder(userId, brokerName, accountId, unifiedOrderRequest);
+    // Handle session expiry with auto-retry
+    if (!orderResponse.success && orderResponse.data?.errorType === 'SESSION_EXPIRED') {
+      console.log(`🔄 Session expired during order placement for ${account.account_id}. Attempting auto-reactivation...`);
 
-      // Handle session expiry with auto-retry
-      if (!orderResponse.success && orderResponse.data?.errorType === 'SESSION_EXPIRED') {
-        console.log(`🔄 Session expired during order placement for ${account.account_id}. Attempting auto-reactivation...`);
-
-        // Try auto-reactivation once
-        const reactivated = await ensureAccountActive(userId, accountId);
-        if (reactivated) {
-          console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
-          orderResponse = await placeBrokerOrder(userId, brokerName, accountId, unifiedOrderRequest);
-        } else {
-          throw new Error(`Session expired and auto-reactivation failed for account ${account.account_id}. Please check your credentials.`);
-        }
+      // Try auto-reactivation once
+      const reactivated = await ensureAccountActive(userId, accountId);
+      if (reactivated) {
+        console.log(`✅ Auto-reactivation successful for ${account.account_id}. Retrying order placement...`);
+        orderResponse = await placeBrokerOrder(userId!, brokerName!, accountId, unifiedOrderRequest);
+      } else {
+        throw new Error(`Session expired and auto-reactivation failed for account ${account.account_id}. Please check your credentials.`);
       }
+    }
 
-      // Handle unified response
-      if (orderResponse.success) {
+    // Handle unified response
+    if (orderResponse.success) {
       // Save order to history with PLACED status
-      // Note: Status is 'PLACED' because broker API success only means order was submitted,
-      // not that it was executed. Actual execution depends on market conditions.
       try {
         const orderHistoryData = {
-          user_id: userId, // Keep as string for MongoDB ObjectId
-          account_id: account.id.toString(), // Ensure it's a string for MongoDB ObjectId
+          user_id: userId,
+          account_id: account.id.toString(),
           broker_name: brokerName,
           broker_order_id: orderResponse.data?.brokerOrderId || orderResponse.data?.orderId,
           symbol: symbol,
@@ -2080,33 +2164,32 @@ export const placeOrder = async (
           quantity: parseInt(quantity),
           price: price ? parseFloat(price) : 0,
           order_type: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-          status: 'PLACED' as const, // Order successfully placed, not necessarily executed
+          status: 'PLACED' as const,
           exchange: exchange || 'NSE',
           product_type: rawProductType,
           remarks: remarks || `Order placed via CopyTrade Pro`,
-          executed_at: new Date().toISOString(), // This is placement time, not execution time
+          executed_at: new Date().toISOString(),
         };
 
         const savedOrder = await userDatabase.createOrderHistory(orderHistoryData);
         const orderId = orderResponse.data?.brokerOrderId || orderResponse.data?.orderId;
         console.log('✅ Order placed and saved to history:', orderId);
-        console.log('ℹ️  Status: PLACED (order submitted to exchange, awaiting execution)');
 
         // Add order to real-time monitoring
         const orderForMonitoring = {
           id: savedOrder.id.toString(),
-          user_id: userId, // Keep as string for MongoDB ObjectId
-          account_id: account.id.toString(), // Keep as string for MongoDB ObjectId
+          user_id: userId,
+          account_id: account.id.toString(),
           symbol: symbol,
           action: action,
           quantity: parseInt(quantity),
           price: price ? parseFloat(price) : 0,
           status: 'PLACED',
-          broker_name: brokerName,
+          broker_name: brokerName!,
           broker_order_id: orderId,
           order_type: orderType,
           exchange: exchange || 'NSE',
-          product_type: rawProductType,
+          product_type: rawProductType || 'C',
           remarks: remarks || '',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -2116,7 +2199,6 @@ export const placeOrder = async (
         console.log('📊 Order added to real-time monitoring:', orderId);
       } catch (historyError: any) {
         console.error('⚠️ Failed to save order history:', historyError.message);
-        // Don't fail the order response if history saving fails
       }
 
       res.status(200).json({
@@ -2138,21 +2220,70 @@ export const placeOrder = async (
         },
       });
     } else {
+      // Order placement failed - save to database with error details
+      try {
+        const failedOrderData = {
+          symbol,
+          action: action as 'BUY' | 'SELL',
+          quantity: parseInt(quantity),
+          orderType: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+          price: price ? parseFloat(price) : 0,
+          exchange: exchange || 'NSE',
+          productType: rawProductType
+        };
+
+        await handleFailedOrder(userId, account, orderResponse, failedOrderData);
+      } catch (historyError: any) {
+        console.error('⚠️ Failed to save failed order history:', historyError.message);
+      }
+
       res.status(400).json({
         success: false,
         message: orderResponse.message || 'Failed to place order',
+        data: {
+          orderId: null,
+          brokerName,
+          symbol,
+          action,
+          quantity,
+          orderType,
+          price,
+          triggerPrice,
+          exchange,
+          status: 'FAILED',
+          timestamp: new Date().toISOString(),
+          error: orderResponse.message || 'Order placement failed',
+          isRetryable: false
+        }
       });
     }
 
-    } catch (error: any) {
-      console.error('🚨 Place order error:', error);
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to place order',
-      });
-    }
   } catch (error: any) {
     console.error('🚨 Place order error:', error);
+
+    // Save system error to database if variables are available
+    if (symbol && action && quantity && orderType && userId && account) {
+      try {
+        const failedOrderData = {
+          symbol,
+          action: action as 'BUY' | 'SELL',
+          quantity: parseInt(quantity),
+          orderType: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
+          price: price ? parseFloat(price) : 0,
+          exchange: exchange || 'NSE',
+          productType: rawProductType
+        };
+
+        await handleFailedOrder(userId, account, {
+          success: false,
+          message: error.message || 'System error during order placement',
+          data: { errorType: 'SYSTEM_ERROR' }
+        }, failedOrderData);
+      } catch (historyError: any) {
+        console.error('⚠️ Failed to save system error order history:', historyError.message);
+      }
+    }
+
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to place order',
@@ -2317,9 +2448,8 @@ export const cancelOrder = async (
         return;
       }
 
-      // Note: cancelOrder method not available in current IUnifiedBrokerService interface
-      // This functionality needs to be implemented in the unified broker interface
-      const cancelResult = { success: false, message: 'Cancel order functionality not yet implemented in unified broker interface' };
+      // Cancel order using unified broker interface
+      const cancelResult = await brokerService.cancelOrder(orderHistory.broker_order_id);
 
       if (cancelResult.success) {
         // Update order status in database
@@ -2485,9 +2615,18 @@ export const modifyOrder = async (
         orderType: orderType || orderHistory.order_type
       };
 
-      // Note: modifyOrder method not available in current IUnifiedBrokerService interface
-      // This functionality needs to be implemented in the unified broker interface
-      const modifyResult = { success: false, message: 'Modify order functionality not yet implemented in unified broker interface' };
+      // Modify order using unified broker interface
+      const modifications = {
+        qty: modifyRequest.quantity.toString(),
+        prc: modifyRequest.price.toString(),
+        prctyp: modifyRequest.orderType
+      };
+
+      if (modifyRequest.triggerPrice) {
+        (modifications as any).trgprc = modifyRequest.triggerPrice.toString();
+      }
+
+      const modifyResult = await brokerService.modifyOrder(orderHistory.broker_order_id, modifications);
 
       if (modifyResult.success) {
         // Update order in database with new details
@@ -3254,6 +3393,147 @@ export const getQuotes = async (
     res.status(500).json({
       success: false,
       message: error.message || 'Failed to get quotes',
+    });
+  }
+};
+
+// Retry a failed order
+export const retryOrder = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { orderId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!orderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Order ID is required',
+      });
+      return;
+    }
+
+    console.log(`🔄 Order retry requested for order ${orderId} by user ${userId}`);
+
+    const retryResult = await orderRetryService.retryOrder(orderId, userId);
+
+    if (retryResult.success) {
+      res.status(200).json({
+        success: true,
+        message: retryResult.message,
+        data: {
+          orderId: retryResult.orderId,
+          newStatus: retryResult.newStatus,
+          retryCount: retryResult.retryCount
+        }
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: retryResult.message,
+        data: {
+          retryCount: retryResult.retryCount,
+          isRetryable: retryResult.isRetryable
+        }
+      });
+    }
+
+  } catch (error: any) {
+    console.error('🚨 Retry order error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to retry order',
+    });
+  }
+};
+
+// Delete a failed order
+export const deleteOrder = async (
+  req: AuthenticatedRequest,
+  res: Response,
+): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    const { orderId } = req.params;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'User not authenticated',
+      });
+      return;
+    }
+
+    if (!orderId) {
+      res.status(400).json({
+        success: false,
+        message: 'Order ID is required',
+      });
+      return;
+    }
+
+    console.log(`🗑️ Order deletion requested for order ${orderId} by user ${userId}`);
+
+    // Get order from database to verify ownership and status
+    const order = await userDatabase.getOrderHistoryById(orderId);
+    if (!order) {
+      res.status(404).json({
+        success: false,
+        message: 'Order not found',
+      });
+      return;
+    }
+
+    // Verify order belongs to user
+    if (order.user_id.toString() !== userId) {
+      res.status(403).json({
+        success: false,
+        message: 'Access denied',
+      });
+      return;
+    }
+
+    // Only allow deletion of failed orders
+    if (order.status !== 'FAILED' && order.status !== 'REJECTED') {
+      res.status(400).json({
+        success: false,
+        message: 'Only failed or rejected orders can be deleted',
+      });
+      return;
+    }
+
+    // Cancel any scheduled retries
+    orderRetryService.cancelScheduledRetry(orderId);
+
+    // Delete the order
+    const deleted = await userDatabase.deleteOrderHistory(orderId);
+
+    if (deleted) {
+      res.status(200).json({
+        success: true,
+        message: 'Order deleted successfully',
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: 'Failed to delete order',
+      });
+    }
+
+  } catch (error: any) {
+    console.error('🚨 Delete order error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to delete order',
     });
   }
 };

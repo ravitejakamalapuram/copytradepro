@@ -19,6 +19,8 @@ import {
   refreshOrderStatus,
   cancelOrder,
   modifyOrder,
+  retryOrder,
+  deleteOrder,
   getOrderHistory,
   getOrderStatus,
   checkOrderStatus,
@@ -175,6 +177,8 @@ router.post('/refresh-all-order-status', authenticateToken, refreshAllOrderStatu
 router.post('/refresh-order-status/:orderId', authenticateToken, refreshOrderStatus);
 router.post('/cancel-order/:orderId', authenticateToken, cancelOrder);
 router.put('/modify-order/:orderId', authenticateToken, modifyOrder);
+router.post('/retry-order/:orderId', authenticateToken, retryOrder);
+router.delete('/delete-order/:orderId', authenticateToken, deleteOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
 router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
 router.post('/check-order-status', authenticateToken, checkOrderStatus);

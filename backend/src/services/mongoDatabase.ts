@@ -48,12 +48,21 @@ interface OrderHistoryDocument extends Document {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: Date;
   created_at: Date;
+  // Enhanced fields for error handling and retry functionality
+  error_message?: string;
+  error_code?: string;
+  error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+  retry_count?: number;
+  max_retries?: number;
+  last_retry_at?: Date;
+  is_retryable?: boolean;
+  failure_reason?: string;
 }
 
 // MongoDB Schemas
@@ -91,16 +100,28 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
   order_type: { type: String, enum: ['MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET'], required: true },
-  status: { 
-    type: String, 
-    enum: ['PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED'], 
-    default: 'PLACED' 
+  status: {
+    type: String,
+    enum: ['PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED', 'FAILED'],
+    default: 'PLACED'
   },
   exchange: { type: String, default: 'NSE' },
   product_type: { type: String, default: 'C' },
   remarks: { type: String, default: '' },
   executed_at: { type: Date, required: true },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
+  // Enhanced fields for error handling and retry functionality
+  error_message: { type: String },
+  error_code: { type: String },
+  error_type: {
+    type: String,
+    enum: ['NETWORK', 'BROKER', 'VALIDATION', 'AUTH', 'SYSTEM', 'MARKET']
+  },
+  retry_count: { type: Number, default: 0 },
+  max_retries: { type: Number, default: 3 },
+  last_retry_at: { type: Date },
+  is_retryable: { type: Boolean, default: false },
+  failure_reason: { type: String }
 });
 
 // Add compound indexes
@@ -278,6 +299,15 @@ export class MongoDatabase implements IDatabaseAdapter {
       remarks: doc.remarks || '',
       executed_at: doc.executed_at ? doc.executed_at.toISOString() : new Date().toISOString(),
       created_at: doc.created_at ? doc.created_at.toISOString() : new Date().toISOString(),
+      // Enhanced fields for error handling and retry functionality
+      error_message: doc.error_message || undefined,
+      error_code: doc.error_code || undefined,
+      error_type: doc.error_type || undefined,
+      retry_count: doc.retry_count || undefined,
+      max_retries: doc.max_retries || undefined,
+      last_retry_at: doc.last_retry_at ? doc.last_retry_at.toISOString() : undefined,
+      is_retryable: doc.is_retryable || undefined,
+      failure_reason: doc.failure_reason || undefined,
       // Add account information if populated
       ...(accountInfo && { account_info: accountInfo })
     };
@@ -506,7 +536,16 @@ export class MongoDatabase implements IDatabaseAdapter {
         exchange: orderData.exchange || 'NSE',
         product_type: orderData.product_type || 'C',
         remarks: orderData.remarks || '',
-        executed_at: new Date(orderData.executed_at)
+        executed_at: new Date(orderData.executed_at),
+        // Enhanced fields for error handling and retry functionality
+        error_message: orderData.error_message,
+        error_code: orderData.error_code,
+        error_type: orderData.error_type,
+        retry_count: orderData.retry_count || 0,
+        max_retries: orderData.max_retries || 3,
+        last_retry_at: orderData.last_retry_at ? new Date(orderData.last_retry_at) : undefined,
+        is_retryable: orderData.is_retryable || false,
+        failure_reason: orderData.failure_reason
       });
 
       const savedOrder = await orderDoc.save();
@@ -629,6 +668,51 @@ export class MongoDatabase implements IDatabaseAdapter {
       return !!result;
     } catch (error) {
       console.error('🚨 Failed to update order status by broker order ID:', error);
+      return false;
+    }
+  }
+
+  async updateOrderWithError(id: string, errorData: {
+    status: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+  }): Promise<boolean> {
+    try {
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        {
+          status: errorData.status,
+          error_message: errorData.error_message,
+          error_code: errorData.error_code,
+          error_type: errorData.error_type,
+          failure_reason: errorData.failure_reason,
+          is_retryable: errorData.is_retryable || false
+        },
+        { new: true }
+      );
+      return !!result;
+    } catch (error) {
+      console.error('🚨 Failed to update order with error:', error);
+      return false;
+    }
+  }
+
+  async incrementOrderRetryCount(id: string): Promise<boolean> {
+    try {
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        {
+          $inc: { retry_count: 1 },
+          last_retry_at: new Date()
+        },
+        { new: true }
+      );
+      return !!result;
+    } catch (error) {
+      console.error('🚨 Failed to increment retry count:', error);
       return false;
     }
   }
