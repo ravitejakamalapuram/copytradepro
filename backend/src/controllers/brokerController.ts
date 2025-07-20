@@ -5,6 +5,8 @@ import { userDatabase } from '../services/databaseCompatibility';
 import { setBrokerConnectionManager } from '../services/orderStatusService';
 import orderStatusService from '../services/orderStatusService';
 import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
+import { logger } from '../utils/logger';
+import { orderStatusLogger, OrderStatusLogContext } from '../services/orderStatusLogger';
 
 import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
 import { oauthStateManager } from '../services/oauthStateManager';
@@ -2782,24 +2784,93 @@ export const getOrderHistory = async (
 export const getOrderStatus = async (
   req: AuthenticatedRequest,
   res: Response,
-
 ): Promise<void> => {
+  const startTime = Date.now();
+  const requestId = req.headers['x-request-id'] as string || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
   try {
     const userId = req.user?.id;
     const { brokerOrderId } = req.params;
     const { brokerName, accountId } = req.query;
 
-    // Validate required parameters
+    // Enhanced logging for request start
+    logger.info('Order status request initiated', {
+      requestId,
+      userId,
+      brokerOrderId,
+      brokerName: brokerName as string,
+      accountId: accountId as string,
+      component: 'BROKER_CONTROLLER',
+      operation: 'GET_ORDER_STATUS',
+      userAgent: req.headers['user-agent'],
+      ipAddress: req.ip
+    });
+
+    // Enhanced authentication validation
     if (!userId) {
+      logger.warn('Order status request failed - user not authenticated', {
+        requestId,
+        component: 'BROKER_CONTROLLER',
+        operation: 'GET_ORDER_STATUS',
+        errorType: 'AUTHENTICATION_ERROR'
+      });
       return BrokerConnectionHelper.sendAuthenticationError(res);
     }
 
+    // Enhanced parameter validation
     const missingParams: string[] = [];
-    if (!brokerOrderId) missingParams.push('brokerOrderId');
-    if (!brokerName) missingParams.push('brokerName');
+    const invalidParams: string[] = [];
 
-    if (missingParams.length > 0) {
-      return BrokerConnectionHelper.sendMissingParametersError(res, missingParams);
+    if (!brokerOrderId || typeof brokerOrderId !== 'string' || brokerOrderId.trim().length === 0) {
+      missingParams.push('brokerOrderId');
+    }
+    if (!brokerName || typeof brokerName !== 'string' || brokerName.trim().length === 0) {
+      missingParams.push('brokerName');
+    }
+
+    // Validate brokerOrderId format (basic validation)
+    if (brokerOrderId && typeof brokerOrderId === 'string' && brokerOrderId.trim().length > 0) {
+      // Check for reasonable order ID format (alphanumeric, dashes, underscores)
+      if (!/^[a-zA-Z0-9_-]+$/.test(brokerOrderId.trim())) {
+        invalidParams.push('brokerOrderId (invalid format)');
+      }
+    }
+
+    // Validate brokerName against supported brokers
+    const supportedBrokers = ['shoonya', 'fyers', 'zerodha', 'angel', 'upstox', 'dhan'];
+    if (brokerName && typeof brokerName === 'string' && brokerName.trim().length > 0) {
+      if (!supportedBrokers.includes(brokerName.toLowerCase())) {
+        invalidParams.push(`brokerName (unsupported broker: ${brokerName})`);
+      }
+    }
+
+    if (missingParams.length > 0 || invalidParams.length > 0) {
+      const errorMessage = [
+        ...(missingParams.length > 0 ? [`Missing required parameters: ${missingParams.join(', ')}`] : []),
+        ...(invalidParams.length > 0 ? [`Invalid parameters: ${invalidParams.join(', ')}`] : [])
+      ].join('. ');
+
+      logger.warn('Order status request failed - parameter validation error', {
+        requestId,
+        userId,
+        component: 'BROKER_CONTROLLER',
+        operation: 'GET_ORDER_STATUS',
+        errorType: 'VALIDATION_ERROR',
+        missingParams,
+        invalidParams
+      });
+
+      res.status(400).json({
+        success: false,
+        message: errorMessage,
+        errorType: 'VALIDATION_ERROR',
+        details: {
+          missingParams,
+          invalidParams,
+          supportedBrokers
+        }
+      });
+      return;
     }
 
     // Find broker connection (specific account if provided, or first available)
@@ -2810,60 +2881,282 @@ export const getOrderStatus = async (
     );
 
     if (!connectionResult.success) {
-      return BrokerConnectionHelper.sendConnectionNotFoundError(
-        res,
-        brokerName as string,
-        accountId as string
-      );
+      logger.warn('Order status request failed - broker connection not found', {
+        requestId,
+        userId,
+        brokerName: brokerName as string,
+        accountId: accountId as string,
+        component: 'BROKER_CONTROLLER',
+        operation: 'GET_ORDER_STATUS',
+        errorType: 'CONNECTION_NOT_FOUND'
+      });
+
+      const errorMessage = accountId 
+        ? `Not connected to ${brokerName} account ${accountId}. Please reconnect your broker account.`
+        : `Not connected to ${brokerName}. Please connect your broker account first.`;
+
+      res.status(404).json({
+        success: false,
+        message: errorMessage,
+        errorType: 'CONNECTION_NOT_FOUND',
+        details: {
+          brokerName,
+          accountId,
+          suggestion: 'Please reconnect your broker account from the Account Setup page.'
+        }
+      });
+      return;
     }
 
     const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
 
-    // Get order status from broker API
-    console.log(`📊 Checking order status for ${brokerOrderId} via ${brokerName} account ${resolvedAccountId}`);
-    const orderStatus = await (brokerService as any).getOrderStatus(
+    // Enhanced logging for broker API call
+    logger.info('Calling broker API for order status', {
+      requestId,
       userId,
-      brokerOrderId
-    );
+      brokerOrderId,
+      brokerName: brokerName as string,
+      accountId: resolvedAccountId,
+      component: 'BROKER_CONTROLLER',
+      operation: 'BROKER_API_CALL'
+    });
 
-    if (orderStatus.stat === 'Ok') {
-      res.status(200).json({
-        success: true,
-        data: {
+    // Import comprehensive error handler
+    const { comprehensiveErrorHandler } = await import('../services/comprehensiveErrorHandler');
+    
+    const context = {
+      userId: userId,
+      brokerName: brokerName as string,
+      accountId: resolvedAccountId || 'unknown',
+      operation: 'getOrderStatus',
+      timestamp: new Date()
+    };
+
+    // Get order status from broker API with comprehensive error handling
+    let orderStatus;
+    try {
+      // Check rate limiting before making broker API call
+      const rateLimitCheck = comprehensiveErrorHandler.checkRateLimit(
+        userId, brokerName as string, 'getOrderStatus'
+      );
+
+      if (!rateLimitCheck.allowed) {
+        const waitTime = rateLimitCheck.waitTime || 0;
+        const waitTimeSeconds = Math.ceil(waitTime / 1000);
+        
+        logger.warn('Order status request rate limited', {
+          requestId,
+          userId,
           brokerOrderId,
+          brokerName: brokerName as string,
           accountId: resolvedAccountId,
+          component: 'BROKER_CONTROLLER',
+          operation: 'RATE_LIMIT_CHECK',
+          waitTime: waitTime
+        });
+
+        res.status(429).json({
+          success: false,
+          message: `Rate limit exceeded. Please wait ${waitTimeSeconds} seconds before trying again.`,
+          errorType: 'RATE_LIMIT_ERROR',
+          waitTime: waitTime,
+          retryAfter: waitTimeSeconds,
+          suggestedActions: [
+            `Wait for ${waitTimeSeconds} seconds before trying again`,
+            'Reduce the frequency of your requests',
+            'Consider using bulk operations where available'
+          ],
+          details: {
+            brokerName,
+            requestId
+          }
+        });
+        return;
+      }
+
+      // Execute order status retrieval with comprehensive error handling and retry logic
+      orderStatus = await comprehensiveErrorHandler.executeWithRetry(
+        async () => {
+          return await (brokerService as any).getOrderStatus(
+            userId,
+            brokerOrderId
+          );
+        },
+        context,
+        {
+          maxRetries: 3,
+          baseDelay: 1000,
+          maxDelay: 10000
+        }
+      );
+
+    } catch (brokerError: any) {
+      logger.error('Broker API call failed for order status', {
+        requestId,
+        userId,
+        brokerOrderId,
+        brokerName: brokerName as string,
+        accountId: resolvedAccountId,
+        component: 'BROKER_CONTROLLER',
+        operation: 'BROKER_API_CALL',
+        errorType: 'BROKER_API_ERROR',
+        originalError: brokerError.message
+      }, brokerError);
+
+      // Use comprehensive error handler for enhanced error processing
+      const userFriendlyMessage = comprehensiveErrorHandler.getUserFriendlyMessage(brokerError, context);
+      const suggestedActions = comprehensiveErrorHandler.getSuggestedActions(brokerError, context);
+      const isRetryable = comprehensiveErrorHandler.isRetryable(brokerError, context);
+      
+      // Determine appropriate HTTP status code based on error type
+      let statusCode = 503; // Default to service unavailable
+      if (brokerError.errorType === 'SESSION_EXPIRED' || brokerError.errorType === 'AUTH_FAILED') {
+        statusCode = 401;
+      } else if (brokerError.errorType === 'PERMISSION_ERROR') {
+        statusCode = 403;
+      } else if (brokerError.errorType === 'ORDER_NOT_FOUND') {
+        statusCode = 404;
+      } else if (brokerError.errorType === 'RATE_LIMIT_ERROR') {
+        statusCode = 429;
+      } else if (brokerError.errorType === 'VALIDATION_ERROR') {
+        statusCode = 400;
+      } else if (brokerError.errorType === 'SERVER_ERROR') {
+        statusCode = 502;
+      } else if (brokerError.errorType === 'NETWORK_ERROR') {
+        statusCode = 503;
+      }
+
+      res.status(statusCode).json({
+        success: false,
+        message: userFriendlyMessage,
+        errorType: brokerError.errorType || 'BROKER_ERROR',
+        retryable: isRetryable,
+        suggestedActions: suggestedActions,
+        details: {
           brokerName,
-          status: orderStatus.status,
-          symbol: orderStatus.symbol,
-          quantity: orderStatus.quantity,
-          price: orderStatus.price,
-          executedQuantity: orderStatus.executedQuantity,
-          averagePrice: orderStatus.averagePrice,
-          rejectionReason: orderStatus.rejectionReason,
-          orderTime: orderStatus.orderTime,
-          updateTime: orderStatus.updateTime,
-          rawResponse: orderStatus.rawOrder
+          requestId,
+          originalError: brokerError.message,
+          context: {
+            operation: 'getOrderStatus',
+            timestamp: new Date().toISOString()
+          }
         }
       });
+      return;
+    }
+
+    const duration = Date.now() - startTime;
+
+    // Enhanced response handling
+    if (orderStatus && orderStatus.stat === 'Ok') {
+      logger.info('Order status retrieved successfully', {
+        requestId,
+        userId,
+        brokerOrderId,
+        brokerName: brokerName as string,
+        accountId: resolvedAccountId,
+        component: 'BROKER_CONTROLLER',
+        operation: 'GET_ORDER_STATUS',
+        duration,
+        status: orderStatus.status
+      });
+
+      const responseData = {
+        brokerOrderId,
+        accountId: resolvedAccountId,
+        brokerName,
+        status: orderStatus.status,
+        symbol: orderStatus.symbol,
+        quantity: orderStatus.quantity,
+        price: orderStatus.price,
+        executedQuantity: orderStatus.executedQuantity,
+        averagePrice: orderStatus.averagePrice,
+        rejectionReason: orderStatus.rejectionReason,
+        orderTime: orderStatus.orderTime,
+        updateTime: orderStatus.updateTime,
+        rawResponse: orderStatus.rawOrder
+      };
+
+      // Log successful response
+      logger.logApiCall('GET', `/api/broker/order-status/${brokerOrderId}`, duration, 200, {
+        requestId,
+        userId,
+        brokerName: brokerName as string,
+        accountId: resolvedAccountId
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Order status retrieved successfully',
+        data: responseData
+      });
     } else {
+      logger.warn('Order not found in broker system', {
+        requestId,
+        userId,
+        brokerOrderId,
+        brokerName: brokerName as string,
+        accountId: resolvedAccountId,
+        component: 'BROKER_CONTROLLER',
+        operation: 'GET_ORDER_STATUS',
+        duration,
+        errorMessage: orderStatus?.emsg
+      });
+
+      const errorMessage = orderStatus?.emsg || 'Order not found in broker system';
+      const userFriendlyMessage = `Order ${brokerOrderId} not found in ${brokerName}. The order may have been cancelled or may not exist.`;
+
+      // Log API call with 404 status
+      logger.logApiCall('GET', `/api/broker/order-status/${brokerOrderId}`, duration, 404, {
+        requestId,
+        userId,
+        brokerName: brokerName as string,
+        accountId: resolvedAccountId
+      });
+
       res.status(404).json({
         success: false,
-        message: orderStatus.emsg || 'Order not found in broker system',
+        message: userFriendlyMessage,
+        errorType: 'ORDER_NOT_FOUND',
         data: {
           brokerOrderId,
           accountId: resolvedAccountId,
           brokerName,
           status: 'NOT_FOUND',
-          details: orderStatus.emsg
+          details: errorMessage
         }
       });
     }
   } catch (error: any) {
-    console.error('🚨 Get order status error:', error);
+    const duration = Date.now() - startTime;
+    
+    logger.error('Unexpected error in getOrderStatus', {
+      requestId,
+      userId: req.user?.id,
+      brokerOrderId: req.params.brokerOrderId,
+      brokerName: req.query.brokerName as string,
+      component: 'BROKER_CONTROLLER',
+      operation: 'GET_ORDER_STATUS',
+      duration,
+      errorType: 'INTERNAL_ERROR'
+    }, error);
+
+    // Log API call with 500 status
+    logger.logApiCall('GET', `/api/broker/order-status/${req.params.brokerOrderId}`, duration, 500, {
+      requestId,
+      userId: req.user?.id,
+      brokerName: req.query.brokerName as string
+    });
+
     res.status(500).json({
       success: false,
-      message: 'Failed to check order status',
-      error: error.message
+      message: 'An unexpected error occurred while retrieving order status. Please try again.',
+      errorType: 'INTERNAL_ERROR',
+      retryable: true,
+      details: {
+        requestId,
+        suggestion: 'If the problem persists, please contact support.'
+      }
     });
   }
 };
