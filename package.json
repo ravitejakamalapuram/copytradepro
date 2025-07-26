@@ -61,7 +61,18 @@
     "kill-port:frontend": "lsof -ti:5173 | xargs kill -9 || echo 'Port 5173 is free'",
     "kill-ports": "npm run kill-port && npm run kill-port:frontend",
     "dev:clean": "npm run kill-ports && npm run dev",
-    "start:fresh": "npm run kill-ports && npm run build && npm start"
+    "start:fresh": "npm run kill-ports && npm run build && npm start",
+    "pm2:start": "npm run build && pm2 start ecosystem.config.js --env production",
+    "pm2:dev": "npm run build && pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop copytrade-pro",
+    "pm2:restart": "pm2 restart copytrade-pro",
+    "pm2:reload": "pm2 reload copytrade-pro",
+    "pm2:delete": "pm2 delete copytrade-pro",
+    "pm2:logs": "pm2 logs copytrade-pro",
+    "pm2:status": "pm2 status",
+    "pm2:monit": "pm2 monit",
+    "pm2:save": "pm2 save",
+    "pm2:resurrect": "pm2 resurrect"
   },
   "keywords": [
     "trading",
