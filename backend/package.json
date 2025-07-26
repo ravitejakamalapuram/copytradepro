@@ -18,7 +18,9 @@
     "deploy": "../scripts/deploy.sh deploy",
     "rollback": "../scripts/deploy.sh rollback",
     "monitoring:start": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.start()\"",
-    "monitoring:stop": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.stop()\""
+    "monitoring:stop": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.stop()\"",
+    "kill-port": "lsof -ti:3001 | xargs kill -9 || echo 'Port 3001 is free'",
+    "dev:clean": "npm run kill-port && npm run dev"
   },
   "dependencies": {
     "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",

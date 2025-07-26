@@ -37,6 +37,11 @@ npm run verify:backend       # Check backend dependencies
 npm run verify:frontend      # Check frontend dependencies
 npm run verify:e2e          # Check e2e dependencies
 npm run verify:dev-packages # Check dev-packages dependencies
+npm run check-deps           # Check if dependencies compile correctly
+npm run fix-deps             # Automatically fix common missing dependencies
+npm run kill-port            # Kill process using port 3001 (backend)
+npm run kill-port:frontend   # Kill process using port 5173 (frontend)
+npm run kill-ports           # Kill both backend and frontend ports
 ```
 
 ## 🏗️ Build Scripts
@@ -109,10 +114,12 @@ npm run test:e2e:ui      # Run e2e tests with Playwright UI
 ### Backend (`cd backend && npm run <script>`)
 - `build` - Compile TypeScript
 - `dev` - Start with nodemon
+- `dev:clean` - Kill port 3001 and start with nodemon
 - `start` - Start production server
 - `clean` - Remove dist, coverage, logs
 - `clean:all` - Deep clean + remove node_modules
 - `reset` - Clean all + reinstall
+- `kill-port` - Kill process using port 3001
 - `test` - Run Jest tests
 - `test:watch` - Run Jest in watch mode
 - `test:coverage` - Run tests with coverage

@@ -56,7 +56,12 @@
     "check-deps": "npm run check-deps:backend && npm run check-deps:frontend",
     "check-deps:backend": "cd backend && npm run build",
     "check-deps:frontend": "cd frontend && npm run build",
-    "fix-deps": "node fix-missing-deps.js"
+    "fix-deps": "node fix-missing-deps.js",
+    "kill-port": "lsof -ti:3001 | xargs kill -9 || echo 'Port 3001 is free'",
+    "kill-port:frontend": "lsof -ti:5173 | xargs kill -9 || echo 'Port 5173 is free'",
+    "kill-ports": "npm run kill-port && npm run kill-port:frontend",
+    "dev:clean": "npm run kill-ports && npm run dev",
+    "start:fresh": "npm run kill-ports && npm run build && npm start"
   },
   "keywords": [
     "trading",

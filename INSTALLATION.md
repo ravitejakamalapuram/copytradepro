@@ -65,6 +65,14 @@ cd e2e-tests && npm ls          # E2E dependencies
 npm run build:dev-packages     # Rebuild dev-packages
 ```
 
+**Problem: Missing dependencies (e.g., node-cron)**
+```bash
+npm run fix-deps               # Automatically fix common missing dependencies
+npm run check-deps             # Check if all dependencies compile correctly
+cd backend && npm install      # Reinstall backend dependencies
+npm run verify:backend         # Verify backend dependencies
+```
+
 **Problem: Dependencies out of sync**
 ```bash
 npm run reset                   # Nuclear option - clean and reinstall everything
@@ -90,6 +98,14 @@ npm run build                   # Build everything
 ```bash
 npm run clean:all              # Remove all node_modules and build artifacts
 npm install                    # Reinstall everything
+```
+
+**Problem: Port already in use (EADDRINUSE):**
+```bash
+npm run kill-ports           # Kill processes on both ports
+npm run kill-port            # Kill backend port 3001 only
+npm run kill-port:frontend   # Kill frontend port 5173 only
+cd backend && npm run dev:clean  # Kill port and start backend
 ```
 
 **Dev-packages dependency issues:**
