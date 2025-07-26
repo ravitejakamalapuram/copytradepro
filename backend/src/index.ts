@@ -325,8 +325,8 @@ async function startServer() {
       operation: 'PRODUCTION_MONITORING_STARTED'
     });
 
-    // Start server with error handling
-    server.listen(PORT, () => {
+    // Start server with error handling - bind to 0.0.0.0 for EC2 access
+    server.listen(Number(PORT), '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`💾 Database: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
