@@ -85,32 +85,21 @@ router.post('/prices', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get major Indian market indices
+ * Get major Indian market indices - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/indices', authenticateToken, async (req: any, res: any) => {
-  try {
-    console.log('📊 Fetching live market indices...');
-    
-    const indices = await marketDataService.getMarketIndices();
-    
-    console.log(`✅ Fetched ${indices.length} market indices`);
-
-    return res.json({
-      success: true,
-      data: {
-        indices,
-        count: indices.length,
-        lastUpdated: new Date()
-      }
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to fetch market indices:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to fetch market indices',
-      details: error.message
-    });
-  }
+  console.log('📊 Market indices endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: {
+      indices: [],
+      count: 0,
+      lastUpdated: new Date(),
+      message: 'Market indices functionality temporarily disabled due to API reliability issues'
+    }
+  });
 });
 
 /**
@@ -236,24 +225,20 @@ router.get('/symbol-status', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get NSE market status
+ * Get NSE market status - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/market-status', authenticateToken, async (req: any, res: any) => {
-  try {
-    const status = await symbolDatabaseService.getMarketStatus();
-
-    return res.json({
-      success: true,
-      data: status
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get market status:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get market status',
-      details: error.message
-    });
-  }
+  console.log('📊 Market status endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: {
+      status: 'Unknown',
+      isOpen: false,
+      message: 'Market status functionality temporarily disabled due to API reliability issues'
+    }
+  });
 });
 
 /**
@@ -279,129 +264,87 @@ router.post('/force-update-csv', authenticateToken, async (req: any, res: any) =
 });
 
 /**
- * Get NSE gainers
+ * Get NSE gainers - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/gainers', authenticateToken, async (req: any, res: any) => {
-  try {
-    const gainers = await symbolDatabaseService.getGainers();
-
-    return res.json({
-      success: true,
-      data: gainers
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get gainers:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get gainers',
-      details: error.message
-    });
-  }
+  console.log('📊 Gainers endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: 'Gainers functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**
- * Get NSE losers
+ * Get NSE losers - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/losers', authenticateToken, async (req: any, res: any) => {
-  try {
-    const losers = await symbolDatabaseService.getLosers();
-
-    return res.json({
-      success: true,
-      data: losers
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get losers:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get losers',
-      details: error.message
-    });
-  }
+  console.log('📊 Losers endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: 'Losers functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**
- * Get 52-week high stocks
+ * Get 52-week high stocks - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/52-week-high', authenticateToken, async (req: any, res: any) => {
-  try {
-    const stocks = await symbolDatabaseService.get52WeekHigh();
-
-    return res.json({
-      success: true,
-      data: stocks
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get 52-week high stocks:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get 52-week high stocks',
-      details: error.message
-    });
-  }
+  console.log('📊 52-week high endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: '52-week high functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**
- * Get 52-week low stocks
+ * Get 52-week low stocks - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/52-week-low', authenticateToken, async (req: any, res: any) => {
-  try {
-    const stocks = await symbolDatabaseService.get52WeekLow();
-
-    return res.json({
-      success: true,
-      data: stocks
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get 52-week low stocks:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get 52-week low stocks',
-      details: error.message
-    });
-  }
+  console.log('📊 52-week low endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: '52-week low functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**
- * Get top value stocks
+ * Get top value stocks - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/top-value', authenticateToken, async (req: any, res: any) => {
-  try {
-    const stocks = await symbolDatabaseService.getTopValueStocks();
-
-    return res.json({
-      success: true,
-      data: stocks
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get top value stocks:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get top value stocks',
-      details: error.message
-    });
-  }
+  console.log('📊 Top value stocks endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: 'Top value stocks functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**
- * Get top volume stocks
+ * Get top volume stocks - DISABLED
+ * Disabled due to NSE API reliability issues causing timeouts
  */
 router.get('/top-volume', authenticateToken, async (req: any, res: any) => {
-  try {
-    const stocks = await symbolDatabaseService.getTopVolumeStocks();
-
-    return res.json({
-      success: true,
-      data: stocks
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to get top volume stocks:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to get top volume stocks',
-      details: error.message
-    });
-  }
+  console.log('📊 Top volume stocks endpoint disabled due to API reliability issues');
+  
+  return res.json({
+    success: true,
+    data: [],
+    message: 'Top volume stocks functionality temporarily disabled due to API reliability issues'
+  });
 });
 
 /**

@@ -151,7 +151,7 @@ class RealTimeDataService {
 
     this.updateInterval = setInterval(async () => {
       await this.updatePrices();
-      await this.updateMarketIndices();
+      // Removed market indices updates due to NSE API reliability issues
     }, this.UPDATE_FREQUENCY);
 
     console.log(`⏰ Started price updates every ${this.UPDATE_FREQUENCY}ms`);
@@ -222,43 +222,22 @@ class RealTimeDataService {
   }
 
   /**
-   * Update and broadcast market indices
+   * Update and broadcast market indices - DISABLED
+   * Removed due to NSE API reliability issues causing timeouts
    */
   private async updateMarketIndices(): Promise<void> {
-    if (!this.io) return;
-
-    try {
-      const indices = await nseService.getIndices();
-      
-      if (indices && indices.length > 0) {
-        this.io.to('market_indices').emit('indices_update', {
-          indices,
-          timestamp: new Date()
-        });
-      }
-    } catch (error) {
-      console.warn('⚠️ Failed to update market indices:', error);
-    }
+    // Functionality disabled due to NSE API reliability issues
+    console.log('📊 Market indices updates disabled due to API reliability issues');
+    return;
   }
 
   /**
-   * Broadcast market status updates
+   * Broadcast market status updates - DISABLED
+   * Disabled due to NSE API reliability issues causing timeouts
    */
   async broadcastMarketStatus(): Promise<void> {
-    if (!this.io) return;
-
-    try {
-      const marketStatus = await nseService.getMarketStatus();
-      
-      this.io.emit('market_status_update', {
-        ...marketStatus,
-        timestamp: new Date()
-      });
-
-      console.log('📢 Broadcasted market status update');
-    } catch (error) {
-      console.warn('⚠️ Failed to broadcast market status:', error);
-    }
+    console.log('📢 Market status broadcast disabled due to API reliability issues');
+    return;
   }
 
   /**

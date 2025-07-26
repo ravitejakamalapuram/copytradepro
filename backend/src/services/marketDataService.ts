@@ -251,74 +251,14 @@ class MarketDataService {
 
 
   /**
-   * Get major Indian market indices from NSE API with Yahoo Finance fallback
+   * Get major Indian market indices - DISABLED
+   * Disabled due to NSE API reliability issues causing timeouts
    */
   async getMarketIndices(): Promise<MarketIndex[]> {
-    try {
-      // Try NSE API first
-      const nseIndices = await nseService.getIndices();
-      if (nseIndices && nseIndices.length > 0) {
-        const results: MarketIndex[] = nseIndices.map((index: NSEMarketIndex) => ({
-          name: index.name,
-          value: index.last || 0,
-          change: index.variation || 0,
-          changePercent: index.percentChange || 0,
-          lastUpdated: new Date()
-        }));
-
-        console.log(`📊 Successfully fetched ${results.length} market indices from NSE`);
-        return results;
-      }
-    } catch (error) {
-      console.warn('⚠️ NSE indices API failed, trying Yahoo Finance:', error);
-    }
-
-    // Fallback to Yahoo Finance
-    const indices = [
-      { symbol: '^NSEI', name: 'NIFTY 50' },
-      { symbol: '^BSESN', name: 'SENSEX' },
-      { symbol: '^NSEBANK', name: 'BANK NIFTY' },
-      { symbol: '^NSEIT', name: 'NIFTY IT' }
-    ];
-
-    const results: MarketIndex[] = [];
-    let successCount = 0;
-
-    for (const index of indices) {
-      try {
-        const response = await axios.get<YahooFinanceResponse>(this.YAHOO_BASE_URL, {
-          params: {
-            symbols: index.symbol,
-            fields: 'regularMarketPrice,regularMarketChange,regularMarketChangePercent'
-          },
-          timeout: 3000, // Reduced timeout
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          }
-        });
-
-        const quote = response.data?.quoteResponse?.result?.[0];
-        if (quote) {
-          results.push({
-            name: index.name,
-            value: quote.regularMarketPrice || 0,
-            change: quote.regularMarketChange || 0,
-            changePercent: quote.regularMarketChangePercent || 0,
-            lastUpdated: new Date()
-          });
-          successCount++;
-        }
-
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, this.REQUEST_DELAY));
-
-      } catch (error: any) {
-        console.warn(`⚠️ Failed to fetch ${index.name} from Yahoo Finance:`, error.message);
-      }
-    }
-
-    console.log(`📊 Successfully fetched ${successCount}/${indices.length} market indices from Yahoo Finance`);
-    return results;
+    console.log('📊 Market indices functionality disabled due to API reliability issues');
+    
+    // Return empty array to prevent frontend errors
+    return [];
   }
 
   /**
