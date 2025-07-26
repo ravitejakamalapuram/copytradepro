@@ -153,7 +153,7 @@ export const usePerformanceMonitor = (options: UsePerformanceMonitorOptions = {}
       }
     };
 
-    const handleInput = (event: InputEvent) => {
+    const handleInput = (event: Event) => {
       const target = event.target as HTMLElement;
       if (target.closest(`[data-component="${componentName}"]`)) {
         recordUserInteraction('input', target.tagName);

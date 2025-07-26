@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { RingSpinner } from '../components/LoadingSpinner';
+import { RingSpinner as LoadingSpinner } from '../components/LoadingSpinner';
 import ErrorDisplay from '../components/ErrorDisplay';
 import './MonitoringDashboard.css';
 
@@ -178,7 +178,7 @@ export const MonitoringDashboard: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string): string => {
+  const getStatusColor = (status: string): 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info' => {
     switch (status) {
       case 'healthy': return 'success';
       case 'degraded': return 'warning';
@@ -187,7 +187,7 @@ export const MonitoringDashboard: React.FC = () => {
     }
   };
 
-  const getSeverityColor = (severity: string): string => {
+  const getSeverityColor = (severity: string): 'default' | 'primary' | 'success' | 'error' | 'warning' | 'info' => {
     switch (severity) {
       case 'critical': return 'error';
       case 'high': return 'error';
@@ -218,7 +218,7 @@ export const MonitoringDashboard: React.FC = () => {
           <h1>System Monitoring</h1>
         </div>
         <ErrorDisplay 
-          message={error}
+          error={error}
           onRetry={fetchDashboardData}
         />
       </div>
@@ -369,7 +369,7 @@ export const MonitoringDashboard: React.FC = () => {
                 <div className="alert-message">{alert.message}</div>
                 <div className="alert-actions">
                   <Button
-                    size="small"
+                    size="sm"
                     onClick={() => resolveAlert(alert.id)}
                   >
                     Resolve

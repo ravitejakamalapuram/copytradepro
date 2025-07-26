@@ -245,7 +245,6 @@ class CacheManager {
    */
   cleanup(): number {
     let cleanedCount = 0;
-    const now = new Date();
     
     for (const [key, entry] of this.cache.entries()) {
       if (this.isExpired(entry)) {
@@ -489,13 +488,7 @@ class CacheManager {
     return data;
   }
 
-  private calculateMemoryPressure(): number {
-    // Calculate directly without calling getStats() to avoid recursion
-    const totalSize = Array.from(this.cache.values()).reduce((sum, entry) => sum + entry.size, 0);
-    const sizeRatio = totalSize / this.config.maxSize;
-    const entryRatio = this.cache.size / this.config.maxEntries;
-    return Math.max(sizeRatio, entryRatio);
-  }
+
 
   private calculateOptimizationScore(entry: CacheEntry): number {
     const age = Date.now() - entry.timestamp.getTime();

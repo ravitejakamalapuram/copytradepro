@@ -100,7 +100,7 @@ const MarketOverview: React.FC = () => {
         highStocks: highStocksResponse.status === 'fulfilled' && highStocksResponse.value.success ? highStocksResponse.value.data : [],
         lowStocks: lowStocksResponse.status === 'fulfilled' && lowStocksResponse.value.success ? lowStocksResponse.value.data : [],
         topValue: topValueResponse.status === 'fulfilled' && topValueResponse.value.success ? topValueResponse.value.data : [],
-        topVolume: topVolumeResponse.status === 'fulfilled' && topVolumeResponse.value.success ? topVolumeResponse.value.data : [],
+        topVolume: topVolumeResponse.status === 'fulfilled' && (topVolumeResponse.value as any)?.success ? (topVolumeResponse.value as any).data : [],
         marketStatus: marketStatusResponse.status === 'fulfilled' && marketStatusResponse.value.success ? marketStatusResponse.value.data : null
       });
 

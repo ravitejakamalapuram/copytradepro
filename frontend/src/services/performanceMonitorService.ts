@@ -278,7 +278,6 @@ class PerformanceMonitorService {
     const last5Minutes = new Date(now.getTime() - 5 * 60 * 1000);
     
     // Recent metrics
-    const recentMetrics = this.metrics.filter(m => m.timestamp >= last5Minutes);
     const recentAPIMetrics = this.apiMetrics.filter(m => m.timestamp >= last5Minutes);
     const recentRenderMetrics = this.renderMetrics.filter(m => m.timestamp >= last5Minutes);
     
@@ -472,13 +471,13 @@ class PerformanceMonitorService {
       const metrics = {
         domContentLoaded: navigation.domContentLoadedEventEnd - navigation.domContentLoadedEventStart,
         loadComplete: navigation.loadEventEnd - navigation.loadEventStart,
-        domInteractive: navigation.domInteractive - navigation.navigationStart,
-        domComplete: navigation.domComplete - navigation.navigationStart,
+        domInteractive: navigation.domInteractive - navigation.fetchStart,
+        domComplete: navigation.domComplete - navigation.fetchStart,
         responseTime: navigation.responseEnd - navigation.requestStart,
         dnsLookup: navigation.domainLookupEnd - navigation.domainLookupStart,
         tcpConnect: navigation.connectEnd - navigation.connectStart,
         serverResponse: navigation.responseStart - navigation.requestStart,
-        pageLoad: navigation.loadEventEnd - navigation.navigationStart
+        pageLoad: navigation.loadEventEnd - navigation.fetchStart
       };
 
       // Record all navigation metrics
@@ -553,7 +552,7 @@ class PerformanceMonitorService {
       largestContentfulPaint: this.getMetricValue('largest_contentful_paint'),
       firstInputDelay: this.getMetricValue('first_input_delay'),
       cumulativeLayoutShift: this.getMetricValue('cumulative_layout_shift'),
-      timeToInteractive: navigation.domInteractive - navigation.navigationStart
+      timeToInteractive: navigation.domInteractive - navigation.fetchStart
     };
   }
 
@@ -574,7 +573,7 @@ class PerformanceMonitorService {
     return metric ? metric.value : 0;
   }
 
-  private checkMetricThresholds(metric: PerformanceMetric): void {
+  private checkMetricThresholds(_metric: PerformanceMetric): void {
     // Custom threshold checking logic can be added here
     // Most thresholds are checked when metrics are recorded
   }

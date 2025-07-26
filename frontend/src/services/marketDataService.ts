@@ -148,7 +148,7 @@ class MarketDataService {
     const key = `${symbol}:${exchange}`;
     const cachedEntry = this.cache.prices.get(key);
     
-    if (this.isCacheValid(cachedEntry)) {
+    if (cachedEntry && this.isCacheValid(cachedEntry)) {
       console.log(`📊 Returning cached price for ${key}`);
       return { ...cachedEntry!.data, source: 'cache' };
     }
@@ -168,29 +168,7 @@ class MarketDataService {
     return null;
   }
 
-  /**
-   * Fallback to REST API when WebSocket fails
-   */
-  private async fallbackToRest<T>(
-    restCall: () => Promise<T>,
-    cacheKey?: string,
-    cacheTtl?: number
-  ): Promise<T> {
-    try {
-      console.log('📊 Using REST API fallback');
-      const result = await restCall();
-      
-      // Cache the result if cache parameters provided
-      if (cacheKey && cacheTtl) {
-        // Implementation depends on the type of data being cached
-      }
-      
-      return result;
-    } catch (error) {
-      console.error('📊 REST API fallback failed:', error);
-      throw error;
-    }
-  }
+
 
   private async makeRequest(endpoint: string, options: RequestInit = {}): Promise<any> {
     const token = authService.getToken();
@@ -307,7 +285,7 @@ class MarketDataService {
     const cacheKey = `${query.toLowerCase()}:${exchange}:${limit}`;
     const cachedEntry = this.cache.searches.get(cacheKey);
     
-    if (this.isCacheValid(cachedEntry)) {
+    if (cachedEntry && this.isCacheValid(cachedEntry)) {
       console.log(`📊 Returning cached search results for "${query}"`);
       return { success: true, data: cachedEntry!.data };
     }
@@ -549,8 +527,6 @@ class MarketDataService {
    * Clean expired cache entries
    */
   cleanExpiredCache(): void {
-    const now = Date.now();
-    
     // Clean expired prices
     for (const [key, entry] of this.cache.prices.entries()) {
       if (!this.isCacheValid(entry)) {
@@ -606,7 +582,7 @@ class MarketDataService {
    */
   cleanup(): void {
     // Unsubscribe from event bus
-    this.eventListenerIds.forEach(id => {
+    this.eventListenerIds.forEach(() => {
       // Note: We can't unsubscribe by ID directly, but the event bus will clean up
       // when components unmount. This is a placeholder for future enhancement.
     });

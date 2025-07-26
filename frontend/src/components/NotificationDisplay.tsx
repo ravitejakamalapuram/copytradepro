@@ -24,7 +24,6 @@ interface NotificationDisplayProps {
 }
 
 const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
-  className = '',
   position = 'top-right',
   maxNotifications = 5
 }) => {
@@ -33,12 +32,13 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
 
   useEffect(() => {
     // Listen for service worker messages (notification clicks)
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'NOTIFICATION_CLICK') {
-        console.log('Notification clicked:', event.data);
+    const handleMessage = (event: Event) => {
+      const messageEvent = event as MessageEvent;
+      if (messageEvent.data?.type === 'NOTIFICATION_CLICK') {
+        console.log('Notification clicked:', messageEvent.data);
         // Handle notification click navigation
-        if (event.data.url && event.data.url !== window.location.pathname) {
-          window.location.href = event.data.url;
+        if (messageEvent.data.url && messageEvent.data.url !== window.location.pathname) {
+          window.location.href = messageEvent.data.url;
         }
       }
     };
@@ -102,26 +102,7 @@ const NotificationDisplay: React.FC<NotificationDisplayProps> = ({
     }
   };
 
-  const getPositionStyles = () => {
-    const baseStyles = {
-      position: 'fixed' as const,
-      zIndex: 9999,
-      pointerEvents: 'none' as const
-    };
 
-    switch (position) {
-      case 'top-right':
-        return { ...baseStyles, top: '1rem', right: '1rem' };
-      case 'top-left':
-        return { ...baseStyles, top: '1rem', left: '1rem' };
-      case 'bottom-right':
-        return { ...baseStyles, bottom: '1rem', right: '1rem' };
-      case 'bottom-left':
-        return { ...baseStyles, bottom: '1rem', left: '1rem' };
-      default:
-        return { ...baseStyles, top: '1rem', right: '1rem' };
-    }
-  };
 
   // Expose addNotification function globally for use by other components
   useEffect(() => {

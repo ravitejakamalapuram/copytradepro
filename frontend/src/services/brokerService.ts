@@ -156,7 +156,7 @@ export const brokerService = {
       const response = await api.post('/broker/disconnect', {
         brokerName,
       });
-      return response.data;
+      return response.data as { success: boolean; message: string; };
     } catch (error: any) {
       console.error('🚨 Disconnect broker error:', error);
       
@@ -221,7 +221,7 @@ export const brokerService = {
   }> {
     try {
       const response = await api.post('/broker/place-multi-account-order', orderData);
-      return response.data;
+      return response.data as any;
     } catch (error: any) {
       console.error('🚨 Place multi-account order error:', error);
       
@@ -459,7 +459,7 @@ export const brokerService = {
   }> {
     try {
       const response = await api.post('/broker/refresh-all-order-status');
-      return response.data;
+      return response.data as { success: boolean; message: string; data?: { totalOrders: number; updatedOrders: number; errors: string[]; } | undefined; };
     } catch (error: any) {
       console.error('🚨 Refresh all order status error:', error);
       
@@ -469,12 +469,7 @@ export const brokerService = {
       
       return {
         success: false,
-        error: {
-          message: 'Network error. Please check your connection and try again.',
-          code: 'NETWORK_ERROR',
-          retryable: true
-        },
-        timestamp: new Date().toISOString()
+        message: 'Network error. Please check your connection and try again.'
       };
     }
   },
@@ -491,7 +486,7 @@ export const brokerService = {
   }> {
     try {
       const response = await api.post(`/broker/refresh-order-status/${orderId}`);
-      return response.data;
+      return response.data as { success: boolean; message: string; data?: { orderId: string; oldStatus: string; newStatus: string; updated: boolean; } | undefined; };
     } catch (error: any) {
       console.error('🚨 Refresh order status error:', error);
       
@@ -501,12 +496,7 @@ export const brokerService = {
       
       return {
         success: false,
-        error: {
-          message: 'Network error. Please check your connection and try again.',
-          code: 'NETWORK_ERROR',
-          retryable: true
-        },
-        timestamp: new Date().toISOString()
+        message: 'Network error. Please check your connection and try again.'
       };
     }
   },
@@ -524,7 +514,7 @@ export const brokerService = {
   }> {
     try {
       const response = await api.post(`/broker/cancel-order/${orderId}`);
-      return response.data;
+      return response.data as { success: boolean; message: string; data?: { orderId: number; brokerOrderId: string; symbol: string; status: string; timestamp: string; } | undefined; };
     } catch (error: any) {
       console.error('🚨 Cancel order error:', error);
       
@@ -557,8 +547,8 @@ export const brokerService = {
   }> {
     try {
       const response = await api.put(`/broker/modify-order/${orderId}`, modifications);
-      return response.data;
-    } catch (error: unknown) {
+      return response.data as { success: boolean; message: string; data?: { orderId: number; brokerOrderId: string; symbol: string; modifications: any; timestamp: string; } | undefined; };
+    } catch (error: any) {
       console.error('🚨 Modify order error:', error);
       
       if (error.response?.data) {
@@ -575,7 +565,7 @@ export const brokerService = {
   async retryOrder(orderId: string): Promise<{ success: boolean; message: string; data?: any }> {
     try {
       const response = await api.post(`/broker/retry-order/${orderId}`);
-      return response.data;
+      return response.data as { success: boolean; message: string; data?: any; };
     } catch (error: any) {
       console.error('Failed to retry order:', error);
 
@@ -596,7 +586,7 @@ export const brokerService = {
   async deleteOrder(orderId: string): Promise<{ success: boolean; message: string }> {
     try {
       const response = await api.delete(`/broker/delete-order/${orderId}`);
-      return response.data;
+      return response.data as { success: boolean; message: string; };
     } catch (error: any) {
       console.error('Failed to delete order:', error);
 

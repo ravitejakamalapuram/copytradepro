@@ -47,7 +47,7 @@ interface ConnectionHealth {
 
 export const useRealTimeData = () => {
   const { isAuthenticated } = useAuth();
-  const { registerTimeout, registerInterval, registerWebSocket, registerSubscription } = useResourceCleanup('useRealTimeData');
+  const { registerTimeout, registerInterval, registerWebSocket } = useResourceCleanup('useRealTimeData');
 
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);

@@ -25,7 +25,7 @@ export const useComponentLifecycle = (
   componentName: string,
   callbacks: LifecycleCallbacks = {}
 ) => {
-  const { registerSubscription, componentId } = useResourceCleanup(componentName);
+  const { componentId } = useResourceCleanup(componentName);
   const metricsRef = useRef<ComponentMetrics>({
     mountTime: new Date(),
     updateCount: 0,

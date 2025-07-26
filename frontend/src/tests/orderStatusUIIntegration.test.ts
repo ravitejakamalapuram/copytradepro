@@ -10,7 +10,7 @@ import api from '../services/api';
 
 // Mock the api service
 vi.mock('../services/api');
-const mockedApi = api as unknown;
+const mockedApi = api as any;
 
 describe('Order Status UI Integration', () => {
   beforeEach(() => {
@@ -39,12 +39,12 @@ describe('Order Status UI Integration', () => {
         }
       };
 
-      mockedApi.post = vi.fn().mockResolvedValue(mockResponse);
+      (mockedApi as any).post = vi.fn().mockResolvedValue(mockResponse);
 
       const result = await brokerService.checkOrderStatus('order-123');
 
       // Verify correct endpoint is called
-      expect(mockedApi.post).toHaveBeenCalledWith('/broker/check-order-status', {
+      expect((mockedApi as any).post).toHaveBeenCalledWith('/broker/check-order-status', {
         orderId: 'order-123'
       });
 

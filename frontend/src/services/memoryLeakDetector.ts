@@ -115,22 +115,27 @@ class MemoryLeakDetector {
    * Update component memory profiles
    */
   private updateComponentProfiles(): void {
-    const resourceStats = resourceManager.getStats();
-    
     // Clear old profiles
     this.componentProfiles.clear();
 
     // Create profiles for active components
-    for (const [componentId, resourceIds] of (resourceManager as any).componentResources.entries()) {
-      const profile: ComponentMemoryProfile = {
-        componentId,
-        resourceCount: resourceIds.size,
-        memoryEstimate: this.estimateComponentMemory(resourceIds.size),
+    // Note: componentResources is private, so we'll skip this for now
+    // This functionality can be implemented when resourceManager provides a public API
+    // TODO: Add public method to resourceManager to get component resource information
+    
+    // For now, we'll create a basic profile based on available stats
+    const stats = resourceManager.getStats();
+    if (stats.totalComponents > 0) {
+      // Create a generic profile since we can't access individual component data
+      const genericProfile: ComponentMemoryProfile = {
+        componentId: 'system-wide',
+        resourceCount: stats.totalResources,
+        memoryEstimate: this.estimateComponentMemory(stats.totalResources),
         lastActivity: new Date(),
-        leakRisk: this.assessLeakRisk(resourceIds.size)
+        leakRisk: this.assessLeakRisk(stats.totalResources)
       };
-
-      this.componentProfiles.set(componentId, profile);
+      
+      this.componentProfiles.set('system-wide', genericProfile);
     }
   }
 

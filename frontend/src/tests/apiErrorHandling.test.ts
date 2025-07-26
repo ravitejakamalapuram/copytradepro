@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import axios, { AxiosError } from 'axios';
 
 // Mock axios completely before importing api
@@ -64,8 +64,8 @@ describe('API Error Handling', () => {
     vi.clearAllMocks();
     
     // Mock axios.create to return our mocked axios instance
-    mockedAxios.create.mockReturnValue(mockedAxios as any);
-    mockedAxios.isCancel.mockReturnValue(false);
+    (mockedAxios.create as any).mockReturnValue(mockedAxios as any);
+    (mockedAxios.isCancel as any).mockReturnValue(false);
     
     // Setup default interceptor mocks
     mockedAxios.interceptors = {
@@ -283,7 +283,6 @@ describe('API Error Handling', () => {
 
     test('should respect maximum retry attempts', () => {
       const maxRetries = 3;
-      let retryCount = 0;
 
       const shouldRetry = (error: AxiosError, currentRetryCount: number): boolean => {
         const isRetryable = !error.response && 
@@ -308,8 +307,6 @@ describe('API Error Handling', () => {
 
   describe('Authentication Error Handling', () => {
     test('should handle 401 errors appropriately in development', () => {
-      const originalEnv = import.meta.env.DEV;
-      
       // Mock development environment
       Object.defineProperty(import.meta, 'env', {
         value: { ...import.meta.env, DEV: true }
@@ -500,7 +497,7 @@ const getUserFriendlyErrorMessage = (error: AxiosError): string => {
     case 504:
       return 'Service temporarily unavailable. Please try again later.';
     default:
-      return (error.response.data as unknown)?.message || 'An unexpected error occurred. Please try again.';
+      return (error.response.data as any)?.message || 'An unexpected error occurred. Please try again.';
   }
 };
 

@@ -23,8 +23,6 @@ interface DataTableProps<T extends { [key: string]: any }> {
 function DataTable<T extends { [key: string]: any }>({ columns, data, loading = false, emptyMessage = 'No data available', className = '', onSort, sortKey, sortDirection }: DataTableProps<T>) {
   const handleSort = (key: string) => {
     if (!onSort) return;
-    
-    const newDirection = sortKey === key && sortDirection === 'asc' ? 'desc' : 'asc';
     onSort(key);
   };
 
