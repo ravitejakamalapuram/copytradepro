@@ -366,9 +366,13 @@ const Orders: React.FC = () => {
       const response = await brokerService.checkOrderStatus(orderId);
 
       if (response.success) {
-        const { statusChanged, previousStatus, currentStatus, message } = response.data;
+        const { statusChanged, previousStatus, status: currentStatus } = response.data;
 
-        // Show success message
+        // Show success message based on status change
+        const message = statusChanged 
+          ? `Order status changed from ${previousStatus} to ${currentStatus}`
+          : `Order status confirmed: ${currentStatus}`;
+        
         setStatusMessage(message);
         setTimeout(() => setStatusMessage(null), 5000);
 
@@ -381,7 +385,7 @@ const Orders: React.FC = () => {
           )
         );
 
-        console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+        console.log(`✅ Manual status check result: ${previousStatus || 'N/A'} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
 
         if (statusChanged) {
           showToast({
@@ -397,20 +401,33 @@ const Orders: React.FC = () => {
           });
         }
       } else {
+        // Handle standardized error response format
+        const errorMessage = response.error?.message || response.message || 'Failed to check order status.';
         showToast({
           type: 'error',
           title: 'Status Check Failed',
-          message: response.message || 'Failed to check order status.'
+          message: errorMessage
         });
-        console.error('Failed to check order status:', response.message);
+        console.error('Failed to check order status:', errorMessage);
       }
 
     } catch (error: any) {
       console.error('Failed to check order status:', error);
+      
+      // Handle both network errors and API error responses
+      let errorMessage = 'Failed to check order status.';
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       showToast({
         type: 'error',
         title: 'Status Check Error',
-        message: error.message || 'Failed to check order status.'
+        message: errorMessage
       });
     } finally {
       // Remove from checking set

@@ -1,10 +1,10 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './databaseCompatibility';
-import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
+import { BrokerRegistry, IBrokerService, IUnifiedBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
-// Import unified broker manager
-import { unifiedBrokerManager } from './unifiedBrokerManager';
+// Import enhanced unified broker manager
+import { enhancedUnifiedBrokerManager } from './enhancedUnifiedBrokerManager';
 
 // Import WebSocket service for real-time updates
 import websocketService from './websocketService';
@@ -14,16 +14,18 @@ import { orderStatusLogger, OrderStatusLogContext } from './orderStatusLogger';
 
 // Broker connection manager interface
 interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
+  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null;
 }
 
-// Create broker connection manager implementation
+// Create broker connection manager implementation using enhanced manager
 const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
+  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null {
     console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
 
-    // Get any connection for this broker
-    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+    // Get all connections for this user and broker from enhanced manager
+    const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
+      .filter(conn => conn.brokerName === brokerName);
+    
     if (connections.length === 0) {
       console.log(`❌ No ${brokerName} connections found for user ${userId}`);
       return null;
@@ -42,10 +44,7 @@ const brokerConnectionManager: BrokerConnectionManager = {
   }
 };
 
-// Legacy function for backward compatibility - deprecated
-export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
-  // No longer needed - now using enhanced unified broker manager
-};
+
 
 // Enhanced logger with structured logging
 const logger = {
@@ -303,7 +302,7 @@ class OrderStatusService extends EventEmitter {
       if (brokerConnectionManager) {
         try {
           // Get the broker connection for the user
-          const brokerService = brokerConnectionManager.getBrokerConnection(brokerAccountId, order.broker_name);
+          const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
           if (brokerService) {
             logger.debug('Broker connection found, calling API', logContext, {
@@ -344,7 +343,7 @@ class OrderStatusService extends EventEmitter {
                 statusValue = (brokerStatus as any).data.status;
                 brokerResponseData = (brokerStatus as any).data;
               }
-              // Handle legacy Shoonya format
+              // Handle Shoonya response format
               else if ((brokerStatus as any).stat === 'Ok') {
                 statusValue = (brokerStatus as any).status;
                 brokerResponseData = brokerStatus;
@@ -557,7 +556,7 @@ class OrderStatusService extends EventEmitter {
 
       // Fallback: Try to get account info from order history table
       logger.debug(`Fallback: Checking order history for order ${order.id}`);
-      const orderHistory = await userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
+      const orderHistory = await userDatabase.getOrderHistoryById(order.id.toString());
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {
@@ -577,9 +576,9 @@ class OrderStatusService extends EventEmitter {
       logger.debug(`Final fallback: Checking active broker connections for user ${order.user_id}`);
       const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
-      if (brokerService && brokerService.isLoggedIn()) {
+      if (brokerService && brokerService.isConnected()) {
         // Try to get broker account ID from the service
-        const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+        const brokerServiceTyped = brokerService as any; // Type assertion for broker service capabilities
 
         // Try different methods to get the account ID based on broker capabilities
         let accountId = null;
@@ -715,7 +714,7 @@ class OrderStatusService extends EventEmitter {
         
         // Use the broker_order_id to update the database
         const updated = await userDatabase.updateOrderStatus(
-          parseInt(order.broker_order_id || order.id),
+          (order.broker_order_id || order.id).toString(),
           newStatus as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED'
         );
 
@@ -1054,7 +1053,7 @@ class OrderStatusService extends EventEmitter {
       logger.info(`🔄 Manual order status refresh requested for order ${orderId}`);
 
       // Find the order in database
-      const orderHistory = await userDatabase.getOrderHistoryById(parseInt(orderId));
+      const orderHistory = await userDatabase.getOrderHistoryById(orderId);
       if (!orderHistory) {
         return {
           success: false,

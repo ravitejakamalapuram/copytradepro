@@ -54,6 +54,11 @@ interface OrderHistoryDocument extends Document {
   remarks: string;
   executed_at: Date;
   created_at: Date;
+  // Enhanced fields for comprehensive order updates
+  executed_quantity?: number;
+  average_price?: number;
+  rejection_reason?: string;
+  last_updated?: Date;
   // Enhanced fields for error handling and retry functionality
   error_message?: string;
   error_code?: string;
@@ -110,6 +115,11 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
   remarks: { type: String, default: '' },
   executed_at: { type: Date, required: true },
   created_at: { type: Date, default: Date.now },
+  // Enhanced fields for comprehensive order updates
+  executed_quantity: { type: Number, default: 0 },
+  average_price: { type: Number, default: 0 },
+  rejection_reason: { type: String },
+  last_updated: { type: Date, default: Date.now },
   // Enhanced fields for error handling and retry functionality
   error_message: { type: String },
   error_code: { type: String },
@@ -299,6 +309,11 @@ export class MongoDatabase implements IDatabaseAdapter {
       remarks: doc.remarks || '',
       executed_at: doc.executed_at ? doc.executed_at.toISOString() : new Date().toISOString(),
       created_at: doc.created_at ? doc.created_at.toISOString() : new Date().toISOString(),
+      // Enhanced fields for comprehensive order updates
+      executed_quantity: doc.executed_quantity || undefined,
+      average_price: doc.average_price || undefined,
+      rejection_reason: doc.rejection_reason || undefined,
+      last_updated: doc.last_updated ? doc.last_updated.toISOString() : undefined,
       // Enhanced fields for error handling and retry functionality
       error_message: doc.error_message || undefined,
       error_code: doc.error_code || undefined,
@@ -567,6 +582,16 @@ export class MongoDatabase implements IDatabaseAdapter {
     }
   }
 
+  async getOrderHistoryByBrokerOrderId(brokerOrderId: string): Promise<OrderHistory | null> {
+    try {
+      const order = await this.OrderHistoryModel.findOne({ broker_order_id: brokerOrderId });
+      return order ? this.orderHistoryDocToInterface(order) : null;
+    } catch (error) {
+      console.error('🚨 Failed to get order history by broker order ID:', error);
+      return null;
+    }
+  }
+
   async getOrderHistoryByUserId(userId: number | string, limit: number = 50, offset: number = 0): Promise<OrderHistory[]> {
     try {
       // Convert userId to string if it's a number (for compatibility)
@@ -697,6 +722,59 @@ export class MongoDatabase implements IDatabaseAdapter {
     } catch (error) {
       console.error('🚨 Failed to update order with error:', error);
       return false;
+    }
+  }
+
+  /**
+   * Comprehensive order update method that can update multiple fields atomically
+   * @param id - Order ID (MongoDB ObjectId string)
+   * @param updateData - Fields to update
+   */
+  async updateOrderComprehensive(id: string, updateData: {
+    status?: string;
+    executed_quantity?: number;
+    average_price?: number;
+    rejection_reason?: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+    last_updated?: Date;
+  }): Promise<OrderHistory | null> {
+    try {
+      // Prepare update object with only defined fields
+      const updateFields: any = {};
+      
+      if (updateData.status !== undefined) updateFields.status = updateData.status;
+      if (updateData.executed_quantity !== undefined) updateFields.executed_quantity = updateData.executed_quantity;
+      if (updateData.average_price !== undefined) updateFields.average_price = updateData.average_price;
+      if (updateData.rejection_reason !== undefined) updateFields.rejection_reason = updateData.rejection_reason;
+      if (updateData.error_message !== undefined) updateFields.error_message = updateData.error_message;
+      if (updateData.error_code !== undefined) updateFields.error_code = updateData.error_code;
+      if (updateData.error_type !== undefined) updateFields.error_type = updateData.error_type;
+      if (updateData.failure_reason !== undefined) updateFields.failure_reason = updateData.failure_reason;
+      if (updateData.is_retryable !== undefined) updateFields.is_retryable = updateData.is_retryable;
+      
+      // Always update the last_updated timestamp
+      updateFields.last_updated = updateData.last_updated || new Date();
+
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        updateFields,
+        { new: true, runValidators: true }
+      );
+
+      if (result) {
+        console.log(`✅ Order ${id} updated comprehensively with fields:`, Object.keys(updateFields));
+        return this.orderHistoryDocToInterface(result);
+      }
+      
+      console.warn(`⚠️ Order ${id} not found for comprehensive update`);
+      return null;
+    } catch (error) {
+      console.error('🚨 Failed to update order comprehensively:', error);
+      return null;
     }
   }
 

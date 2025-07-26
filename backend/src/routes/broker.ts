@@ -22,7 +22,6 @@ import {
   retryOrder,
   deleteOrder,
   getOrderHistory,
-  getOrderStatus,
   checkOrderStatus,
   getOrderSearchSuggestions,
   getOrderBook,
@@ -37,6 +36,7 @@ import {
   validateAccountSession,
   refreshAccountToken
 } from '../controllers/sessionHealthController';
+
 import { authenticateToken } from '../middleware/auth';
 
 const router = express.Router();
@@ -180,7 +180,7 @@ router.put('/modify-order/:orderId', authenticateToken, modifyOrder);
 router.post('/retry-order/:orderId', authenticateToken, retryOrder);
 router.delete('/delete-order/:orderId', authenticateToken, deleteOrder);
 router.get('/order-history', authenticateToken, getOrderHistory);
-router.get('/order-status/:brokerOrderId', authenticateToken, getOrderStatus);
+// Consolidated order status endpoint - POST method for consistency
 router.post('/check-order-status', authenticateToken, checkOrderStatus);
 router.get('/order-search-suggestions', authenticateToken, getOrderSearchSuggestions);
 router.get('/orders/:brokerName', authenticateToken, getOrderBook);

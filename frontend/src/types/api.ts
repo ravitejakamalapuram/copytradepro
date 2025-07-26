@@ -3,20 +3,33 @@
  * Proper TypeScript interfaces to replace 'any' types
  */
 
+// Standardized Error Object
+export interface ApiError {
+  message: string;
+  code: string;
+  retryable: boolean;
+  details?: any;
+}
+
 // Base API Response
 export interface ApiResponse<T = unknown> {
   success: boolean;
-  message?: string;
   data?: T;
-  error?: string;
+  error?: ApiError;
+  requestId?: string;
+  timestamp?: string;
+  // Legacy support
+  message?: string;
 }
 
 // Error Response
 export interface ErrorResponse {
   success: false;
-  error: string;
+  error: ApiError;
+  requestId?: string;
+  timestamp?: string;
+  // Legacy support
   message?: string;
-  details?: string;
 }
 
 // Auth Types

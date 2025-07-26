@@ -40,7 +40,7 @@ export class OrderRetryService {
   async retryOrder(orderId: string, userId: string): Promise<RetryResult> {
     try {
       // Get order from database
-      const order = await userDatabase.getOrderHistoryById(parseInt(orderId));
+      const order = await userDatabase.getOrderHistoryById(orderId);
       if (!order) {
         return {
           success: false,
@@ -86,7 +86,7 @@ export class OrderRetryService {
 
       if (retryResult.success) {
         // Update order status to PLACED
-        await userDatabase.updateOrderStatus(parseInt(orderId), 'PLACED');
+        await userDatabase.updateOrderStatus(orderId, 'PLACED');
         
         return {
           success: true,
@@ -137,7 +137,7 @@ export class OrderRetryService {
     // Schedule new retry
     const timeout = setTimeout(async () => {
       try {
-        const order = await userDatabase.getOrderHistoryById(parseInt(orderId));
+        const order = await userDatabase.getOrderHistoryById(orderId);
         if (order && order.is_retryable) {
           const result = await this.retryOrder(orderId, order.user_id.toString());
           logger.info(`Auto-retry result for order ${orderId}:`, result);
