@@ -42,8 +42,26 @@ validateEnv();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Security middleware
-app.use(helmet());
+// Security middleware with CSP configuration for frontend
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https:"],
+      imgSrc: ["'self'", "data:", "https:"],
+      fontSrc: ["'self'", "https:", "data:"],
+      connectSrc: ["'self'", "ws:", "wss:"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      workerSrc: ["'self'", "blob:"],
+      childSrc: ["'self'", "blob:"],
+      formAction: ["'self'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+}));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -58,7 +76,11 @@ app.use(limiter);
 // CORS configuration
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : [process.env.FRONTEND_URL || 'http://localhost:5173'];
+  : [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
+      `http://localhost:${PORT}`, // Allow the production server origin
+      `http://127.0.0.1:${PORT}`, // Allow localhost variations
+    ];
 
 app.use(cors({
   origin: (origin, callback) => {
