@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRealTimeData } from '../hooks/useRealTimeData';
-import { useResourceCleanup } from '../hooks/useResourceCleanup';
+// import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import AnimatedPrice from './AnimatedPrice';
 import './LivePriceTicker.css';
 

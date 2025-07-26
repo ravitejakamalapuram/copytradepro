@@ -4,11 +4,11 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Card } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { Button } from '../components/ui/Button';
-import { LoadingSpinner } from '../components/LoadingSpinner';
-import { ErrorDisplay } from '../components/ErrorDisplay';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import { RingSpinner } from '../components/LoadingSpinner';
+import ErrorDisplay from '../components/ErrorDisplay';
 import './MonitoringDashboard.css';
 
 interface SystemMetrics {
@@ -236,7 +236,7 @@ export const MonitoringDashboard: React.FC = () => {
     );
   }
 
-  const { systemHealth, recentMetrics, errorSummary, uptime } = dashboardData;
+  const { systemHealth, errorSummary, uptime } = dashboardData;
   const currentMetrics = systemHealth.metrics;
 
   return (

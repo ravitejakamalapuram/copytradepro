@@ -9,7 +9,10 @@
     "test:debug": "playwright test --debug",
     "test:ui": "playwright test --ui",
     "test:report": "playwright show-report",
-    "install-browsers": "playwright install"
+    "install-browsers": "playwright install",
+    "clean": "rm -rf test-results playwright-report coverage *.log",
+    "clean:all": "npm run clean && rm -rf node_modules package-lock.json",
+    "reset": "npm run clean:all && npm install && npm run install-browsers"
   },
   "devDependencies": {
     "@playwright/test": "^1.40.0",

@@ -1,11 +1,11 @@
-import React from 'react';
+
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import OrderResultDisplay, { type OrderResultSummary } from '../OrderResultDisplay';
 
 // Mock the error messages utility
 vi.mock('../../utils/errorMessages', () => ({
-  getUserFriendlyError: vi.fn((error: string) => ({
+  getUserFriendlyError: vi.fn((_error: string) => ({
     title: 'Test Error',
     message: 'Test error message',
     suggestion: 'Test suggestion',

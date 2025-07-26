@@ -10,7 +10,7 @@ import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransf
 import { Checkbox } from '../components/ui/Checkbox';
 import Button from '../components/ui/Button';
 import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card';
-import { PageHeader, Grid, Stack, HStack, Flex } from '../components/ui/Layout';
+import { Grid, Stack, HStack, Flex } from '../components/ui/Layout';
 import '../styles/app-theme.css';
 import './TradeSetup.css';
 

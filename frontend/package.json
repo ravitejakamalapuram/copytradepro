@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
+    "clean": "rm -rf dist coverage .vite *.log",
+    "clean:all": "npm run clean && rm -rf node_modules package-lock.json",
+    "reset": "npm run clean:all && npm install",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",

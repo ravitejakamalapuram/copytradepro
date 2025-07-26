@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import { vi, beforeEach, afterAll } from 'vitest';
 
 // Mock environment variables
 Object.defineProperty(import.meta, 'env', {
