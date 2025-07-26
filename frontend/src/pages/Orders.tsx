@@ -5,7 +5,8 @@ import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
-import { useToast } from '../components/Toast'; // Added import for Button
+import { useToast } from '../components/Toast';
+import Popover from '../components/ui/Popover';
 
 interface Order {
   id: string;
@@ -461,7 +462,7 @@ const Orders: React.FC = () => {
           message: response.message || 'Failed to retry order.'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to retry order:', error);
       showToast({
         type: 'error',
@@ -503,7 +504,7 @@ const Orders: React.FC = () => {
           message: response.message || 'Failed to delete order.'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to delete order:', error);
       showToast({
         type: 'error',
@@ -1049,7 +1050,7 @@ const Orders: React.FC = () => {
                         {order.triggerPrice ? formatCurrency(order.triggerPrice) : '-'}
                       </td>
                       <td>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span className="status-badge" style={{
                             color: getStatusColor(order.status),
                             backgroundColor: `${getStatusColor(order.status)}15`
@@ -1057,38 +1058,50 @@ const Orders: React.FC = () => {
                             {order.status}
                           </span>
 
-                          {/* Error details for failed orders */}
+                          {/* Error indicator for failed orders - shows details on hover */}
                           {['FAILED', 'REJECTED'].includes(order.status) && order.errorMessage && (
-                            <div
-                              style={{
-                                fontSize: '0.7rem',
-                                color: 'var(--color-loss)',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                padding: '0.25rem 0.5rem',
-                                borderRadius: 'var(--radius-sm)',
-                                border: '1px solid rgba(239, 68, 68, 0.2)',
-                                maxWidth: '200px',
-                                wordWrap: 'break-word'
-                              }}
-                              title={`Error: ${order.errorMessage}\nType: ${order.errorType || 'Unknown'}\nRetries: ${order.retryCount || 0}/${order.maxRetries || 3}`}
-                            >
-                              <div style={{ fontWeight: '600', marginBottom: '0.1rem' }}>
-                                {order.errorType || 'Error'}
-                              </div>
-                              <div style={{ opacity: 0.8 }}>
-                                {order.failureReason || order.errorMessage}
-                              </div>
-                              {order.isRetryable && (
-                                <div style={{
-                                  marginTop: '0.1rem',
-                                  fontSize: '0.65rem',
-                                  color: 'var(--color-warning)',
-                                  fontWeight: '500'
-                                }}>
-                                  Retryable ({order.retryCount || 0}/{order.maxRetries || 3})
+                            <Popover
+                              placement="top"
+                              delay={200}
+                              trigger={
+                                <div
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    height: '16px',
+                                    backgroundColor: 'var(--color-loss)',
+                                    color: 'white',
+                                    borderRadius: '50%',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    cursor: 'help',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  !
                                 </div>
-                              )}
-                            </div>
+                              }
+                              content={
+                                <div>
+                                  <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: 'var(--color-loss)' }}>
+                                    {order.errorType || 'Error'}
+                                  </div>
+                                  <div style={{ marginBottom: '0.5rem' }}>
+                                    {order.failureReason || order.errorMessage}
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    Retries: {order.retryCount || 0}/{order.maxRetries || 3}
+                                    {order.isRetryable && (
+                                      <span style={{ color: 'var(--color-warning)', marginLeft: '0.5rem' }}>
+                                        • Retryable
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              }
+                            />
                           )}
                         </div>
                       </td>
