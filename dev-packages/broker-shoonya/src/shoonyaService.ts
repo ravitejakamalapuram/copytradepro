@@ -2,6 +2,82 @@ import crypto from 'crypto';
 import axios from 'axios';
 import { authenticator } from 'otplib';
 
+// Import enhanced logging for order status operations
+// Note: In a real implementation, this would be imported from the backend
+// For now, we'll use console logging with structured format
+interface OrderStatusLogContext {
+  userId?: string;
+  brokerName?: string;
+  accountId?: string;
+  operation?: string;
+  orderId?: string;
+  responseTime?: number;
+  sessionId?: string;
+  requestId?: string;
+}
+
+class StructuredLogger {
+  private generateRequestId(): string {
+    return `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  logOrderStatusRequest(context: OrderStatusLogContext): string {
+    const requestId = this.generateRequestId();
+    console.log(`[${new Date().toISOString()}] [INFO] [ORDER_STATUS] Order status request initiated`, {
+      requestId,
+      ...context,
+      component: 'SHOONYA_SERVICE',
+      operation: 'getOrderStatus'
+    });
+    return requestId;
+  }
+
+  logOrderStatusSuccess(context: OrderStatusLogContext, orderData: any, requestId: string): void {
+    console.log(`[${new Date().toISOString()}] [INFO] [ORDER_STATUS] Order status retrieved successfully`, {
+      requestId,
+      ...context,
+      orderStatus: orderData.status,
+      symbol: orderData.tsym,
+      quantity: orderData.qty,
+      filledQuantity: orderData.fillshares,
+      responseTime: context.responseTime
+    });
+  }
+
+  logOrderStatusError(context: OrderStatusLogContext, error: any, requestId: string): void {
+    console.error(`[${new Date().toISOString()}] [ERROR] [ORDER_STATUS] Order status request failed`, {
+      requestId,
+      ...context,
+      errorMessage: error.message,
+      errorType: error.errorType || 'UNKNOWN_ERROR',
+      originalError: error.originalError
+    });
+  }
+
+  logApiCall(method: string, endpoint: string, duration: number, success: boolean, context?: any): void {
+    const level = success ? 'INFO' : 'ERROR';
+    console.log(`[${new Date().toISOString()}] [${level}] [API_CALL] ${method} ${endpoint} - ${success ? 'SUCCESS' : 'FAILED'} (${Math.round(duration)}ms)`, {
+      method,
+      endpoint,
+      duration: Math.round(duration),
+      success,
+      ...context
+    });
+  }
+
+  logRateLimit(context: OrderStatusLogContext, rateLimitInfo: any): void {
+    const level = rateLimitInfo.exceeded ? 'WARN' : 'DEBUG';
+    console.log(`[${new Date().toISOString()}] [${level}] [RATE_LIMIT] Rate limit check`, {
+      ...context,
+      exceeded: rateLimitInfo.exceeded,
+      remaining: rateLimitInfo.remaining,
+      resetTime: rateLimitInfo.resetTime
+    });
+  }
+}
+
+const structuredLogger = new StructuredLogger();
+
 export interface ShoonyaCredentials {
   userId: string;
   password: string;
@@ -278,48 +354,206 @@ export class ShoonyaService {
     }
   }
 
-  async getOrderStatus(userId: string, orderNumber: string): Promise<any> {
+  async getOrderStatus(userId: string, orderNumber: string, exchange?: string): Promise<any> {
+    const startTime = performance.now();
+    const logContext: OrderStatusLogContext = {
+      userId,
+      brokerName: 'shoonya',
+      accountId: userId,
+      operation: 'getOrderStatus',
+      orderId: orderNumber
+    };
+
+    // Start structured logging
+    const requestId = structuredLogger.logOrderStatusRequest(logContext);
+
     if (!this.sessionToken) {
-      throw new Error('Not logged in to Shoonya. Please login first.');
+      const error = new Error('Not logged in to Shoonya. Please login first.');
+      (error as any).errorType = 'SESSION_EXPIRED';
+      
+      // Log authentication error
+      structuredLogger.logOrderStatusError({
+        ...logContext,
+        responseTime: performance.now() - startTime
+      }, error, requestId);
+      
+      throw error;
     }
 
     try {
       console.log(`📊 Checking order status for order: ${orderNumber}`);
 
-      const response = await this.makeAuthenticatedRequest('SingleOrdStatus', {
+      // Build request parameters according to Shoonya API specification
+      const requestParams: any = {
         uid: userId,
-        actid: userId,
-        norenordno: orderNumber,
-        exch: 'NSE'
+        actid: userId, // Account ID (same as uid for most cases)
+        norenordno: orderNumber // Order number from Shoonya
+      };
+
+      // Add exchange if provided (optional but recommended)
+      if (exchange) {
+        requestParams.exch = exchange;
+      }
+
+      console.log('🔍 Shoonya getOrderStatus request params:', requestParams);
+
+      // Make API call with performance tracking
+      const apiStartTime = performance.now();
+      const response = await this.makeAuthenticatedRequest('SingleOrdStatus', requestParams);
+      const apiDuration = performance.now() - apiStartTime;
+
+      // Log API call performance
+      structuredLogger.logApiCall('POST', 'SingleOrdStatus', apiDuration, response?.stat === 'Ok', {
+        userId,
+        orderNumber,
+        exchange,
+        requestId
       });
 
+      console.log('🔍 Shoonya getOrderStatus raw response:', response);
+
+      const totalResponseTime = performance.now() - startTime;
+
+      // Handle successful response
       if (response && response.stat === 'Ok') {
         console.log(`📊 Order ${orderNumber} status: ${response.status}`);
-        return {
+        
+        // Transform response to standardized format with proper error handling
+        const transformedResponse = {
           stat: 'Ok',
-          orderNumber: response.norenordno,
-          status: response.status,
-          symbol: response.tsym,
-          quantity: response.qty,
-          price: response.prc,
+          norenordno: response.norenordno || orderNumber,
+          status: response.status || 'UNKNOWN',
+          tsym: response.tsym || '',
+          qty: response.qty || '0',
+          prc: response.prc || '0',
+          fillshares: response.fillshares || '0',
+          avgprc: response.avgprc || '0',
+          rejreason: response.rejreason || '',
+          norentm: response.norentm || '',
+          exch_tm: response.exch_tm || '',
+          // Legacy format for backward compatibility
+          orderNumber: response.norenordno || orderNumber,
+          symbol: response.tsym || '',
+          quantity: response.qty || '0',
+          price: response.prc || '0',
           executedQuantity: response.fillshares || '0',
           averagePrice: response.avgprc || '0',
           rejectionReason: response.rejreason || '',
-          orderTime: response.norentm,
-          updateTime: response.exch_tm,
+          orderTime: response.norentm || '',
+          updateTime: response.exch_tm || '',
           rawOrder: response
         };
+
+        // Log successful response
+        structuredLogger.logOrderStatusSuccess({
+          ...logContext,
+          responseTime: totalResponseTime
+        }, transformedResponse, requestId);
+
+        return transformedResponse;
       } else {
-        console.log(`⚠️ Failed to get order status: ${response?.emsg || 'Unknown error'}`);
-        return {
+        // Handle API error response
+        const errorMessage = response?.emsg || 'Failed to get order status';
+        console.log(`⚠️ Failed to get order status: ${errorMessage}`);
+        
+        // Create structured error response
+        const errorResponse = {
           stat: 'Not_Ok',
-          emsg: response?.emsg || 'Failed to get order status'
+          emsg: errorMessage,
+          originalError: errorMessage,
+          rawResponse: response,
+          errorType: this.categorizeApiError(response)
         };
+
+        // Log API error
+        structuredLogger.logOrderStatusError({
+          ...logContext,
+          responseTime: totalResponseTime
+        }, {
+          message: errorMessage,
+          errorType: errorResponse.errorType,
+          originalError: errorMessage
+        }, requestId);
+        
+        return errorResponse;
       }
     } catch (error: any) {
+      const totalResponseTime = performance.now() - startTime;
+      
       console.error('🚨 Shoonya get order status error:', error.message);
-      throw error;
+      
+      // Categorize the error for better logging
+      const errorType = this.categorizeNetworkError(error);
+      
+      // Log the error with structured logging
+      structuredLogger.logOrderStatusError({
+        ...logContext,
+        responseTime: totalResponseTime
+      }, {
+        message: error.message,
+        errorType,
+        originalError: error.message,
+        stack: error.stack
+      }, requestId);
+      
+      // Create enhanced error with additional context
+      const enhancedError = new Error(error.message);
+      (enhancedError as any).originalError = error.message;
+      (enhancedError as any).errorType = errorType;
+      (enhancedError as any).requestId = requestId;
+      (enhancedError as any).responseTime = totalResponseTime;
+      
+      throw enhancedError;
     }
+  }
+
+  /**
+   * Categorize API errors for better logging and error handling
+   */
+  private categorizeApiError(response: any): string {
+    if (!response || !response.emsg) {
+      return 'UNKNOWN_ERROR';
+    }
+
+    const errorMessage = response.emsg.toLowerCase();
+    
+    if (errorMessage.includes('session') || errorMessage.includes('token') || errorMessage.includes('login')) {
+      return 'SESSION_EXPIRED';
+    }
+    if (errorMessage.includes('order not found') || errorMessage.includes('invalid order')) {
+      return 'ORDER_NOT_FOUND';
+    }
+    if (errorMessage.includes('rate limit') || errorMessage.includes('too many requests')) {
+      return 'RATE_LIMITED';
+    }
+    if (errorMessage.includes('invalid') || errorMessage.includes('validation')) {
+      return 'VALIDATION_ERROR';
+    }
+    
+    return 'BROKER_ERROR';
+  }
+
+  /**
+   * Categorize network errors for better logging and error handling
+   */
+  private categorizeNetworkError(error: any): string {
+    if (error.code === 'ECONNRESET' || error.code === 'ECONNREFUSED') {
+      return 'NETWORK_ERROR';
+    }
+    if (error.code === 'ETIMEDOUT' || error.message?.includes('timeout')) {
+      return 'TIMEOUT_ERROR';
+    }
+    if (error.response?.status >= 500) {
+      return 'SERVER_ERROR';
+    }
+    if (error.response?.status === 429) {
+      return 'RATE_LIMITED';
+    }
+    if (error.response?.status >= 400 && error.response?.status < 500) {
+      return 'CLIENT_ERROR';
+    }
+    
+    return 'UNKNOWN_ERROR';
   }
 
   async getPositions(userId: string): Promise<any> {
@@ -432,5 +666,70 @@ export class ShoonyaService {
    */
   getUserId(): string | null {
     return this.userId;
+  }
+
+  // Legacy error handling methods removed - now using comprehensive error handler
+
+  /**
+   * Cancel an existing order
+   */
+  async cancelOrder(userId: string, orderNumber: string): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      console.log(`🚫 Cancelling Shoonya order: ${orderNumber}`);
+
+      const response = await this.makeAuthenticatedRequest('CancelOrder', {
+        uid: userId,
+        actid: userId,
+        norenordno: orderNumber
+      });
+
+      if (response && response.stat === 'Ok') {
+        console.log(`✅ Order ${orderNumber} cancelled successfully`);
+        return response;
+      } else {
+        console.log(`⚠️ Failed to cancel order: ${response?.emsg || 'Unknown error'}`);
+        throw new Error(response?.emsg || 'Order cancellation failed');
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya cancel order error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Modify an existing order
+   */
+  async modifyOrder(userId: string, orderNumber: string, modifications: any): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      console.log(`✏️ Modifying Shoonya order: ${orderNumber}`, modifications);
+
+      const requestData = {
+        uid: userId,
+        actid: userId,
+        norenordno: orderNumber,
+        ...modifications
+      };
+
+      const response = await this.makeAuthenticatedRequest('ModifyOrder', requestData);
+
+      if (response && response.stat === 'Ok') {
+        console.log(`✅ Order ${orderNumber} modified successfully`);
+        return response;
+      } else {
+        console.log(`⚠️ Failed to modify order: ${response?.emsg || 'Unknown error'}`);
+        throw new Error(response?.emsg || 'Order modification failed');
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya modify order error:', error.message);
+      throw error;
+    }
   }
 }

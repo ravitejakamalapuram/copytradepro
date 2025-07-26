@@ -1,26 +1,31 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './databaseCompatibility';
-import { BrokerRegistry, IBrokerService } from '@copytrade/unified-broker';
+import { BrokerRegistry, IBrokerService, IUnifiedBrokerService } from '@copytrade/unified-broker';
 import { notificationService, OrderNotificationData } from './notificationService';
 
-// Import unified broker manager
-import { unifiedBrokerManager } from './unifiedBrokerManager';
+// Import enhanced unified broker manager
+import { enhancedUnifiedBrokerManager } from './enhancedUnifiedBrokerManager';
 
 // Import WebSocket service for real-time updates
 import websocketService from './websocketService';
 
+// Import enhanced logging for order status operations
+import { orderStatusLogger, OrderStatusLogContext } from './orderStatusLogger';
+
 // Broker connection manager interface
 interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null;
+  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null;
 }
 
-// Create broker connection manager implementation
+// Create broker connection manager implementation using enhanced manager
 const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): IBrokerService | null {
+  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null {
     console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
 
-    // Get any connection for this broker
-    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+    // Get all connections for this user and broker from enhanced manager
+    const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
+      .filter(conn => conn.brokerName === brokerName);
+    
     if (connections.length === 0) {
       console.log(`❌ No ${brokerName} connections found for user ${userId}`);
       return null;
@@ -39,17 +44,26 @@ const brokerConnectionManager: BrokerConnectionManager = {
   }
 };
 
-// Legacy function for backward compatibility
-export const setBrokerConnectionManager = (manager: BrokerConnectionManager) => {
-  // No longer needed as we use the direct implementation above
-};
 
-// Simple logger
+
+// Enhanced logger with structured logging
 const logger = {
-  info: (message: string, ...args: any[]) => console.log(`[INFO] ${message}`, ...args),
-  warn: (message: string, ...args: any[]) => console.warn(`[WARN] ${message}`, ...args),
-  error: (message: string, ...args: any[]) => console.error(`[ERROR] ${message}`, ...args),
-  debug: (message: string, ...args: any[]) => console.debug(`[DEBUG] ${message}`, ...args),
+  info: (message: string, context?: any, data?: any) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] [INFO] [ORDER_STATUS_SERVICE] ${message}`, context || {}, data || {});
+  },
+  warn: (message: string, context?: any, data?: any) => {
+    const timestamp = new Date().toISOString();
+    console.warn(`[${timestamp}] [WARN] [ORDER_STATUS_SERVICE] ${message}`, context || {}, data || {});
+  },
+  error: (message: string, context?: any, error?: any) => {
+    const timestamp = new Date().toISOString();
+    console.error(`[${timestamp}] [ERROR] [ORDER_STATUS_SERVICE] ${message}`, context || {}, error || {});
+  },
+  debug: (message: string, context?: any, data?: any) => {
+    const timestamp = new Date().toISOString();
+    console.debug(`[${timestamp}] [DEBUG] [ORDER_STATUS_SERVICE] ${message}`, context || {}, data || {});
+  },
 };
 
 interface Order {
@@ -196,25 +210,91 @@ class OrderStatusService extends EventEmitter {
 
 
   /**
-   * Check status of a specific order using real Shoonya API
+   * Check status of a specific order using real broker API with enhanced logging
    */
   async checkOrderStatus(order: Order, retryCount: number = 0): Promise<void> {
+    const startTime = performance.now();
+    const operationId = `checkOrderStatus_${order.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Enhanced logging context
+    const logContext: OrderStatusLogContext = {
+      userId: order.user_id?.toString(),
+      brokerName: order.broker_name,
+      accountId: order.account_id?.toString(),
+      operation: 'checkOrderStatus',
+      orderId: order.id,
+      symbol: order.symbol,
+      quantity: order.quantity,
+      price: order.price,
+      orderType: order.order_type,
+      productType: order.product_type,
+      retryAttempt: retryCount
+    };
+    
+    // Add orderNumber only if it exists
+    if (order.broker_order_id) {
+      logContext.orderNumber = order.broker_order_id;
+    }
+
+    // Start performance tracking
+    orderStatusLogger.startPerformanceTracking(operationId, 'checkOrderStatus', logContext);
+
+    // Log operation start
+    logger.info('Order status check initiated', logContext, {
+      operationId,
+      currentStatus: order.status,
+      retryCount
+    });
+
     try {
       if (!order.broker_order_id) {
-        logger.warn(`Order ${order.id} has no broker_order_id`);
+        const error = new Error(`Order ${order.id} has no broker_order_id`);
+        
+        logger.warn('Order status check failed - missing broker order ID', logContext, {
+          operationId,
+          errorType: 'VALIDATION_ERROR'
+        });
+
+        orderStatusLogger.logOrderStatusError(logContext, {
+          message: error.message,
+          errorType: 'VALIDATION_ERROR'
+        });
+
+        orderStatusLogger.endPerformanceTracking(operationId, false, 'VALIDATION_ERROR');
         return;
       }
 
-      logger.debug(`Checking order status for ${order.symbol} (${order.broker_order_id})`);
+      logger.debug('Order status check parameters validated', logContext, {
+        operationId,
+        brokerOrderId: order.broker_order_id
+      });
 
       // Get the broker account ID from the order
       const brokerAccountId = await this.getBrokerAccountIdFromOrder(order);
       if (!brokerAccountId) {
-        logger.warn(`Could not get broker account ID for order ${order.id}`);
+        const error = new Error(`Could not get broker account ID for order ${order.id}`);
+        
+        logger.warn('Order status check failed - broker account ID not found', logContext, {
+          operationId,
+          errorType: 'ACCOUNT_NOT_FOUND'
+        });
+
+        orderStatusLogger.logOrderStatusError(logContext, {
+          message: error.message,
+          errorType: 'ACCOUNT_NOT_FOUND'
+        });
+
+        orderStatusLogger.endPerformanceTracking(operationId, false, 'ACCOUNT_NOT_FOUND');
         return;
       }
 
-      logger.debug(`Using broker account ID: ${brokerAccountId} for order ${order.id}`);
+      // Update log context with resolved account ID
+      logContext.accountId = brokerAccountId;
+
+      logger.debug('Broker account ID resolved', logContext, {
+        operationId,
+        brokerAccountId
+      });
 
       let newStatus = order.status;
 
@@ -222,68 +302,228 @@ class OrderStatusService extends EventEmitter {
       if (brokerConnectionManager) {
         try {
           // Get the broker connection for the user
-          const brokerService = brokerConnectionManager.getBrokerConnection(brokerAccountId, order.broker_name);
+          const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
           if (brokerService) {
-            logger.debug(`Getting real order status from ${order.broker_name} API for order ${order.broker_order_id}`);
+            logger.debug('Broker connection found, calling API', logContext, {
+              operationId,
+              brokerService: !!brokerService
+            });
 
-            // Try to get order status from broker API
-            logger.debug(`Calling broker API for order status: ${order.broker_order_id}`);
+            // Log the API request
+            orderStatusLogger.logOrderStatusRequest(logContext);
+
+            // Try to get order status from broker API with performance tracking
+            const apiStartTime = performance.now();
+            logger.debug('Calling broker API for order status', logContext, {
+              operationId,
+              brokerOrderId: order.broker_order_id
+            });
+
             const brokerStatus = await brokerService.getOrderStatus(brokerAccountId, order.broker_order_id);
-            logger.debug(`Broker API response:`, brokerStatus);
+            const apiDuration = performance.now() - apiStartTime;
+
+            // Update log context with API response time
+            logContext.responseTime = apiDuration;
+
+            logger.debug('Broker API response received', logContext, {
+              operationId,
+              apiDuration: Math.round(apiDuration),
+              responseType: typeof brokerStatus,
+              hasResponse: !!brokerStatus
+            });
 
             // Handle different broker response formats
             if (brokerStatus) {
               let statusValue = '';
+              let brokerResponseData: any = {};
 
               // Handle unified response format
               if ((brokerStatus as any).success && (brokerStatus as any).data) {
                 statusValue = (brokerStatus as any).data.status;
+                brokerResponseData = (brokerStatus as any).data;
               }
-              // Handle legacy Shoonya format
+              // Handle Shoonya response format
               else if ((brokerStatus as any).stat === 'Ok') {
                 statusValue = (brokerStatus as any).status;
+                brokerResponseData = brokerStatus;
               }
               // Handle direct OrderStatus format
               else if (brokerStatus.status) {
                 statusValue = brokerStatus.status;
+                brokerResponseData = brokerStatus;
               }
 
               if (statusValue) {
                 const mappedStatus = this.mapBrokerStatus(statusValue, order.broker_name);
+                
+                logger.debug('Order status mapping completed', logContext, {
+                  operationId,
+                  originalStatus: statusValue,
+                  mappedStatus,
+                  currentStatus: order.status,
+                  statusChanged: mappedStatus !== order.status
+                });
+
                 if (mappedStatus !== order.status) {
                   newStatus = mappedStatus;
-                  logger.info(`📊 Real API: Order ${order.id} status changed from ${order.status} to ${newStatus}`);
+                  
+                  logger.info('Order status changed via broker API', logContext, {
+                    operationId,
+                    previousStatus: order.status,
+                    newStatus: mappedStatus,
+                    brokerStatus: statusValue
+                  });
+
+                  // Log successful status change
+                  orderStatusLogger.logOrderStatusSuccess(logContext, {
+                    ...brokerResponseData,
+                    status: mappedStatus,
+                    previousStatus: order.status
+                  });
+                } else {
+                  logger.debug('Order status unchanged', logContext, {
+                    operationId,
+                    status: order.status
+                  });
+
+                  // Log successful status retrieval (no change)
+                  orderStatusLogger.logOrderStatusSuccess(logContext, brokerResponseData);
                 }
               } else {
-                logger.warn(`Failed to get order status from broker API: ${(brokerStatus as any)?.emsg || 'Unknown error'}`);
+                const errorMessage = (brokerStatus as any)?.emsg || 'Unknown error';
+                
+                logger.warn('Failed to extract status from broker API response', logContext, {
+                  operationId,
+                  errorMessage,
+                  responseFormat: typeof brokerStatus
+                });
+
+                orderStatusLogger.logOrderStatusError(logContext, {
+                  message: `Failed to get order status from broker API: ${errorMessage}`,
+                  errorType: 'BROKER_RESPONSE_ERROR',
+                  originalError: errorMessage
+                });
               }
+            } else {
+              logger.warn('Empty response from broker API', logContext, {
+                operationId,
+                brokerResponse: brokerStatus
+              });
+
+              orderStatusLogger.logOrderStatusError(logContext, {
+                message: 'Empty response from broker API',
+                errorType: 'EMPTY_RESPONSE'
+              });
             }
           } else {
-            logger.warn(`No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`);
+            logger.warn('No active broker connection found', logContext, {
+              operationId,
+              brokerAccountId,
+              brokerName: order.broker_name
+            });
+
+            orderStatusLogger.logOrderStatusError(logContext, {
+              message: `No active broker connection found for user ${brokerAccountId} and broker ${order.broker_name}`,
+              errorType: 'CONNECTION_NOT_FOUND'
+            });
           }
         } catch (apiError: any) {
-          logger.error(`Error calling Shoonya API for order ${order.id}:`, apiError.message);
-          // Fall back to simulation if API call fails
-        }
-      }
+          const apiDuration = performance.now() - startTime;
+          logContext.responseTime = apiDuration;
 
-      // Status will only change based on real broker API responses
+          logger.error('Broker API call failed', logContext, {
+            operationId,
+            errorMessage: apiError.message,
+            errorType: apiError.errorType || 'API_ERROR',
+            apiDuration: Math.round(apiDuration)
+          });
+
+          orderStatusLogger.logOrderStatusError(logContext, {
+            message: `Error calling ${order.broker_name} API for order ${order.id}: ${apiError.message}`,
+            errorType: apiError.errorType || 'API_ERROR',
+            originalError: apiError.message
+          });
+
+          // Don't throw here - we want to continue with status update logic
+        }
+      } else {
+        logger.warn('Broker connection manager not available', logContext, {
+          operationId
+        });
+      }
 
       // Update status if changed
       if (newStatus !== order.status) {
+        const dbStartTime = performance.now();
         await this.updateOrderStatus(order, newStatus);
+        const dbDuration = performance.now() - dbStartTime;
+
+        // Log database operation
+        orderStatusLogger.logDatabaseOperation(logContext, 'updateOrderStatus', true, {
+          queryTime: Math.round(dbDuration),
+          previousStatus: order.status,
+          newStatus
+        });
+
+        logger.info('Order status updated in database', logContext, {
+          operationId,
+          previousStatus: order.status,
+          newStatus,
+          dbDuration: Math.round(dbDuration)
+        });
       }
 
-    } catch (error) {
-      logger.error(`Error checking status for order ${order.id}:`, error);
+      // End performance tracking with success
+      orderStatusLogger.endPerformanceTracking(operationId, true);
 
-      // Retry logic
+      const totalDuration = performance.now() - startTime;
+      logger.info('Order status check completed successfully', logContext, {
+        operationId,
+        totalDuration: Math.round(totalDuration),
+        statusChanged: newStatus !== order.status,
+        finalStatus: newStatus
+      });
+
+    } catch (error: any) {
+      const totalDuration = performance.now() - startTime;
+      logContext.responseTime = totalDuration;
+
+      logger.error('Order status check failed with unexpected error', logContext, {
+        operationId,
+        errorMessage: error.message,
+        totalDuration: Math.round(totalDuration),
+        retryCount
+      });
+
+      orderStatusLogger.logOrderStatusError(logContext, {
+        message: `Error checking status for order ${order.id}: ${error.message}`,
+        errorType: 'UNEXPECTED_ERROR',
+        originalError: error.message
+      });
+
+      orderStatusLogger.endPerformanceTracking(operationId, false, 'UNEXPECTED_ERROR');
+
+      // Retry logic with enhanced logging
       if (retryCount < this.maxRetries) {
-        logger.info(`Retrying status check for order ${order.id} (attempt ${retryCount + 1})`);
+        const retryDelay = 1000 * (retryCount + 1); // Exponential backoff
+        
+        logger.info('Scheduling retry for order status check', logContext, {
+          operationId,
+          retryAttempt: retryCount + 1,
+          maxRetries: this.maxRetries,
+          retryDelay
+        });
+
         setTimeout(() => {
           this.checkOrderStatus(order, retryCount + 1);
-        }, 1000 * (retryCount + 1)); // Exponential backoff
+        }, retryDelay);
+      } else {
+        logger.error('Max retries exceeded for order status check', logContext, {
+          operationId,
+          maxRetries: this.maxRetries,
+          finalError: error.message
+        });
       }
     }
   }
@@ -316,7 +556,7 @@ class OrderStatusService extends EventEmitter {
 
       // Fallback: Try to get account info from order history table
       logger.debug(`Fallback: Checking order history for order ${order.id}`);
-      const orderHistory = await userDatabase.getOrderHistoryById(typeof order.id === 'string' ? parseInt(order.id) : order.id);
+      const orderHistory = await userDatabase.getOrderHistoryById(order.id.toString());
       logger.debug(`Order history found:`, orderHistory ? 'Yes' : 'No');
 
       if (orderHistory) {
@@ -336,9 +576,9 @@ class OrderStatusService extends EventEmitter {
       logger.debug(`Final fallback: Checking active broker connections for user ${order.user_id}`);
       const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
 
-      if (brokerService && brokerService.isLoggedIn()) {
+      if (brokerService && brokerService.isConnected()) {
         // Try to get broker account ID from the service
-        const brokerServiceTyped = brokerService as any; // Type assertion for legacy compatibility
+        const brokerServiceTyped = brokerService as any; // Type assertion for broker service capabilities
 
         // Try different methods to get the account ID based on broker capabilities
         let accountId = null;
@@ -418,7 +658,7 @@ class OrderStatusService extends EventEmitter {
 
 
   /**
-   * Update order status in database and emit event
+   * Update order status in database and emit event with enhanced logging
    */
   async updateOrderStatus(order: Order, newStatus: string, executionData?: {
     executedQuantity?: number;
@@ -426,27 +666,100 @@ class OrderStatusService extends EventEmitter {
     rejectionReason?: string;
     updateTime?: string;
   }): Promise<void> {
+    const startTime = performance.now();
+    const operationId = `updateOrderStatus_${order.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Enhanced logging context
+    const logContext: OrderStatusLogContext = {
+      userId: order.user_id?.toString(),
+      brokerName: order.broker_name,
+      accountId: order.account_id?.toString(),
+      operation: 'updateOrderStatus',
+      orderId: order.id,
+      symbol: order.symbol,
+      quantity: order.quantity,
+      price: order.price,
+      orderType: order.order_type,
+      productType: order.product_type
+    };
+    
+    // Add orderNumber only if it exists
+    if (order.broker_order_id) {
+      logContext.orderNumber = order.broker_order_id;
+    }
+
     try {
       const oldStatus = order.status;
       const now = new Date().toISOString();
 
+      logger.info('Order status update initiated', logContext, {
+        operationId,
+        previousStatus: oldStatus,
+        newStatus,
+        executionData: executionData || {}
+      });
+
       // Update in SQLite database (order_history table)
-      logger.info(`Updating order ${order.id} in database: ${oldStatus} → ${newStatus}`);
+      logger.info('Updating order in database', logContext, {
+        operationId,
+        statusChange: `${oldStatus} → ${newStatus}`,
+        brokerOrderId: order.broker_order_id
+      });
+
+      let dbUpdateSuccess = false;
+      let dbUpdateDuration = 0;
 
       try {
+        const dbStartTime = performance.now();
+        
         // Use the broker_order_id to update the database
         const updated = await userDatabase.updateOrderStatus(
-          parseInt(order.broker_order_id || order.id),
+          (order.broker_order_id || order.id).toString(),
           newStatus as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED'
         );
 
-        if (await updated) {
-          logger.info(`✅ Database updated successfully for order ${order.id}`);
+        dbUpdateDuration = performance.now() - dbStartTime;
+        dbUpdateSuccess = !!updated;
+
+        // Log database operation result
+        orderStatusLogger.logDatabaseOperation(logContext, 'updateOrderStatus', dbUpdateSuccess, {
+          queryTime: Math.round(dbUpdateDuration),
+          recordsAffected: updated ? 1 : 0,
+          previousStatus: oldStatus,
+          newStatus
+        });
+
+        if (dbUpdateSuccess) {
+          logger.info('Database update successful', logContext, {
+            operationId,
+            dbDuration: Math.round(dbUpdateDuration),
+            recordsUpdated: 1
+          });
         } else {
-          logger.warn(`⚠️ No rows updated in database for order ${order.id} (broker_order_id: ${order.broker_order_id})`);
+          logger.warn('Database update returned no affected rows', logContext, {
+            operationId,
+            dbDuration: Math.round(dbUpdateDuration),
+            brokerOrderId: order.broker_order_id,
+            orderId: order.id
+          });
         }
       } catch (dbError: any) {
-        logger.error(`🚨 Failed to update database for order ${order.id}:`, dbError.message);
+        dbUpdateDuration = performance.now() - startTime;
+        
+        logger.error('Database update failed', logContext, {
+          operationId,
+          errorMessage: dbError.message,
+          dbDuration: Math.round(dbUpdateDuration)
+        });
+
+        // Log database operation failure
+        orderStatusLogger.logDatabaseOperation(logContext, 'updateOrderStatus', false, {
+          queryTime: Math.round(dbUpdateDuration),
+          error: dbError,
+          retryable: true
+        });
+
+        // Don't throw here - continue with other operations
       }
 
       // Update local order object
@@ -456,10 +769,18 @@ class OrderStatusService extends EventEmitter {
       }
       order.updated_at = now;
 
-      logger.info(`Order ${order.id} status updated: ${oldStatus} → ${newStatus}`);
+      logger.info('Local order object updated', logContext, {
+        operationId,
+        statusChange: `${oldStatus} → ${newStatus}`,
+        executedAt: order.executed_at,
+        updatedAt: order.updated_at
+      });
 
       // Broadcast real-time update via WebSocket
+      let wsUpdateSuccess = false;
       try {
+        const wsStartTime = performance.now();
+        
         const orderUpdateData = {
           orderId: order.id,
           brokerOrderId: order.broker_order_id,
@@ -478,14 +799,44 @@ class OrderStatusService extends EventEmitter {
 
         // Emit to user-specific room
         websocketService.sendToUser(order.user_id.toString(), 'orderStatusUpdate', orderUpdateData);
-        logger.info(`📡 WebSocket update sent for order ${order.id} status change`);
+        
+        const wsDuration = performance.now() - wsStartTime;
+        wsUpdateSuccess = true;
+
+        // Log WebSocket broadcast
+        orderStatusLogger.logWebSocketBroadcast(logContext, {
+          orderId: order.id,
+          status: newStatus,
+          recipientCount: 1, // Single user
+          type: 'orderStatusUpdate',
+          broadcastDuration: Math.round(wsDuration)
+        });
+
+        logger.info('WebSocket update sent successfully', logContext, {
+          operationId,
+          wsDuration: Math.round(wsDuration),
+          recipientUserId: order.user_id.toString(),
+          eventType: 'orderStatusUpdate'
+        });
+
       } catch (wsError: any) {
-        logger.error(`Failed to send WebSocket update for order ${order.id}:`, wsError.message);
+        const wsDuration = performance.now() - startTime;
+        
+        logger.error('WebSocket update failed', logContext, {
+          operationId,
+          errorMessage: wsError.message,
+          wsDuration: Math.round(wsDuration),
+          recipientUserId: order.user_id.toString()
+        });
+
         // Don't fail the entire operation if WebSocket fails
       }
 
       // Send push notification for order status change
+      let notificationSuccess = false;
       try {
+        const notificationStartTime = performance.now();
+        
         const orderNotificationData: OrderNotificationData = {
           orderId: order.id,
           symbol: order.symbol,
@@ -499,18 +850,102 @@ class OrderStatusService extends EventEmitter {
         };
 
         await notificationService.sendOrderStatusNotification(order.user_id.toString(), orderNotificationData);
-        logger.info(`📱 Push notification sent for order ${order.id} status change`);
-      } catch (notificationError) {
-        logger.error(`Failed to send push notification for order ${order.id}:`, notificationError);
+        
+        const notificationDuration = performance.now() - notificationStartTime;
+        notificationSuccess = true;
+
+        logger.info('Push notification sent successfully', logContext, {
+          operationId,
+          notificationDuration: Math.round(notificationDuration),
+          recipientUserId: order.user_id.toString(),
+          notificationType: 'orderStatusUpdate'
+        });
+
+      } catch (notificationError: any) {
+        const notificationDuration = performance.now() - startTime;
+        
+        logger.error('Push notification failed', logContext, {
+          operationId,
+          errorMessage: notificationError.message,
+          notificationDuration: Math.round(notificationDuration),
+          recipientUserId: order.user_id.toString()
+        });
+
         // Don't fail the entire operation if notification fails
       }
 
       // Remove from monitoring if order is complete
-      if (['EXECUTED', 'CANCELLED', 'REJECTED'].includes(newStatus)) {
-        this.removeOrderFromMonitoring(order);
+      const isCompleteStatus = ['EXECUTED', 'CANCELLED', 'REJECTED'].includes(newStatus);
+      if (isCompleteStatus) {
+        try {
+          this.removeOrderFromMonitoring(order);
+          
+          logger.info('Order removed from monitoring', logContext, {
+            operationId,
+            reason: 'Order completed',
+            finalStatus: newStatus
+          });
+        } catch (monitoringError: any) {
+          logger.warn('Failed to remove order from monitoring', logContext, {
+            operationId,
+            errorMessage: monitoringError.message
+          });
+        }
       }
 
-    } catch (error) {
+      const totalDuration = performance.now() - startTime;
+
+      // Create comprehensive audit log entry
+      orderStatusLogger.createAuditLog({
+        userId: order.user_id?.toString() || '',
+        accountId: order.account_id?.toString() || '',
+        brokerName: order.broker_name,
+        operation: 'updateOrderStatus',
+        orderId: order.id,
+        previousStatus: oldStatus,
+        newStatus: newStatus,
+        changes: {
+          status: { from: oldStatus, to: newStatus },
+          executionData: executionData || {},
+          updatedAt: now,
+          ...(newStatus === 'EXECUTED' && { executedAt: now })
+        },
+        success: true
+      } as any);
+
+      logger.info('Order status update completed successfully', logContext, {
+        operationId,
+        totalDuration: Math.round(totalDuration),
+        statusChange: `${oldStatus} → ${newStatus}`,
+        dbUpdateSuccess,
+        wsUpdateSuccess,
+        notificationSuccess,
+        isCompleteStatus
+      });
+
+    } catch (error: any) {
+      const totalDuration = performance.now() - startTime;
+      
+      logger.error('Order status update failed with unexpected error', logContext, {
+        operationId,
+        errorMessage: error.message,
+        totalDuration: Math.round(totalDuration),
+        stack: error.stack
+      });
+
+      // Create audit log entry for failure
+      orderStatusLogger.createAuditLog({
+        userId: order.user_id?.toString() || '',
+        accountId: order.account_id?.toString() || '',
+        brokerName: order.broker_name,
+        operation: 'updateOrderStatus',
+        orderId: order.id,
+        success: false,
+        errorMessage: error.message
+      } as any);
+
+      // Re-throw the error to maintain existing error handling behavior
+      throw error;
       logger.error(`Failed to update order ${order.id} status:`, error);
     }
   }
@@ -618,7 +1053,7 @@ class OrderStatusService extends EventEmitter {
       logger.info(`🔄 Manual order status refresh requested for order ${orderId}`);
 
       // Find the order in database
-      const orderHistory = await userDatabase.getOrderHistoryById(parseInt(orderId));
+      const orderHistory = await userDatabase.getOrderHistoryById(orderId);
       if (!orderHistory) {
         return {
           success: false,

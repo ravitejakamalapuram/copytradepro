@@ -201,6 +201,47 @@ export class FyersService {
     }
   }
 
+  // Cancel order using official API
+  async cancelOrder(orderId: string): Promise<FyersOrderResponse> {
+    if (!this.accessToken) {
+      throw new Error('Not authenticated. Please login first.');
+    }
+
+    try {
+      const payload = {
+        id: orderId
+      };
+
+      const response = await this.fyers.cancel_order(payload);
+      console.log('✅ Order cancelled successfully:', response);
+      return response;
+    } catch (error: any) {
+      console.error('🚨 Failed to cancel order:', error);
+      throw new Error(error.message || 'Order cancellation failed');
+    }
+  }
+
+  // Modify order using official API
+  async modifyOrder(orderId: string, modifications: any): Promise<FyersOrderResponse> {
+    if (!this.accessToken) {
+      throw new Error('Not authenticated. Please login first.');
+    }
+
+    try {
+      const payload = {
+        id: orderId,
+        ...modifications
+      };
+
+      const response = await this.fyers.modify_order(payload);
+      console.log('✅ Order modified successfully:', response);
+      return response;
+    } catch (error: any) {
+      console.error('🚨 Failed to modify order:', error);
+      throw new Error(error.message || 'Order modification failed');
+    }
+  }
+
   // Get order book using official API
   async getOrderBook(): Promise<any[]> {
     if (!this.accessToken) {

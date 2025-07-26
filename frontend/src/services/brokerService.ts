@@ -267,9 +267,15 @@ export const brokerService = {
         return error.response.data;
       }
 
+      // Return standardized error format for network errors
       return {
         success: false,
-        message: 'Network error. Please check your connection and try again.',
+        error: {
+          message: 'Network error. Please check your connection and try again.',
+          code: 'NETWORK_ERROR',
+          retryable: true
+        },
+        timestamp: new Date().toISOString()
       };
     }
   },
@@ -463,7 +469,12 @@ export const brokerService = {
       
       return {
         success: false,
-        message: 'Network error. Please check your connection and try again.',
+        error: {
+          message: 'Network error. Please check your connection and try again.',
+          code: 'NETWORK_ERROR',
+          retryable: true
+        },
+        timestamp: new Date().toISOString()
       };
     }
   },
@@ -490,7 +501,12 @@ export const brokerService = {
       
       return {
         success: false,
-        message: 'Network error. Please check your connection and try again.',
+        error: {
+          message: 'Network error. Please check your connection and try again.',
+          code: 'NETWORK_ERROR',
+          retryable: true
+        },
+        timestamp: new Date().toISOString()
       };
     }
   },
@@ -555,4 +571,48 @@ export const brokerService = {
       };
     }
   },
+
+  async retryOrder(orderId: string): Promise<{ success: boolean; message: string; data?: any }> {
+    try {
+      const response = await api.post(`/broker/retry-order/${orderId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to retry order:', error);
+
+      if (error.response?.data) {
+        return {
+          success: false,
+          message: error.response.data.message || 'Failed to retry order',
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Network error. Please check your connection and try again.',
+      };
+    }
+  },
+
+  async deleteOrder(orderId: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.delete(`/broker/delete-order/${orderId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Failed to delete order:', error);
+
+      if (error.response?.data) {
+        return {
+          success: false,
+          message: error.response.data.message || 'Failed to delete order',
+        };
+      }
+
+      return {
+        success: false,
+        message: 'Network error. Please check your connection and try again.',
+      };
+    }
+  },
+
+
 };

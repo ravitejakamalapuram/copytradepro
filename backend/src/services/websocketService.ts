@@ -324,6 +324,124 @@ class WebSocketService {
     this.io.to(`user:${userId}`).emit(event, data);
   }
 
+  /**
+   * Enhanced order status broadcasting with retry logic and error handling
+   * @param userId - User ID to broadcast to
+   * @param orderUpdate - Order update data
+   * @param options - Broadcasting options
+   */
+  async broadcastOrderStatusUpdate(
+    userId: string, 
+    orderUpdate: {
+      orderId: string;
+      brokerOrderId: string;
+      status: string;
+      previousStatus?: string;
+      timestamp: Date;
+      symbol?: string;
+      executedQuantity?: number;
+      averagePrice?: number;
+      rejectionReason?: string;
+    },
+    options: {
+      maxRetries?: number;
+      retryDelay?: number;
+      requireAcknowledgment?: boolean;
+    } = {}
+  ): Promise<{ success: boolean; error?: string; retriesUsed?: number }> {
+    const { maxRetries = 3, retryDelay = 1000, requireAcknowledgment = false } = options;
+    
+    if (!this.io) {
+      logger.warn('WebSocket service not initialized, cannot broadcast order update');
+      return { success: false, error: 'WebSocket service not initialized' };
+    }
+
+    const userSockets = this.userSockets.get(userId);
+    if (!userSockets || userSockets.size === 0) {
+      logger.debug(`No active connections for user ${userId}, skipping broadcast`);
+      return { success: true }; // Not an error, just no connections
+    }
+
+    let retriesUsed = 0;
+    let lastError: string | undefined;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const broadcastData = {
+          ...orderUpdate,
+          timestamp: orderUpdate.timestamp.toISOString(),
+          broadcastId: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          attempt: attempt + 1
+        };
+
+        if (requireAcknowledgment) {
+          // Send with acknowledgment requirement
+          const promises = Array.from(userSockets).map(socketId => {
+            const socket = this.io!.sockets.sockets.get(socketId);
+            if (socket) {
+              return new Promise<void>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  reject(new Error('Acknowledgment timeout'));
+                }, 5000);
+
+                socket.emit('order_status_update', broadcastData, (ack: any) => {
+                  clearTimeout(timeout);
+                  if (ack && ack.received) {
+                    resolve();
+                  } else {
+                    reject(new Error('Invalid acknowledgment'));
+                  }
+                });
+              });
+            }
+            return Promise.resolve();
+          });
+
+          await Promise.all(promises);
+        } else {
+          // Simple broadcast without acknowledgment
+          this.io.to(`user:${userId}`).emit('order_status_update', broadcastData);
+        }
+
+        logger.info(`Order status update broadcasted successfully to user ${userId}`, {
+          orderId: orderUpdate.orderId,
+          status: orderUpdate.status,
+          attempt: attempt + 1,
+          connectionsCount: userSockets.size
+        });
+
+        return { success: true, retriesUsed };
+
+      } catch (error: any) {
+        retriesUsed = attempt + 1;
+        lastError = error.message;
+        
+        logger.warn(`Order status broadcast attempt ${attempt + 1} failed for user ${userId}:`, {
+          error: error.message,
+          orderId: orderUpdate.orderId,
+          willRetry: attempt < maxRetries
+        });
+
+        if (attempt < maxRetries) {
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, retryDelay * (attempt + 1)));
+        }
+      }
+    }
+
+    logger.error(`Failed to broadcast order status update to user ${userId} after ${maxRetries + 1} attempts`, {
+      orderId: orderUpdate.orderId,
+      lastError,
+      retriesUsed
+    });
+
+    const result: any = { success: false, retriesUsed };
+    if (lastError) {
+      result.error = lastError;
+    }
+    return result;
+  }
+
 
 
   /**

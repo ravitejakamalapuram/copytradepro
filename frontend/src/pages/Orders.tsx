@@ -5,7 +5,8 @@ import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
-import { useToast } from '../components/Toast'; // Added import for Button
+import { useToast } from '../components/Toast';
+import Popover from '../components/ui/Popover';
 
 interface Order {
   id: string;
@@ -15,7 +16,7 @@ interface Order {
   qty: number;
   price?: number;
   triggerPrice?: number;
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   time: string;
   filledQty: number;
   avgPrice?: number;
@@ -23,6 +24,14 @@ interface Order {
   brokerName?: string;
   brokerOrderId?: string;
   exchange?: string;
+  // Enhanced fields for error handling
+  errorMessage?: string;
+  errorCode?: string;
+  errorType?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+  retryCount?: number;
+  maxRetries?: number;
+  isRetryable?: boolean;
+  failureReason?: string;
   accountInfo?: {
     account_id: string;
     user_name: string;
@@ -34,7 +43,7 @@ const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'executed' | 'failed'>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
@@ -133,7 +142,7 @@ const Orders: React.FC = () => {
           qty: order.quantity,
           price: order.price,
           triggerPrice: 0, // Not available in broker order history
-          status: order.status.toUpperCase() as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED',
+          status: order.status.toUpperCase() as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED',
           time: new Date(order.executed_at || order.created_at).toLocaleTimeString('en-IN', {
             hour: '2-digit',
             minute: '2-digit',
@@ -145,6 +154,14 @@ const Orders: React.FC = () => {
           brokerName: order.broker_name,
           brokerOrderId: order.broker_order_id,
           exchange: order.exchange,
+          // Enhanced error information
+          errorMessage: order.error_message,
+          errorCode: order.error_code,
+          errorType: order.error_type,
+          retryCount: order.retry_count || 0,
+          maxRetries: order.max_retries || 3,
+          isRetryable: order.is_retryable || false,
+          failureReason: order.failure_reason,
           accountInfo: order.account_info
         }));
 
@@ -257,6 +274,7 @@ const Orders: React.FC = () => {
   const filteredOrders = filterOrdersByAccount(orders).filter(order => {
     if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
     if (activeTab === 'executed') return order.status === 'EXECUTED';
+    if (activeTab === 'failed') return ['FAILED', 'REJECTED', 'CANCELLED'].includes(order.status);
     return true;
   });
 
@@ -275,6 +293,7 @@ const Orders: React.FC = () => {
       case 'PARTIALLY_FILLED': return 'var(--color-neutral)';
       case 'CANCELLED': return 'var(--text-secondary)';
       case 'REJECTED': return 'var(--color-loss)';
+      case 'FAILED': return 'var(--color-loss)';
       default: return 'var(--text-primary)';
     }
   };
@@ -284,18 +303,54 @@ const Orders: React.FC = () => {
   };
 
   const handleModifyOrder = (orderId: string) => {
-    // TODO: Implement order modification
+    // TODO: Implement order modification UI
+    showToast({
+      type: 'info',
+      title: 'Feature Coming Soon',
+      message: 'Order modification feature is under development.'
+    });
     console.log('Modify order:', orderId);
   };
 
   const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to cancel this order?')) {
+      return;
+    }
+
     try {
-      // TODO: Implement broker order cancellation
-      console.log('Cancel order:', orderId);
-      // For now, just refresh the orders
-      await fetchOrders();
-    } catch (error) {
+      setCheckingStatus(prev => new Set(prev).add(orderId));
+
+      const response = await brokerService.cancelOrder(orderId);
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Order Cancelled',
+          message: 'Order has been cancelled successfully.'
+        });
+
+        // Refresh orders to show updated status
+        await fetchOrders();
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Cancellation Failed',
+          message: response.message || 'Failed to cancel order.'
+        });
+      }
+    } catch (error: any) {
       console.error('Failed to cancel order:', error);
+      showToast({
+        type: 'error',
+        title: 'Cancellation Error',
+        message: 'An error occurred while cancelling the order.'
+      });
+    } finally {
+      setCheckingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
     }
   };
 
@@ -312,9 +367,13 @@ const Orders: React.FC = () => {
       const response = await brokerService.checkOrderStatus(orderId);
 
       if (response.success) {
-        const { statusChanged, previousStatus, currentStatus, message } = response.data;
+        const { statusChanged, previousStatus, status: currentStatus } = response.data;
 
-        // Show success message
+        // Show success message based on status change
+        const message = statusChanged 
+          ? `Order status changed from ${previousStatus} to ${currentStatus}`
+          : `Order status confirmed: ${currentStatus}`;
+        
         setStatusMessage(message);
         setTimeout(() => setStatusMessage(null), 5000);
 
@@ -327,7 +386,7 @@ const Orders: React.FC = () => {
           )
         );
 
-        console.log(`✅ Manual status check result: ${previousStatus} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
+        console.log(`✅ Manual status check result: ${previousStatus || 'N/A'} → ${currentStatus}${statusChanged ? ' (CHANGED)' : ' (NO CHANGE)'}`);
 
         if (statusChanged) {
           showToast({
@@ -343,23 +402,116 @@ const Orders: React.FC = () => {
           });
         }
       } else {
+        // Handle standardized error response format
+        const errorMessage = response.error?.message || response.message || 'Failed to check order status.';
         showToast({
           type: 'error',
           title: 'Status Check Failed',
-          message: response.message || 'Failed to check order status.'
+          message: errorMessage
         });
-        console.error('Failed to check order status:', response.message);
+        console.error('Failed to check order status:', errorMessage);
       }
 
     } catch (error: any) {
       console.error('Failed to check order status:', error);
+      
+      // Handle both network errors and API error responses
+      let errorMessage = 'Failed to check order status.';
+      if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       showToast({
         type: 'error',
         title: 'Status Check Error',
-        message: error.message || 'Failed to check order status.'
+        message: errorMessage
       });
     } finally {
       // Remove from checking set
+      setCheckingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRetryOrder = async (orderId: string) => {
+    try {
+      setCheckingStatus(prev => new Set(prev).add(orderId));
+
+      const response = await brokerService.retryOrder(orderId);
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Order Retry Successful',
+          message: `Order ${orderId} has been retried successfully.`
+        });
+
+        // Refresh orders to show updated status
+        await fetchOrders();
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Retry Failed',
+          message: response.message || 'Failed to retry order.'
+        });
+      }
+    } catch (error: unknown) {
+      console.error('Failed to retry order:', error);
+      showToast({
+        type: 'error',
+        title: 'Retry Error',
+        message: 'An error occurred while retrying the order.'
+      });
+    } finally {
+      setCheckingStatus(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to delete this failed order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      setCheckingStatus(prev => new Set(prev).add(orderId));
+
+      const response = await brokerService.deleteOrder(orderId);
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Order Deleted',
+          message: 'Failed order has been deleted successfully.'
+        });
+
+        // Remove order from local state
+        setOrders(prev => prev.filter(order => order.id !== orderId));
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Delete Failed',
+          message: response.message || 'Failed to delete order.'
+        });
+      }
+    } catch (error: unknown) {
+      console.error('Failed to delete order:', error);
+      showToast({
+        type: 'error',
+        title: 'Delete Error',
+        message: 'An error occurred while deleting the order.'
+      });
+    } finally {
       setCheckingStatus(prev => {
         const newSet = new Set(prev);
         newSet.delete(orderId);
@@ -731,12 +883,13 @@ const Orders: React.FC = () => {
               {[
                 { key: 'all', label: 'All', count: orders.length },
                 { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
-                { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length }
+                { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length },
+                { key: 'failed', label: 'Failed', count: orders.filter(o => ['FAILED', 'REJECTED', 'CANCELLED'].includes(o.status)).length }
               ].map(tab => (
                 <Button
                   key={tab.key}
                   variant={activeTab === tab.key ? 'primary' : 'secondary'}
-                  onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed')}
+                  onClick={() => setActiveTab(tab.key as unknown as 'all' | 'pending' | 'executed' | 'failed')}
                   size="sm"
                   style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                 >
@@ -897,12 +1050,60 @@ const Orders: React.FC = () => {
                         {order.triggerPrice ? formatCurrency(order.triggerPrice) : '-'}
                       </td>
                       <td>
-                        <span className="status-badge" style={{
-                          color: getStatusColor(order.status),
-                          backgroundColor: `${getStatusColor(order.status)}15`
-                        }}>
-                          {order.status}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span className="status-badge" style={{
+                            color: getStatusColor(order.status),
+                            backgroundColor: `${getStatusColor(order.status)}15`
+                          }}>
+                            {order.status}
+                          </span>
+
+                          {/* Error indicator for failed orders - shows details on hover */}
+                          {['FAILED', 'REJECTED'].includes(order.status) && order.errorMessage && (
+                            <Popover
+                              placement="top"
+                              delay={200}
+                              trigger={
+                                <div
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: '16px',
+                                    height: '16px',
+                                    backgroundColor: 'var(--color-loss)',
+                                    color: 'white',
+                                    borderRadius: '50%',
+                                    fontSize: '10px',
+                                    fontWeight: 'bold',
+                                    cursor: 'help',
+                                    flexShrink: 0
+                                  }}
+                                >
+                                  !
+                                </div>
+                              }
+                              content={
+                                <div>
+                                  <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: 'var(--color-loss)' }}>
+                                    {order.errorType || 'Error'}
+                                  </div>
+                                  <div style={{ marginBottom: '0.5rem' }}>
+                                    {order.failureReason || order.errorMessage}
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                                    Retries: {order.retryCount || 0}/{order.maxRetries || 3}
+                                    {order.isRetryable && (
+                                      <span style={{ color: 'var(--color-warning)', marginLeft: '0.5rem' }}>
+                                        • Retryable
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              }
+                            />
+                          )}
+                        </div>
                       </td>
                       <td className="numeric-cell">
                         {order.filledQty}/{order.qty}
@@ -951,6 +1152,46 @@ const Orders: React.FC = () => {
                                 title="Cancel order"
                               >
                                 Cancel
+                              </button>
+                            </>
+                          )}
+
+                          {/* Retry and Delete buttons for failed orders */}
+                          {['FAILED', 'REJECTED'].includes(order.status) && (
+                            <>
+                              {order.isRetryable && (order.retryCount || 0) < (order.maxRetries || 3) && (
+                                <button
+                                  className="compact-button"
+                                  onClick={() => handleRetryOrder(order.id)}
+                                  disabled={checkingStatus.has(order.id)}
+                                  title={`Retry failed order (${order.retryCount || 0}/${order.maxRetries || 3} attempts)`}
+                                  style={{
+                                    backgroundColor: 'var(--color-warning)',
+                                    color: 'white'
+                                  }}
+                                >
+                                  {checkingStatus.has(order.id) ? (
+                                    <span style={{
+                                      display: 'inline-block',
+                                      width: '0.6rem',
+                                      height: '0.6rem',
+                                      border: '1px solid currentColor',
+                                      borderTop: '1px solid transparent',
+                                      borderRadius: '50%',
+                                      animation: 'spin 1s linear infinite'
+                                    }}></span>
+                                  ) : (
+                                    '🔄 Retry'
+                                  )}
+                                </button>
+                              )}
+                              <button
+                                className="compact-button danger"
+                                onClick={() => handleDeleteOrder(order.id)}
+                                disabled={checkingStatus.has(order.id)}
+                                title="Delete failed order"
+                              >
+                                {checkingStatus.has(order.id) ? '...' : '🗑️ Delete'}
                               </button>
                             </>
                           )}
@@ -1032,12 +1273,24 @@ const Orders: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-loss)' }}>
-                  {orders.filter(o => o.status === 'CANCELLED' || o.status === 'REJECTED').length}
+                  {orders.filter(o => ['CANCELLED', 'REJECTED', 'FAILED'].includes(o.status)).length}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Failed
                 </div>
               </div>
+
+              {/* Show retry stats if there are retryable failed orders */}
+              {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable).length > 0 && (
+                <div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-warning)' }}>
+                    {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable && (o.retryCount || 0) < (o.maxRetries || 3)).length}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    Retryable
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -77,13 +77,6 @@ const AccountStatusIndicator: React.FC<AccountStatusIndicatorProps> = ({
           {statusInfo.text}
         </span>
       )}
-      {!connected && (
-        <span 
-          className="connection-indicator-warning"
-        >
-          ⚠️
-        </span>
-      )}
     </span>
   );
 };

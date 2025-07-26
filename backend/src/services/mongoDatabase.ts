@@ -48,12 +48,26 @@ interface OrderHistoryDocument extends Document {
   quantity: number;
   price: number;
   order_type: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED';
+  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
   exchange: string;
   product_type: string;
   remarks: string;
   executed_at: Date;
   created_at: Date;
+  // Enhanced fields for comprehensive order updates
+  executed_quantity?: number;
+  average_price?: number;
+  rejection_reason?: string;
+  last_updated?: Date;
+  // Enhanced fields for error handling and retry functionality
+  error_message?: string;
+  error_code?: string;
+  error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+  retry_count?: number;
+  max_retries?: number;
+  last_retry_at?: Date;
+  is_retryable?: boolean;
+  failure_reason?: string;
 }
 
 // MongoDB Schemas
@@ -91,16 +105,33 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
   quantity: { type: Number, required: true },
   price: { type: Number, required: true },
   order_type: { type: String, enum: ['MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET'], required: true },
-  status: { 
-    type: String, 
-    enum: ['PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED'], 
-    default: 'PLACED' 
+  status: {
+    type: String,
+    enum: ['PLACED', 'PENDING', 'EXECUTED', 'CANCELLED', 'REJECTED', 'PARTIALLY_FILLED', 'FAILED'],
+    default: 'PLACED'
   },
   exchange: { type: String, default: 'NSE' },
   product_type: { type: String, default: 'C' },
   remarks: { type: String, default: '' },
   executed_at: { type: Date, required: true },
-  created_at: { type: Date, default: Date.now }
+  created_at: { type: Date, default: Date.now },
+  // Enhanced fields for comprehensive order updates
+  executed_quantity: { type: Number, default: 0 },
+  average_price: { type: Number, default: 0 },
+  rejection_reason: { type: String },
+  last_updated: { type: Date, default: Date.now },
+  // Enhanced fields for error handling and retry functionality
+  error_message: { type: String },
+  error_code: { type: String },
+  error_type: {
+    type: String,
+    enum: ['NETWORK', 'BROKER', 'VALIDATION', 'AUTH', 'SYSTEM', 'MARKET']
+  },
+  retry_count: { type: Number, default: 0 },
+  max_retries: { type: Number, default: 3 },
+  last_retry_at: { type: Date },
+  is_retryable: { type: Boolean, default: false },
+  failure_reason: { type: String }
 });
 
 // Add compound indexes
@@ -278,6 +309,20 @@ export class MongoDatabase implements IDatabaseAdapter {
       remarks: doc.remarks || '',
       executed_at: doc.executed_at ? doc.executed_at.toISOString() : new Date().toISOString(),
       created_at: doc.created_at ? doc.created_at.toISOString() : new Date().toISOString(),
+      // Enhanced fields for comprehensive order updates
+      executed_quantity: doc.executed_quantity || undefined,
+      average_price: doc.average_price || undefined,
+      rejection_reason: doc.rejection_reason || undefined,
+      last_updated: doc.last_updated ? doc.last_updated.toISOString() : undefined,
+      // Enhanced fields for error handling and retry functionality
+      error_message: doc.error_message || undefined,
+      error_code: doc.error_code || undefined,
+      error_type: doc.error_type || undefined,
+      retry_count: doc.retry_count || undefined,
+      max_retries: doc.max_retries || undefined,
+      last_retry_at: doc.last_retry_at ? doc.last_retry_at.toISOString() : undefined,
+      is_retryable: doc.is_retryable || undefined,
+      failure_reason: doc.failure_reason || undefined,
       // Add account information if populated
       ...(accountInfo && { account_info: accountInfo })
     };
@@ -506,7 +551,16 @@ export class MongoDatabase implements IDatabaseAdapter {
         exchange: orderData.exchange || 'NSE',
         product_type: orderData.product_type || 'C',
         remarks: orderData.remarks || '',
-        executed_at: new Date(orderData.executed_at)
+        executed_at: new Date(orderData.executed_at),
+        // Enhanced fields for error handling and retry functionality
+        error_message: orderData.error_message,
+        error_code: orderData.error_code,
+        error_type: orderData.error_type,
+        retry_count: orderData.retry_count || 0,
+        max_retries: orderData.max_retries || 3,
+        last_retry_at: orderData.last_retry_at ? new Date(orderData.last_retry_at) : undefined,
+        is_retryable: orderData.is_retryable || false,
+        failure_reason: orderData.failure_reason
       });
 
       const savedOrder = await orderDoc.save();
@@ -524,6 +578,16 @@ export class MongoDatabase implements IDatabaseAdapter {
       return order ? this.orderHistoryDocToInterface(order) : null;
     } catch (error) {
       console.error('🚨 Failed to get order history by ID:', error);
+      return null;
+    }
+  }
+
+  async getOrderHistoryByBrokerOrderId(brokerOrderId: string): Promise<OrderHistory | null> {
+    try {
+      const order = await this.OrderHistoryModel.findOne({ broker_order_id: brokerOrderId });
+      return order ? this.orderHistoryDocToInterface(order) : null;
+    } catch (error) {
+      console.error('🚨 Failed to get order history by broker order ID:', error);
       return null;
     }
   }
@@ -629,6 +693,104 @@ export class MongoDatabase implements IDatabaseAdapter {
       return !!result;
     } catch (error) {
       console.error('🚨 Failed to update order status by broker order ID:', error);
+      return false;
+    }
+  }
+
+  async updateOrderWithError(id: string, errorData: {
+    status: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+  }): Promise<boolean> {
+    try {
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        {
+          status: errorData.status,
+          error_message: errorData.error_message,
+          error_code: errorData.error_code,
+          error_type: errorData.error_type,
+          failure_reason: errorData.failure_reason,
+          is_retryable: errorData.is_retryable || false
+        },
+        { new: true }
+      );
+      return !!result;
+    } catch (error) {
+      console.error('🚨 Failed to update order with error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Comprehensive order update method that can update multiple fields atomically
+   * @param id - Order ID (MongoDB ObjectId string)
+   * @param updateData - Fields to update
+   */
+  async updateOrderComprehensive(id: string, updateData: {
+    status?: string;
+    executed_quantity?: number;
+    average_price?: number;
+    rejection_reason?: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+    last_updated?: Date;
+  }): Promise<OrderHistory | null> {
+    try {
+      // Prepare update object with only defined fields
+      const updateFields: any = {};
+      
+      if (updateData.status !== undefined) updateFields.status = updateData.status;
+      if (updateData.executed_quantity !== undefined) updateFields.executed_quantity = updateData.executed_quantity;
+      if (updateData.average_price !== undefined) updateFields.average_price = updateData.average_price;
+      if (updateData.rejection_reason !== undefined) updateFields.rejection_reason = updateData.rejection_reason;
+      if (updateData.error_message !== undefined) updateFields.error_message = updateData.error_message;
+      if (updateData.error_code !== undefined) updateFields.error_code = updateData.error_code;
+      if (updateData.error_type !== undefined) updateFields.error_type = updateData.error_type;
+      if (updateData.failure_reason !== undefined) updateFields.failure_reason = updateData.failure_reason;
+      if (updateData.is_retryable !== undefined) updateFields.is_retryable = updateData.is_retryable;
+      
+      // Always update the last_updated timestamp
+      updateFields.last_updated = updateData.last_updated || new Date();
+
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        updateFields,
+        { new: true, runValidators: true }
+      );
+
+      if (result) {
+        console.log(`✅ Order ${id} updated comprehensively with fields:`, Object.keys(updateFields));
+        return this.orderHistoryDocToInterface(result);
+      }
+      
+      console.warn(`⚠️ Order ${id} not found for comprehensive update`);
+      return null;
+    } catch (error) {
+      console.error('🚨 Failed to update order comprehensively:', error);
+      return null;
+    }
+  }
+
+  async incrementOrderRetryCount(id: string): Promise<boolean> {
+    try {
+      const result = await this.OrderHistoryModel.findByIdAndUpdate(
+        id,
+        {
+          $inc: { retry_count: 1 },
+          last_retry_at: new Date()
+        },
+        { new: true }
+      );
+      return !!result;
+    } catch (error) {
+      console.error('🚨 Failed to increment retry count:', error);
       return false;
     }
   }

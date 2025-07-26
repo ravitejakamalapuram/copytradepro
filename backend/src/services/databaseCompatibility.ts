@@ -7,12 +7,10 @@ import { IDatabaseAdapter } from '../interfaces/IDatabaseAdapter';
  */
 class DatabaseCompatibilityLayer {
   private database: IDatabaseAdapter | null = null;
-  private dbType: string = 'mongodb'; // Always MongoDB now
 
   private async getDb(): Promise<IDatabaseAdapter> {
     if (!this.database) {
       this.database = await getDatabase();
-      this.dbType = 'mongodb';
     }
     return this.database;
   }
@@ -79,15 +77,28 @@ class DatabaseCompatibilityLayer {
     return await db.deleteConnectedAccount(id);
   }
 
-  // Order History methods
+  // Order History methods - Standardized to use string IDs only
   async createOrderHistory(orderData: any) {
     const db = await this.getDb();
     return await db.createOrderHistory(orderData);
   }
 
-  async getOrderHistoryById(id: number) {
+  /**
+   * Get order history by internal order ID (MongoDB ObjectId format)
+   * @param id - String ID in MongoDB ObjectId format only
+   */
+  async getOrderHistoryById(id: string) {
     const db = await this.getDb();
     return await db.getOrderHistoryById(id);
+  }
+
+  /**
+   * Get order history by broker order ID
+   * @param brokerOrderId - Broker's order ID string
+   */
+  async getOrderHistoryByBrokerOrderId(brokerOrderId: string) {
+    const db = await this.getDb();
+    return await db.getOrderHistoryByBrokerOrderId(brokerOrderId);
   }
 
   async getOrderHistoryByUserId(userId: number | string, limit?: number, offset?: number) {
@@ -100,7 +111,12 @@ class DatabaseCompatibilityLayer {
     return await db.getOrderHistoryByUserIdWithFilters(userId, limit, offset, filters);
   }
 
-  async updateOrderStatus(id: number, status: string) {
+  /**
+   * Update order status by internal order ID (string only)
+   * @param id - String ID in MongoDB ObjectId format
+   * @param status - New status string
+   */
+  async updateOrderStatus(id: string, status: string) {
     const db = await this.getDb();
     return await db.updateOrderStatus(id, status);
   }
@@ -110,7 +126,11 @@ class DatabaseCompatibilityLayer {
     return await db.updateOrderStatusByBrokerOrderId(brokerOrderId, status);
   }
 
-  async deleteOrderHistory(id: number) {
+  /**
+   * Delete order history by internal order ID (string only)
+   * @param id - String ID in MongoDB ObjectId format
+   */
+  async deleteOrderHistory(id: string) {
     const db = await this.getDb();
     return await db.deleteOrderHistory(id);
   }
@@ -192,6 +212,62 @@ class DatabaseCompatibilityLayer {
       await this.database.close();
       this.database = null;
     }
+  }
+
+  /**
+   * Update order with error information (string ID only)
+   * @param id - String ID in MongoDB ObjectId format
+   * @param errorData - Error information to update
+   */
+  async updateOrderWithError(id: string, errorData: {
+    status: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+  }) {
+    const db = await this.getDb();
+    if (db.updateOrderWithError) {
+      return await db.updateOrderWithError(id, errorData);
+    }
+    return false;
+  }
+
+  /**
+   * Comprehensive order update method (string ID only)
+   * @param id - String ID in MongoDB ObjectId format
+   * @param updateData - Fields to update
+   */
+  async updateOrderComprehensive(id: string, updateData: {
+    status?: string;
+    executed_quantity?: number;
+    average_price?: number;
+    rejection_reason?: string;
+    error_message?: string;
+    error_code?: string;
+    error_type?: 'NETWORK' | 'BROKER' | 'VALIDATION' | 'AUTH' | 'SYSTEM' | 'MARKET';
+    failure_reason?: string;
+    is_retryable?: boolean;
+    last_updated?: Date;
+  }) {
+    const db = await this.getDb();
+    if (db.updateOrderComprehensive) {
+      return await db.updateOrderComprehensive(id, updateData);
+    }
+    return null;
+  }
+
+  /**
+   * Increment order retry count (string ID only)
+   * @param id - String ID in MongoDB ObjectId format
+   */
+  async incrementOrderRetryCount(id: string) {
+    const db = await this.getDb();
+    if (db.incrementOrderRetryCount) {
+      return await db.incrementOrderRetryCount(id);
+    }
+    return false;
   }
 }
 

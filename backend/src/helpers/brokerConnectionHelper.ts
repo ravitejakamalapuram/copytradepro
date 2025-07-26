@@ -1,10 +1,10 @@
 import { Response } from 'express';
-import { IBrokerService } from '@copytrade/unified-broker';
-import { unifiedBrokerManager } from '../services/unifiedBrokerManager';
+import { IBrokerService, IUnifiedBrokerService } from '@copytrade/unified-broker';
+import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
 import { logger } from '../utils/logger';
 
 // Type definitions
-export type BrokerService = IBrokerService;
+export type BrokerService = IUnifiedBrokerService;
 
 export interface BrokerConnectionResult {
   success: boolean;
@@ -41,7 +41,7 @@ export class BrokerConnectionHelper {
   ): BrokerConnectionResult {
     if (accountId) {
       // Look for specific connection
-      const connection = unifiedBrokerManager.getConnection(userId, brokerName, accountId);
+      const connection = enhancedUnifiedBrokerManager.getConnection(userId, brokerName, accountId);
       if (connection) {
         return {
           success: true,
@@ -51,7 +51,8 @@ export class BrokerConnectionHelper {
       }
     } else {
       // Look for any connection for this broker
-      const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+      const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
+        .filter(conn => conn.brokerName === brokerName);
       if (connections.length > 0 && connections[0]) {
         return {
           success: true,
@@ -78,7 +79,8 @@ export class BrokerConnectionHelper {
     userId: string,
     brokerName: string
   ): MultipleBrokerConnectionsResult {
-    const connections = unifiedBrokerManager.getUserBrokerConnections(userId, brokerName);
+    const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
+      .filter(conn => conn.brokerName === brokerName);
 
     if (connections.length === 0) {
       return {

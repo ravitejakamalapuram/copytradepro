@@ -440,6 +440,80 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
     }
   }
 
+  async cancelOrder(orderId: string): Promise<any> {
+    if (!this.isConnected()) {
+      throw new Error('Not connected to Fyers. Please authenticate first.');
+    }
+
+    try {
+      console.log('🚫 Cancelling Fyers order:', orderId);
+
+      const fyersResponse = await this.fyersService.cancelOrder(orderId);
+
+      // Transform Fyers response to unified format
+      if (fyersResponse.s === 'ok') {
+        return {
+          success: true,
+          message: 'Order cancelled successfully',
+          data: {
+            orderId: orderId,
+            status: 'CANCELLED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: fyersResponse.message || 'Order cancellation failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Fyers order cancellation error:', error);
+      return {
+        success: false,
+        message: error.message || 'Order cancellation failed',
+        data: null
+      };
+    }
+  }
+
+  async modifyOrder(orderId: string, modifications: any): Promise<any> {
+    if (!this.isConnected()) {
+      throw new Error('Not connected to Fyers. Please authenticate first.');
+    }
+
+    try {
+      console.log('✏️ Modifying Fyers order:', orderId, modifications);
+
+      const fyersResponse = await this.fyersService.modifyOrder(orderId, modifications);
+
+      // Transform Fyers response to unified format
+      if (fyersResponse.s === 'ok') {
+        return {
+          success: true,
+          message: 'Order modified successfully',
+          data: {
+            orderId: orderId,
+            status: 'MODIFIED'
+          }
+        };
+      } else {
+        return {
+          success: false,
+          message: fyersResponse.message || 'Order modification failed',
+          data: null
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Fyers order modification error:', error);
+      return {
+        success: false,
+        message: error.message || 'Order modification failed',
+        data: null
+      };
+    }
+  }
+
   private formatSymbolForFyers(symbol: string, exchange: string): string {
     // Fyers expects format: EXCHANGE:SYMBOL
     // e.g., NSE:RELIANCE-EQ, BSE:RELIANCE

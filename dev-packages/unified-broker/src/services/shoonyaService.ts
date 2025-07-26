@@ -260,6 +260,65 @@ export class ShoonyaService {
     }
   }
 
+  async cancelOrder(orderNumber: string): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      console.log('🚫 Cancelling Shoonya order:', orderNumber);
+
+      const requestData = {
+        uid: this.userId,
+        actid: this.userId,
+        norenordno: orderNumber
+      };
+
+      const response = await this.makeAuthenticatedRequest('CancelOrder', requestData);
+
+      if (response.stat === 'Ok') {
+        console.log('✅ Shoonya order cancelled successfully:', orderNumber);
+        return response;
+      } else {
+        console.error('❌ Shoonya order cancellation failed:', response.emsg);
+        throw new Error(response.emsg || 'Order cancellation failed');
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya cancel order error:', error.message);
+      throw error;
+    }
+  }
+
+  async modifyOrder(orderNumber: string, modifications: any): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      console.log('✏️ Modifying Shoonya order:', orderNumber, modifications);
+
+      const requestData = {
+        uid: this.userId,
+        actid: this.userId,
+        norenordno: orderNumber,
+        ...modifications
+      };
+
+      const response = await this.makeAuthenticatedRequest('ModifyOrder', requestData);
+
+      if (response.stat === 'Ok') {
+        console.log('✅ Shoonya order modified successfully:', orderNumber);
+        return response;
+      } else {
+        console.error('❌ Shoonya order modification failed:', response.emsg);
+        throw new Error(response.emsg || 'Order modification failed');
+      }
+    } catch (error: any) {
+      console.error('🚨 Shoonya modify order error:', error.message);
+      throw error;
+    }
+  }
+
   async getOrderBook(userId: string): Promise<any> {
     if (!this.sessionToken) {
       throw new Error('Not logged in to Shoonya. Please login first.');
