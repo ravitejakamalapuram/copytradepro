@@ -248,7 +248,9 @@ export class OptionsDatabase {
     });
 
     return expiries
+      .filter((date): date is Date => date instanceof Date)
       .map(date => date.toISOString().split('T')[0])
+      .filter((dateStr): dateStr is string => typeof dateStr === 'string')
       .sort();
   }
 
@@ -385,7 +387,7 @@ export class OptionsDatabase {
 
   private instrumentDocToInterface(doc: OptionsInstrumentDocument): OptionsInstrument {
     return {
-      id: doc._id.toString(),
+      id: (doc._id as mongoose.Types.ObjectId).toString(),
       underlying_symbol: doc.underlying_symbol,
       trading_symbol: doc.trading_symbol,
       instrument_key: doc.instrument_key,
@@ -404,9 +406,9 @@ export class OptionsDatabase {
 
   private marketDataDocToInterface(doc: OptionsMarketDataDocument): OptionsMarketData {
     return {
-      id: doc._id.toString(),
+      id: (doc._id as mongoose.Types.ObjectId).toString(),
       instrument_id: doc.instrument_id.toString(),
-      date: doc.date.toISOString().split('T')[0],
+      date: (doc.date?.toISOString().split('T')[0] || new Date().toISOString().split('T')[0]) as string,
       open: doc.open,
       high: doc.high,
       low: doc.low,
@@ -421,7 +423,7 @@ export class OptionsDatabase {
 
   private positionDocToInterface(doc: OptionsPositionDocument): OptionsPosition {
     return {
-      id: doc._id.toString(),
+      id: (doc._id as mongoose.Types.ObjectId).toString(),
       user_id: doc.user_id.toString(),
       account_id: doc.account_id.toString(),
       instrument_key: doc.instrument_key,

@@ -29,7 +29,7 @@ export interface OptionsInstrument {
   underlying_symbol: string;
   trading_symbol: string;
   instrument_key: string; // Broker-specific key
-  strike_price?: number; // Not applicable for futures
+  strike_price?: number | undefined; // Not applicable for futures
   expiry_date: string; // ISO date string
   option_type: OptionType;
   lot_size: number;
@@ -267,7 +267,7 @@ export interface OptionsPosition {
   instrument_key: string;
   trading_symbol: string;
   underlying_symbol: string;
-  strike_price?: number;
+  strike_price?: number | undefined;
   expiry_date: string;
   option_type: OptionType;
   quantity: number; // Net quantity (positive for long, negative for short)
@@ -275,7 +275,7 @@ export interface OptionsPosition {
   current_price: number;
   pnl: number;
   pnl_percent: number;
-  margin_used?: number;
+  margin_used?: number | undefined;
   created_at: string;
   updated_at: string;
 }

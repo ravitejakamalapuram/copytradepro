@@ -79,6 +79,7 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
     };
 
     res.json(response);
+    return;
   } catch (error) {
     logger.error('Failed to search options instruments', {
       component: 'OPTIONS_API',
@@ -90,6 +91,7 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
       success: false,
       message: 'Failed to search instruments'
     });
+    return;
   }
 });
 
@@ -220,14 +222,16 @@ router.get('/portfolio', authenticateToken, async (req, res) => {
     const expiryWiseSummary: any = {};
     positions.forEach(position => {
       const expiry = position.expiry_date.split('T')[0];
-      if (!expiryWiseSummary[expiry]) {
+      if (expiry && !expiryWiseSummary[expiry]) {
         expiryWiseSummary[expiry] = {
           positions: 0,
           pnl: 0
         };
       }
-      expiryWiseSummary[expiry].positions += 1;
-      expiryWiseSummary[expiry].pnl += position.pnl;
+      if (expiry) {
+        expiryWiseSummary[expiry].positions += 1;
+        expiryWiseSummary[expiry].pnl += position.pnl;
+      }
     });
 
     const portfolioSummary = {
