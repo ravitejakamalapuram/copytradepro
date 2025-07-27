@@ -99,7 +99,7 @@ const OrderHistorySchema = new Schema<OrderHistoryDocument>({
   user_id: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
   account_id: { type: Schema.Types.ObjectId, ref: 'ConnectedAccount', required: true },
   broker_name: { type: String, required: true },
-  broker_order_id: { type: String, required: true, index: true },
+  broker_order_id: { type: String, required: true },
   symbol: { type: String, required: true },
   action: { type: String, enum: ['BUY', 'SELL'], required: true },
   quantity: { type: Number, required: true },
