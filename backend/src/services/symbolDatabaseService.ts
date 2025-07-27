@@ -46,11 +46,36 @@ export interface BSESymbol {
 
 
 
+// Static F&O instruments for testing (no API calls needed)
+const STATIC_FO_INSTRUMENTS = [
+  // RELIANCE Options
+  { symbol: "RELIANCE24FEB3000CE", tradingSymbol: "RELIANCE24FEB3000CE", name: "RELIANCE 3000 CE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "RELIANCE24FEB3000PE", tradingSymbol: "RELIANCE24FEB3000PE", name: "RELIANCE 3000 PE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "RELIANCE24FEB3100CE", tradingSymbol: "RELIANCE24FEB3100CE", name: "RELIANCE 3100 CE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3100, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "RELIANCE24FEB3100PE", tradingSymbol: "RELIANCE24FEB3100PE", name: "RELIANCE 3100 PE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3100, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
+  
+  // NIFTY Options
+  { symbol: "NIFTY24FEB21000CE", tradingSymbol: "NIFTY24FEB21000CE", name: "NIFTY 21000 CE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "NIFTY24FEB21000PE", tradingSymbol: "NIFTY24FEB21000PE", name: "NIFTY 21000 PE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "NIFTY24FEB21500CE", tradingSymbol: "NIFTY24FEB21500CE", name: "NIFTY 21500 CE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21500, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "NIFTY24FEB21500PE", tradingSymbol: "NIFTY24FEB21500PE", name: "NIFTY 21500 PE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21500, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
+  
+  // TCS Options
+  { symbol: "TCS24FEB4000CE", tradingSymbol: "TCS24FEB4000CE", name: "TCS 4000 CE", instrument_type: "OPTION" as const, underlying_symbol: "TCS", strike_price: 4000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 150, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "TCS24FEB4000PE", tradingSymbol: "TCS24FEB4000PE", name: "TCS 4000 PE", instrument_type: "OPTION" as const, underlying_symbol: "TCS", strike_price: 4000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 150, exchange: "NFO" as const, status: "Active" as const },
+  
+  // Futures
+  { symbol: "RELIANCE24FEBFUT", tradingSymbol: "RELIANCE24FEBFUT", name: "RELIANCE Future", instrument_type: "FUTURE" as const, underlying_symbol: "RELIANCE", expiry_date: "2024-02-29", lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "NIFTY24FEBFUT", tradingSymbol: "NIFTY24FEBFUT", name: "NIFTY Future", instrument_type: "FUTURE" as const, underlying_symbol: "NIFTY", expiry_date: "2024-02-29", lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
+  { symbol: "TCS24FEBFUT", tradingSymbol: "TCS24FEBFUT", name: "TCS Future", instrument_type: "FUTURE" as const, underlying_symbol: "TCS", expiry_date: "2024-02-29", lot_size: 150, exchange: "NFO" as const, status: "Active" as const }
+];
+
 class SymbolDatabaseService {
   constructor() {
     console.log('🚀 Multi-Exchange Symbol Database Service initialized');
     console.log('📊 NSE CSV + BSE CSV + Live API integration enabled');
     console.log('🔗 Using NSE/BSE CSV for symbol search and live API for market data');
+    console.log(`📈 Static F&O instruments loaded: ${STATIC_FO_INSTRUMENTS.length} instruments`);
   }
 
   /**
@@ -299,31 +324,21 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Search options instruments
+   * Search options instruments (using static data)
    */
   async searchOptionsInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
     try {
-      // Search by underlying symbol or direct option symbol
-      const instruments = await optionsDatabase.getInstrumentsByUnderlying(query.toUpperCase());
+      const searchQuery = query.toUpperCase();
       
-      // Filter only options and convert to unified format
-      const optionInstruments = instruments
-        .filter(inst => inst.option_type === 'CE' || inst.option_type === 'PE')
-        .slice(0, limit)
-        .map(inst => ({
-          symbol: inst.trading_symbol,
-          tradingSymbol: inst.trading_symbol,
-          name: `${inst.underlying_symbol} ${inst.strike_price} ${inst.option_type}`,
-          exchange: inst.exchange,
-          instrument_type: 'OPTION' as const,
-          underlying_symbol: inst.underlying_symbol,
-          strike_price: inst.strike_price,
-          expiry_date: inst.expiry_date,
-          option_type: inst.option_type,
-          lot_size: inst.lot_size,
-          status: inst.is_active ? 'Active' as const : 'Suspended' as const
-        }));
+      // Search by underlying symbol or direct option symbol
+      const optionInstruments = STATIC_FO_INSTRUMENTS
+        .filter(inst => 
+          inst.instrument_type === 'OPTION' && 
+          (inst.underlying_symbol.includes(searchQuery) || inst.symbol.includes(searchQuery))
+        )
+        .slice(0, limit);
 
+      console.log(`📊 Found ${optionInstruments.length} options for "${query}"`);
       return optionInstruments;
     } catch (error: any) {
       console.error(`❌ Error searching options:`, error.message);
@@ -332,29 +347,21 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Search futures instruments
+   * Search futures instruments (using static data)
    */
   async searchFuturesInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
     try {
-      // Search by underlying symbol
-      const instruments = await optionsDatabase.getInstrumentsByUnderlying(query.toUpperCase());
+      const searchQuery = query.toUpperCase();
       
-      // Filter only futures and convert to unified format
-      const futureInstruments = instruments
-        .filter(inst => inst.option_type === 'FUT')
-        .slice(0, limit)
-        .map(inst => ({
-          symbol: inst.trading_symbol,
-          tradingSymbol: inst.trading_symbol,
-          name: `${inst.underlying_symbol} Future`,
-          exchange: inst.exchange,
-          instrument_type: 'FUTURE' as const,
-          underlying_symbol: inst.underlying_symbol,
-          expiry_date: inst.expiry_date,
-          lot_size: inst.lot_size,
-          status: inst.is_active ? 'Active' as const : 'Suspended' as const
-        }));
+      // Search by underlying symbol or direct future symbol
+      const futureInstruments = STATIC_FO_INSTRUMENTS
+        .filter(inst => 
+          inst.instrument_type === 'FUTURE' && 
+          (inst.underlying_symbol.includes(searchQuery) || inst.symbol.includes(searchQuery))
+        )
+        .slice(0, limit);
 
+      console.log(`📊 Found ${futureInstruments.length} futures for "${query}"`);
       return futureInstruments;
     } catch (error: any) {
       console.error(`❌ Error searching futures:`, error.message);
@@ -363,30 +370,18 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Get option chain for a specific underlying
+   * Get option chain for a specific underlying (using static data)
    */
   async getOptionChain(underlyingSymbol: string, expiry?: string): Promise<UnifiedSymbol[]> {
     try {
-      const instruments = await optionsDatabase.getInstrumentsByUnderlying(
-        underlyingSymbol.toUpperCase(),
-        expiry
-      );
-
-      return instruments
-        .filter(inst => inst.option_type === 'CE' || inst.option_type === 'PE')
-        .map(inst => ({
-          symbol: inst.trading_symbol,
-          tradingSymbol: inst.trading_symbol,
-          name: `${inst.underlying_symbol} ${inst.strike_price} ${inst.option_type}`,
-          exchange: inst.exchange,
-          instrument_type: 'OPTION' as const,
-          underlying_symbol: inst.underlying_symbol,
-          strike_price: inst.strike_price,
-          expiry_date: inst.expiry_date,
-          option_type: inst.option_type,
-          lot_size: inst.lot_size,
-          status: inst.is_active ? 'Active' as const : 'Suspended' as const
-        }))
+      const searchSymbol = underlyingSymbol.toUpperCase();
+      
+      return STATIC_FO_INSTRUMENTS
+        .filter(inst => 
+          inst.instrument_type === 'OPTION' && 
+          inst.underlying_symbol === searchSymbol &&
+          (!expiry || inst.expiry_date === expiry)
+        )
         .sort((a, b) => {
           // Sort by strike price
           if (a.strike_price && b.strike_price) {
@@ -401,11 +396,19 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Get expiry dates for an underlying
+   * Get expiry dates for an underlying (using static data)
    */
   async getExpiryDates(underlyingSymbol: string): Promise<string[]> {
     try {
-      return await optionsDatabase.getExpiryDates(underlyingSymbol.toUpperCase());
+      const searchSymbol = underlyingSymbol.toUpperCase();
+      
+      const expiries = STATIC_FO_INSTRUMENTS
+        .filter(inst => inst.underlying_symbol === searchSymbol)
+        .map(inst => inst.expiry_date)
+        .filter((expiry, index, arr) => arr.indexOf(expiry) === index) // Remove duplicates
+        .sort();
+        
+      return expiries;
     } catch (error: any) {
       console.error(`❌ Error getting expiry dates:`, error.message);
       return [];
