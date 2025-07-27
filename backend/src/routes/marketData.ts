@@ -103,7 +103,8 @@ router.get('/indices', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Search for symbols (for autocomplete) using live broker APIs
+ * Search for symbols (for autocomplete) - LEGACY ENDPOINT
+ * Use /search-unified for new unified search with F&O support
  */
 router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
   try {
@@ -142,6 +143,7 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
         displaySymbol: result.symbol,  // Original symbol for display
         name: result.name,
         exchange: result.exchange,
+        instrument_type: result.instrument_type,
         isin: result.isin,
         series: result.series,
         group: result.group,
@@ -196,6 +198,97 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to search symbols',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * NEW: Unified search for all instruments (equity + F&O)
+ */
+router.get('/search-unified/:query', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { query } = req.params;
+    const { limit = 20, type = 'all', includePrices = 'false' } = req.query;
+    const userId = req.user?.id;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query must be at least 2 characters long'
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    console.log(`🔍 Unified search request: query="${query}", limit=${limit}, type=${type}, userId=${userId}`);
+
+    let searchResults: any;
+
+    if (type === 'all') {
+      // Search all instrument types
+      searchResults = await symbolDatabaseService.searchAllInstruments(query, parseInt(limit as string));
+    } else if (type === 'equity') {
+      // Search equity only
+      const equity = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
+      searchResults = { equity, options: [], futures: [], total: equity.length };
+    } else if (type === 'options') {
+      // Search options only
+      const options = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
+      searchResults = { equity: [], options, futures: [], total: options.length };
+    } else if (type === 'futures') {
+      // Search futures only
+      const futures = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
+      searchResults = { equity: [], options: [], futures, total: futures.length };
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid type. Use: all, equity, options, or futures'
+      });
+    }
+
+    // Optionally fetch prices for equity instruments
+    if (includePrices === 'true' && searchResults.equity.length > 0) {
+      try {
+        const equitySymbols = searchResults.equity.map((r: any) => r.tradingSymbol);
+        console.log(`💰 Fetching prices for ${equitySymbols.length} equity symbols...`);
+        const prices = await marketDataService.getPrices(equitySymbols, 'NSE');
+        
+        // Enrich equity results with prices
+        searchResults.equity = searchResults.equity.map((stock: any) => ({
+          ...stock,
+          price: prices.get(stock.tradingSymbol)?.price || null,
+          change: prices.get(stock.tradingSymbol)?.change || null,
+          changePercent: prices.get(stock.tradingSymbol)?.changePercent || null
+        }));
+        
+        console.log(`💰 Fetched prices for ${prices.size} equity symbols`);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch live prices, continuing without prices');
+      }
+    }
+
+    console.log(`✅ Unified search completed: ${searchResults.total} total results`);
+
+    return res.json({
+      success: true,
+      data: {
+        ...searchResults,
+        query,
+        type,
+        source: 'unified_search'
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to perform unified search:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to perform unified search',
       details: error.message
     });
   }
@@ -384,6 +477,66 @@ router.post('/cache/clear', authenticateToken, async (req: any, res: any) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to clear cache',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get option chain for an underlying symbol
+ */
+router.get('/option-chain/:underlying', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { underlying } = req.params;
+    const { expiry } = req.query;
+
+    console.log(`📊 Fetching option chain for ${underlying}${expiry ? ` (expiry: ${expiry})` : ''}`);
+
+    const optionChain = await symbolDatabaseService.getOptionChain(underlying, expiry as string);
+
+    return res.json({
+      success: true,
+      data: {
+        underlying: underlying.toUpperCase(),
+        expiry: expiry || 'all',
+        options: optionChain,
+        count: optionChain.length
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Failed to fetch option chain for ${req.params.underlying}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch option chain',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get expiry dates for an underlying symbol
+ */
+router.get('/expiry-dates/:underlying', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { underlying } = req.params;
+
+    console.log(`📅 Fetching expiry dates for ${underlying}`);
+
+    const expiryDates = await symbolDatabaseService.getExpiryDates(underlying);
+
+    return res.json({
+      success: true,
+      data: {
+        underlying: underlying.toUpperCase(),
+        expiry_dates: expiryDates,
+        count: expiryDates.length
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Failed to fetch expiry dates for ${req.params.underlying}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch expiry dates',
       details: error.message
     });
   }

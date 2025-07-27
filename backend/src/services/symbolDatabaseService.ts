@@ -1,18 +1,36 @@
 import { nseService, NSESymbol } from './nseService';
 import { nseCSVService, NSESymbolData } from './nseCSVService';
 import { bseCSVService, BSESymbolData } from './bseCSVService';
+import { optionsDatabase } from './optionsDatabase';
+import { Exchange } from '@copytrade/shared-types';
 
-// Unified symbol interface for multi-exchange support
+// Unified symbol interface for multi-exchange support including F&O
 export interface UnifiedSymbol {
-  symbol: string;           // Display symbol (TCS, AAKASH)
+  symbol: string;           // Display symbol (TCS, RELIANCE24FEB3000CE)
   tradingSymbol: string;    // Exchange-specific format (TCS-EQ for NSE, TCS for BSE)
   name: string;
-  exchange: 'NSE' | 'BSE';
-  isin: string;
+  exchange: Exchange;
+  instrument_type: 'EQUITY' | 'OPTION' | 'FUTURE';
+  isin?: string;
   series?: string;          // NSE: EQ, BE, etc.
   group?: string;           // BSE: A, B, T, M, Z
   securityCode?: string;    // BSE specific
   status?: 'Active' | 'Suspended' | 'Delisted';
+  
+  // F&O specific fields
+  underlying_symbol?: string;
+  strike_price?: number | undefined;
+  expiry_date?: string;
+  option_type?: 'CE' | 'PE' | 'FUT';
+  lot_size?: number;
+}
+
+// Unified search result interface
+export interface UnifiedSearchResult {
+  equity: UnifiedSymbol[];
+  options: UnifiedSymbol[];
+  futures: UnifiedSymbol[];
+  total: number;
 }
 
 // BSE Symbol interface
@@ -36,7 +54,7 @@ class SymbolDatabaseService {
   }
 
   /**
-   * Search symbols across both NSE and BSE exchanges
+   * Search symbols across both NSE and BSE exchanges (legacy method)
    */
   async searchSymbols(query: string, limit: number = 10, exchange?: 'NSE' | 'BSE' | 'ALL'): Promise<UnifiedSymbol[]> {
     if (!query || query.length < 1) {
@@ -103,6 +121,7 @@ class SymbolDatabaseService {
         tradingSymbol: `${symbol.symbol}-${symbol.series}`, // Trading format (TCS-EQ)
         name: symbol.name,
         exchange: 'NSE' as const,
+        instrument_type: 'EQUITY' as const,
         isin: symbol.isin,
         series: symbol.series,
         status: 'Active'
@@ -129,6 +148,7 @@ class SymbolDatabaseService {
         tradingSymbol: symbol.symbol,    // Trading format (TCS - plain for BSE)
         name: symbol.name,
         exchange: 'BSE' as const,
+        instrument_type: 'EQUITY' as const,
         isin: symbol.isin,
         group: symbol.group,
         securityCode: symbol.securityCode,
@@ -227,6 +247,169 @@ class SymbolDatabaseService {
       isin: symbol.isin,
       series: symbol.series
     }));
+  }
+
+  // ============================================================================
+  // NEW: UNIFIED SEARCH METHODS (EQUITY + F&O)
+  // ============================================================================
+
+  /**
+   * Search all instruments (equity + F&O) with unified results
+   */
+  async searchAllInstruments(query: string, limit: number = 20): Promise<UnifiedSearchResult> {
+    if (!query || query.length < 1) {
+      return { equity: [], options: [], futures: [], total: 0 };
+    }
+
+    try {
+      console.log(`🔍 Unified search for: "${query}"`);
+
+      const [equityResults, optionsResults, futuresResults] = await Promise.all([
+        this.searchEquityInstruments(query, Math.ceil(limit / 3)),
+        this.searchOptionsInstruments(query, Math.ceil(limit / 3)),
+        this.searchFuturesInstruments(query, Math.ceil(limit / 3))
+      ]);
+
+      const result: UnifiedSearchResult = {
+        equity: equityResults,
+        options: optionsResults,
+        futures: futuresResults,
+        total: equityResults.length + optionsResults.length + futuresResults.length
+      };
+
+      console.log(`✅ Unified search found: ${result.total} instruments (${result.equity.length} equity, ${result.options.length} options, ${result.futures.length} futures)`);
+      return result;
+
+    } catch (error: any) {
+      console.error(`❌ Error in unified search:`, error.message);
+      return { equity: [], options: [], futures: [], total: 0 };
+    }
+  }
+
+  /**
+   * Search equity instruments only
+   */
+  async searchEquityInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
+    // Use existing searchSymbols method but ensure instrument_type is set
+    const results = await this.searchSymbols(query, limit, 'ALL');
+    return results.map(symbol => ({
+      ...symbol,
+      instrument_type: 'EQUITY' as const
+    }));
+  }
+
+  /**
+   * Search options instruments
+   */
+  async searchOptionsInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
+    try {
+      // Search by underlying symbol or direct option symbol
+      const instruments = await optionsDatabase.getInstrumentsByUnderlying(query.toUpperCase());
+      
+      // Filter only options and convert to unified format
+      const optionInstruments = instruments
+        .filter(inst => inst.option_type === 'CE' || inst.option_type === 'PE')
+        .slice(0, limit)
+        .map(inst => ({
+          symbol: inst.trading_symbol,
+          tradingSymbol: inst.trading_symbol,
+          name: `${inst.underlying_symbol} ${inst.strike_price} ${inst.option_type}`,
+          exchange: inst.exchange,
+          instrument_type: 'OPTION' as const,
+          underlying_symbol: inst.underlying_symbol,
+          strike_price: inst.strike_price,
+          expiry_date: inst.expiry_date,
+          option_type: inst.option_type,
+          lot_size: inst.lot_size,
+          status: inst.is_active ? 'Active' as const : 'Suspended' as const
+        }));
+
+      return optionInstruments;
+    } catch (error: any) {
+      console.error(`❌ Error searching options:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Search futures instruments
+   */
+  async searchFuturesInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
+    try {
+      // Search by underlying symbol
+      const instruments = await optionsDatabase.getInstrumentsByUnderlying(query.toUpperCase());
+      
+      // Filter only futures and convert to unified format
+      const futureInstruments = instruments
+        .filter(inst => inst.option_type === 'FUT')
+        .slice(0, limit)
+        .map(inst => ({
+          symbol: inst.trading_symbol,
+          tradingSymbol: inst.trading_symbol,
+          name: `${inst.underlying_symbol} Future`,
+          exchange: inst.exchange,
+          instrument_type: 'FUTURE' as const,
+          underlying_symbol: inst.underlying_symbol,
+          expiry_date: inst.expiry_date,
+          lot_size: inst.lot_size,
+          status: inst.is_active ? 'Active' as const : 'Suspended' as const
+        }));
+
+      return futureInstruments;
+    } catch (error: any) {
+      console.error(`❌ Error searching futures:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get option chain for a specific underlying
+   */
+  async getOptionChain(underlyingSymbol: string, expiry?: string): Promise<UnifiedSymbol[]> {
+    try {
+      const instruments = await optionsDatabase.getInstrumentsByUnderlying(
+        underlyingSymbol.toUpperCase(),
+        expiry
+      );
+
+      return instruments
+        .filter(inst => inst.option_type === 'CE' || inst.option_type === 'PE')
+        .map(inst => ({
+          symbol: inst.trading_symbol,
+          tradingSymbol: inst.trading_symbol,
+          name: `${inst.underlying_symbol} ${inst.strike_price} ${inst.option_type}`,
+          exchange: inst.exchange,
+          instrument_type: 'OPTION' as const,
+          underlying_symbol: inst.underlying_symbol,
+          strike_price: inst.strike_price,
+          expiry_date: inst.expiry_date,
+          option_type: inst.option_type,
+          lot_size: inst.lot_size,
+          status: inst.is_active ? 'Active' as const : 'Suspended' as const
+        }))
+        .sort((a, b) => {
+          // Sort by strike price
+          if (a.strike_price && b.strike_price) {
+            return a.strike_price - b.strike_price;
+          }
+          return 0;
+        });
+    } catch (error: any) {
+      console.error(`❌ Error getting option chain:`, error.message);
+      return [];
+    }
+  }
+
+  /**
+   * Get expiry dates for an underlying
+   */
+  async getExpiryDates(underlyingSymbol: string): Promise<string[]> {
+    try {
+      return await optionsDatabase.getExpiryDates(underlyingSymbol.toUpperCase());
+    } catch (error: any) {
+      console.error(`❌ Error getting expiry dates:`, error.message);
+      return [];
+    }
   }
 }
 
