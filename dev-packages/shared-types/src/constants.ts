@@ -180,7 +180,7 @@ export type ApiErrorCode = typeof API_ERROR_CODE[keyof typeof API_ERROR_CODE];
 
 /**
  * Standardized database field names
- * Used across MongoDB and SQLite adapters
+ * Used across MongoDB adapters
  */
 export const DB_FIELDS = {
   // User fields

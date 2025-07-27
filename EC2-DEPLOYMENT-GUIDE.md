@@ -208,8 +208,8 @@ pm2 restart copytrade-pro
 
 ### Backup Database
 ```bash
-# Backup SQLite database
-cp backend/data/trading.db backend/data/trading.db.backup.$(date +%Y%m%d_%H%M%S)
+# Backup MongoDB database
+mongodump --uri="$MONGODB_URI" --out=backup-$(date +%Y%m%d_%H%M%S)
 ```
 
 ---

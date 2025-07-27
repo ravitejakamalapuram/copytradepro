@@ -24,7 +24,7 @@ backend/
 │   ├── migrations/    # Database migration scripts
 │   ├── tests/         # Test files
 │   └── index.ts       # Main server entry point
-├── data/              # SQLite databases and CSV files
+├── data/              # Application data and CSV files
 ├── public/            # Static files (production frontend build)
 ├── dist/              # Compiled TypeScript output
 └── package.json       # Backend dependencies

@@ -101,7 +101,7 @@ export interface OrderFilters {
 
 /**
  * Database Adapter Interface
- * Provides a unified interface for different database implementations (SQLite, MongoDB, etc.)
+ * Provides a unified interface for different database implementations (MongoDB, etc.)
  */
 export interface IDatabaseAdapter {
   // Connection Management

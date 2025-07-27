@@ -3,7 +3,7 @@
  * 
  * These interfaces are used across:
  * - MongoDB adapter
- * - SQLite adapter  
+  
  * - Backend services
  * - API responses
  */
@@ -49,7 +49,7 @@ export interface UpdateUserData {
 
 /**
  * Connected Account - Database representation
- * Used by both MongoDB and SQLite adapters
+ * Used by MongoDB adapters
  */
 export interface ConnectedAccount {
   id: number | string;
@@ -244,7 +244,7 @@ export type BrokerCredentials = ShoonyaCredentials | FyersCredentials;
 
 /**
  * Unified database adapter interface
- * Implemented by both MongoDB and SQLite adapters
+ * Implemented by MongoDB adapters
  */
 export interface IDatabaseAdapter {
   // Connection Management

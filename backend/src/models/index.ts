@@ -61,29 +61,28 @@ export interface CreateOrderHistoryData {
   executed_at: string;
 }
 
-// Mock database operations for Order model (since we're using SQLite service)
+// Mock database operations for Order model (using MongoDB via database adapter)
 export const Order = {
   findByPk: async (id: string | number): Promise<Order | null> => {
-    // This is a placeholder - in real implementation, this would use the SQLite service
-    // For now, return null to prevent build errors
+    // This is a placeholder - use the database adapter service instead
     // Note: Order.findByPk called - this should be replaced with proper database service
     return null;
   },
 
   findAll: async (options?: any): Promise<Order[]> => {
-    // This is a placeholder - in real implementation, this would use the SQLite service
+    // This is a placeholder - use the database adapter service instead
     // Note: Order.findAll called - this should be replaced with proper database service
     return [];
   },
 
   create: async (data: Partial<Order>): Promise<Order> => {
-    // This is a placeholder - in real implementation, this would use the SQLite service
+    // This is a placeholder - use the database adapter service instead
     // Note: Order.create called - this should be replaced with proper database service
-    throw new Error('Order.create not implemented - use SQLite service instead');
+    throw new Error('Order.create not implemented - use database adapter service instead');
   },
 
   update: async (data: Partial<Order>, options: any): Promise<[number, Order[]]> => {
-    // This is a placeholder - in real implementation, this would use the SQLite service
+    // This is a placeholder - use the database adapter service instead
     // Note: Order.update called - this should be replaced with proper database service
     return [0, []];
   }

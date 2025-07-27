@@ -125,7 +125,7 @@ app.get('/health', (_req, res) => {
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
       services: {
-        database: 'SQLite',
+        database: 'MongoDB',
         websocket: 'Socket.IO',
         orderMonitoring: 'Active'
       }
@@ -149,7 +149,7 @@ app.get('/api/health', (_req, res) => {
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
       services: {
-        database: 'SQLite',
+        database: 'MongoDB',
         websocket: 'Socket.IO',
         orderMonitoring: 'Active'
       }
