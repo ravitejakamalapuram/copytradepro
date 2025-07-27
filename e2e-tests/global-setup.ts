@@ -21,11 +21,11 @@ async function globalSetup(config: FullConfig) {
 }
 
 async function setupTestDatabase() {
-  // Copy the main database to a test database
-  const mainDbPath = path.join(__dirname, '../backend/data/users.db');
-  const testDbPath = path.join(__dirname, 'test-data/test-users.db');
+  // Setup test database for MongoDB
+  console.log('Setting up test database for MongoDB...');
   
-  if (fs.existsSync(mainDbPath)) {
+  // MongoDB test setup would be handled differently
+  if (process.env.NODE_ENV === 'test') {
     fs.copyFileSync(mainDbPath, testDbPath);
   }
   

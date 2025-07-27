@@ -4,7 +4,7 @@ FROM node:18-alpine
 # Set working directory
 WORKDIR /app
 
-# Create data directory for SQLite
+# Create data directory for application files
 RUN mkdir -p /app/data && chmod 755 /app/data
 
 # Copy package files

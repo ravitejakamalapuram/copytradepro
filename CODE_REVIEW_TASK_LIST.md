@@ -38,7 +38,7 @@ The codebase shows a well-structured trading application with modern architectur
   - **Effort**: 1 hour
 
 - [ ] **Strengthen Encryption Key Management**
-  - [ ] Fix encryption key fallback in `sqliteDatabase.ts`
+  - [ ] Fix encryption key fallback in database adapters
   - [ ] Implement proper key derivation (PBKDF2/Argon2)
   - [ ] Add key rotation mechanism
   - **Risk**: HIGH - Weak data encryption
@@ -85,7 +85,7 @@ The codebase shows a well-structured trading application with modern architectur
   - **Effort**: 16 hours
 
 - [ ] **Database Strategy Consolidation**
-  - [ ] Choose single database strategy (MongoDB vs SQLite)
+  - [x] Choose single database strategy (MongoDB)
   - [ ] Implement proper connection pooling
   - [ ] Add database migration system
   - [ ] Create backup/restore procedures

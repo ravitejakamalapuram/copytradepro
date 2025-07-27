@@ -89,10 +89,8 @@ create_backup() {
         cp -r frontend/dist "$backup_dir/frontend_dist"
     fi
     
-    # Backup database
-    if [ -f "backend/data/users.db" ]; then
-        cp backend/data/users.db "$backup_dir/users.db"
-    fi
+    # Backup database (MongoDB backup would be handled separately)
+    echo "📊 Database backup: MongoDB backups should be handled via mongodump"
     
     # Save deployment metadata
     cat > "$backup_dir/metadata.json" << EOF
@@ -303,9 +301,8 @@ rollback() {
         cp -r "$backup_dir/frontend_dist" backend/public
     fi
     
-    if [ -f "$backup_dir/users.db" ]; then
-        cp "$backup_dir/users.db" backend/data/users.db
-    fi
+    # Database restore (MongoDB restore would be handled separately)
+    echo "📊 Database restore: MongoDB restores should be handled via mongorestore"
     
     # Start application
     if start_application; then

@@ -129,7 +129,7 @@ class OrderStatusService extends EventEmitter {
 
 
   /**
-   * Get pending orders from SQLite database
+   * Get pending orders from database
    */
   private async getPendingOrders(): Promise<Order[]> {
     try {
@@ -539,7 +539,7 @@ class OrderStatusService extends EventEmitter {
       if (order.account_id) {
         logger.debug(`Order has account_id: ${order.account_id}`);
 
-        // Get connected account using account_id (handle both MongoDB string and SQLite number)
+        // Get connected account using account_id
         let account = null;
         try {
           account = await userDatabase.getConnectedAccountById(order.account_id as any);
@@ -699,7 +699,7 @@ class OrderStatusService extends EventEmitter {
         executionData: executionData || {}
       });
 
-      // Update in SQLite database (order_history table)
+      // Update in database (order_history collection)
       logger.info('Updating order in database', logContext, {
         operationId,
         statusChange: `${oldStatus} → ${newStatus}`,

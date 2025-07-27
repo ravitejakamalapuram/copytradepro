@@ -127,8 +127,6 @@ backups/
 
 # Database files
 *.db
-*.sqlite
-*.sqlite3
 
 # Backup files
 *.bak

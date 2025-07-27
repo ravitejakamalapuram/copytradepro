@@ -5,7 +5,7 @@
 CopyTrade Pro uses a **unified deployment architecture** where:
 - **Frontend**: React + TypeScript + Vite (builds to static files)
 - **Backend**: Node.js + Express + TypeScript (serves API + static files)
-- **Database**: SQLite (file-based, persistent storage)
+- **Database**: MongoDB (document-based, persistent storage)
 - **Real-time**: Socket.IO for live order updates
 - **Deployment**: Single Render.com web service (full-stack)
 
@@ -50,7 +50,7 @@ npm run build
 backend/
 ├── dist/           # Compiled TypeScript backend
 ├── public/         # Frontend static files (from frontend/dist)
-├── data/           # SQLite database directory
+├── data/           # Application data directory
 └── node_modules/   # Backend dependencies only
 ```
 
@@ -64,7 +64,7 @@ JWT_SECRET=your-super-secure-jwt-secret-key-here-minimum-32-characters
 ENCRYPTION_KEY=your-32-character-encryption-key-here
 FRONTEND_URL=https://your-frontend-domain.onrender.com
 ALLOWED_ORIGINS=https://your-frontend-domain.onrender.com
-DATABASE_PATH=/opt/render/project/src/data/trading.db
+MONGODB_URI=mongodb://localhost:27017/copytrade
 LOG_LEVEL=info
 ENABLE_REQUEST_LOGGING=true
 RATE_LIMIT_WINDOW_MS=900000
@@ -137,7 +137,7 @@ Expected response:
   "environment": "production",
   "version": "1.0.0",
   "services": {
-    "database": "SQLite",
+    "database": "MongoDB",
     "websocket": "Socket.IO",
     "orderMonitoring": "Active"
   }
@@ -156,7 +156,7 @@ Visit: `https://your-frontend-url.onrender.com`
 
 ### Optional Backend Variables
 - `PORT`: Server port (default: 3001)
-- `DATABASE_PATH`: SQLite database file path
+- `MONGODB_URI`: MongoDB connection string
 - `LOG_LEVEL`: Logging level (info, debug, warn, error)
 - `RATE_LIMIT_WINDOW_MS`: Rate limiting window
 - `RATE_LIMIT_MAX_REQUESTS`: Max requests per window
@@ -186,8 +186,8 @@ FYERS_REDIRECT_URI=https://your-backend-domain.onrender.com/api/broker/fyers/cal
 
 2. **Database Issues**
    - Ensure data directory has write permissions
-   - Check DATABASE_PATH environment variable
-   - Verify SQLite file creation
+   - Check MONGODB_URI environment variable
+   - Verify MongoDB connection
 
 3. **CORS Errors**
    - Verify FRONTEND_URL and ALLOWED_ORIGINS
@@ -203,7 +203,7 @@ FYERS_REDIRECT_URI=https://your-backend-domain.onrender.com/api/broker/fyers/cal
 
 - Backend logs: Available in Render.com dashboard
 - Health check: Monitor `/health` endpoint
-- Database: SQLite file persists across deployments
+- Database: MongoDB data persists across deployments
 
 ## Security Considerations
 
@@ -215,7 +215,7 @@ FYERS_REDIRECT_URI=https://your-backend-domain.onrender.com/api/broker/fyers/cal
 
 ## Performance Optimization
 
-1. **Database**: SQLite is suitable for small to medium loads
+1. **Database**: MongoDB is suitable for small to large loads
 2. **Caching**: Consider adding Redis for session storage
 3. **CDN**: Use Render.com's CDN for static assets
 4. **Monitoring**: Set up health checks and alerts
