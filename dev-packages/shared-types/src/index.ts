@@ -11,6 +11,7 @@ export * from './api-responses';
 // Export constants and database interfaces
 export * from './constants';
 export * from './database-interfaces';
+export * from './options-types';
 
 // Re-export commonly used types for convenience
 export type {

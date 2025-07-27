@@ -17,6 +17,7 @@ import advancedOrdersRoutes from './routes/advancedOrders';
 import marketDataRoutes from './routes/marketData';
 import logsRoutes from './routes/logs';
 import monitoringRoutes from './routes/monitoring';
+import optionsRoutes from './routes/options';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -25,6 +26,7 @@ import { logger } from './utils/logger';
 import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
 import { realTimeDataService } from './services/realTimeDataService';
+import { optionsDataService } from './services/optionsDataService';
 // Auto-initialize services on import
 import './services/nseCSVService';
 import './services/bseCSVService';
@@ -171,6 +173,7 @@ app.use('/api/advanced-orders', advancedOrdersRoutes);
 app.use('/api/market-data', marketDataRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/monitoring', monitoringRoutes);
+app.use('/api/options', optionsRoutes);
 app.use('/api/notifications', require('./routes/notifications').default);
 
 
@@ -327,6 +330,17 @@ async function startServer() {
 
     // Initialize broker account cache
     await initializeBrokerAccountCache();
+
+    // Initialize options data service
+    logger.info('Initializing options data service', {
+      component: 'SERVER_STARTUP',
+      operation: 'OPTIONS_SERVICE_INIT'
+    });
+    await optionsDataService.initialize();
+    logger.info('Options data service initialized', {
+      component: 'SERVER_STARTUP',
+      operation: 'OPTIONS_SERVICE_INIT_SUCCESS'
+    });
 
     // Start order status monitoring
     orderStatusService.startMonitoring().catch((error: any) => {
