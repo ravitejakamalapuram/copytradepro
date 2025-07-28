@@ -1,7 +1,7 @@
 import { nseService, NSESymbol } from './nseService';
 import { nseCSVService, NSESymbolData } from './nseCSVService';
 import { bseCSVService, BSESymbolData } from './bseCSVService';
-import { optionsDatabase } from './optionsDatabase';
+// optionsDatabase removed - using optionsDataService with direct MongoDB operations
 import { Exchange } from '@copytrade/shared-types';
 
 // Unified symbol interface for multi-exchange support including F&O
@@ -46,36 +46,15 @@ export interface BSESymbol {
 
 
 
-// Static F&O instruments for testing (no API calls needed)
-const STATIC_FO_INSTRUMENTS = [
-  // RELIANCE Options
-  { symbol: "RELIANCE24FEB3000CE", tradingSymbol: "RELIANCE24FEB3000CE", name: "RELIANCE 3000 CE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "RELIANCE24FEB3000PE", tradingSymbol: "RELIANCE24FEB3000PE", name: "RELIANCE 3000 PE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "RELIANCE24FEB3100CE", tradingSymbol: "RELIANCE24FEB3100CE", name: "RELIANCE 3100 CE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3100, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "RELIANCE24FEB3100PE", tradingSymbol: "RELIANCE24FEB3100PE", name: "RELIANCE 3100 PE", instrument_type: "OPTION" as const, underlying_symbol: "RELIANCE", strike_price: 3100, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
-  
-  // NIFTY Options
-  { symbol: "NIFTY24FEB21000CE", tradingSymbol: "NIFTY24FEB21000CE", name: "NIFTY 21000 CE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "NIFTY24FEB21000PE", tradingSymbol: "NIFTY24FEB21000PE", name: "NIFTY 21000 PE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "NIFTY24FEB21500CE", tradingSymbol: "NIFTY24FEB21500CE", name: "NIFTY 21500 CE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21500, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "NIFTY24FEB21500PE", tradingSymbol: "NIFTY24FEB21500PE", name: "NIFTY 21500 PE", instrument_type: "OPTION" as const, underlying_symbol: "NIFTY", strike_price: 21500, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
-  
-  // TCS Options
-  { symbol: "TCS24FEB4000CE", tradingSymbol: "TCS24FEB4000CE", name: "TCS 4000 CE", instrument_type: "OPTION" as const, underlying_symbol: "TCS", strike_price: 4000, expiry_date: "2024-02-29", option_type: "CE" as const, lot_size: 150, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "TCS24FEB4000PE", tradingSymbol: "TCS24FEB4000PE", name: "TCS 4000 PE", instrument_type: "OPTION" as const, underlying_symbol: "TCS", strike_price: 4000, expiry_date: "2024-02-29", option_type: "PE" as const, lot_size: 150, exchange: "NFO" as const, status: "Active" as const },
-  
-  // Futures
-  { symbol: "RELIANCE24FEBFUT", tradingSymbol: "RELIANCE24FEBFUT", name: "RELIANCE Future", instrument_type: "FUTURE" as const, underlying_symbol: "RELIANCE", expiry_date: "2024-02-29", lot_size: 250, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "NIFTY24FEBFUT", tradingSymbol: "NIFTY24FEBFUT", name: "NIFTY Future", instrument_type: "FUTURE" as const, underlying_symbol: "NIFTY", expiry_date: "2024-02-29", lot_size: 50, exchange: "NFO" as const, status: "Active" as const },
-  { symbol: "TCS24FEBFUT", tradingSymbol: "TCS24FEBFUT", name: "TCS Future", instrument_type: "FUTURE" as const, underlying_symbol: "TCS", expiry_date: "2024-02-29", lot_size: 150, exchange: "NFO" as const, status: "Active" as const }
-];
+// F&O instruments are now fetched dynamically from Upstox API
+// No static data - all data comes from live Upstox instrument master
 
 class SymbolDatabaseService {
   constructor() {
     console.log('🚀 Multi-Exchange Symbol Database Service initialized');
     console.log('📊 NSE CSV + BSE CSV + Live API integration enabled');
     console.log('🔗 Using NSE/BSE CSV for symbol search and live API for market data');
-    console.log(`📈 Static F&O instruments loaded: ${STATIC_FO_INSTRUMENTS.length} instruments`);
+    console.log('📈 F&O instruments will be loaded dynamically from Upstox API');
   }
 
   /**
@@ -331,49 +310,31 @@ class SymbolDatabaseService {
       const searchQuery = query.toUpperCase();
       console.log(`🔍 Searching options for: "${searchQuery}"`);
 
-      // Try to get from live Upstox data first
-      try {
-        const { optionsDataService } = await import('./optionsDataService');
-        const ceResults = await optionsDataService.searchInstruments(searchQuery, 'CE');
-        const peResults = await optionsDataService.searchInstruments(searchQuery, 'PE');
-        
-        const combinedResults = [...ceResults, ...peResults]
-          .slice(0, limit)
-          .map(option => ({
-            symbol: option.trading_symbol,
-            tradingSymbol: option.trading_symbol,
-            name: option.name || option.trading_symbol,
-            exchange: option.exchange,
-            instrument_type: 'OPTION' as const,
-            underlying_symbol: option.underlying,
-            strike_price: option.strike,
-            expiry_date: option.expiry,
-            option_type: option.option_type,
-            lot_size: option.lot_size,
-            status: 'Active' as const
-          }));
+      const { optionsDataService } = await import('./optionsDataService');
+      const ceResults = await optionsDataService.searchInstruments(searchQuery, 'CE');
+      const peResults = await optionsDataService.searchInstruments(searchQuery, 'PE');
+      
+      const combinedResults = [...ceResults, ...peResults]
+        .slice(0, limit)
+        .map(option => ({
+          symbol: option.trading_symbol,
+          tradingSymbol: option.trading_symbol,
+          name: option.name || option.trading_symbol,
+          exchange: option.exchange,
+          instrument_type: 'OPTION' as const,
+          underlying_symbol: option.underlying,
+          strike_price: option.strike,
+          expiry_date: option.expiry,
+          option_type: option.option_type,
+          lot_size: option.lot_size,
+          status: 'Active' as const
+        }));
 
-        if (combinedResults.length > 0) {
-          console.log(`✅ Found ${combinedResults.length} options from Upstox for "${searchQuery}"`);
-          return combinedResults;
-        }
-      } catch (error) {
-        console.warn('⚠️ Upstox options search failed, falling back to static data:', error);
-      }
-
-      // Fallback to static data
-      const optionInstruments = STATIC_FO_INSTRUMENTS
-        .filter(inst => 
-          inst.instrument_type === 'OPTION' && 
-          (inst.underlying_symbol?.includes(searchQuery) || inst.symbol.includes(searchQuery))
-        )
-        .slice(0, limit);
-
-      console.log(`📊 Found ${optionInstruments.length} options from static data for "${query}"`);
-      return optionInstruments;
+      console.log(`✅ Found ${combinedResults.length} options from Upstox for "${searchQuery}"`);
+      return combinedResults;
     } catch (error: any) {
-      console.error(`❌ Error searching options:`, error.message);
-      return [];
+      console.error(`❌ Error searching options from Upstox:`, error.message);
+      throw new Error(`Failed to search options: ${error.message}`);
     }
   }
 
@@ -385,62 +346,61 @@ class SymbolDatabaseService {
       const searchQuery = query.toUpperCase();
       console.log(`🔍 Searching futures for: "${searchQuery}"`);
 
-      // Try to get from live Upstox data first
-      try {
-        const { optionsDataService } = await import('./optionsDataService');
-        const futureResults = await optionsDataService.searchInstruments(searchQuery, 'FUT');
-        
-        const transformedResults = futureResults
-          .slice(0, limit)
-          .map(future => ({
-            symbol: future.trading_symbol,
-            tradingSymbol: future.trading_symbol,
-            name: future.name || future.trading_symbol,
-            exchange: future.exchange,
-            instrument_type: 'FUTURE' as const,
-            underlying_symbol: future.underlying,
-            expiry_date: future.expiry,
-            lot_size: future.lot_size,
-            status: 'Active' as const
-          }));
+      const { optionsDataService } = await import('./optionsDataService');
+      const futureResults = await optionsDataService.searchInstruments(searchQuery, 'FUT');
+      
+      const transformedResults = futureResults
+        .slice(0, limit)
+        .map(future => ({
+          symbol: future.trading_symbol,
+          tradingSymbol: future.trading_symbol,
+          name: future.name || future.trading_symbol,
+          exchange: future.exchange,
+          instrument_type: 'FUTURE' as const,
+          underlying_symbol: future.underlying,
+          expiry_date: future.expiry,
+          lot_size: future.lot_size,
+          status: 'Active' as const
+        }));
 
-        if (transformedResults.length > 0) {
-          console.log(`✅ Found ${transformedResults.length} futures from Upstox for "${searchQuery}"`);
-          return transformedResults;
-        }
-      } catch (error) {
-        console.warn('⚠️ Upstox futures search failed, falling back to static data:', error);
-      }
-
-      // Fallback to static data
-      const futureInstruments = STATIC_FO_INSTRUMENTS
-        .filter(inst => 
-          inst.instrument_type === 'FUTURE' && 
-          (inst.underlying_symbol?.includes(searchQuery) || inst.symbol.includes(searchQuery))
-        )
-        .slice(0, limit);
-
-      console.log(`📊 Found ${futureInstruments.length} futures from static data for "${query}"`);
-      return futureInstruments;
+      console.log(`✅ Found ${transformedResults.length} futures from Upstox for "${searchQuery}"`);
+      return transformedResults;
     } catch (error: any) {
-      console.error(`❌ Error searching futures:`, error.message);
-      return [];
+      console.error(`❌ Error searching futures from Upstox:`, error.message);
+      throw new Error(`Failed to search futures: ${error.message}`);
     }
   }
 
   /**
-   * Get option chain for a specific underlying (using static data)
+   * Get option chain for a specific underlying (using Upstox data)
    */
   async getOptionChain(underlyingSymbol: string, expiry?: string): Promise<UnifiedSymbol[]> {
     try {
       const searchSymbol = underlyingSymbol.toUpperCase();
+      console.log(`🔍 Getting option chain for: "${searchSymbol}", expiry: ${expiry || 'all'}`);
       
-      return STATIC_FO_INSTRUMENTS
-        .filter(inst => 
-          inst.instrument_type === 'OPTION' && 
-          inst.underlying_symbol === searchSymbol &&
-          (!expiry || inst.expiry_date === expiry)
+      const { optionsDataService } = await import('./optionsDataService');
+      const ceResults = await optionsDataService.searchInstruments(searchSymbol, 'CE');
+      const peResults = await optionsDataService.searchInstruments(searchSymbol, 'PE');
+      
+      const combinedResults = [...ceResults, ...peResults]
+        .filter(option => 
+          option.underlying === searchSymbol &&
+          (!expiry || option.expiry === expiry)
         )
+        .map(option => ({
+          symbol: option.trading_symbol,
+          tradingSymbol: option.trading_symbol,
+          name: option.name || option.trading_symbol,
+          exchange: option.exchange,
+          instrument_type: 'OPTION' as const,
+          underlying_symbol: option.underlying,
+          strike_price: option.strike,
+          expiry_date: option.expiry,
+          option_type: option.option_type,
+          lot_size: option.lot_size,
+          status: 'Active' as const
+        }))
         .sort((a, b) => {
           // Sort by strike price
           if (a.strike_price && b.strike_price) {
@@ -448,29 +408,42 @@ class SymbolDatabaseService {
           }
           return 0;
         });
+
+      console.log(`✅ Found ${combinedResults.length} options in chain for "${searchSymbol}"`);
+      return combinedResults;
     } catch (error: any) {
-      console.error(`❌ Error getting option chain:`, error.message);
-      return [];
+      console.error(`❌ Error getting option chain from Upstox:`, error.message);
+      throw new Error(`Failed to get option chain: ${error.message}`);
     }
   }
 
   /**
-   * Get expiry dates for an underlying (using static data)
+   * Get expiry dates for an underlying (using Upstox data)
    */
   async getExpiryDates(underlyingSymbol: string): Promise<string[]> {
     try {
       const searchSymbol = underlyingSymbol.toUpperCase();
+      console.log(`🔍 Getting expiry dates for: "${searchSymbol}"`);
       
-      const expiries = STATIC_FO_INSTRUMENTS
-        .filter(inst => inst.underlying_symbol === searchSymbol)
-        .map(inst => inst.expiry_date)
+      const { optionsDataService } = await import('./optionsDataService');
+      const ceResults = await optionsDataService.searchInstruments(searchSymbol, 'CE');
+      const peResults = await optionsDataService.searchInstruments(searchSymbol, 'PE');
+      const futResults = await optionsDataService.searchInstruments(searchSymbol, 'FUT');
+      
+      const allResults = [...ceResults, ...peResults, ...futResults];
+      
+      const expiries = allResults
+        .filter(inst => inst.underlying === searchSymbol)
+        .map(inst => inst.expiry)
         .filter((expiry, index, arr) => arr.indexOf(expiry) === index) // Remove duplicates
+        .filter(expiry => expiry) // Remove null/undefined
         .sort();
         
+      console.log(`✅ Found ${expiries.length} expiry dates for "${searchSymbol}"`);
       return expiries;
     } catch (error: any) {
-      console.error(`❌ Error getting expiry dates:`, error.message);
-      return [];
+      console.error(`❌ Error getting expiry dates from Upstox:`, error.message);
+      throw new Error(`Failed to get expiry dates: ${error.message}`);
     }
   }
   /**
@@ -492,26 +465,33 @@ class SymbolDatabaseService {
    */
   async getOptionsInstruments(limit: number = 50): Promise<UnifiedSymbol[]> {
     try {
-      const optionsData = STATIC_FO_INSTRUMENTS
-        .filter(instrument => instrument.instrument_type === 'OPTION')
-        .slice(0, limit);
+      const { optionsDataService } = await import('./optionsDataService');
       
-      return optionsData.map(option => ({
-        symbol: option.symbol,
-        tradingSymbol: option.tradingSymbol,
-        name: option.name,
-        exchange: option.exchange,
-        instrument_type: option.instrument_type,
-        underlying_symbol: option.underlying_symbol,
-        strike_price: option.strike_price,
-        expiry_date: option.expiry_date,
-        option_type: option.option_type,
-        lot_size: option.lot_size,
-        status: option.status
-      }));
+      // Get all options from database (use a broad search)
+      const ceResults = await optionsDataService.searchInstruments('.', 'CE');
+      const peResults = await optionsDataService.searchInstruments('.', 'PE');
+      
+      const combinedResults = [...ceResults, ...peResults]
+        .slice(0, limit)
+        .map(option => ({
+          symbol: option.trading_symbol,
+          tradingSymbol: option.trading_symbol,
+          name: option.name || option.trading_symbol,
+          exchange: option.exchange,
+          instrument_type: 'OPTION' as const,
+          underlying_symbol: option.underlying,
+          strike_price: option.strike,
+          expiry_date: option.expiry,
+          option_type: option.option_type,
+          lot_size: option.lot_size,
+          status: 'Active' as const
+        }));
+
+      console.log(`✅ Retrieved ${combinedResults.length} options from Upstox database`);
+      return combinedResults;
     } catch (error) {
-      console.error('❌ Error getting options instruments:', error);
-      return [];
+      console.error('❌ Error getting options instruments from Upstox:', error);
+      throw new Error(`Failed to get options instruments: ${error}`);
     }
   }
 
@@ -520,24 +500,30 @@ class SymbolDatabaseService {
    */
   async getFuturesInstruments(limit: number = 50): Promise<UnifiedSymbol[]> {
     try {
-      const futuresData = STATIC_FO_INSTRUMENTS
-        .filter(instrument => instrument.instrument_type === 'FUTURE')
-        .slice(0, limit);
+      const { optionsDataService } = await import('./optionsDataService');
       
-      return futuresData.map(future => ({
-        symbol: future.symbol,
-        tradingSymbol: future.tradingSymbol,
-        name: future.name,
-        exchange: future.exchange,
-        instrument_type: future.instrument_type,
-        underlying_symbol: future.underlying_symbol,
-        expiry_date: future.expiry_date,
-        lot_size: future.lot_size,
-        status: future.status
-      }));
+      // Get all futures from database (use a broad search)
+      const futureResults = await optionsDataService.searchInstruments('.', 'FUT');
+      
+      const transformedResults = futureResults
+        .slice(0, limit)
+        .map(future => ({
+          symbol: future.trading_symbol,
+          tradingSymbol: future.trading_symbol,
+          name: future.name || future.trading_symbol,
+          exchange: future.exchange,
+          instrument_type: 'FUTURE' as const,
+          underlying_symbol: future.underlying,
+          expiry_date: future.expiry,
+          lot_size: future.lot_size,
+          status: 'Active' as const
+        }));
+
+      console.log(`✅ Retrieved ${transformedResults.length} futures from Upstox database`);
+      return transformedResults;
     } catch (error) {
-      console.error('❌ Error getting futures instruments:', error);
-      return [];
+      console.error('❌ Error getting futures instruments from Upstox:', error);
+      throw new Error(`Failed to get futures instruments: ${error}`);
     }
   }
 }

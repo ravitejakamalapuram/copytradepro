@@ -380,6 +380,43 @@ router.post('/force-update-fo', authenticateToken, async (req: any, res: any) =>
 });
 
 /**
+ * Debug endpoint to check F&O database status
+ */
+router.get('/debug-fo-status', authenticateToken, async (req: any, res: any) => {
+  try {
+    const mongoose = require('mongoose');
+    const db = mongoose.connection.db;
+    const collection = db.collection('fo_instruments');
+    
+    const totalCount = await collection.countDocuments();
+    const sampleDocs = await collection.find({}).limit(5).toArray();
+    
+    // Check different instrument types
+    const ceCount = await collection.countDocuments({ instrument_type: 'CE' });
+    const peCount = await collection.countDocuments({ instrument_type: 'PE' });
+    const futCount = await collection.countDocuments({ instrument_type: 'FUT' });
+    
+    return res.json({
+      success: true,
+      data: {
+        totalDocuments: totalCount,
+        callOptionsCount: ceCount,
+        putOptionsCount: peCount,
+        futuresCount: futCount,
+        sampleDocuments: sampleDocs
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to check F&O database status:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check F&O database status',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Get NSE gainers - DISABLED
  * Disabled due to NSE API reliability issues causing timeouts
  */

@@ -89,12 +89,12 @@ const AppNavigation: React.FC = () => {
   };
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/portfolio', label: 'Portfolio', icon: '📈' },
-    { path: '/holdings', label: 'Holdings', icon: '📊' },
-    { path: '/orders', label: 'Orders', icon: '📋' },
-    { path: '/positions', label: 'Positions', icon: '🎯' },
+    // { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+    // { path: '/portfolio', label: 'Portfolio', icon: '📈' },
+    // { path: '/holdings', label: 'Holdings', icon: '📊' },
     { path: '/trade-setup', label: 'Trade', icon: '⚡' },
+    { path: '/orders', label: 'Orders', icon: '📋' },
+    // { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
 

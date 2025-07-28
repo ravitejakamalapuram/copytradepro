@@ -50,7 +50,6 @@ const Orders: React.FC = () => {
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-
   const [dateFilter, setDateFilter] = useState<'today' | 'week'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
@@ -58,6 +57,32 @@ const Orders: React.FC = () => {
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>(['all']); // Array of selected account IDs
   const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string, mongoId: string}>>([]);
   const [showAccountFilter, setShowAccountFilter] = useState(false);
+
+  // Function to get broker symbol/icon
+  const getBrokerSymbol = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return '🔥';
+      case 'shoonya': return '🏛️';
+      case 'zerodha': return '⚡';
+      case 'angel': return '👼';
+      case 'upstox': return '📈';
+      case 'dhan': return '💰';
+      default: return '🏢';
+    }
+  };
+
+  // Function to get broker display name
+  const getBrokerDisplayName = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return 'Fyers';
+      case 'shoonya': return 'Shoonya';
+      case 'zerodha': return 'Zerodha';
+      case 'angel': return 'Angel';
+      case 'upstox': return 'Upstox';
+      case 'dhan': return 'Dhan';
+      default: return brokerName || 'Unknown';
+    }
+  };
 
   // Function to get date range based on filter
   const getDateRange = () => {
@@ -104,7 +129,7 @@ const Orders: React.FC = () => {
 
       const accountOptions = accounts.map((account: any) => ({
         id: account.accountId, // Use the broker account ID (like "FN135006") as the filter value
-        name: `${account.userName || account.accountId || 'Unknown'} (${account.brokerDisplayName || account.brokerName})`,
+        name: `${getBrokerSymbol(account.brokerName)} ${account.userName || account.accountId || 'Unknown'} (${getBrokerDisplayName(account.brokerName)})`,
         broker: account.brokerName,
         mongoId: account.id // Keep the MongoDB ObjectId for reference
       }));
@@ -412,7 +437,7 @@ const Orders: React.FC = () => {
         console.error('Failed to check order status:', errorMessage);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to check order status:', error);
       
       // Handle both network errors and API error responses
@@ -657,18 +682,21 @@ const Orders: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          min-height: 2.5rem;
+          justify-content: center;
         }
 
         .symbol-row {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          flex-wrap: wrap;
         }
 
         .account-row {
           display: flex;
-          align-items: center;
-          gap: 0.25rem;
+          flex-direction: column;
+          gap: 0.1rem;
           font-size: 0.7rem;
           color: var(--text-secondary);
         }
@@ -679,6 +707,18 @@ const Orders: React.FC = () => {
           border-radius: 0.25rem;
           font-weight: 600;
           letter-spacing: 0.5px;
+        }
+
+        .exchange-badge.nse {
+          background-color: #1e40af;
+        }
+
+        .exchange-badge.bse {
+          background-color: #7c3aed;
+        }
+
+        .exchange-badge.nfo {
+          background-color: #059669;
         }
 
         .account-badge {
@@ -1011,21 +1051,32 @@ const Orders: React.FC = () => {
                             </span>
                             {order.exchange && (
                               <span className="exchange-badge" style={{
-                                backgroundColor: order.exchange === 'NSE' ? '#1e40af' : '#7c3aed',
+                                backgroundColor: 
+                                  order.exchange === 'NSE' ? '#1e40af' : 
+                                  order.exchange === 'BSE' ? '#7c3aed' : 
+                                  order.exchange === 'NFO' ? '#059669' : '#6b7280',
                                 color: 'white'
                               }}>
                                 {order.exchange}
                               </span>
                             )}
                           </div>
-                          {order.accountInfo && (
-                            <div className="account-row">
-                              <span className="account-badge">
-                                {order.accountInfo.account_id}
+                          <div className="account-row">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '0.7rem' }}>
+                                {getBrokerSymbol(order.brokerName || '')}
                               </span>
-                              <span>{order.accountInfo.user_name}</span>
+                              <span className="account-badge">
+                                {order.accountInfo?.account_id || 'N/A'}
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                                {getBrokerDisplayName(order.brokerName || '')}
+                              </span>
                             </div>
-                          )}
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                              {order.accountInfo?.user_name || ''}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td>

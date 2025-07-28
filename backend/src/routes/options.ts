@@ -1,7 +1,7 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
 import { optionsDataService } from '../services/optionsDataService';
-import { optionsDatabase } from '../services/optionsDatabase';
+// optionsDatabase removed - using optionsDataService with direct MongoDB operations
 import { logger } from '../utils/logger';
 import { 
   OptionChainResponse, 
@@ -45,10 +45,11 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
       });
     }
 
-    const instruments = await optionsDatabase.getInstrumentsByUnderlying(
+    // Use symbolDatabaseService for option chain data
+    const { symbolDatabaseService } = await import('../services/symbolDatabaseService');
+    const instruments = await symbolDatabaseService.getOptionChain(
       underlying as string,
-      expiry as string,
-      option_type as any
+      expiry as string
     );
 
     // Apply strike price filters if provided
@@ -68,11 +69,29 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
     // Apply pagination
     const startIndex = parseInt(offset as string);
     const endIndex = startIndex + parseInt(limit as string);
-    const paginatedInstruments = filteredInstruments.slice(startIndex, endIndex);
+    const paginatedResults = filteredInstruments.slice(startIndex, endIndex);
+
+    // Transform UnifiedSymbol to OptionsInstrument format
+    const transformedInstruments = paginatedResults.map(instrument => ({
+      id: instrument.symbol,
+      underlying_symbol: instrument.underlying_symbol || '',
+      trading_symbol: instrument.tradingSymbol,
+      instrument_key: instrument.symbol,
+      strike_price: instrument.strike_price,
+      expiry_date: instrument.expiry_date || '',
+      option_type: instrument.option_type || 'CE',
+      lot_size: instrument.lot_size || 1,
+      exchange: instrument.exchange,
+      segment: 'NSE_FO',
+      tick_size: 0.05,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      is_active: true
+    }));
 
     const response: OptionsInstrumentSearchResponse = {
       success: true,
-      data: paginatedInstruments,
+      data: transformedInstruments,
       total: filteredInstruments.length,
       page: Math.floor(startIndex / parseInt(limit as string)) + 1,
       limit: parseInt(limit as string)
@@ -110,7 +129,9 @@ router.get('/instruments/:underlying/expiries', authenticateToken, async (req, r
       underlying
     });
 
-    const expiries = await optionsDatabase.getExpiryDates(underlying);
+    // Use symbolDatabaseService for expiry dates
+    const { symbolDatabaseService } = await import('../services/symbolDatabaseService');
+    const expiries = await symbolDatabaseService.getExpiryDates(underlying);
 
     res.json({
       success: true,
@@ -196,7 +217,8 @@ router.get('/portfolio', authenticateToken, async (req, res) => {
       userId
     });
 
-    const positions = await optionsDatabase.getPositionsByUser(userId);
+    // Positions functionality not implemented yet - return empty array
+    const positions: any[] = [];
 
     // Calculate portfolio summary
     const totalPnl = positions.reduce((sum, pos) => sum + pos.pnl, 0);
@@ -280,7 +302,8 @@ router.get('/portfolio/:underlying', authenticateToken, async (req, res) => {
       underlying
     });
 
-    const positions = await optionsDatabase.getPositionsByUnderlying(userId, underlying);
+    // Positions functionality not implemented yet - return empty array
+    const positions: any[] = [];
 
     res.json({
       success: true,

@@ -16,17 +16,19 @@ const ALL_BROKERS = [
     id: 'shoonya',
     name: 'Shoonya',
     description: 'Reliable trading & investment platform by Finvasia',
-    logo: '🏦',
+    logo: '🏛️',
     features: ['Zero brokerage on equity delivery', 'Advanced charting tools', 'API trading support']
   },
   {
     id: 'fyers',
     name: 'Fyers',
     description: 'Advanced trading platform with powerful APIs',
-    logo: '🚀',
+    logo: '🔥',
     features: ['Professional trading tools', 'Real-time market data', 'Advanced order types']
   },
 ];
+
+// Broker symbols are already defined in ALL_BROKERS array above
 
 interface FormData {
   brokerName: string;

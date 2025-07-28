@@ -64,6 +64,25 @@ export class OptionsDataService {
       timezone: 'Asia/Kolkata'
     });
 
+    // Fetch instruments immediately on startup
+    logger.info('Fetching F&O instruments on startup', {
+      component: 'OPTIONS_DATA_SERVICE',
+      operation: 'STARTUP_FETCH'
+    });
+    
+    try {
+      await this.refreshInstruments();
+      logger.info('F&O instruments fetched successfully on startup', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'STARTUP_FETCH_SUCCESS'
+      });
+    } catch (error) {
+      logger.error('Failed to fetch F&O instruments on startup', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'STARTUP_FETCH_ERROR'
+      }, error);
+    }
+
     this.isInitialized = true;
     logger.info('Options Data Service initialized successfully', {
       component: 'OPTIONS_DATA_SERVICE',
@@ -103,6 +122,18 @@ export class OptionsDataService {
         operation: 'FETCH_UPSTOX_INSTRUMENTS_SUCCESS',
         totalInstruments: jsonData.length
       });
+
+      // Log summary of fetched data
+      if (jsonData.length > 0) {
+        const foCount = jsonData.filter((inst: any) => 
+          inst.segment === 'NSE_FO' || 
+          inst.exchange === 'NFO' ||
+          inst.instrument_type === 'OPT' ||
+          inst.instrument_type === 'FUT'
+        ).length;
+        
+        console.log(`📊 Upstox data: ${jsonData.length} total instruments, ${foCount} F&O instruments`);
+      }
 
       return jsonData;
     } catch (error) {
@@ -160,26 +191,19 @@ export class OptionsDataService {
     try {
       let instruments: any[] = [];
 
-      // Try Upstox first
-      try {
-        instruments = await this.fetchUpstoxInstruments();
-      } catch (error) {
-        logger.warn('Upstox fetch failed, trying TIQS backup', {
-          component: 'OPTIONS_DATA_SERVICE',
-          operation: 'UPSTOX_FALLBACK'
-        });
+      // Fetch from Upstox - no fallbacks
+      instruments = await this.fetchUpstoxInstruments();
 
-        // Fallback to TIQS
-        if (this.tiqs) {
-          instruments = await this.fetchTIQSInstruments();
-        }
-      }
-
-      // Filter F&O instruments
+      // Filter F&O instruments - try multiple possible field names
       const foInstruments = instruments.filter(instrument => 
         instrument.segment === 'NSE_FO' || 
-        instrument.exchange === 'NFO'
+        instrument.exchange === 'NFO' ||
+        instrument.instrument_type === 'OPT' ||
+        instrument.instrument_type === 'FUT' ||
+        (instrument.exchange === 'NSE' && (instrument.instrument_type === 'OPT' || instrument.instrument_type === 'FUT'))
       );
+
+      console.log(`📊 Filtered ${foInstruments.length} F&O instruments from ${instruments.length} total instruments`);
 
       // Store in database
       await this.storeInstruments(foInstruments);
@@ -211,24 +235,42 @@ export class OptionsDataService {
       await collection.deleteMany({});
       
       // Transform and insert new data
-      const transformedInstruments = instruments.map(instrument => ({
-        instrument_key: instrument.instrument_key,
-        exchange_token: instrument.exchange_token,
-        trading_symbol: instrument.trading_symbol,
-        name: instrument.name,
-        last_price: instrument.last_price,
-        expiry: instrument.expiry,
-        strike: instrument.strike,
-        tick_size: instrument.tick_size,
-        lot_size: instrument.lot_size,
-        instrument_type: instrument.instrument_type,
-        option_type: instrument.option_type,
-        exchange: instrument.exchange,
-        segment: instrument.segment,
-        underlying: instrument.underlying,
-        created_at: new Date(),
-        updated_at: new Date()
-      }));
+      const transformedInstruments = instruments.map(instrument => {
+        // Extract underlying symbol and strike from trading_symbol
+        // Format: "INDUSINDBK 780 CE 30 SEP 25" or "NIFTY 21000 CE 30 JAN 25"
+        let underlying = null;
+        let strike = null;
+        
+        if (instrument.trading_symbol) {
+          const parts = instrument.trading_symbol.split(' ');
+          if (parts.length >= 3) {
+            underlying = parts[0]; // First part is underlying
+            const strikeStr = parts[1];
+            if (!isNaN(parseFloat(strikeStr))) {
+              strike = parseFloat(strikeStr);
+            }
+          }
+        }
+        
+        return {
+          instrument_key: instrument.instrument_key,
+          exchange_token: instrument.exchange_token,
+          trading_symbol: instrument.trading_symbol,
+          name: instrument.name,
+          last_price: instrument.last_price,
+          expiry: instrument.expiry,
+          strike: strike || instrument.strike,
+          tick_size: instrument.tick_size,
+          lot_size: instrument.lot_size,
+          instrument_type: instrument.instrument_type,
+          option_type: instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' ? instrument.instrument_type : instrument.option_type,
+          exchange: instrument.exchange,
+          segment: instrument.segment,
+          underlying: underlying || instrument.underlying,
+          created_at: new Date(),
+          updated_at: new Date()
+        };
+      });
       
       if (transformedInstruments.length > 0) {
         await collection.insertMany(transformedInstruments);
@@ -389,6 +431,13 @@ export class OptionsDataService {
       const db = mongoose.connection.db;
       const collection = db.collection('fo_instruments');
       
+      // Check if database has data
+      const totalCount = await collection.countDocuments();
+      if (totalCount === 0) {
+        console.log('⚠️ No F&O instruments found in database. Run force-update-fo to fetch data.');
+        return [];
+      }
+      
       const searchQuery: any = {
         $or: [
           { trading_symbol: { $regex: query, $options: 'i' } },
@@ -402,8 +451,8 @@ export class OptionsDataService {
         if (type === 'FUT') {
           searchQuery.instrument_type = 'FUT';
         } else {
-          searchQuery.instrument_type = 'OPT';
-          searchQuery.option_type = type;
+          // For options, instrument_type is CE or PE directly
+          searchQuery.instrument_type = type;
         }
       }
       

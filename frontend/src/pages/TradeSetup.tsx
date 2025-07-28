@@ -32,7 +32,7 @@ type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
   symbol: string;
-  exchange: 'NSE' | 'BSE';
+  exchange: 'NSE' | 'BSE' | 'NFO';
   action: 'BUY' | 'SELL';
   quantity: string;
   price: string;
@@ -52,6 +52,32 @@ interface MarginInfo {
 const TradeSetup: React.FC = () => {
   const navigate = useNavigate();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+
+  // Function to get broker symbol/icon (consistent with Orders page)
+  const getBrokerSymbol = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return '🔥';
+      case 'shoonya': return '🏛️';
+      case 'zerodha': return '⚡';
+      case 'angel': return '👼';
+      case 'upstox': return '📈';
+      case 'dhan': return '💰';
+      default: return '🏢';
+    }
+  };
+
+  // Function to get broker display name
+  const getBrokerDisplayName = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return 'Fyers';
+      case 'shoonya': return 'Shoonya';
+      case 'zerodha': return 'Zerodha';
+      case 'angel': return 'Angel';
+      case 'upstox': return 'Upstox';
+      case 'dhan': return 'Dhan';
+      default: return brokerName || 'Unknown';
+    }
+  };
   const [orderForm, setOrderForm] = useState<OrderForm>({
     symbol: '',
     exchange: 'NSE',
@@ -206,13 +232,13 @@ const TradeSetup: React.FC = () => {
       const result = selectedSymbol as SymbolSearchResult;
       
       // Handle different exchanges including F&O (NFO)
-      let exchange: 'NSE' | 'BSE' = 'NSE'; // Default to NSE
+      let exchange: 'NSE' | 'BSE' | 'NFO' = 'NSE'; // Default to NSE
       
       if (result.exchange === 'BSE') {
         exchange = 'BSE';
       } else if (result.exchange === 'NFO' || result.instrumentType === 'OPTION' || result.instrumentType === 'FUTURE') {
-        // F&O instruments are traded on NFO but we'll use NSE for order placement
-        exchange = 'NSE';
+        // F&O instruments should be sent to NFO exchange
+        exchange = 'NFO';
       } else {
         exchange = 'NSE';
       }
@@ -695,7 +721,7 @@ const TradeSetup: React.FC = () => {
                             <Checkbox
                               checked={orderForm.selectedAccounts.includes(account.id)}
                               onChange={(checked) => handleAccountSelection(account.id, checked)}
-                              label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
+                              label={`${getBrokerSymbol(account.brokerName || '')} ${getBrokerDisplayName(account.brokerName || 'Unknown')} (${account.isActive ? 'Active' : 'Inactive'})`}
                               size="base"
                             />
                           </div>
