@@ -6,6 +6,7 @@ import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/b
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
+import { symbolDatabaseService } from '../services/symbolDatabaseService';
 import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
 import Button from '../components/ui/Button';
@@ -22,6 +23,10 @@ type SymbolSearchResult = {
   name: string;
   token?: string | null;
   ltp?: number;
+  instrumentType?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  optionType?: 'CE' | 'PE';
+  strikePrice?: number;
+  expiryDate?: string;
 };
 type FailedOrderResult = { accountId: string };
 
@@ -70,6 +75,7 @@ const TradeSetup: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'EQUITY' | 'OPTION' | 'FUTURE'>('EQUITY');
   const [orderResult, setOrderResult] = useState<OrderResultSummary | null>(null);
   const [showOrderResult, setShowOrderResult] = useState(false);
 
@@ -124,7 +130,7 @@ const TradeSetup: React.FC = () => {
     }
   }, [orderForm.symbol, orderForm.quantity, orderForm.price, orderForm.orderType]);
 
-  // Debounced symbol search
+  // Unified symbol search with support for equity, options, and futures
   const handleSymbolSearch = React.useCallback((searchTerm: string) => {
     if (searchTerm.length < 2) {
       setSearchResults([]);
@@ -136,27 +142,45 @@ const TradeSetup: React.FC = () => {
     setSearchLoading(true);
     const timeoutId = setTimeout(async () => {
       try {
-        console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
+        console.log(`🔍 Frontend: Searching for "${searchTerm}" type: ${activeTab}`);
 
-        const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
-        console.log(`📊 Frontend: Received response:`, response);
+        let results: SymbolSearchResult[] = [];
 
-        const results = response.success ? response.data.results : [];
+        if (activeTab === 'EQUITY') {
+          // Use existing market data service for equity
+          const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
+          const equityResults = response.success ? response.data.results : [];
+          
+          results = equityResults.map((result: { symbol: string; name: string; exchange: string; token?: string }) => ({
+            symbol: result.symbol,
+            name: result.name,
+            exchange: result.exchange,
+            ltp: 0,
+            token: result.token || null,
+            instrumentType: 'EQUITY' as const
+          }));
+        } else {
+          // Use symbol database service for F&O instruments
+          const foResults = await symbolDatabaseService.searchInstruments(searchTerm, activeTab, 8);
+          
+          results = foResults.map(result => ({
+            symbol: result.symbol,
+            name: result.name || result.symbol,
+            exchange: result.exchange,
+            token: result.token || null,
+            instrumentType: result.instrumentType,
+            optionType: result.optionType,
+            strikePrice: result.strikePrice,
+            expiryDate: result.expiryDate
+          }));
+        }
 
-        const transformedResults = results.map((result: { symbol: string; name: string; exchange: string; token?: string }) => ({
-          symbol: result.symbol,
-          name: result.name,
-          exchange: result.exchange,
-          ltp: 0,
-          token: result.token || null
-        }));
+        console.log(`✅ Frontend: Found ${results.length} results for ${activeTab}:`, results);
 
-        console.log(`✅ Frontend: Transformed results:`, transformedResults);
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
 
-        setSearchResults(transformedResults);
-        setShowSearchResults(transformedResults.length > 0);
-
-        if (transformedResults.length === 0) {
+        if (results.length === 0) {
           console.log('❌ Frontend: No results found for:', searchTerm);
         }
       } catch (error: unknown) {
@@ -169,7 +193,7 @@ const TradeSetup: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [orderForm.exchange]);
+  }, [orderForm.exchange, activeTab]);
 
   const handleSymbolSelect = (selectedSymbol: unknown) => {
     if (
@@ -177,17 +201,36 @@ const TradeSetup: React.FC = () => {
       selectedSymbol !== null &&
       'symbol' in selectedSymbol &&
       'exchange' in selectedSymbol &&
-      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string' &&
-      ((selectedSymbol as { exchange: unknown }).exchange === 'NSE' || (selectedSymbol as { exchange: unknown }).exchange === 'BSE')
+      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string'
     ) {
-      const { symbol, exchange } = selectedSymbol as SymbolSearchResult & { exchange: 'NSE' | 'BSE' };
+      const result = selectedSymbol as SymbolSearchResult;
+      
+      // Handle different exchanges including F&O (NFO)
+      let exchange: 'NSE' | 'BSE' = 'NSE'; // Default to NSE
+      
+      if (result.exchange === 'BSE') {
+        exchange = 'BSE';
+      } else if (result.exchange === 'NFO' || result.instrumentType === 'OPTION' || result.instrumentType === 'FUTURE') {
+        // F&O instruments are traded on NFO but we'll use NSE for order placement
+        exchange = 'NSE';
+      } else {
+        exchange = 'NSE';
+      }
+      
       setOrderForm(prev => ({
         ...prev,
-        symbol,
+        symbol: result.symbol,
         exchange,
         price: prev.price
       }));
       setShowSearchResults(false);
+      
+      console.log(`✅ Selected ${result.instrumentType || 'EQUITY'} instrument:`, {
+        symbol: result.symbol,
+        exchange: result.exchange,
+        orderExchange: exchange,
+        instrumentType: result.instrumentType
+      });
     }
   };
 
@@ -397,13 +440,60 @@ const TradeSetup: React.FC = () => {
 
                   <CardContent>
                     <Stack gap={5}>
-                      {/* Symbol Search */}
+                      {/* Unified Symbol Search with Tabs */}
                       <div style={{ position: 'relative' }}>
                         <label className="form-label">Symbol *</label>
+                        
+                        {/* Instrument Type Tabs */}
+                        <div style={{ 
+                          display: 'flex', 
+                          gap: '0.5rem', 
+                          marginBottom: '0.75rem',
+                          borderBottom: '1px solid var(--border-secondary)',
+                          paddingBottom: '0.5rem'
+                        }}>
+                          {(['EQUITY', 'OPTION', 'FUTURE'] as const).map((tab) => (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() => {
+                                setActiveTab(tab);
+                                setSearchResults([]);
+                                setShowSearchResults(false);
+                                // Clear the selected symbol when switching tabs
+                                setOrderForm(prev => ({
+                                  ...prev,
+                                  symbol: '',
+                                  price: '',
+                                  triggerPrice: ''
+                                }));
+                                console.log(`🔄 Switched to ${tab} tab, cleared symbol selection`);
+                              }}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                border: 'none',
+                                borderRadius: '0.375rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                backgroundColor: activeTab === tab ? 'var(--color-primary)' : 'var(--bg-secondary)',
+                                color: activeTab === tab ? 'white' : 'var(--text-secondary)',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {tab === 'EQUITY' ? 'Stocks' : tab === 'OPTION' ? 'Options' : 'Futures'}
+                            </button>
+                          ))}
+                        </div>
+
                         <div style={{ position: 'relative' }}>
                           <input
                             type="text"
-                            placeholder="Search stocks (e.g., RELIANCE, TCS)"
+                            placeholder={
+                              activeTab === 'EQUITY' ? "Search stocks (e.g., RELIANCE, TCS)" :
+                              activeTab === 'OPTION' ? "Search options (e.g., RELIANCE, NIFTY)" :
+                              "Search futures (e.g., RELIANCE, NIFTY)"
+                            }
                             value={orderForm.symbol}
                             onChange={(e) => {
                               setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
@@ -425,7 +515,7 @@ const TradeSetup: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Search Results Dropdown */}
+                        {/* Enhanced Search Results Dropdown */}
                         {showSearchResults && searchResults.length > 0 && (
                           <div className="search-dropdown">
                             {searchResults.map((result, index) => (
@@ -434,11 +524,46 @@ const TradeSetup: React.FC = () => {
                                 onClick={() => handleSymbolSelect(result)}
                                 className="search-result-item"
                               >
-                                <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                                  {result.symbol}
-                                </div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                  {result.name}
+                                <div style={{ 
+                                  display: 'flex', 
+                                  justifyContent: 'space-between', 
+                                  alignItems: 'flex-start',
+                                  width: '100%'
+                                }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+                                      {result.symbol}
+                                    </div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                      {result.name}
+                                    </div>
+                                    {result.instrumentType === 'OPTION' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        {result.optionType} | Strike: ₹{result.strikePrice} | Exp: {result.expiryDate}
+                                      </div>
+                                    )}
+                                    {result.instrumentType === 'FUTURE' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        Future | Exp: {result.expiryDate}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{
+                                    fontSize: '0.75rem',
+                                    padding: '0.25rem 0.5rem',
+                                    borderRadius: '0.25rem',
+                                    backgroundColor: 
+                                      result.instrumentType === 'EQUITY' ? 'var(--color-info-bg)' :
+                                      result.instrumentType === 'OPTION' ? 'var(--color-warning-bg)' :
+                                      'var(--color-success-bg)',
+                                    color:
+                                      result.instrumentType === 'EQUITY' ? 'var(--color-info)' :
+                                      result.instrumentType === 'OPTION' ? 'var(--color-warning)' :
+                                      'var(--color-success)',
+                                    fontWeight: '500'
+                                  }}>
+                                    {result.instrumentType}
+                                  </div>
                                 </div>
                               </div>
                             ))}

@@ -542,4 +542,135 @@ router.get('/expiry-dates/:underlying', authenticateToken, async (req: any, res:
   }
 });
 
+/**
+ * Search instruments by type (for unified trading interface)
+ */
+router.get('/search-instruments', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { query, instrumentType, limit = 10 } = req.query;
+    const userId = req.user?.id;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query must be at least 2 characters long'
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    if (!instrumentType || !['EQUITY', 'OPTION', 'FUTURE'].includes(instrumentType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid instrumentType required: EQUITY, OPTION, or FUTURE'
+      });
+    }
+
+    console.log(`🔍 Instrument search: query="${query}", type=${instrumentType}, limit=${limit}, userId=${userId}`);
+
+    let searchResults: any[] = [];
+
+    if (instrumentType === 'EQUITY') {
+      searchResults = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
+    } else if (instrumentType === 'OPTION') {
+      searchResults = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
+    } else if (instrumentType === 'FUTURE') {
+      searchResults = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
+    }
+
+    // Transform results to match frontend interface
+    const transformedResults = searchResults.map((result: any) => ({
+      symbol: result.tradingSymbol || result.symbol,
+      name: result.name || result.symbol,
+      exchange: result.exchange,
+      token: result.token || null,
+      instrumentType: instrumentType,
+      optionType: result.optionType,
+      strikePrice: result.strikePrice,
+      expiryDate: result.expiryDate
+    }));
+
+    console.log(`✅ Found ${transformedResults.length} ${instrumentType} instruments for "${query}"`);
+
+    return res.json({
+      success: true,
+      data: transformedResults
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to search instruments:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to search instruments',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get instruments by type (for unified trading interface)
+ */
+router.get('/instruments', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { instrumentType, limit = 50 } = req.query;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    if (!instrumentType || !['EQUITY', 'OPTION', 'FUTURE'].includes(instrumentType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid instrumentType required: EQUITY, OPTION, or FUTURE'
+      });
+    }
+
+    console.log(`📊 Getting ${instrumentType} instruments, limit=${limit}, userId=${userId}`);
+
+    let instruments: any[] = [];
+
+    if (instrumentType === 'EQUITY') {
+      instruments = await symbolDatabaseService.getEquityInstruments(parseInt(limit as string));
+    } else if (instrumentType === 'OPTION') {
+      instruments = await symbolDatabaseService.getOptionsInstruments(parseInt(limit as string));
+    } else if (instrumentType === 'FUTURE') {
+      instruments = await symbolDatabaseService.getFuturesInstruments(parseInt(limit as string));
+    }
+
+    // Transform results to match frontend interface
+    const transformedResults = instruments.map((result: any) => ({
+      symbol: result.tradingSymbol || result.symbol,
+      name: result.name || result.symbol,
+      exchange: result.exchange,
+      token: result.token || null,
+      instrumentType: instrumentType,
+      optionType: result.optionType,
+      strikePrice: result.strikePrice,
+      expiryDate: result.expiryDate
+    }));
+
+    console.log(`✅ Retrieved ${transformedResults.length} ${instrumentType} instruments`);
+
+    return res.json({
+      success: true,
+      data: transformedResults
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get instruments:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get instruments',
+      details: error.message
+    });
+  }
+});
+
 export default router;

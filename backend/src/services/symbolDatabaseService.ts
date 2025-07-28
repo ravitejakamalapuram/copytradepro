@@ -414,6 +414,73 @@ class SymbolDatabaseService {
       return [];
     }
   }
+  /**
+   * Get equity instruments (limited list)
+   */
+  async getEquityInstruments(limit: number = 50): Promise<UnifiedSymbol[]> {
+    try {
+      // Use existing search method to get equity symbols
+      const results = await this.searchSymbols('', limit, 'ALL');
+      return results.filter(symbol => symbol.instrument_type === 'EQUITY').slice(0, limit);
+    } catch (error) {
+      console.error('❌ Error getting equity instruments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get options instruments (limited list)
+   */
+  async getOptionsInstruments(limit: number = 50): Promise<UnifiedSymbol[]> {
+    try {
+      const optionsData = STATIC_FO_INSTRUMENTS
+        .filter(instrument => instrument.instrument_type === 'OPTION')
+        .slice(0, limit);
+      
+      return optionsData.map(option => ({
+        symbol: option.symbol,
+        tradingSymbol: option.tradingSymbol,
+        name: option.name,
+        exchange: option.exchange,
+        instrument_type: option.instrument_type,
+        underlying_symbol: option.underlying_symbol,
+        strike_price: option.strike_price,
+        expiry_date: option.expiry_date,
+        option_type: option.option_type,
+        lot_size: option.lot_size,
+        status: option.status
+      }));
+    } catch (error) {
+      console.error('❌ Error getting options instruments:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get futures instruments (limited list)
+   */
+  async getFuturesInstruments(limit: number = 50): Promise<UnifiedSymbol[]> {
+    try {
+      const futuresData = STATIC_FO_INSTRUMENTS
+        .filter(instrument => instrument.instrument_type === 'FUTURE')
+        .slice(0, limit);
+      
+      return futuresData.map(future => ({
+        symbol: future.symbol,
+        tradingSymbol: future.tradingSymbol,
+        name: future.name,
+        exchange: future.exchange,
+        instrument_type: future.instrument_type,
+        underlying_symbol: future.underlying_symbol,
+        expiry_date: future.expiry_date,
+        lot_size: future.lot_size,
+        status: future.status
+      }));
+    } catch (error) {
+      console.error('❌ Error getting futures instruments:', error);
+      return [];
+    }
+  }
 }
 
 export const symbolDatabaseService = new SymbolDatabaseService();

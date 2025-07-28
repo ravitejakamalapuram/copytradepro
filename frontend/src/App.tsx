@@ -18,7 +18,7 @@ import ComponentDemo from './pages/ComponentDemo';
 import PortfolioAnalytics from './pages/PortfolioAnalytics';
 import NotificationDisplay from './components/NotificationDisplay';
 import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
-import UnifiedTradingPage from './pages/UnifiedTradingPage';
+
 // Main application pages
 import Dashboard from './pages/Dashboard';
 import Holdings from './pages/Holdings';
@@ -138,16 +138,6 @@ const AppContent: React.FC = () => {
 
 
         {/* Trading routes */}
-        <Route
-          path="/unified-trading"
-          element={
-            <ProtectedRoute>
-              <TradingErrorBoundary>
-                <UnifiedTradingPage />
-              </TradingErrorBoundary>
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/trade-setup"
           element={
