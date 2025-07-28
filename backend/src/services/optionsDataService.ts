@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { logger } from '../utils/logger';
 import { getDatabase } from './databaseFactory';
+import { MongoDatabase } from './mongoDatabase';
 import cron from 'node-cron';
 
 /**
@@ -84,16 +85,26 @@ export class OptionsDataService {
       const response = await axios.get(
         'https://assets.upstox.com/market-quote/instruments/exchange/complete.json.gz',
         {
-          responseType: 'stream',
+          responseType: 'arraybuffer',
           headers: {
             'Accept-Encoding': 'gzip'
-          }
+          },
+          timeout: 30000
         }
       );
 
-      // TODO: Implement gzip decompression and JSON parsing
-      // For now, return empty array
-      return [];
+      // Decompress gzip data
+      const zlib = require('zlib');
+      const decompressed = zlib.gunzipSync(response.data);
+      const jsonData = JSON.parse(decompressed.toString());
+
+      logger.info('Successfully fetched and parsed Upstox instruments', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'FETCH_UPSTOX_INSTRUMENTS_SUCCESS',
+        totalInstruments: jsonData.length
+      });
+
+      return jsonData;
     } catch (error) {
       logger.error('Failed to fetch Upstox instruments', {
         component: 'OPTIONS_DATA_SERVICE',
@@ -190,14 +201,51 @@ export class OptionsDataService {
    * Store instruments in database
    */
   private async storeInstruments(instruments: any[]): Promise<void> {
-    const db = await getDatabase();
-    
-    // TODO: Implement database storage for options instruments
-    logger.info('Storing instruments in database', {
-      component: 'OPTIONS_DATA_SERVICE',
-      operation: 'STORE_INSTRUMENTS',
-      count: instruments.length
-    });
+    try {
+      // Get MongoDB connection directly
+      const mongoose = require('mongoose');
+      const db = mongoose.connection.db;
+      const collection = db.collection('fo_instruments');
+      
+      // Clear existing data
+      await collection.deleteMany({});
+      
+      // Transform and insert new data
+      const transformedInstruments = instruments.map(instrument => ({
+        instrument_key: instrument.instrument_key,
+        exchange_token: instrument.exchange_token,
+        trading_symbol: instrument.trading_symbol,
+        name: instrument.name,
+        last_price: instrument.last_price,
+        expiry: instrument.expiry,
+        strike: instrument.strike,
+        tick_size: instrument.tick_size,
+        lot_size: instrument.lot_size,
+        instrument_type: instrument.instrument_type,
+        option_type: instrument.option_type,
+        exchange: instrument.exchange,
+        segment: instrument.segment,
+        underlying: instrument.underlying,
+        created_at: new Date(),
+        updated_at: new Date()
+      }));
+      
+      if (transformedInstruments.length > 0) {
+        await collection.insertMany(transformedInstruments);
+      }
+      
+      logger.info('Successfully stored instruments in database', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'STORE_INSTRUMENTS_SUCCESS',
+        count: transformedInstruments.length
+      });
+    } catch (error) {
+      logger.error('Failed to store instruments in database', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'STORE_INSTRUMENTS_ERROR'
+      }, error);
+      throw error;
+    }
   }
 
   /**
@@ -336,8 +384,44 @@ export class OptionsDataService {
    */
   async searchInstruments(query: string, type?: 'CE' | 'PE' | 'FUT'): Promise<any[]> {
     try {
-      // TODO: Implement instrument search logic
-      return [];
+      // Get MongoDB connection directly
+      const mongoose = require('mongoose');
+      const db = mongoose.connection.db;
+      const collection = db.collection('fo_instruments');
+      
+      const searchQuery: any = {
+        $or: [
+          { trading_symbol: { $regex: query, $options: 'i' } },
+          { name: { $regex: query, $options: 'i' } },
+          { underlying: { $regex: query, $options: 'i' } }
+        ]
+      };
+      
+      // Filter by instrument type if specified
+      if (type) {
+        if (type === 'FUT') {
+          searchQuery.instrument_type = 'FUT';
+        } else {
+          searchQuery.instrument_type = 'OPT';
+          searchQuery.option_type = type;
+        }
+      }
+      
+      const results = await collection
+        .find(searchQuery)
+        .limit(50)
+        .sort({ expiry: 1, strike: 1 })
+        .toArray();
+      
+      logger.info('Instrument search completed', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'SEARCH_INSTRUMENTS_SUCCESS',
+        query,
+        type,
+        resultCount: results.length
+      });
+      
+      return results;
     } catch (error) {
       logger.error('Failed to search instruments', {
         component: 'OPTIONS_DATA_SERVICE',

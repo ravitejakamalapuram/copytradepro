@@ -357,6 +357,29 @@ router.post('/force-update-csv', authenticateToken, async (req: any, res: any) =
 });
 
 /**
+ * Force update F&O instruments from Upstox
+ */
+router.post('/force-update-fo', authenticateToken, async (req: any, res: any) => {
+  try {
+    console.log('🔄 Manual F&O instruments update triggered');
+    const { optionsDataService } = await import('../services/optionsDataService');
+    await optionsDataService.refreshInstruments();
+
+    return res.json({
+      success: true,
+      message: 'F&O instruments updated successfully from Upstox'
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to update F&O instruments:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to update F&O instruments',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Get NSE gainers - DISABLED
  * Disabled due to NSE API reliability issues causing timeouts
  */

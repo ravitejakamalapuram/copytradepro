@@ -329,16 +329,47 @@ class SymbolDatabaseService {
   async searchOptionsInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
     try {
       const searchQuery = query.toUpperCase();
-      
-      // Search by underlying symbol or direct option symbol
+      console.log(`🔍 Searching options for: "${searchQuery}"`);
+
+      // Try to get from live Upstox data first
+      try {
+        const { optionsDataService } = await import('./optionsDataService');
+        const ceResults = await optionsDataService.searchInstruments(searchQuery, 'CE');
+        const peResults = await optionsDataService.searchInstruments(searchQuery, 'PE');
+        
+        const combinedResults = [...ceResults, ...peResults]
+          .slice(0, limit)
+          .map(option => ({
+            symbol: option.trading_symbol,
+            tradingSymbol: option.trading_symbol,
+            name: option.name || option.trading_symbol,
+            exchange: option.exchange,
+            instrument_type: 'OPTION' as const,
+            underlying_symbol: option.underlying,
+            strike_price: option.strike,
+            expiry_date: option.expiry,
+            option_type: option.option_type,
+            lot_size: option.lot_size,
+            status: 'Active' as const
+          }));
+
+        if (combinedResults.length > 0) {
+          console.log(`✅ Found ${combinedResults.length} options from Upstox for "${searchQuery}"`);
+          return combinedResults;
+        }
+      } catch (error) {
+        console.warn('⚠️ Upstox options search failed, falling back to static data:', error);
+      }
+
+      // Fallback to static data
       const optionInstruments = STATIC_FO_INSTRUMENTS
         .filter(inst => 
           inst.instrument_type === 'OPTION' && 
-          (inst.underlying_symbol.includes(searchQuery) || inst.symbol.includes(searchQuery))
+          (inst.underlying_symbol?.includes(searchQuery) || inst.symbol.includes(searchQuery))
         )
         .slice(0, limit);
 
-      console.log(`📊 Found ${optionInstruments.length} options for "${query}"`);
+      console.log(`📊 Found ${optionInstruments.length} options from static data for "${query}"`);
       return optionInstruments;
     } catch (error: any) {
       console.error(`❌ Error searching options:`, error.message);
@@ -352,16 +383,44 @@ class SymbolDatabaseService {
   async searchFuturesInstruments(query: string, limit: number = 10): Promise<UnifiedSymbol[]> {
     try {
       const searchQuery = query.toUpperCase();
-      
-      // Search by underlying symbol or direct future symbol
+      console.log(`🔍 Searching futures for: "${searchQuery}"`);
+
+      // Try to get from live Upstox data first
+      try {
+        const { optionsDataService } = await import('./optionsDataService');
+        const futureResults = await optionsDataService.searchInstruments(searchQuery, 'FUT');
+        
+        const transformedResults = futureResults
+          .slice(0, limit)
+          .map(future => ({
+            symbol: future.trading_symbol,
+            tradingSymbol: future.trading_symbol,
+            name: future.name || future.trading_symbol,
+            exchange: future.exchange,
+            instrument_type: 'FUTURE' as const,
+            underlying_symbol: future.underlying,
+            expiry_date: future.expiry,
+            lot_size: future.lot_size,
+            status: 'Active' as const
+          }));
+
+        if (transformedResults.length > 0) {
+          console.log(`✅ Found ${transformedResults.length} futures from Upstox for "${searchQuery}"`);
+          return transformedResults;
+        }
+      } catch (error) {
+        console.warn('⚠️ Upstox futures search failed, falling back to static data:', error);
+      }
+
+      // Fallback to static data
       const futureInstruments = STATIC_FO_INSTRUMENTS
         .filter(inst => 
           inst.instrument_type === 'FUTURE' && 
-          (inst.underlying_symbol.includes(searchQuery) || inst.symbol.includes(searchQuery))
+          (inst.underlying_symbol?.includes(searchQuery) || inst.symbol.includes(searchQuery))
         )
         .slice(0, limit);
 
-      console.log(`📊 Found ${futureInstruments.length} futures for "${query}"`);
+      console.log(`📊 Found ${futureInstruments.length} futures from static data for "${query}"`);
       return futureInstruments;
     } catch (error: any) {
       console.error(`❌ Error searching futures:`, error.message);
