@@ -450,7 +450,7 @@ const Orders: React.FC = () => {
       } else if ((err as any)?.response?.data?.message) {
         errorMessage = (err as any).response.data.message;
       } else if ((err as any)?.message) {
-        errorMessage = (err as unknown).message;
+        errorMessage = (err as any).message;
       }
 
       showToast({

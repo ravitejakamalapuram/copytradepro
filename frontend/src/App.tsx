@@ -33,6 +33,7 @@ const MarketOverview = React.lazy(() => import('./pages/MarketOverview'));
 const AlertsManagement = React.lazy(() => import('./pages/AlertsManagement'));
 const RiskManagement = React.lazy(() => import('./pages/RiskManagement'));
 const CopyTradingStrategies = React.lazy(() => import('./pages/CopyTradingStrategies'));
+const UserSettings = React.lazy(() => import('./pages/UserSettings'));
 
 // Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
@@ -234,6 +235,18 @@ const AppContent: React.FC = () => {
           }
         />
 
+        {/* User Settings */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <UserSettings />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy routes */}
         <Route
           path="/legacy-account-setup"
@@ -276,7 +289,7 @@ const AppContent: React.FC = () => {
           }
         />
         <Route
-          path="/settings"
+          path="/legacy-settings"
           element={
             <ProtectedRoute>
               <ErrorBoundary>

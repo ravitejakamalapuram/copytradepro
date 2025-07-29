@@ -8,6 +8,7 @@ import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
 import Button from './ui/Button';
 import { ThemeToggle } from './ui/ThemeToggle';
+import { UserDropdown } from './ui/UserDropdown';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -20,7 +21,7 @@ interface PortfolioSummary {
 const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
@@ -80,14 +81,7 @@ const AppNavigation: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    }
-  };
+
 
   const navItems = [
     // { path: '/dashboard', label: 'Dashboard', icon: '📊' },
@@ -151,13 +145,7 @@ const AppNavigation: React.FC = () => {
                 </div>
               </div>
               <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleLogout}
-              >
-                Logout
-              </Button>
+              <UserDropdown />
             </div>
           </div>
         </div>
