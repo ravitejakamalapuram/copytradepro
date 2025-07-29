@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
 import { useResourceCleanup } from '../hooks/useResourceCleanup';
-import { marketDataService, type MarketIndex } from '../services/marketDataService';
 import { portfolioService } from '../services/portfolioService';
-import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
 import Button from './ui/Button';
-import { ThemeToggle } from './ui/ThemeToggle';
 import { UserDropdown } from './ui/UserDropdown';
 
 interface PortfolioSummary {
@@ -21,11 +17,8 @@ interface PortfolioSummary {
 const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
   const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [marketIndices, setMarketIndices] = useState<MarketIndex[]>([]);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary>({
     totalValue: 0,
     totalPnL: 0,
@@ -34,21 +27,8 @@ const AppNavigation: React.FC = () => {
     dayPnLPercent: 0
   });
 
-  // Real-time data hook for market status
-  const { marketStatus } = useRealTimeData();
-
-  // Fetch live market indices and portfolio data
+  // Fetch portfolio data
   useEffect(() => {
-    const fetchMarketData = async () => {
-      try {
-        const indices = await marketDataService.getMarketIndices();
-        setMarketIndices(indices);
-        setLastUpdated(new Date());
-      } catch (error) {
-        console.error('Failed to fetch market indices:', error);
-      }
-    };
-
     const fetchPortfolioData = async () => {
       try {
         const metrics = await portfolioService.getMetrics();
@@ -66,12 +46,10 @@ const AppNavigation: React.FC = () => {
     };
 
     // Initial fetch
-    fetchMarketData();
     fetchPortfolioData();
 
     // Update every 30 seconds
     const interval = setInterval(() => {
-      fetchMarketData();
       fetchPortfolioData();
     }, 30000);
 
@@ -79,7 +57,7 @@ const AppNavigation: React.FC = () => {
     registerInterval(interval);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [registerInterval]);
 
 
 
@@ -93,13 +71,12 @@ const AppNavigation: React.FC = () => {
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
 
-  // Use live market indices for watchlist
-  const watchlistItems = marketIndices.map(index => ({
-    symbol: index.name,
-    ltp: index.value,
-    change: index.change,
-    changePercent: index.changePercent
-  }));
+  // Static watchlist items for demo
+  const watchlistItems = [
+    { symbol: 'RELIANCE', ltp: 2485, change: 12.5, changePercent: 0.5 },
+    { symbol: 'TCS', ltp: 3520, change: -25.0, changePercent: -0.7 },
+    { symbol: 'INFY', ltp: 1650, change: 8.0, changePercent: 0.5 }
+  ];
 
   return (
     <>
@@ -129,24 +106,7 @@ const AppNavigation: React.FC = () => {
 
           {/* User Menu */}
           <div className="nav-user-menu">
-            {/* Market Status */}
-            <div className="market-status-indicator">
-              <div className="status-dot" style={{ backgroundColor: marketStatus?.isOpen ? 'var(--color-profit)' : 'var(--color-loss)' }}></div>
-              {marketStatus?.status || 'Market Status Unknown'}
-            </div>
-
-            {/* User Info */}
-            <div className="user-info-container">
-              <div style={{ textAlign: 'right' }}>
-                <div className="user-name">
-                  {user?.name || 'Kamalapuram'}
-                </div>
-                <div className="user-email text-muted">
-                </div>
-              </div>
-              <ThemeToggle />
-              <UserDropdown />
-            </div>
+            <UserDropdown />
           </div>
         </div>
       </nav>
@@ -188,22 +148,7 @@ const AppNavigation: React.FC = () => {
             ))}
           </div>
 
-          {/* Live Data Indicator */}
-          {lastUpdated && (
-            <div className="live-data-indicator">
-              <span style={{
-                width: '6px',
-                height: '6px',
-                backgroundColor: 'var(--color-profit)',
-                borderRadius: '50%',
-                animation: 'pulse 2s infinite'
-              }}></span>
-              Live • {lastUpdated.toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
-          )}
+
         </div>
 
         {/* Portfolio Summary */}
