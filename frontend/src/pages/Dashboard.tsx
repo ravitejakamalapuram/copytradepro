@@ -6,6 +6,7 @@ import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import { Stack, Grid } from '../components/ui/Layout';
+import { PageTransition } from '../utils/animations';
 
 
 
@@ -121,20 +122,22 @@ const Dashboard: React.FC = () => {
     return (
       <div className="app-theme app-layout">
         <AppNavigation />
-        <div className="app-main">
-          <Card style={{ textAlign: 'center', padding: '2rem' }}>
-            <CardContent>
-              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-              <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
-              <Button
-                variant="primary"
-                onClick={() => window.location.reload()}
-              >
-                Retry
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        <PageTransition>
+          <div className="app-main">
+            <Card style={{ textAlign: 'center', padding: '2rem' }}>
+              <CardContent>
+                <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
+                <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+                <Button
+                  variant="primary"
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </PageTransition>
       </div>
     );
   }
@@ -142,8 +145,9 @@ const Dashboard: React.FC = () => {
   return (
     <div className="app-theme app-layout">
       <AppNavigation />
-      <div className="app-main">
-        <Stack gap={6}>
+      <PageTransition>
+        <div className="app-main">
+          <Stack gap={6}>
           {/* Portfolio Overview */}
           <Grid cols={3} gap={4}>
           <div className="trading-card card--compact">
@@ -267,8 +271,9 @@ const Dashboard: React.FC = () => {
           )}
             </CardContent>
           </Card>
-        </Stack>
-      </div>
+          </Stack>
+        </div>
+      </PageTransition>
     </div>
   );
 };

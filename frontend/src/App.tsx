@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { AccountStatusProvider } from './context/AccountStatusContext';
 import { ToastProvider } from './components/Toast';
+import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './hooks/useAuth';
 import { useConnectionStatus } from './hooks/useConnectionStatus';
 import { memoryMonitorService } from './services/memoryMonitorService';
@@ -10,26 +11,33 @@ import { memoryLeakDetector } from './services/memoryLeakDetector';
 import { resourceManager } from './utils/resourceManager';
 import { appCache, apiCache, marketDataCache } from './services/cacheManager';
 import { performanceMonitorService } from './services/performanceMonitorService';
-import LandingPage from './pages/LandingPage';
-import CopyTradeLogin from './pages/CopyTradeLogin';
+// Lazy load components for better performance
+const LandingPage = React.lazy(() => import('./pages/LandingPage'));
+const CopyTradeLogin = React.lazy(() => import('./pages/CopyTradeLogin'));
+const Settings = React.lazy(() => import('./pages/Settings'));
+const ComponentDemo = React.lazy(() => import('./pages/ComponentDemo'));
+const PortfolioAnalytics = React.lazy(() => import('./pages/PortfolioAnalytics'));
+const AdvancedOrderManagement = React.lazy(() => import('./pages/AdvancedOrderManagement'));
 
-import Settings from './pages/Settings';
-import ComponentDemo from './pages/ComponentDemo';
-import PortfolioAnalytics from './pages/PortfolioAnalytics';
+// Main application pages - lazy loaded
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const Holdings = React.lazy(() => import('./pages/Holdings'));
+const Orders = React.lazy(() => import('./pages/Orders'));
+const Positions = React.lazy(() => import('./pages/Positions'));
+const TradeSetup = React.lazy(() => import('./pages/TradeSetup'));
+const AccountSetup = React.lazy(() => import('./pages/AccountSetup'));
+const Portfolio = React.lazy(() => import('./pages/Portfolio'));
+const MarketOverview = React.lazy(() => import('./pages/MarketOverview'));
+
+// Advanced features - lazy loaded
+const AlertsManagement = React.lazy(() => import('./pages/AlertsManagement'));
+const RiskManagement = React.lazy(() => import('./pages/RiskManagement'));
+const CopyTradingStrategies = React.lazy(() => import('./pages/CopyTradingStrategies'));
+
+// Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
-import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
-
-// Main application pages
-import Dashboard from './pages/Dashboard';
-import Holdings from './pages/Holdings';
-import Orders from './pages/Orders';
-import Positions from './pages/Positions';
-
-import TradeSetup from './pages/TradeSetup';
-import AccountSetup from './pages/AccountSetup';
-import Portfolio from './pages/Portfolio';
-import MarketOverview from './pages/MarketOverview';
 import './styles/enterprise-base.css';
+import './styles/dark-theme.css';
 
 // Error Boundaries
 import ErrorBoundary from './components/ErrorBoundary';
@@ -63,20 +71,34 @@ const ConnectionStatus: React.FC = () => {
   );
 };
 
-// Protected Route Component
+// Loading Fallback Component
+const LoadingFallback: React.FC = () => (
+  <div className="loading-container" style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    gap: '1rem'
+  }}>
+    <div className="loading-spinner"></div>
+    <p className="loading-text" style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+  </div>
+);
+
+// Protected Route Component with Suspense
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p className="loading-text">Loading...</p>
-      </div>
-    );
+    return <LoadingFallback />;
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+  return isAuthenticated ? (
+    <React.Suspense fallback={<LoadingFallback />}>
+      {children}
+    </React.Suspense>
+  ) : <Navigate to="/" replace />;
 };
 
 // Main App Component
@@ -89,10 +111,21 @@ const AppContent: React.FC = () => {
         <Route
           path="/"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <CopyTradeLogin />
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : (
+              <React.Suspense fallback={<LoadingFallback />}>
+                <CopyTradeLogin />
+              </React.Suspense>
+            )
           }
         />
-        <Route path="/landing" element={<LandingPage />} />
+        <Route
+          path="/landing"
+          element={
+            <React.Suspense fallback={<LoadingFallback />}>
+              <LandingPage />
+            </React.Suspense>
+          }
+        />
 
         {/* Main application routes */}
         <Route
@@ -169,6 +202,38 @@ const AppContent: React.FC = () => {
           }
         />
 
+        {/* Advanced Features */}
+        <Route
+          path="/alerts"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AlertsManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/risk-management"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <RiskManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/copy-trading"
+          element={
+            <ProtectedRoute>
+              <TradingErrorBoundary>
+                <CopyTradingStrategies />
+              </TradingErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy routes */}
         <Route
           path="/legacy-account-setup"
@@ -223,9 +288,11 @@ const AppContent: React.FC = () => {
         <Route
           path="/demo"
           element={
-            <ErrorBoundary>
-              <ComponentDemo />
-            </ErrorBoundary>
+            <React.Suspense fallback={<LoadingFallback />}>
+              <ErrorBoundary>
+                <ComponentDemo />
+              </ErrorBoundary>
+            </React.Suspense>
           }
         />
         <Route
@@ -261,16 +328,16 @@ const App: React.FC = () => {
   // Initialize memory monitoring and leak detection
   useEffect(() => {
     console.log('🚀 Initializing memory monitoring services');
-    
+
     // Start memory monitoring
     memoryMonitorService.startMonitoring();
-    
+
     // Start leak detection
     memoryLeakDetector.startDetection();
-    
+
     // Start performance monitoring
     performanceMonitorService.startMonitoring();
-    
+
     // Expose services globally for debugging
     (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor = memoryMonitorService;
     (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector = memoryLeakDetector;
@@ -279,7 +346,7 @@ const App: React.FC = () => {
     (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
     (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
     (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
-    
+
     // Setup memory alert handling
     const unsubscribeMemoryAlert = memoryMonitorService.onAlert((alert) => {
       if (typeof window.addNotification === 'function') {
@@ -289,22 +356,22 @@ const App: React.FC = () => {
         });
       }
     });
-    
+
     // Cleanup on app unmount
     return () => {
       console.log('🧹 Shutting down memory monitoring services');
-      
+
       unsubscribeMemoryAlert();
       memoryMonitorService.shutdown();
       memoryLeakDetector.shutdown();
       resourceManager.shutdown();
       performanceMonitorService.shutdown();
-      
+
       // Shutdown cache managers
       appCache.shutdown();
       apiCache.shutdown();
       marketDataCache.shutdown();
-      
+
       // Clean up global references
       delete (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor;
       delete (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector;
@@ -318,19 +385,21 @@ const App: React.FC = () => {
 
   return (
     <Router>
-      <ToastProvider>
-        <AuthProvider>
-          <ConditionalAccountStatusProvider>
-            <ErrorBoundary>
-              <ConnectionStatus />
-              <NavigationErrorBoundary>
-                <AppContent />
-              </NavigationErrorBoundary>
-              <NotificationDisplay position="top-right" />
-            </ErrorBoundary>
-          </ConditionalAccountStatusProvider>
-        </AuthProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ConditionalAccountStatusProvider>
+              <ErrorBoundary>
+                <ConnectionStatus />
+                <NavigationErrorBoundary>
+                  <AppContent />
+                </NavigationErrorBoundary>
+                <NotificationDisplay position="top-right" />
+              </ErrorBoundary>
+            </ConditionalAccountStatusProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </Router>
   );
 };

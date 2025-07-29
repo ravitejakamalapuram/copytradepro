@@ -445,12 +445,12 @@ const Orders: React.FC = () => {
       // Handle both network errors and API error responses
       let errorMessage = 'Failed to check order status.';
       const err = error as unknown;
-      if (err?.response?.data?.error?.message) {
-        errorMessage = err.response.data.error.message;
-      } else if (err?.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      } else if (err?.message) {
-        errorMessage = err.message;
+      if ((err as any)?.response?.data?.error?.message) {
+        errorMessage = (err as any).response.data.error.message;
+      } else if ((err as any)?.response?.data?.message) {
+        errorMessage = (err as any).response.data.message;
+      } else if ((err as any)?.message) {
+        errorMessage = (err as unknown).message;
       }
 
       showToast({

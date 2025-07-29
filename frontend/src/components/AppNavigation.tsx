@@ -7,6 +7,7 @@ import { portfolioService } from '../services/portfolioService';
 import useRealTimeData from '../hooks/useRealTimeData';
 import '../styles/app-theme.css';
 import Button from './ui/Button';
+import { ThemeToggle } from './ui/ThemeToggle';
 
 interface PortfolioSummary {
   totalValue: number;
@@ -149,6 +150,7 @@ const AppNavigation: React.FC = () => {
                 <div className="user-email text-muted">
                 </div>
               </div>
+              <ThemeToggle />
               <Button
                 variant="outline"
                 size="sm"
@@ -262,6 +264,24 @@ const AppNavigation: React.FC = () => {
               onClick={() => navigate('/portfolio')}
             >
               View Analytics
+            </Button>
+            <Button
+              className="btn"
+              onClick={() => navigate('/alerts')}
+            >
+              🔔 Alerts
+            </Button>
+            <Button
+              className="btn"
+              onClick={() => navigate('/risk-management')}
+            >
+              ⚠️ Risk Management
+            </Button>
+            <Button
+              className="btn"
+              onClick={() => navigate('/copy-trading')}
+            >
+              📋 Copy Trading
             </Button>
           </div>
         </div>
