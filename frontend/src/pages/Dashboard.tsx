@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
+import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, Grid } from '../components/ui/Layout';
 
 
 
@@ -119,16 +122,18 @@ const Dashboard: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
-            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
-            <button
-              className="btn btn-primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </button>
-          </div>
+          <Card style={{ textAlign: 'center', padding: '2rem' }}>
+            <CardContent>
+              <div style={{ fontSize: '24px', marginBottom: '12px' }}>⚠️</div>
+              <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+              <Button
+                variant="primary"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -138,8 +143,9 @@ const Dashboard: React.FC = () => {
     <div className="app-theme app-layout">
       <AppNavigation />
       <div className="app-main">
-        {/* Portfolio Overview */}
-        <div className="trading-grid" style={{ marginBottom: 'var(--space-4)' }}>
+        <Stack gap={6}>
+          {/* Portfolio Overview */}
+          <Grid cols={3} gap={4}>
           <div className="trading-card card--compact">
             <div className="trading-metric">
               <div className="trading-metric-label">Portfolio Value</div>
@@ -171,23 +177,24 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        </div>
+          </Grid>
 
-
-
-        {/* Today's Positions */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Recent Positions ({positions.length})</h2>
-            <button
-              className="btn"
-              onClick={() => navigate('/positions')}
-            >
-              View All
-            </button>
-          </div>
-          {positions.length > 0 ? (
-            <div style={{ overflowX: 'auto' }}>
+          {/* Today's Positions */}
+          <Card>
+            <CardHeader
+              title={`Recent Positions (${positions.length})`}
+              action={
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/positions')}
+                >
+                  View All
+                </Button>
+              }
+            />
+            <CardContent>
+              {positions.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
               <table className="table table-trading">
                 <thead>
                   <tr>
@@ -249,16 +256,18 @@ const Dashboard: React.FC = () => {
               <div style={{ fontSize: '32px', marginBottom: '12px' }}>📊</div>
               <div style={{ fontSize: '14px', marginBottom: '6px' }}>No positions today</div>
               <div style={{ fontSize: '11px' }}>Start trading to see your positions here</div>
-              <button
-                className="btn btn-primary"
+              <Button
+                variant="primary"
                 style={{ marginTop: '1rem' }}
                 onClick={() => navigate('/trade-setup')}
               >
                 Place Order
-              </button>
+              </Button>
             </div>
           )}
-        </div>
+            </CardContent>
+          </Card>
+        </Stack>
       </div>
     </div>
   );

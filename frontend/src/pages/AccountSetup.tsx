@@ -8,6 +8,8 @@ import AccountStatusIndicator from '../components/AccountStatusIndicator';
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, HStack } from '../components/ui/Layout';
 import { OAuthDialog } from '../components/OAuthDialog';
 import { useToast } from '../components/Toast';
 
@@ -445,12 +447,12 @@ const AccountSetup: React.FC = () => {
           message: 'Failed to remove the account. Please try again.'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to remove account:', error);
       showToast({
         type: 'error',
         title: 'Removal Error',
-        message: error.message || 'Failed to remove account.'
+        message: (error as any).message || 'Failed to remove account.'
       });
     }
   };
@@ -483,35 +485,37 @@ const AccountSetup: React.FC = () => {
       <AppNavigation />
       
       <div className="app-main">
-        {/* Page Header */}
-        <div className="card">
-          <div className="card-header">
-            <h1 className="card-title">Broker Accounts</h1>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Button 
-                variant="primary"
-                onClick={() => navigate('/trade-setup')}
-              >
-                📈 Start Trading
-              </Button>
-              <Button 
-                variant="primary"
-                onClick={() => setShowAddForm(true)}
-              >
-                + Add Broker
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Stack gap={6}>
+          {/* Page Header */}
+          <Card>
+            <CardHeader
+              title="Broker Accounts"
+              action={
+                <HStack gap={2}>
+                  <Button 
+                    variant="primary"
+                    onClick={() => navigate('/trade-setup')}
+                  >
+                    📈 Start Trading
+                  </Button>
+                  <Button 
+                    variant="primary"
+                    onClick={() => setShowAddForm(true)}
+                  >
+                    + Add Broker
+                  </Button>
+                </HStack>
+              }
+            />
+          </Card>
 
-        {/* Connected Accounts */}
-        {accounts.length > 0 && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Connected Accounts ({accounts.length})</h2>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table table-trading">
+          {/* Connected Accounts */}
+          {accounts.length > 0 && (
+            <Card>
+              <CardHeader title={`Connected Accounts (${accounts.length})`} />
+              <CardContent>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Broker</th>
@@ -624,31 +628,31 @@ const AccountSetup: React.FC = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Add Broker Form */}
-        {showAddForm && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">
-                {selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
-              </h2>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setSelectedBroker('');
-                  setError(null);
-                }}
-              >
-                ✕ Cancel
-              </Button>
-            </div>
-
-            <div style={{ padding: '1.5rem' }}>
+          {/* Add Broker Form */}
+          {showAddForm && (
+            <Card>
+              <CardHeader
+                title={selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setSelectedBroker('');
+                      setError(null);
+                    }}
+                  >
+                    ✕ Cancel
+                  </Button>
+                }
+              />
+              <CardContent>
               {!selectedBroker ? (
                 /* Broker Selection */
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
@@ -934,29 +938,30 @@ const AccountSetup: React.FC = () => {
                   </Button>
                 </div>
               )}
-            </div>
-          </div>
-        )}
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Empty State */}
-        {accounts.length === 0 && !showAddForm && (
-          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              No Broker Accounts Connected
-            </div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
-              Connect your broker account to start trading. We support multiple brokers with secure API integration.
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => setShowAddForm(true)}
-              style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
-            >
-              Connect Your First Broker
-            </Button>
-          </div>
-        )}
+          {/* Empty State */}
+          {accounts.length === 0 && !showAddForm && (
+            <Card padding="lg" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                No Broker Accounts Connected
+              </div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+                Connect your broker account to start trading. We support multiple brokers with secure API integration.
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setShowAddForm(true)}
+                style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
+              >
+                Connect Your First Broker
+              </Button>
+            </Card>
+          )}
+        </Stack>
       </div>
 
       {/* OAuth Dialog */}
