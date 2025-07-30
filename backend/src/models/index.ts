@@ -1,5 +1,8 @@
 // Database models and interfaces
 
+// Export symbol models
+export * from './symbolModels';
+
 export interface User {
   id: number;
   email: string;

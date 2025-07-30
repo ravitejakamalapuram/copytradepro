@@ -55,7 +55,7 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
     // Apply strike price filters if provided
     let filteredInstruments = instruments;
     if (strike_min || strike_max) {
-      filteredInstruments = instruments.filter(instrument => {
+      filteredInstruments = instruments.filter((instrument: any) => {
         if (!instrument.strike_price) return true; // Include futures
         
         const strike = instrument.strike_price;
@@ -72,7 +72,7 @@ router.get('/instruments/search', authenticateToken, async (req, res) => {
     const paginatedResults = filteredInstruments.slice(startIndex, endIndex);
 
     // Transform UnifiedSymbol to OptionsInstrument format
-    const transformedInstruments = paginatedResults.map(instrument => ({
+    const transformedInstruments = paginatedResults.map((instrument: any) => ({
       id: instrument.symbol,
       underlying_symbol: instrument.underlying_symbol || '',
       trading_symbol: instrument.tradingSymbol,
