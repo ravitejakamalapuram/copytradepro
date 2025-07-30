@@ -6,6 +6,7 @@
 import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
 import { FyersService } from './fyersService';
 import { FyersCredentials } from './types';
+import { FyersSymbolFormatter } from './symbolFormatter';
 
 export class FyersServiceAdapter extends IBrokerService {
   private fyersService: FyersService;
@@ -139,9 +140,25 @@ export class FyersServiceAdapter extends IBrokerService {
         };
         const fyersProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
+        // Format symbol properly for Fyers API
+        let formattedSymbol: string;
+        try {
+          // Try to format symbol using the symbol formatter
+          formattedSymbol = FyersSymbolFormatter.formatSymbol(
+            orderRequest.symbol,
+            orderRequest.exchange || 'NSE'
+          );
+          
+          console.log(`🔄 Fyers symbol formatting: ${orderRequest.symbol} -> ${formattedSymbol}`);
+        } catch (error: any) {
+          console.warn(`⚠️ Symbol formatting failed for ${orderRequest.symbol}, using fallback:`, error.message);
+          // Fallback to original format
+          formattedSymbol = `${orderRequest.exchange || 'NSE'}:${orderRequest.symbol}`;
+        }
+
         // Transform to Fyers-specific order format
         const fyersOrderRequest = {
-          symbol: `${orderRequest.exchange}:${orderRequest.symbol}`,
+          symbol: formattedSymbol,
           qty: orderRequest.quantity,
           type: fyersOrderType,
           side: orderRequest.action, // Keep as 'BUY' | 'SELL' string
@@ -367,7 +384,17 @@ export class FyersServiceAdapter extends IBrokerService {
 
   async getQuote(symbol: string, exchange: string): Promise<Quote> {
     try {
-      const response = await this.fyersService.getQuotes([`${exchange}:${symbol}`]);
+      // Format symbol properly for Fyers API
+      let formattedSymbol: string;
+      try {
+        formattedSymbol = FyersSymbolFormatter.formatSymbol(symbol, exchange);
+        console.log(`🔄 Fyers quote symbol formatting: ${symbol} -> ${formattedSymbol}`);
+      } catch (error: any) {
+        console.warn(`⚠️ Quote symbol formatting failed for ${symbol}, using fallback:`, error.message);
+        formattedSymbol = `${exchange}:${symbol}`;
+      }
+
+      const response = await this.fyersService.getQuotes([formattedSymbol]);
 
       if (!response || response.length === 0) {
         throw new Error('No quote data received');

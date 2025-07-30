@@ -7,6 +7,7 @@
 import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
 import { ShoonyaService } from './shoonyaService';
 import { ShoonyaCredentials } from './types';
+import { ShoonyaSymbolFormatter } from './symbolFormatter';
 
 export class ShoonyaServiceAdapter extends IBrokerService {
   private shoonyaService: ShoonyaService;
@@ -95,13 +96,36 @@ export class ShoonyaServiceAdapter extends IBrokerService {
         };
         const shoonyaProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
+        // Format symbol and exchange properly for Shoonya API
+        let formattedData: { tradingSymbol: string; exchange: string };
+        try {
+          // Use symbol formatter to get proper symbol and exchange
+          formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(
+            orderRequest.symbol,
+            orderRequest.exchange || 'NSE'
+          );
+          
+          console.log(`🔄 Shoonya symbol formatting: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        } catch (error: any) {
+          console.warn(`⚠️ Symbol formatting failed for ${orderRequest.symbol}, using fallback:`, error.message);
+          // Fallback to original logic
+          let tradingSymbol = orderRequest.symbol;
+          if ((orderRequest.exchange || 'NSE') === 'NSE' && !tradingSymbol.includes('-EQ')) {
+            tradingSymbol = `${tradingSymbol}-EQ`;
+          }
+          formattedData = {
+            tradingSymbol: tradingSymbol,
+            exchange: orderRequest.exchange || 'NSE'
+          };
+        }
+
         // Transform to Shoonya-specific order format
         const shoonyaOrderRequest = {
           userId: orderRequest.accountId || this.accountId || '',
           buyOrSell: orderRequest.action === 'BUY' ? 'B' as const : 'S' as const,
           productType: shoonyaProductType,
-          exchange: orderRequest.exchange || 'NSE',
-          tradingSymbol: orderRequest.symbol,
+          exchange: formattedData.exchange,
+          tradingSymbol: formattedData.tradingSymbol,
           quantity: orderRequest.quantity,
           discloseQty: 0,
           priceType: shoonyaPriceType,
@@ -451,7 +475,20 @@ export class ShoonyaServiceAdapter extends IBrokerService {
 
   async getQuote(symbol: string, exchange: string): Promise<Quote> {
     try {
-      const response = await this.shoonyaService.getQuotes(exchange, symbol);
+      // Format symbol and exchange properly for Shoonya API
+      let formattedData: { tradingSymbol: string; exchange: string };
+      try {
+        formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(symbol, exchange);
+        console.log(`🔄 Shoonya quote symbol formatting: ${symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+      } catch (error: any) {
+        console.warn(`⚠️ Quote symbol formatting failed for ${symbol}, using fallback:`, error.message);
+        formattedData = {
+          tradingSymbol: symbol,
+          exchange: exchange
+        };
+      }
+
+      const response = await this.shoonyaService.getQuotes(formattedData.exchange, formattedData.tradingSymbol);
 
       return {
         symbol: response.tsym || symbol,
