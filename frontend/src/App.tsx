@@ -34,6 +34,8 @@ const AlertsManagement = React.lazy(() => import('./pages/AlertsManagement'));
 const RiskManagement = React.lazy(() => import('./pages/RiskManagement'));
 const CopyTradingStrategies = React.lazy(() => import('./pages/CopyTradingStrategies'));
 const UserSettings = React.lazy(() => import('./pages/UserSettings'));
+const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
+const AdminUserDetails = React.lazy(() => import('./pages/AdminUserDetails'));
 
 // Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
@@ -242,6 +244,28 @@ const AppContent: React.FC = () => {
             <ProtectedRoute>
               <ErrorBoundary>
                 <UserSettings />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Panel */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminPanel />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/user/:userId"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminUserDetails />
               </ErrorBoundary>
             </ProtectedRoute>
           }
