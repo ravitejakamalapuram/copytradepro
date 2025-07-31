@@ -2,17 +2,17 @@ import mongoose, { Model } from 'mongoose';
 import {
   StandardizedSymbol,
   CreateStandardizedSymbolData,
-  SymbolHistory,
-  CreateSymbolHistoryData,
   SymbolProcessingLog,
   CreateSymbolProcessingLogData,
   StandardizedSymbolDocument,
-  SymbolHistoryDocument,
   SymbolProcessingLogDocument,
   createStandardizedSymbolModel,
-  createSymbolHistoryModel,
   createSymbolProcessingLogModel
 } from '../models/symbolModels';
+import { symbolCacheService } from './symbolCacheService';
+import { databaseOptimizationService } from './databaseOptimizationService';
+import { symbolMonitoringService } from './symbolMonitoringService';
+import { logger } from '../utils/logger';
 
 export interface SymbolSearchQuery {
   query?: string | undefined;               // Text search
@@ -57,7 +57,6 @@ export interface ProcessingResult {
  */
 export class SymbolDatabaseService {
   private StandardizedSymbolModel!: Model<StandardizedSymbolDocument>;
-  private SymbolHistoryModel!: Model<SymbolHistoryDocument>;
   private SymbolProcessingLogModel!: Model<SymbolProcessingLogDocument>;
   private isInitialized: boolean = false;
 
@@ -76,11 +75,17 @@ export class SymbolDatabaseService {
 
       // Create models using the existing connection
       this.StandardizedSymbolModel = createStandardizedSymbolModel(mongoose.connection);
-      this.SymbolHistoryModel = createSymbolHistoryModel(mongoose.connection);
       this.SymbolProcessingLogModel = createSymbolProcessingLogModel(mongoose.connection);
 
       this.isInitialized = true;
       console.log('✅ Symbol Database Service initialized successfully');
+
+      // Warm the cache after initialization
+      setTimeout(() => {
+        symbolCacheService.warmCache(this).catch(error => {
+          console.error('🚨 Failed to warm cache during initialization:', error);
+        });
+      }, 1000); // Delay to ensure service is fully ready
     } catch (error) {
       console.error('🚨 Failed to initialize Symbol Database Service:', error);
       throw error;
@@ -119,17 +124,6 @@ export class SymbolDatabaseService {
     };
   }
 
-  private historyDocToInterface(doc: SymbolHistoryDocument): SymbolHistory {
-    return {
-      id: (doc._id as mongoose.Types.ObjectId).toString(),
-      symbolId: doc.symbolId.toString(),
-      changeType: doc.changeType,
-      oldData: doc.oldData,
-      newData: doc.newData,
-      changedAt: doc.changedAt.toISOString(),
-      changedBy: doc.changedBy || undefined
-    };
-  }
 
   private logDocToInterface(doc: SymbolProcessingLogDocument): SymbolProcessingLog {
     return {
@@ -166,8 +160,7 @@ export class SymbolDatabaseService {
 
       const savedSymbol = await symbolDoc.save();
       
-      // Create history entry
-      await this.createHistoryEntry((savedSymbol._id as mongoose.Types.ObjectId).toString(), 'CREATED', undefined, symbolData);
+
       
       console.log('✅ Symbol created successfully:', symbolData.tradingSymbol);
       return this.symbolDocToInterface(savedSymbol);
@@ -224,8 +217,14 @@ export class SymbolDatabaseService {
             });
             await existingSymbol.save();
             
-            // Create history entry
-            await this.createHistoryEntry((existingSymbol._id as mongoose.Types.ObjectId).toString(), 'UPDATED', oldData, symbolData);
+            // Invalidate cache for updated symbol
+            symbolCacheService.invalidateSymbol(
+              (existingSymbol._id as mongoose.Types.ObjectId).toString(),
+              symbolData.tradingSymbol,
+              symbolData.exchange
+            );
+            
+
             
             updatedSymbols++;
           } else {
@@ -236,8 +235,7 @@ export class SymbolDatabaseService {
             });
             await symbolDoc.save();
             
-            // Create history entry
-            await this.createHistoryEntry((symbolDoc._id as mongoose.Types.ObjectId).toString(), 'CREATED', undefined, symbolData);
+
             
             newSymbols++;
           }
@@ -272,8 +270,38 @@ export class SymbolDatabaseService {
         throw new Error('Symbol Database Service not initialized');
       }
 
+      // Check cache first
+      const cacheKey = symbolCacheService.generateSymbolKey(id);
+      const cachedSymbol = symbolCacheService.getSymbol(cacheKey);
+      if (cachedSymbol) {
+        return cachedSymbol;
+      }
+
+      // Fetch from database with performance monitoring
+      const findStart = Date.now();
       const symbol = await this.StandardizedSymbolModel.findById(id);
-      return symbol ? this.symbolDocToInterface(symbol) : null;
+      const duration = Date.now() - findStart;
+      databaseOptimizationService.recordQuery('findById', 'standardizedsymbols', duration, { _id: id }, { found: !!symbol });
+      
+      // Record monitoring metrics
+      symbolMonitoringService.recordDatabaseMetrics({
+        operation: 'getSymbolById',
+        collection: 'standardizedsymbols',
+        duration,
+        queryType: 'findOne',
+        indexUsed: true, // _id queries always use index
+        documentsExamined: 1,
+        documentsReturned: symbol ? 1 : 0,
+        success: true
+      });
+      if (symbol) {
+        const symbolInterface = this.symbolDocToInterface(symbol);
+        // Cache the result
+        symbolCacheService.cacheSymbol(cacheKey, symbolInterface);
+        return symbolInterface;
+      }
+
+      return null;
     } catch (error) {
       console.error('🚨 Failed to get symbol by ID:', error);
       return null;
@@ -287,6 +315,13 @@ export class SymbolDatabaseService {
     try {
       if (!this.isReady()) {
         throw new Error('Symbol Database Service not initialized');
+      }
+
+      // Check cache first for search results
+      const cacheKey = symbolCacheService.generateSearchKey(searchQuery);
+      const cachedResult = symbolCacheService.getSearchResults(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
       }
 
       const query: any = {};
@@ -350,21 +385,56 @@ export class SymbolDatabaseService {
       const limit = searchQuery.limit || 50;
       const offset = searchQuery.offset || 0;
 
-      // Get total count
+      // Get total count with performance monitoring
+      const countStart = Date.now();
       const total = await this.StandardizedSymbolModel.countDocuments(query);
+      const countDuration = Date.now() - countStart;
+      databaseOptimizationService.recordQuery('countDocuments', 'standardizedsymbols', countDuration, query, { count: total });
+      
+      // Record count monitoring metrics
+      symbolMonitoringService.recordDatabaseMetrics({
+        operation: 'searchSymbolsCount',
+        collection: 'standardizedsymbols',
+        duration: countDuration,
+        queryType: 'countDocuments',
+        indexUsed: this.hasIndexForQuery(query),
+        documentsExamined: total,
+        documentsReturned: 1,
+        success: true
+      });
 
-      // Get symbols
+      // Get symbols with performance monitoring
+      const findStart = Date.now();
       const symbols = await this.StandardizedSymbolModel
         .find(query)
         .sort({ displayName: 1 })
         .limit(limit)
         .skip(offset);
+      const findDuration = Date.now() - findStart;
+      databaseOptimizationService.recordQuery('find', 'standardizedsymbols', findDuration, query, { count: symbols.length });
+      
+      // Record search monitoring metrics
+      symbolMonitoringService.recordDatabaseMetrics({
+        operation: 'searchSymbols',
+        collection: 'standardizedsymbols',
+        duration: findDuration,
+        queryType: 'find',
+        indexUsed: this.hasIndexForQuery(query),
+        documentsExamined: Math.min(total, limit + offset),
+        documentsReturned: symbols.length,
+        success: true
+      });
 
-      return {
+      const result = {
         symbols: symbols.map(symbol => this.symbolDocToInterface(symbol)),
         total,
         hasMore: offset + symbols.length < total
       };
+
+      // Cache the search result
+      symbolCacheService.cacheSearchResults(cacheKey, result);
+
+      return result;
     } catch (error) {
       console.error('🚨 Failed to search symbols:', error);
       return { symbols: [], total: 0, hasMore: false };
@@ -380,13 +450,31 @@ export class SymbolDatabaseService {
         throw new Error('Symbol Database Service not initialized');
       }
 
+      // Check cache first
+      const cacheKey = exchange 
+        ? symbolCacheService.generateSymbolKey(undefined, tradingSymbol, exchange)
+        : symbolCacheService.generateSymbolKey(undefined, tradingSymbol);
+      const cachedSymbol = symbolCacheService.getSymbol(cacheKey);
+      if (cachedSymbol) {
+        return cachedSymbol;
+      }
+
       const query: any = { tradingSymbol, isActive: true };
       if (exchange) {
         query.exchange = exchange;
       }
 
+      const findStart = Date.now();
       const symbol = await this.StandardizedSymbolModel.findOne(query);
-      return symbol ? this.symbolDocToInterface(symbol) : null;
+      databaseOptimizationService.recordQuery('findOne', 'standardizedsymbols', Date.now() - findStart, query, { found: !!symbol });
+      if (symbol) {
+        const symbolInterface = this.symbolDocToInterface(symbol);
+        // Cache the result
+        symbolCacheService.cacheSymbol(cacheKey, symbolInterface);
+        return symbolInterface;
+      }
+
+      return null;
     } catch (error) {
       console.error('🚨 Failed to get symbol by trading symbol:', error);
       return null;
@@ -441,54 +529,7 @@ export class SymbolDatabaseService {
     }
   }
 
-  // Symbol History Operations
 
-  /**
-   * Create history entry
-   */
-  private async createHistoryEntry(
-    symbolId: string, 
-    changeType: 'CREATED' | 'UPDATED' | 'DEACTIVATED' | 'REACTIVATED',
-    oldData?: any,
-    newData?: any,
-    changedBy?: string
-  ): Promise<void> {
-    try {
-      const historyDoc = new this.SymbolHistoryModel({
-        symbolId: new mongoose.Types.ObjectId(symbolId),
-        changeType,
-        oldData,
-        newData,
-        changedBy
-      });
-
-      await historyDoc.save();
-    } catch (error) {
-      console.error('🚨 Failed to create history entry:', error);
-      // Don't throw error as this is not critical
-    }
-  }
-
-  /**
-   * Get symbol history
-   */
-  async getSymbolHistory(symbolId: string, limit: number = 50): Promise<SymbolHistory[]> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      const history = await this.SymbolHistoryModel
-        .find({ symbolId: new mongoose.Types.ObjectId(symbolId) })
-        .sort({ changedAt: -1 })
-        .limit(limit);
-
-      return history.map(entry => this.historyDocToInterface(entry));
-    } catch (error) {
-      console.error('🚨 Failed to get symbol history:', error);
-      return [];
-    }
-  }
 
   // Processing Log Operations
 
@@ -557,6 +598,144 @@ export class SymbolDatabaseService {
     } catch (error) {
       console.error('🚨 Failed to get processing logs:', error);
       return [];
+    }
+  }
+
+  // Additional methods for symbol lifecycle management
+
+  /**
+   * Update symbol by ID
+   */
+  async updateSymbol(id: string, updateData: Partial<CreateStandardizedSymbolData>): Promise<StandardizedSymbol | null> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      const existingSymbol = await this.StandardizedSymbolModel.findById(id);
+      if (!existingSymbol) {
+        return null;
+      }
+
+      const oldData = this.symbolDocToInterface(existingSymbol);
+      
+      // Update the symbol
+      const updatedSymbol = await this.StandardizedSymbolModel.findByIdAndUpdate(
+        id,
+        {
+          ...updateData,
+          expiryDate: updateData.expiryDate ? new Date(updateData.expiryDate) : undefined,
+          lastUpdated: new Date()
+        },
+        { new: true }
+      );
+
+      if (!updatedSymbol) {
+        return null;
+      }
+
+      // Invalidate cache
+      symbolCacheService.invalidateSymbol(id, updatedSymbol.tradingSymbol, updatedSymbol.exchange);
+
+
+
+      return this.symbolDocToInterface(updatedSymbol);
+    } catch (error) {
+      console.error('🚨 Failed to update symbol:', error);
+      return null;
+    }
+  }
+
+
+
+  /**
+   * Get symbols updated before a certain date
+   */
+  async getSymbolsUpdatedBefore(date: string): Promise<StandardizedSymbol[]> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      const symbols = await this.StandardizedSymbolModel
+        .find({ 
+          lastUpdated: { $lt: new Date(date) },
+          isActive: true 
+        })
+        .sort({ lastUpdated: 1 })
+        .limit(1000);
+
+      return symbols.map(symbol => this.symbolDocToInterface(symbol));
+    } catch (error) {
+      console.error('🚨 Failed to get symbols updated before date:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete symbol by ID (for cleanup of expired symbols)
+   */
+  async deleteSymbol(id: string): Promise<boolean> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      // Delete the symbol
+      const result = await this.StandardizedSymbolModel.findByIdAndDelete(id);
+      
+      if (result) {
+        // Clear from cache
+        symbolCacheService.invalidateSymbol(id, result.tradingSymbol, result.exchange);
+        
+        console.log(`✅ Deleted symbol: ${result.tradingSymbol}`);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('🚨 Failed to delete symbol:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Clear all symbols from the database (for fresh start)
+   */
+  async clearAllSymbols(): Promise<number> {
+    if (!this.isInitialized) {
+      throw new Error('Database service not initialized');
+    }
+
+    try {
+      logger.info('Clearing all symbols from database', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CLEAR_ALL_SYMBOLS'
+      });
+
+      // Get count before deletion for logging
+      const countBefore = await this.StandardizedSymbolModel.countDocuments();
+
+      // Delete all symbols
+      const deleteResult = await this.StandardizedSymbolModel.deleteMany({});
+
+      // Also clear processing logs for fresh start
+      await this.SymbolProcessingLogModel.deleteMany({});
+
+      logger.info('Cleared all symbols from database', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CLEAR_ALL_SYMBOLS_SUCCESS',
+        deletedCount: deleteResult.deletedCount,
+        countBefore
+      });
+
+      return deleteResult.deletedCount || 0;
+    } catch (error) {
+      logger.error('Failed to clear all symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CLEAR_ALL_SYMBOLS_ERROR'
+      }, error);
+      throw error;
     }
   }
 
@@ -838,6 +1017,32 @@ export class SymbolDatabaseService {
   }
 
   /**
+   * Check if query likely uses an index
+   */
+  private hasIndexForQuery(query: any): boolean {
+    // Check for indexed fields
+    const indexedFields = ['_id', 'tradingSymbol', 'instrumentType', 'exchange', 'underlying', 'expiryDate', 'isActive', 'displayName'];
+    
+    for (const field of indexedFields) {
+      if (query[field] !== undefined) {
+        return true;
+      }
+    }
+    
+    // Check for text search (has text index)
+    if (query.$text) {
+      return true;
+    }
+    
+    // Check for compound queries
+    if (query.$or && Array.isArray(query.$or)) {
+      return query.$or.some((subQuery: any) => this.hasIndexForQuery(subQuery));
+    }
+    
+    return false;
+  }
+
+  /**
    * Search futures instruments
    */
   async searchFuturesInstruments(query: string, limit: number = 10): Promise<any[]> {
@@ -942,7 +1147,9 @@ export class SymbolDatabaseService {
   getStats(): any {
     return {
       isReady: this.isReady(),
-      isInitialized: this.isInitialized
+      isInitialized: this.isInitialized,
+      cache: symbolCacheService.getStats(),
+      memoryUsage: symbolCacheService.getMemoryUsage()
     };
   }
 

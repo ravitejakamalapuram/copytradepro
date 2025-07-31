@@ -318,6 +318,160 @@ router.get('/symbol-status', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
+ * Get cache statistics
+ */
+router.get('/cache/stats', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    const stats = symbolCacheService.getStats();
+    const memoryUsage = symbolCacheService.getMemoryUsage();
+
+    return res.json({
+      success: true,
+      data: {
+        ...stats,
+        memoryUsage
+      }
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache stats failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get cache statistics',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Warm cache manually
+ */
+router.post('/cache/warm', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    
+    // Start cache warming in background
+    symbolCacheService.warmCache(symbolDatabaseService).catch(error => {
+      console.error('🚨 Background cache warming failed:', error);
+    });
+
+    return res.json({
+      success: true,
+      message: 'Cache warming started in background'
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache warm failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to start cache warming',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Clear cache
+ */
+router.post('/cache/clear', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    const { type } = req.body;
+
+    if (type === 'search') {
+      symbolCacheService.clearSearchCache();
+    } else if (type === 'all') {
+      symbolCacheService.invalidateAll();
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid cache type. Use "search" or "all"'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Cache ${type === 'all' ? 'completely' : type} cleared`
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache clear failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to clear cache',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get database performance statistics
+ */
+router.get('/database/stats', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    const stats = await databaseOptimizationService.getPerformanceStats();
+
+    return res.json({
+      success: true,
+      data: {
+        ...stats,
+        uptime: databaseOptimizationService.getUptime()
+      }
+    });
+  } catch (error: any) {
+    console.error('🚨 Database stats failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get database statistics',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Optimize database performance
+ */
+router.post('/database/optimize', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    const result = await databaseOptimizationService.optimizeDatabase();
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('🚨 Database optimization failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to optimize database',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Clear database metrics
+ */
+router.post('/database/clear-metrics', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    databaseOptimizationService.clearMetrics();
+
+    return res.json({
+      success: true,
+      message: 'Database metrics cleared'
+    });
+  } catch (error: any) {
+    console.error('🚨 Clear database metrics failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to clear database metrics',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Get NSE market status - DISABLED
  * Disabled due to NSE API reliability issues causing timeouts
  */
@@ -334,27 +488,7 @@ router.get('/market-status', authenticateToken, async (req: any, res: any) => {
   });
 });
 
-/**
- * Force update NSE CSV data
- */
-router.post('/force-update-csv', authenticateToken, async (req: any, res: any) => {
-  try {
-    console.log('🔄 Manual NSE CSV update triggered');
-    await symbolDatabaseService.forceUpdate();
 
-    return res.json({
-      success: true,
-      message: 'NSE CSV data updated successfully'
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to update NSE CSV:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to update NSE CSV data',
-      details: error.message
-    });
-  }
-});
 
 /**
  * Force update F&O instruments from Upstox

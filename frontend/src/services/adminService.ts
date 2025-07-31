@@ -268,10 +268,10 @@ class AdminService {
       const brokerData = (response as any).data || {};
       const statuses: BrokerStatus[] = Object.entries(brokerData).map(([name, data]: [string, unknown]) => ({
         name: name.charAt(0).toUpperCase() + name.slice(1),
-        status: data.connected ? 'CONNECTED' : 'DISCONNECTED',
-        lastSync: data.lastSync || new Date().toISOString(),
-        totalAccounts: data.totalAccounts || 0,
-        activeConnections: data.activeConnections || 0
+        status: (data as any)?.connected ? 'CONNECTED' : 'DISCONNECTED',
+        lastSync: (data as any)?.lastSync || new Date().toISOString(),
+        totalAccounts: (data as any)?.totalAccounts || 0,
+        activeConnections: (data as any)?.activeConnections || 0
       }));
 
       return {

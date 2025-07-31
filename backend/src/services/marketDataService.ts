@@ -1,5 +1,4 @@
 import axios from 'axios';
-import { nseService, NSEMarketIndex } from './nseService';
 
 export interface MarketPrice {
   symbol: string;
@@ -101,31 +100,7 @@ class MarketDataService {
         return cached;
       }
 
-      // Try NSE API first for NSE symbols
-      if (exchange === 'NSE') {
-        try {
-          const nseQuote = await nseService.getQuoteInfo(symbol);
-          if (nseQuote) {
-            const marketPrice: MarketPrice = {
-              symbol: symbol,
-              price: nseQuote.lastPrice || 0,
-              change: nseQuote.change || 0,
-              changePercent: nseQuote.pChange || 0,
-              volume: 0, // NSE API doesn't provide volume in this format
-              lastUpdated: new Date(),
-              exchange: 'NSE'
-            };
-
-            // Cache the result
-            this.cachePrice(symbol, marketPrice);
-            return marketPrice;
-          }
-        } catch (nseError) {
-          console.warn(`⚠️ NSE API failed for ${symbol}, trying Yahoo Finance:`, nseError);
-        }
-      }
-
-      // Fallback to Yahoo Finance
+      // Use Yahoo Finance as primary data source
       const yahooSymbol = this.formatSymbolForYahoo(symbol, exchange);
 
       const response = await axios.get<YahooFinanceResponse>(this.YAHOO_BASE_URL, {

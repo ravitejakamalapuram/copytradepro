@@ -58,6 +58,10 @@ export class ShoonyaSymbolFormatter {
     try {
       // Remove exchange prefix if present (e.g., 'NSE:NIFTY25JAN22000CE' -> 'NIFTY25JAN22000CE')
       const cleanSymbol = symbol.includes(':') ? symbol.split(':')[1] : symbol;
+      
+      if (!cleanSymbol) {
+        return null;
+      }
 
       // Check for equity format (ends with -EQ)
       if (cleanSymbol.endsWith('-EQ')) {
@@ -73,7 +77,7 @@ export class ShoonyaSymbolFormatter {
         const withoutFut = cleanSymbol.replace('FUT', '');
         const match = withoutFut.match(/^([A-Z]+)(\d{2}[A-Z]{3})$/);
         
-        if (match) {
+        if (match && match[1] && match[2]) {
           return {
             underlying: match[1],
             expiry: match[2],
@@ -86,7 +90,7 @@ export class ShoonyaSymbolFormatter {
       // Pattern: UNDERLYING + EXPIRY + STRIKE + OPTION_TYPE
       // Example: NIFTY25JAN22000CE -> NIFTY + 25JAN + 22000 + CE
       const optionMatch = cleanSymbol.match(/^([A-Z]+)(\d{2}[A-Z]{3})(\d+)(CE|PE)$/);
-      if (optionMatch) {
+      if (optionMatch && optionMatch[1] && optionMatch[2] && optionMatch[3] && optionMatch[4]) {
         return {
           underlying: optionMatch[1],
           expiry: optionMatch[2],

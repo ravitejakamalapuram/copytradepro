@@ -18,6 +18,11 @@ import marketDataRoutes from './routes/marketData';
 import logsRoutes from './routes/logs';
 import monitoringRoutes from './routes/monitoring';
 import optionsRoutes from './routes/options';
+import symbolsRoutes from './routes/symbols';
+import symbolLifecycleRoutes from './routes/symbolLifecycleRoutes';
+import symbolInitializationRoutes from './routes/symbolInitialization';
+import symbolHealthRoutes from './routes/symbolHealth';
+import notificationRoutes from './routes/notifications';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -28,12 +33,15 @@ import orderStatusService from './services/orderStatusService';
 import { realTimeDataService } from './services/realTimeDataService';
 import { optionsDataService } from './services/optionsDataService';
 // Auto-initialize services on import
-import './services/nseCSVService';
-import './services/bseCSVService';
 import './services/symbolDatabaseService';
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 import { initializeBrokerAccountCache } from './controllers/brokerController';
 import { productionMonitoringService } from './services/productionMonitoringService';
+import { symbolLifecycleManager } from './services/symbolLifecycleManager';
+import { startupSymbolInitializationService } from './services/startupSymbolInitializationService';
+import { symbolMonitoringService } from './services/symbolMonitoringService';
+import { symbolAlertingService } from './services/symbolAlertingService';
+import { notificationService } from './services/notificationService';
 
 // Load environment variables
 dotenv.config();
@@ -174,7 +182,11 @@ app.use('/api/market-data', marketDataRoutes);
 app.use('/api/logs', logsRoutes);
 app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/options', optionsRoutes);
-app.use('/api/notifications', require('./routes/notifications').default);
+app.use('/api/symbols', symbolsRoutes);
+app.use('/api', symbolLifecycleRoutes);
+app.use('/api/symbol-initialization', symbolInitializationRoutes);
+app.use('/api/symbol-health', symbolHealthRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 
 
@@ -342,35 +354,53 @@ async function startServer() {
       operation: 'OPTIONS_SERVICE_INIT_SUCCESS'
     });
 
-    // Start order status monitoring
-    orderStatusService.startMonitoring().catch((error: any) => {
-      logger.error('Failed to start order status monitoring', {
-        component: 'SERVER_STARTUP',
-        operation: 'ORDER_STATUS_MONITORING_ERROR'
-      }, error);
+    // Initialize symbol lifecycle manager
+    logger.info('Initializing symbol lifecycle manager', {
+      component: 'SERVER_STARTUP',
+      operation: 'SYMBOL_LIFECYCLE_INIT'
+    });
+    await symbolLifecycleManager.initialize();
+    logger.info('Symbol lifecycle manager initialized', {
+      component: 'SERVER_STARTUP',
+      operation: 'SYMBOL_LIFECYCLE_INIT_SUCCESS'
     });
 
-    // Start production monitoring service
-    logger.info('Starting production monitoring service', {
-      component: 'SERVER_STARTUP',
-      operation: 'PRODUCTION_MONITORING_START'
-    });
-    productionMonitoringService.start();
-    logger.info('Production monitoring service started', {
-      component: 'SERVER_STARTUP',
-      operation: 'PRODUCTION_MONITORING_STARTED'
-    });
-
-    // Start server with error handling - bind to 0.0.0.0 for EC2 access
-    server.listen(Number(PORT), '0.0.0.0', () => {
+    // Start server first, then initialize symbol data in background
+    // This allows the server to be responsive while symbol data loads
+    server.listen(Number(PORT), '0.0.0.0', async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`💾 Database: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`🔄 Socket.IO enabled for real-time updates`);
       console.log(`📊 Order status monitoring active`);
-      console.log(`📈 NSE & BSE CSV Databases initialized with daily auto-updates`);
+      console.log(`📈 Starting symbol data initialization...`);
       console.log(`⚡ Real-time price streaming active`);
+
+      // Start monitoring services
+      logger.info('Starting monitoring services', {
+        component: 'SERVER_STARTUP',
+        operation: 'MONITORING_INIT'
+      });
+      
+      productionMonitoringService.start();
+      symbolMonitoringService.start();
+      
+      // Initialize notification service
+      await notificationService.initialize();
+      
+      console.log(`📊 Symbol monitoring active`);
+      console.log(`🚨 Alert system active`);
+      console.log(`📧 Notification system active`);
+
+      // Initialize symbol data in background after server starts
+      startupSymbolInitializationService.initializeSymbolData().catch((error: any) => {
+        logger.error('Symbol data initialization failed during startup', {
+          component: 'SERVER_STARTUP',
+          operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
+        }, error);
+        // Don't exit the server - it can still function with cached data or manual initialization
+      });
     });
 
     // Handle server errors
@@ -390,6 +420,25 @@ async function startServer() {
         }, error);
         process.exit(1);
       }
+    });
+
+    // Start order status monitoring
+    orderStatusService.startMonitoring().catch((error: any) => {
+      logger.error('Failed to start order status monitoring', {
+        component: 'SERVER_STARTUP',
+        operation: 'ORDER_STATUS_MONITORING_ERROR'
+      }, error);
+    });
+
+    // Start production monitoring service
+    logger.info('Starting production monitoring service', {
+      component: 'SERVER_STARTUP',
+      operation: 'PRODUCTION_MONITORING_START'
+    });
+    productionMonitoringService.start();
+    logger.info('Production monitoring service started', {
+      component: 'SERVER_STARTUP',
+      operation: 'PRODUCTION_MONITORING_STARTED'
     });
 
   } catch (error) {

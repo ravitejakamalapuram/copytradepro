@@ -41,23 +41,7 @@ export interface CreateStandardizedSymbolData {
   sector?: string | undefined;
 }
 
-export interface SymbolHistory {
-  id: string;
-  symbolId: string;
-  changeType: 'CREATED' | 'UPDATED' | 'DEACTIVATED' | 'REACTIVATED';
-  oldData?: any;
-  newData?: any;
-  changedAt: string;
-  changedBy?: string | undefined;
-}
 
-export interface CreateSymbolHistoryData {
-  symbolId: string;
-  changeType: 'CREATED' | 'UPDATED' | 'DEACTIVATED' | 'REACTIVATED';
-  oldData?: any;
-  newData?: any;
-  changedBy?: string;
-}
 
 export interface SymbolProcessingLog {
   id: string;
@@ -109,14 +93,7 @@ export interface StandardizedSymbolDocument extends Document {
   createdAt: Date;
 }
 
-export interface SymbolHistoryDocument extends Document {
-  symbolId: mongoose.Types.ObjectId;
-  changeType: 'CREATED' | 'UPDATED' | 'DEACTIVATED' | 'REACTIVATED';
-  oldData?: any;
-  newData?: any;
-  changedAt: Date;
-  changedBy?: string;
-}
+
 
 export interface SymbolProcessingLogDocument extends Document {
   processType: 'DAILY_UPDATE' | 'MANUAL_UPDATE' | 'VALIDATION';
@@ -164,18 +141,6 @@ export const StandardizedSymbolSchema = new Schema<StandardizedSymbolDocument>({
   createdAt: { type: Date, default: Date.now }
 });
 
-export const SymbolHistorySchema = new Schema<SymbolHistoryDocument>({
-  symbolId: { type: Schema.Types.ObjectId, ref: 'StandardizedSymbol', required: true, index: true },
-  changeType: { 
-    type: String, 
-    enum: ['CREATED', 'UPDATED', 'DEACTIVATED', 'REACTIVATED'], 
-    required: true 
-  },
-  oldData: { type: Schema.Types.Mixed },
-  newData: { type: Schema.Types.Mixed },
-  changedAt: { type: Date, default: Date.now, index: true },
-  changedBy: { type: String }
-});
 
 export const SymbolProcessingLogSchema = new Schema<SymbolProcessingLogDocument>({
   processType: { 
@@ -202,6 +167,8 @@ export const SymbolProcessingLogSchema = new Schema<SymbolProcessingLogDocument>
 });
 
 // Compound indexes for efficient queries
+
+// Unique constraint indexes
 // For equity symbols (no expiry, strike, or option type)
 StandardizedSymbolSchema.index({ tradingSymbol: 1, exchange: 1, instrumentType: 1 }, { 
   unique: true, 
@@ -213,8 +180,24 @@ StandardizedSymbolSchema.index({ tradingSymbol: 1, exchange: 1, expiryDate: 1, s
   unique: true,
   partialFilterExpression: { instrumentType: { $in: ['OPTION', 'FUTURE'] } }
 });
-StandardizedSymbolSchema.index({ underlying: 1, instrumentType: 1, expiryDate: 1 });
+
+// Search optimization indexes
 StandardizedSymbolSchema.index({ displayName: 'text', tradingSymbol: 'text', companyName: 'text' });
+
+// Query optimization indexes
+StandardizedSymbolSchema.index({ underlying: 1, instrumentType: 1, expiryDate: 1, isActive: 1 });
+StandardizedSymbolSchema.index({ instrumentType: 1, exchange: 1, isActive: 1 });
+StandardizedSymbolSchema.index({ underlying: 1, expiryDate: 1, strikePrice: 1, optionType: 1, isActive: 1 });
+StandardizedSymbolSchema.index({ exchange: 1, instrumentType: 1, isActive: 1 });
+StandardizedSymbolSchema.index({ sector: 1, instrumentType: 1, isActive: 1 });
+
+// Performance optimization indexes
+StandardizedSymbolSchema.index({ isActive: 1, lastUpdated: -1 });
+StandardizedSymbolSchema.index({ source: 1, lastUpdated: -1 });
+
+// Option chain specific indexes
+StandardizedSymbolSchema.index({ underlying: 1, expiryDate: 1, instrumentType: 1, isActive: 1 });
+StandardizedSymbolSchema.index({ underlying: 1, strikePrice: 1, optionType: 1, expiryDate: 1, isActive: 1 });
 
 // Update timestamps middleware
 StandardizedSymbolSchema.pre('save', function(next) {
@@ -227,9 +210,7 @@ export const createStandardizedSymbolModel = (connection: mongoose.Connection): 
   return connection.model<StandardizedSymbolDocument>('StandardizedSymbol', StandardizedSymbolSchema);
 };
 
-export const createSymbolHistoryModel = (connection: mongoose.Connection): Model<SymbolHistoryDocument> => {
-  return connection.model<SymbolHistoryDocument>('SymbolHistory', SymbolHistorySchema);
-};
+
 
 export const createSymbolProcessingLogModel = (connection: mongoose.Connection): Model<SymbolProcessingLogDocument> => {
   return connection.model<SymbolProcessingLogDocument>('SymbolProcessingLog', SymbolProcessingLogSchema);

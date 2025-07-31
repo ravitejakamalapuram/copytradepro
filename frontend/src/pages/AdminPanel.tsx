@@ -346,7 +346,7 @@ const AdminPanel: React.FC = () => {
                         System Uptime
                       </div>
                       <div style={{ fontSize: '0.75rem', color: 'var(--color-profit)', marginTop: '0.25rem' }}>
-                        {slaMetrics ? `${(slaMetrics as unknown).availability?.toFixed(1) || 0}% availability` : 'Loading...'}
+                        {slaMetrics ? `${(slaMetrics as any)?.availability?.toFixed(1) || 0}% availability` : 'Loading...'}
                       </div>
                     </CardContent>
                   </Card>
