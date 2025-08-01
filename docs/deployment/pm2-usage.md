@@ -1,11 +1,13 @@
 # PM2 Usage Guide for CopyTrade Pro
 
 ## Overview
+
 PM2 is a production process manager for Node.js applications. It provides features like process monitoring, automatic restarts, load balancing, and log management.
 
 ## Installation
 
 ### Install PM2 Globally
+
 ```bash
 npm install -g pm2
 # or
@@ -15,6 +17,7 @@ yarn global add pm2
 ## Quick Start Commands
 
 ### Using NPM Scripts (Recommended)
+
 ```bash
 # Start in production mode
 npm run pm2:start
@@ -45,6 +48,7 @@ npm run pm2:delete
 ```
 
 ### Direct PM2 Commands
+
 ```bash
 # Start with ecosystem config
 pm2 start ecosystem.config.js --env production
@@ -77,18 +81,21 @@ pm2 status                 # Process status
 Your ecosystem.config.js supports multiple environments:
 
 ### Development
+
 ```bash
 pm2 start ecosystem.config.js --env development
 # Uses: NODE_ENV=development, PORT=3001
 ```
 
 ### Staging
+
 ```bash
 pm2 start ecosystem.config.js --env staging
 # Uses: NODE_ENV=staging, PORT=3002
 ```
 
 ### Production
+
 ```bash
 pm2 start ecosystem.config.js --env production
 # Uses: NODE_ENV=production, PORT=3001
@@ -97,23 +104,27 @@ pm2 start ecosystem.config.js --env production
 ## Key Features Configured
 
 ### 🔄 Auto-Restart
+
 - **Max Restarts**: 10 attempts before giving up
 - **Min Uptime**: 10 seconds before considering stable
 - **Restart Delay**: 4 seconds between restart attempts
 - **Memory Limit**: Restarts if memory exceeds 500MB
 
 ### 📝 Logging
+
 - **Combined Logs**: `./logs/combined.log`
 - **Output Logs**: `./logs/out.log`
 - **Error Logs**: `./logs/error.log`
 - **Log Format**: Timestamped with timezone
 
 ### 🏥 Health Monitoring
+
 - **Health Check**: HTTP endpoint at `/health`
 - **Grace Period**: 3 seconds for health check response
 - **Memory Monitoring**: Node.js max old space size set to 512MB
 
 ### ⚡ Performance
+
 - **Single Instance**: Fork mode (not cluster)
 - **Source Maps**: Enabled for better error tracking
 - **Graceful Shutdown**: Proper cleanup on process termination
@@ -121,6 +132,7 @@ pm2 start ecosystem.config.js --env production
 ## Production Deployment Workflow
 
 ### 1. Build and Deploy
+
 ```bash
 # Complete build and start
 npm run pm2:start
@@ -131,6 +143,7 @@ pm2 start ecosystem.config.js --env production
 ```
 
 ### 2. Zero-Downtime Updates
+
 ```bash
 # Build new version
 npm run build
@@ -140,6 +153,7 @@ npm run pm2:reload
 ```
 
 ### 3. Monitor and Maintain
+
 ```bash
 # Check status
 npm run pm2:status
@@ -154,6 +168,7 @@ npm run pm2:monit
 ## Advanced PM2 Features
 
 ### Process Persistence
+
 ```bash
 # Save current PM2 processes
 pm2 save
@@ -167,6 +182,7 @@ pm2 resurrect
 ```
 
 ### Log Management
+
 ```bash
 # Rotate logs (install pm2-logrotate)
 pm2 install pm2-logrotate
@@ -178,7 +194,9 @@ pm2 set pm2-logrotate:compress true
 ```
 
 ### Cluster Mode (Optional)
+
 To use cluster mode for better performance:
+
 ```javascript
 // In ecosystem.config.js
 instances: 'max',        // Use all CPU cores
@@ -190,6 +208,7 @@ exec_mode: 'cluster'     // Enable cluster mode
 ### Common Issues
 
 #### 1. Port Already in Use
+
 ```bash
 # Kill processes on port 3001
 npm run kill-port
@@ -199,6 +218,7 @@ lsof -ti:3001 | xargs kill -9
 ```
 
 #### 2. Application Won't Start
+
 ```bash
 # Check logs for errors
 pm2 logs copytrade-pro --lines 50
@@ -211,6 +231,7 @@ ls -la backend/dist/.env*
 ```
 
 #### 3. Memory Issues
+
 ```bash
 # Monitor memory usage
 pm2 monit
@@ -220,6 +241,7 @@ pm2 monit
 ```
 
 #### 4. Health Check Failures
+
 ```bash
 # Test health endpoint manually
 curl http://localhost:3001/health
@@ -229,6 +251,7 @@ node backend/dist/index.js
 ```
 
 ### Log Analysis
+
 ```bash
 # View real-time logs
 pm2 logs copytrade-pro --lines 0
@@ -244,15 +267,18 @@ tail -f logs/out.log
 ## Best Practices
 
 ### 1. Always Build Before Starting
+
 ```bash
 npm run build && pm2 start ecosystem.config.js --env production
 ```
 
 ### 2. Use Environment-Specific Configs
+
 - Development: Lower memory limits, more verbose logging
 - Production: Higher memory limits, error-only logging
 
 ### 3. Monitor Regularly
+
 ```bash
 # Set up monitoring dashboard
 pm2 monit
@@ -262,14 +288,17 @@ pm2 status
 ```
 
 ### 4. Log Rotation
+
 Install and configure pm2-logrotate to prevent log files from growing too large.
 
 ### 5. Process Persistence
+
 Always save your PM2 configuration and set up startup scripts for production servers.
 
 ## Integration with CI/CD
 
 ### Example Deployment Script
+
 ```bash
 #!/bin/bash
 # deploy.sh
