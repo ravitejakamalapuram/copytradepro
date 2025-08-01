@@ -23,6 +23,7 @@ import symbolLifecycleRoutes from './routes/symbolLifecycleRoutes';
 import symbolInitializationRoutes from './routes/symbolInitialization';
 import symbolHealthRoutes from './routes/symbolHealth';
 import notificationRoutes from './routes/notifications';
+import startupRoutes from './routes/startup';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -42,6 +43,9 @@ import { startupSymbolInitializationService } from './services/startupSymbolInit
 import { symbolMonitoringService } from './services/symbolMonitoringService';
 import { symbolAlertingService } from './services/symbolAlertingService';
 import { notificationService } from './services/notificationService';
+import { startupStatusService } from './services/startupStatusService';
+import { startupMonitoringService } from './services/startupMonitoringService';
+import { requireSymbolData, requireServerReady, addStartupStatusHeaders } from './middleware/symbolDataReadyMiddleware';
 
 // Load environment variables
 dotenv.config();
@@ -119,6 +123,9 @@ app.use(performanceMonitoring);
 // Enhanced logging middleware
 app.use(loggingMiddleware);
 
+// Add startup status headers for debugging
+app.use(addStartupStatusHeaders);
+
 // Morgan logging middleware (keep for compatibility)
 const logFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
 if (process.env.ENABLE_REQUEST_LOGGING !== 'false') {
@@ -128,16 +135,26 @@ if (process.env.ENABLE_REQUEST_LOGGING !== 'false') {
 // Health check endpoint
 app.get('/health', (_req, res) => {
   try {
-    res.status(200).json({
-      status: 'OK',
+    const startupStatus = startupStatusService.getStatus();
+    const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
+    
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
+      startup: {
+        phase: startupStatus.startupPhase,
+        serverReady: startupStatus.serverReady,
+        symbolDataReady: startupStatus.symbolDataReady,
+        fullyReady: startupStatusService.isFullyReady()
+      },
       services: {
         database: 'MongoDB',
         websocket: 'Socket.IO',
-        orderMonitoring: 'Active'
+        orderMonitoring: 'Active',
+        symbolData: startupStatus.symbolDataReady ? 'Ready' : 'Initializing'
       }
     });
   } catch (error) {
@@ -152,16 +169,28 @@ app.get('/health', (_req, res) => {
 // API Health check endpoint
 app.get('/api/health', (_req, res) => {
   try {
-    res.status(200).json({
-      status: 'OK',
+    const startupStatus = startupStatusService.getStatus();
+    const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
+    
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
+      startup: {
+        phase: startupStatus.startupPhase,
+        serverReady: startupStatus.serverReady,
+        symbolDataReady: startupStatus.symbolDataReady,
+        fullyReady: startupStatusService.isFullyReady(),
+        symbolInitProgress: startupStatus.symbolInitStatus?.progress || 0,
+        currentStep: startupStatus.symbolInitStatus?.currentStep || 'Unknown'
+      },
       services: {
         database: 'MongoDB',
         websocket: 'Socket.IO',
-        orderMonitoring: 'Active'
+        orderMonitoring: 'Active',
+        symbolData: startupStatus.symbolDataReady ? 'Ready' : 'Initializing'
       }
     });
   } catch (error) {
@@ -173,20 +202,42 @@ app.get('/api/health', (_req, res) => {
   }
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/broker', brokerRoutes);
-app.use('/api/portfolio', portfolioRoutes);
-app.use('/api/advanced-orders', advancedOrdersRoutes);
-app.use('/api/market-data', marketDataRoutes);
-app.use('/api/logs', logsRoutes);
-app.use('/api/monitoring', monitoringRoutes);
-app.use('/api/options', optionsRoutes);
-app.use('/api/symbols', symbolsRoutes);
-app.use('/api', symbolLifecycleRoutes);
-app.use('/api/symbol-initialization', symbolInitializationRoutes);
-app.use('/api/symbol-health', symbolHealthRoutes);
-app.use('/api/notifications', notificationRoutes);
+// Startup status endpoint
+app.get('/api/startup-status', (_req, res) => {
+  try {
+    const status = startupStatusService.getStatus();
+    const metrics = startupStatusService.getStartupMetrics();
+    
+    res.status(200).json({
+      success: true,
+      status,
+      metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get startup status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// API routes with startup status middleware
+app.use('/api/auth', requireServerReady, authRoutes);
+app.use('/api/broker', requireServerReady, brokerRoutes);
+app.use('/api/portfolio', requireSymbolData, portfolioRoutes);
+app.use('/api/advanced-orders', requireSymbolData, advancedOrdersRoutes);
+app.use('/api/market-data', requireSymbolData, marketDataRoutes);
+app.use('/api/logs', requireServerReady, logsRoutes);
+app.use('/api/monitoring', requireServerReady, monitoringRoutes);
+app.use('/api/options', requireSymbolData, optionsRoutes);
+app.use('/api/symbols', requireSymbolData, symbolsRoutes);
+app.use('/api', requireSymbolData, symbolLifecycleRoutes);
+app.use('/api/symbol-initialization', requireServerReady, symbolInitializationRoutes);
+app.use('/api/symbol-health', requireServerReady, symbolHealthRoutes);
+app.use('/api/notifications', requireServerReady, notificationRoutes);
+app.use('/api/startup', requireServerReady, startupRoutes);
 
 
 
@@ -374,8 +425,16 @@ async function startServer() {
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`🔄 Socket.IO enabled for real-time updates`);
       console.log(`📊 Order status monitoring active`);
-      console.log(`📈 Starting symbol data initialization...`);
       console.log(`⚡ Real-time price streaming active`);
+
+      // Start startup monitoring
+      startupMonitoringService.startMonitoring();
+      
+      // Mark server as ready
+      startupStatusService.markServerReady();
+      
+      // Start monitoring startup status
+      startupStatusService.startMonitoring();
 
       // Start monitoring services
       logger.info('Starting monitoring services', {
@@ -392,15 +451,26 @@ async function startServer() {
       console.log(`📊 Symbol monitoring active`);
       console.log(`🚨 Alert system active`);
       console.log(`📧 Notification system active`);
+      console.log(`📈 Starting symbol data initialization in background...`);
+
+      // Mark symbol initialization as started
+      startupStatusService.markSymbolInitStarted();
 
       // Initialize symbol data in background after server starts
-      startupSymbolInitializationService.initializeSymbolData().catch((error: any) => {
-        logger.error('Symbol data initialization failed during startup', {
-          component: 'SERVER_STARTUP',
-          operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
-        }, error);
-        // Don't exit the server - it can still function with cached data or manual initialization
-      });
+      startupSymbolInitializationService.initializeSymbolData()
+        .then(() => {
+          console.log(`✅ Symbol data initialization completed successfully`);
+          startupStatusService.markSymbolInitCompleted();
+        })
+        .catch((error: any) => {
+          console.error(`❌ Symbol data initialization failed: ${error.message}`);
+          logger.error('Symbol data initialization failed during startup', {
+            component: 'SERVER_STARTUP',
+            operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
+          }, error);
+          startupStatusService.markStartupFailed(error.message);
+          // Don't exit the server - it can still function with cached data or manual initialization
+        });
     });
 
     // Handle server errors

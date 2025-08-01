@@ -7,6 +7,7 @@ import { logger } from '../utils/logger';
 import { upstoxDataProcessor } from './upstoxDataProcessor';
 import { symbolDatabaseService } from './symbolDatabaseService';
 import { dataValidationService } from './dataValidationService';
+import websocketService from './websocketService';
 
 
 export interface StartupInitializationStatus {
@@ -24,6 +25,19 @@ export interface StartupInitializationStatus {
   };
 }
 
+export interface StartupStep {
+  name: string;
+  description: string;
+  progress: number;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  startedAt?: Date;
+  completedAt?: Date;
+  error?: string;
+  retryCount?: number;
+  duration?: number;
+  details?: any;
+}
+
 export class StartupSymbolInitializationService {
   private initializationStatus: StartupInitializationStatus = {
     status: 'PENDING',
@@ -32,6 +46,16 @@ export class StartupSymbolInitializationService {
   };
 
   private isInitializing = false;
+  private initializationPromise: Promise<void> | null = null;
+  private steps: StartupStep[] = [
+    { name: 'clear_data', description: 'Clearing existing symbol data', progress: 20, status: 'PENDING', retryCount: 0 },
+    { name: 'download_process', description: 'Downloading and processing Upstox data', progress: 70, status: 'PENDING', retryCount: 0 },
+    { name: 'validate', description: 'Validating data integrity', progress: 90, status: 'PENDING', retryCount: 0 },
+    { name: 'complete', description: 'Completing initialization', progress: 100, status: 'PENDING', retryCount: 0 }
+  ];
+  private readonly MAX_RETRY_ATTEMPTS = 3;
+  private readonly RETRY_DELAY_MS = 5000; // 5 seconds
+  private statusUpdateCallbacks: Array<(status: StartupInitializationStatus) => void> = [];
 
   constructor() {
     logger.info('Startup Symbol Initialization Service created', {
@@ -81,20 +105,16 @@ export class StartupSymbolInitializationService {
 
     try {
       // Step 1: Clear existing symbol data (fresh start)
-      await this.clearExistingData();
-      this.updateProgress(20, 'Cleared existing data');
+      await this.executeStepWithRetry('clear_data', () => this.clearExistingData());
 
       // Step 2: Download and process Upstox data
-      await this.downloadAndProcessUpstoxData();
-      this.updateProgress(70, 'Downloaded and processed Upstox data');
+      await this.executeStepWithRetry('download_process', () => this.downloadAndProcessUpstoxData());
 
       // Step 3: Validate data integrity
-      await this.validateDataIntegrity();
-      this.updateProgress(90, 'Validated data integrity');
+      await this.executeStepWithRetry('validate', () => this.validateDataIntegrity());
 
       // Step 4: Complete initialization
-      await this.completeInitialization();
-      this.updateProgress(100, 'Initialization completed');
+      await this.executeStepWithRetry('complete', () => this.completeInitialization());
 
       this.initializationStatus.status = 'COMPLETED';
       this.initializationStatus.completedAt = new Date();
@@ -162,12 +182,192 @@ export class StartupSymbolInitializationService {
       progress,
       currentStep
     });
+
+    // Broadcast progress update via WebSocket
+    try {
+      websocketService.broadcastSymbolInitProgress({
+        progress,
+        currentStep,
+        status: this.initializationStatus.status,
+        stats: this.initializationStatus.stats,
+        steps: this.steps
+      });
+    } catch (error) {
+      logger.error('Error broadcasting symbol init progress via WebSocket', {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'WEBSOCKET_BROADCAST_ERROR'
+      }, error);
+    }
+  }
+
+  /**
+   * Start a step with detailed logging
+   */
+  private startStep(stepName: string): void {
+    const step = this.steps.find(s => s.name === stepName);
+    if (step) {
+      step.status = 'IN_PROGRESS';
+      step.startedAt = new Date();
+      
+      logger.info(`Starting step: ${step.description}`, {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'STEP_START',
+        stepName,
+        stepDescription: step.description,
+        retryCount: step.retryCount || 0
+      });
+
+      this.updateProgress(step.progress - 10, `Starting: ${step.description}`);
+    }
+  }
+
+  /**
+   * Complete a step with detailed logging
+   */
+  private completeStep(stepName: string, details?: any): void {
+    const step = this.steps.find(s => s.name === stepName);
+    if (step) {
+      step.status = 'COMPLETED';
+      step.completedAt = new Date();
+      step.details = details;
+      
+      if (step.startedAt) {
+        step.duration = step.completedAt.getTime() - step.startedAt.getTime();
+      }
+      
+      logger.info(`Completed step: ${step.description}`, {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'STEP_COMPLETE',
+        stepName,
+        stepDescription: step.description,
+        duration: step.duration,
+        details
+      });
+
+      this.updateProgress(step.progress, `Completed: ${step.description}`);
+    }
+  }
+
+  /**
+   * Fail a step with detailed logging and retry logic
+   */
+  private async failStep(stepName: string, error: Error): Promise<boolean> {
+    const step = this.steps.find(s => s.name === stepName);
+    if (!step) return false;
+
+    step.retryCount = (step.retryCount || 0) + 1;
+    step.error = error.message;
+    
+    logger.error(`Step failed: ${step.description}`, {
+      component: 'STARTUP_SYMBOL_INIT',
+      operation: 'STEP_FAILED',
+      stepName,
+      stepDescription: step.description,
+      retryCount: step.retryCount,
+      error: error.message
+    }, error);
+
+    // Check if we should retry
+    if (step.retryCount < this.MAX_RETRY_ATTEMPTS) {
+      logger.info(`Retrying step: ${step.description} (attempt ${step.retryCount + 1}/${this.MAX_RETRY_ATTEMPTS})`, {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'STEP_RETRY',
+        stepName,
+        retryCount: step.retryCount,
+        delayMs: this.RETRY_DELAY_MS
+      });
+
+      this.updateProgress(step.progress - 15, `Retrying: ${step.description} (attempt ${step.retryCount + 1})`);
+      
+      // Wait before retry
+      await new Promise(resolve => setTimeout(resolve, this.RETRY_DELAY_MS));
+      
+      return true; // Should retry
+    } else {
+      step.status = 'FAILED';
+      step.completedAt = new Date();
+      
+      if (step.startedAt) {
+        step.duration = step.completedAt.getTime() - step.startedAt.getTime();
+      }
+      
+      logger.error(`Step permanently failed after ${step.retryCount} attempts: ${step.description}`, {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'STEP_PERMANENT_FAILURE',
+        stepName,
+        stepDescription: step.description,
+        totalRetries: step.retryCount,
+        totalDuration: step.duration
+      });
+
+      return false; // Should not retry
+    }
+  }
+
+  /**
+   * Get detailed step information
+   */
+  getSteps(): StartupStep[] {
+    return [...this.steps];
+  }
+
+  /**
+   * Get step metrics for monitoring
+   */
+  getStepMetrics(): any {
+    const completedSteps = this.steps.filter(s => s.status === 'COMPLETED');
+    const failedSteps = this.steps.filter(s => s.status === 'FAILED');
+    const totalDuration = completedSteps.reduce((sum, step) => sum + (step.duration || 0), 0);
+    const totalRetries = this.steps.reduce((sum, step) => sum + (step.retryCount || 0), 0);
+
+    return {
+      totalSteps: this.steps.length,
+      completedSteps: completedSteps.length,
+      failedSteps: failedSteps.length,
+      totalDuration,
+      totalRetries,
+      averageStepDuration: completedSteps.length > 0 ? totalDuration / completedSteps.length : 0,
+      steps: this.steps.map(step => ({
+        name: step.name,
+        description: step.description,
+        status: step.status,
+        duration: step.duration,
+        retryCount: step.retryCount,
+        error: step.error
+      }))
+    };
+  }
+
+  /**
+   * Execute a step with retry logic
+   */
+  private async executeStepWithRetry(stepName: string, stepFunction: () => Promise<any>): Promise<any> {
+    let shouldRetry = true;
+    let result: any;
+
+    while (shouldRetry) {
+      this.startStep(stepName);
+      
+      try {
+        result = await stepFunction();
+        this.completeStep(stepName, result);
+        shouldRetry = false;
+      } catch (error: any) {
+        shouldRetry = await this.failStep(stepName, error);
+        
+        if (!shouldRetry) {
+          throw error;
+        }
+      }
+    }
+
+    return result;
   }
 
   /**
    * Clear existing symbol data for fresh start
    */
-  private async clearExistingData(): Promise<void> {
+  private async clearExistingData(): Promise<any> {
     logger.info('Clearing existing symbol data', {
       component: 'STARTUP_SYMBOL_INIT',
       operation: 'CLEAR_EXISTING_DATA'
@@ -193,11 +393,15 @@ export class StartupSymbolInitializationService {
           operation: 'CLEAR_EXISTING_DATA_SUCCESS',
           clearedSymbols: existingCount
         });
+
+        return { clearedSymbols: existingCount };
       } else {
         logger.info('No existing symbol data found to clear', {
           component: 'STARTUP_SYMBOL_INIT',
           operation: 'CLEAR_EXISTING_DATA_NONE'
         });
+
+        return { clearedSymbols: 0 };
       }
     } catch (error: any) {
       logger.error('Failed to clear existing symbol data', {
@@ -211,7 +415,7 @@ export class StartupSymbolInitializationService {
   /**
    * Download and process Upstox data
    */
-  private async downloadAndProcessUpstoxData(): Promise<void> {
+  private async downloadAndProcessUpstoxData(): Promise<any> {
     logger.info('Downloading and processing Upstox data', {
       component: 'STARTUP_SYMBOL_INIT',
       operation: 'DOWNLOAD_PROCESS_UPSTOX'
@@ -238,6 +442,8 @@ export class StartupSymbolInitializationService {
         operation: 'DOWNLOAD_PROCESS_UPSTOX_SUCCESS',
         stats: this.initializationStatus.stats
       });
+
+      return this.initializationStatus.stats;
 
       // Validate minimum symbol count with more flexible thresholds
       const minSymbolCount = parseInt(process.env.MIN_SYMBOL_COUNT || '1000');
@@ -276,7 +482,7 @@ export class StartupSymbolInitializationService {
   /**
    * Validate data integrity after processing
    */
-  private async validateDataIntegrity(): Promise<void> {
+  private async validateDataIntegrity(): Promise<any> {
     logger.info('Validating symbol data integrity', {
       component: 'STARTUP_SYMBOL_INIT',
       operation: 'VALIDATE_DATA_INTEGRITY'
@@ -305,6 +511,8 @@ export class StartupSymbolInitializationService {
         stats
       });
 
+      return { validationStats: stats, validationsPassed: validations.length };
+
     } catch (error: any) {
       logger.error('Data integrity validation failed', {
         component: 'STARTUP_SYMBOL_INIT',
@@ -317,7 +525,7 @@ export class StartupSymbolInitializationService {
   /**
    * Complete initialization process
    */
-  private async completeInitialization(): Promise<void> {
+  private async completeInitialization(): Promise<any> {
     logger.info('Completing symbol initialization', {
       component: 'STARTUP_SYMBOL_INIT',
       operation: 'COMPLETE_INITIALIZATION'
@@ -337,6 +545,8 @@ export class StartupSymbolInitializationService {
         component: 'STARTUP_SYMBOL_INIT',
         operation: 'COMPLETE_INITIALIZATION_SUCCESS'
       });
+
+      return { cacheWarmed: true, initializationComplete: true };
 
     } catch (error: any) {
       logger.error('Failed to complete initialization', {
@@ -404,6 +614,8 @@ export class StartupSymbolInitializationService {
    * Get initialization statistics
    */
   getInitializationStats(): any {
+    const stepMetrics = this.getStepMetrics();
+    
     return {
       service: 'Startup Symbol Initialization',
       status: this.initializationStatus.status,
@@ -412,7 +624,15 @@ export class StartupSymbolInitializationService {
       startedAt: this.initializationStatus.startedAt,
       completedAt: this.initializationStatus.completedAt,
       stats: this.initializationStatus.stats,
-      error: this.initializationStatus.error
+      error: this.initializationStatus.error,
+      stepMetrics,
+      performance: {
+        totalDuration: stepMetrics.totalDuration,
+        averageStepDuration: stepMetrics.averageStepDuration,
+        totalRetries: stepMetrics.totalRetries,
+        successRate: stepMetrics.totalSteps > 0 ? 
+          (stepMetrics.completedSteps / stepMetrics.totalSteps) * 100 : 0
+      }
     };
   }
 }
