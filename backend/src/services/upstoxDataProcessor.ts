@@ -680,7 +680,7 @@ export class UpstoxDataProcessor {
         // Step 4: Validate symbol data
         const validation = this.validateSymbolData(standardizedSymbols);
 
-        // Step 5: Store in database
+        // Step 5: Replace all symbols in database with fresh data
         const result: ProcessingResult = await symbolDatabaseService.upsertSymbols(validation.validSymbols);
 
         // Calculate processing time

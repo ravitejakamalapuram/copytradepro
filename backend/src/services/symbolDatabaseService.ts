@@ -174,7 +174,7 @@ export class SymbolDatabaseService {
   }
 
   /**
-   * Bulk create or update symbols
+   * Replace all symbols with fresh data from source
    */
   async upsertSymbols(symbols: CreateStandardizedSymbolData[]): Promise<ProcessingResult> {
     try {
@@ -182,84 +182,124 @@ export class SymbolDatabaseService {
         throw new Error('Symbol Database Service not initialized');
       }
 
-      let newSymbols = 0;
-      let updatedSymbols = 0;
-      let validSymbols = 0;
-      let invalidSymbols = 0;
+      logger.info('Starting symbol replacement process', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'REPLACE_ALL_SYMBOLS',
+        inputCount: symbols.length
+      });
+
+      // Step 1: Validate all symbols first
+      const validSymbols: CreateStandardizedSymbolData[] = [];
       const errors: string[] = [];
+      let invalidSymbols = 0;
 
       for (const symbolData of symbols) {
-        try {
-          // Validate symbol data
-          const validation = this.validateSymbolData(symbolData);
-          if (!validation.isValid) {
-            invalidSymbols++;
-            errors.push(`Invalid symbol ${symbolData.tradingSymbol}: ${validation.errors.join(', ')}`);
-            continue;
-          }
-
-          // Try to find existing symbol
-          const existingSymbol = await this.StandardizedSymbolModel.findOne({
-            tradingSymbol: symbolData.tradingSymbol,
-            exchange: symbolData.exchange,
-            expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate) : undefined,
-            strikePrice: symbolData.strikePrice,
-            optionType: symbolData.optionType
+        const validation = this.validateSymbolData(symbolData);
+        if (validation.isValid) {
+          validSymbols.push({
+            ...symbolData,
+            expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate).toISOString().split('T')[0] : undefined
           });
-
-          if (existingSymbol) {
-            // Update existing symbol
-            const oldData = this.symbolDocToInterface(existingSymbol);
-            Object.assign(existingSymbol, {
-              ...symbolData,
-              expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate) : undefined,
-              lastUpdated: new Date()
-            });
-            await existingSymbol.save();
-            
-            // Invalidate cache for updated symbol
-            symbolCacheService.invalidateSymbol(
-              (existingSymbol._id as mongoose.Types.ObjectId).toString(),
-              symbolData.tradingSymbol,
-              symbolData.exchange
-            );
-            
-
-            
-            updatedSymbols++;
-          } else {
-            // Create new symbol
-            const symbolDoc = new this.StandardizedSymbolModel({
-              ...symbolData,
-              expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate) : undefined
-            });
-            await symbolDoc.save();
-            
-
-            
-            newSymbols++;
-          }
-          
-          validSymbols++;
-        } catch (error: any) {
+        } else {
           invalidSymbols++;
-          errors.push(`Error processing symbol ${symbolData.tradingSymbol}: ${error.message}`);
+          errors.push(`Invalid symbol ${symbolData.tradingSymbol}: ${validation.errors.join(', ')}`);
         }
       }
 
-      return {
+      if (validSymbols.length === 0) {
+        throw new Error('No valid symbols to insert');
+      }
+
+      logger.info('Symbol validation completed', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'VALIDATION_COMPLETE',
+        validSymbols: validSymbols.length,
+        invalidSymbols
+      });
+
+      // Step 2: Use transaction for atomic replacement
+      const session = await mongoose.startSession();
+      let result: ProcessingResult = {
         totalProcessed: symbols.length,
-        validSymbols,
+        validSymbols: validSymbols.length,
         invalidSymbols,
-        newSymbols,
-        updatedSymbols,
+        newSymbols: validSymbols.length,
+        updatedSymbols: 0,
         errors
       };
+
+      try {
+        await session.withTransaction(async () => {
+          // Clear existing symbols
+          const deleteResult = await this.StandardizedSymbolModel.deleteMany({}, { session });
+          logger.info('Cleared existing symbols', {
+            component: 'SYMBOL_DATABASE_SERVICE',
+            operation: 'CLEAR_EXISTING',
+            deletedCount: deleteResult.deletedCount
+          });
+
+          // Insert new symbols in batches for better performance
+          const batchSize = 1000;
+          const batches = [];
+          for (let i = 0; i < validSymbols.length; i += batchSize) {
+            batches.push(validSymbols.slice(i, i + batchSize));
+          }
+
+          let insertedCount = 0;
+          for (const batch of batches) {
+            const insertResult = await this.StandardizedSymbolModel.insertMany(
+              batch.map(symbol => ({
+                ...symbol,
+                expiryDate: symbol.expiryDate ? new Date(symbol.expiryDate) : undefined
+              })),
+              { session, ordered: false }
+            );
+            insertedCount += insertResult.length;
+            
+            logger.info('Inserted symbol batch', {
+              component: 'SYMBOL_DATABASE_SERVICE',
+              operation: 'BATCH_INSERT',
+              batchSize: batch.length,
+              insertedCount: insertResult.length,
+              totalInserted: insertedCount
+            });
+          }
+
+          result = {
+            totalProcessed: symbols.length,
+            validSymbols: validSymbols.length,
+            invalidSymbols,
+            newSymbols: validSymbols.length, // All are new since we replaced everything
+            updatedSymbols: 0, // None updated since we replaced everything
+            errors
+          };
+        });
+
+        // Clear all symbol cache since we replaced everything
+        symbolCacheService.invalidateAll();
+        
+        logger.info('Symbol replacement completed successfully', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'REPLACE_COMPLETE',
+          ...result!
+        });
+
+        return result;
+
+      } finally {
+        await session.endSession();
+      }
+
     } catch (error) {
-      console.error('🚨 Failed to upsert symbols:', error);
+      logger.error('Failed to replace symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'REPLACE_ERROR'
+      }, error);
       throw error;
     }
   }
+
+
 
   /**
    * Get symbol by ID
