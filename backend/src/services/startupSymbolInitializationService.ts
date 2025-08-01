@@ -57,6 +57,8 @@ export class StartupSymbolInitializationService {
   private readonly RETRY_DELAY_MS = 5000; // 5 seconds
   private statusUpdateCallbacks: Array<(status: StartupInitializationStatus) => void> = [];
 
+  private refreshTimeout: NodeJS.Timeout | null = null;
+
   constructor() {
     logger.info('Startup Symbol Initialization Service created', {
       component: 'STARTUP_SYMBOL_INIT',
@@ -79,7 +81,7 @@ export class StartupSymbolInitializationService {
   }
 
   /**
-   * Initialize symbol data on startup
+   * Initialize symbol data on startup with smart fetching
    */
   async initializeSymbolData(): Promise<void> {
     if (this.isInitializing) {
@@ -90,6 +92,73 @@ export class StartupSymbolInitializationService {
       return;
     }
 
+    // Check if data already exists and is fresh
+    const dataStatus = await symbolDatabaseService.checkDataFreshness();
+    
+    if (dataStatus.hasData) {
+      if (dataStatus.isFresh) {
+        logger.info('Fresh symbol data already exists, skipping initialization', {
+          component: 'STARTUP_SYMBOL_INIT',
+          operation: 'SKIP_FRESH_DATA',
+          totalSymbols: dataStatus.totalSymbols,
+          lastUpdated: dataStatus.lastUpdated,
+          ageHours: dataStatus.ageHours
+        });
+
+        // Mark as completed without doing anything
+        this.initializationStatus = {
+          status: 'COMPLETED',
+          progress: 100,
+          currentStep: 'Using existing fresh data',
+          startedAt: new Date(),
+          completedAt: new Date(),
+          stats: {
+            totalSymbols: dataStatus.totalSymbols,
+            validSymbols: dataStatus.totalSymbols,
+            invalidSymbols: 0,
+            processingTime: 0
+          }
+        };
+
+        return;
+      } else {
+        logger.info('Symbol data exists but is stale, scheduling one-time refresh', {
+          component: 'STARTUP_SYMBOL_INIT',
+          operation: 'SCHEDULE_STALE_REFRESH',
+          totalSymbols: dataStatus.totalSymbols,
+          lastUpdated: dataStatus.lastUpdated,
+          ageHours: dataStatus.ageHours
+        });
+
+        // Mark as completed, but schedule a one-time refresh within the first hour
+        this.initializationStatus = {
+          status: 'COMPLETED',
+          progress: 100,
+          currentStep: 'Using existing data, refresh scheduled',
+          startedAt: new Date(),
+          completedAt: new Date(),
+          stats: {
+            totalSymbols: dataStatus.totalSymbols,
+            validSymbols: dataStatus.totalSymbols,
+            invalidSymbols: 0,
+            processingTime: 0
+          }
+        };
+
+        // Schedule a one-time refresh within the first hour (random delay to avoid peak times)
+        const refreshDelayMs = Math.random() * 60 * 60 * 1000; // 0-60 minutes
+        this.scheduleOneTimeRefresh(refreshDelayMs);
+
+        return;
+      }
+    }
+
+    // No data exists, proceed with full initialization
+    logger.info('No symbol data found, starting fresh initialization', {
+      component: 'STARTUP_SYMBOL_INIT',
+      operation: 'INITIALIZE_START_NO_DATA'
+    });
+
     this.isInitializing = true;
     this.initializationStatus = {
       status: 'IN_PROGRESS',
@@ -97,11 +166,6 @@ export class StartupSymbolInitializationService {
       currentStep: 'Starting initialization',
       startedAt: new Date()
     };
-
-    logger.info('Starting fresh symbol data initialization', {
-      component: 'STARTUP_SYMBOL_INIT',
-      operation: 'INITIALIZE_START'
-    });
 
     try {
       // Step 1: Clear existing symbol data (fresh start)
@@ -150,6 +214,87 @@ export class StartupSymbolInitializationService {
   }
 
   /**
+   * Schedule a one-time refresh for stale data
+   */
+  private scheduleOneTimeRefresh(delayMs: number): void {
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+    }
+
+    logger.info('Scheduling one-time symbol data refresh', {
+      component: 'STARTUP_SYMBOL_INIT',
+      operation: 'SCHEDULE_ONE_TIME_REFRESH',
+      delayMinutes: Math.round(delayMs / (1000 * 60))
+    });
+
+    this.refreshTimeout = setTimeout(async () => {
+      try {
+        logger.info('Starting scheduled one-time symbol data refresh', {
+          component: 'STARTUP_SYMBOL_INIT',
+          operation: 'ONE_TIME_REFRESH_START'
+        });
+
+        // Force a full refresh
+        await this.forceFullRefresh();
+
+        logger.info('Completed scheduled one-time symbol data refresh', {
+          component: 'STARTUP_SYMBOL_INIT',
+          operation: 'ONE_TIME_REFRESH_SUCCESS'
+        });
+
+      } catch (error: any) {
+        logger.error('Failed scheduled one-time symbol data refresh', {
+          component: 'STARTUP_SYMBOL_INIT',
+          operation: 'ONE_TIME_REFRESH_ERROR',
+          error: error.message
+        }, error);
+      }
+    }, delayMs);
+  }
+
+  /**
+   * Force a full refresh (used by scheduler and manual triggers)
+   */
+  private async forceFullRefresh(): Promise<void> {
+    if (this.isInitializing) {
+      throw new Error('Initialization already in progress');
+    }
+
+    this.isInitializing = true;
+    this.initializationStatus = {
+      status: 'IN_PROGRESS',
+      progress: 0,
+      currentStep: 'Starting scheduled refresh',
+      startedAt: new Date()
+    };
+
+    try {
+      // Step 1: Clear existing symbol data (fresh start)
+      await this.executeStepWithRetry('clear_data', () => this.clearExistingData());
+
+      // Step 2: Download and process Upstox data
+      await this.executeStepWithRetry('download_process', () => this.downloadAndProcessUpstoxData());
+
+      // Step 3: Validate data integrity
+      await this.executeStepWithRetry('validate', () => this.validateDataIntegrity());
+
+      // Step 4: Complete initialization
+      await this.executeStepWithRetry('complete', () => this.completeInitialization());
+
+      this.initializationStatus.status = 'COMPLETED';
+      this.initializationStatus.completedAt = new Date();
+
+    } catch (error: any) {
+      this.initializationStatus.status = 'FAILED';
+      this.initializationStatus.error = error.message;
+      this.initializationStatus.completedAt = new Date();
+      throw error;
+    } finally {
+      this.isInitializing = false;
+    }
+  }
+
+  /**
    * Force restart symbol initialization
    */
   async forceRestart(): Promise<void> {
@@ -166,7 +311,7 @@ export class StartupSymbolInitializationService {
       operation: 'FORCE_RESTART'
     });
 
-    await this.initializeSymbolData();
+    await this.forceFullRefresh();
   }
 
   /**

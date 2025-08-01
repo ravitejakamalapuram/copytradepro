@@ -1202,6 +1202,67 @@ export class SymbolDatabaseService {
   }
 
   /**
+   * Check if symbol data exists and is fresh
+   */
+  async checkDataFreshness(): Promise<{
+    hasData: boolean;
+    isFresh: boolean;
+    totalSymbols: number;
+    lastUpdated?: Date;
+    ageHours?: number;
+  }> {
+    try {
+      if (!this.isReady()) {
+        return { hasData: false, isFresh: false, totalSymbols: 0 };
+      }
+
+      // Get total symbol count
+      const totalSymbols = await this.StandardizedSymbolModel.countDocuments();
+      
+      if (totalSymbols === 0) {
+        return { hasData: false, isFresh: false, totalSymbols: 0 };
+      }
+
+      // Get the most recently updated symbol to check freshness
+      const recentSymbol = await this.StandardizedSymbolModel
+        .findOne({}, { lastUpdated: 1 })
+        .sort({ lastUpdated: -1 })
+        .lean();
+
+      if (!recentSymbol?.lastUpdated) {
+        // If no lastUpdated field, consider data as old
+        return { 
+          hasData: true, 
+          isFresh: false, 
+          totalSymbols
+        };
+      }
+
+      const now = new Date();
+      const lastUpdated = new Date(recentSymbol.lastUpdated);
+      const ageHours = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60);
+      
+      // Consider data fresh if updated within last 24 hours
+      const isFresh = ageHours < 24;
+
+      return {
+        hasData: true,
+        isFresh,
+        totalSymbols,
+        lastUpdated,
+        ageHours
+      };
+
+    } catch (error) {
+      logger.error('Failed to check data freshness', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CHECK_DATA_FRESHNESS_ERROR'
+      }, error);
+      return { hasData: false, isFresh: false, totalSymbols: 0 };
+    }
+  }
+
+  /**
    * Get database statistics
    */
   async getStatistics(): Promise<{

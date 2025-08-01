@@ -87,110 +87,31 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
-const isDevelopment = process.env.NODE_ENV !== 'production';
+// Simplified CORS configuration - allow all origins for now
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
+  optionsSuccessStatus: 200
+}));
 
-let corsOptions;
-
-if (isDevelopment) {
-  // In development, be more permissive with CORS
-  corsOptions = {
-    origin: true, // Allow all origins in development
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
-    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
-  };
-  
-  logger.info('CORS configured for development - allowing all origins', {
-    component: 'SERVER_STARTUP',
-    operation: 'CORS_CONFIG',
-    mode: 'development'
-  });
-} else {
-  // In production, use strict CORS
-  const allowedOrigins = process.env.ALLOWED_ORIGINS
-    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-    : [
-        process.env.FRONTEND_URL || 'http://localhost:5173',
-        `http://localhost:${PORT}`,
-        `http://127.0.0.1:${PORT}`,
-      ];
-
-  corsOptions = {
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        logger.warn('CORS blocked request from unauthorized origin', {
-          component: 'CORS',
-          operation: 'ORIGIN_BLOCKED',
-          origin,
-          allowedOrigins
-        });
-        return callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-    exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
-  };
-  
-  logger.info('CORS configured for production', {
-    component: 'SERVER_STARTUP',
-    operation: 'CORS_CONFIG',
-    mode: 'production',
-    allowedOrigins
-  });
-}
-
-app.use(cors(corsOptions));
+logger.info('CORS configured to allow all origins', {
+  component: 'SERVER_STARTUP',
+  operation: 'CORS_CONFIG',
+  mode: 'permissive'
+});
 
 // Handle preflight OPTIONS requests for all routes
 app.options('*', (req, res) => {
-  const origin = req.headers.origin;
-  
-  if (isDevelopment) {
-    logger.debug('Handling OPTIONS preflight request', {
-      component: 'CORS',
-      operation: 'PREFLIGHT',
-      origin,
-      method: req.method,
-      url: req.url,
-      headers: req.headers
-    });
-  }
-  
-  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Request-ID');
   res.header('Access-Control-Allow-Credentials', 'true');
   res.header('Access-Control-Max-Age', '86400'); // 24 hours
   res.sendStatus(200);
 });
-
-// Add CORS debugging middleware for development
-if (isDevelopment) {
-  app.use((req, res, next) => {
-    const origin = req.headers.origin;
-    if (req.method !== 'OPTIONS') {
-      logger.debug('Processing request with CORS headers', {
-        component: 'CORS',
-        operation: 'REQUEST',
-        method: req.method,
-        url: req.url,
-        origin,
-        userAgent: req.headers['user-agent']
-      });
-    }
-    next();
-  });
-}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
