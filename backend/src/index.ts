@@ -41,7 +41,7 @@ import { productionMonitoringService } from './services/productionMonitoringServ
 import { symbolLifecycleManager } from './services/symbolLifecycleManager';
 import { startupSymbolInitializationService } from './services/startupSymbolInitializationService';
 import { symbolMonitoringService } from './services/symbolMonitoringService';
-import { symbolAlertingService } from './services/symbolAlertingService';
+// Removed unused import: symbolAlertingService
 import { notificationService } from './services/notificationService';
 import { startupStatusService } from './services/startupStatusService';
 import { startupMonitoringService } from './services/startupMonitoringService';
@@ -88,27 +88,109 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      `http://localhost:${PORT}`, // Allow the production server origin
-      `http://127.0.0.1:${PORT}`, // Allow localhost variations
-    ];
+const isDevelopment = process.env.NODE_ENV !== 'production';
 
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+let corsOptions;
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
+if (isDevelopment) {
+  // In development, be more permissive with CORS
+  corsOptions = {
+    origin: true, // Allow all origins in development
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
+    optionsSuccessStatus: 200, // Some legacy browsers choke on 204
+  };
+  
+  logger.info('CORS configured for development - allowing all origins', {
+    component: 'SERVER_STARTUP',
+    operation: 'CORS_CONFIG',
+    mode: 'development'
+  });
+} else {
+  // In production, use strict CORS
+  const allowedOrigins = process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
+    : [
+        process.env.FRONTEND_URL || 'http://localhost:5173',
+        `http://localhost:${PORT}`,
+        `http://127.0.0.1:${PORT}`,
+      ];
+
+  corsOptions = {
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        logger.warn('CORS blocked request from unauthorized origin', {
+          component: 'CORS',
+          operation: 'ORIGIN_BLOCKED',
+          origin,
+          allowedOrigins
+        });
+        return callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+    exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
+  };
+  
+  logger.info('CORS configured for production', {
+    component: 'SERVER_STARTUP',
+    operation: 'CORS_CONFIG',
+    mode: 'production',
+    allowedOrigins
+  });
+}
+
+app.use(cors(corsOptions));
+
+// Handle preflight OPTIONS requests for all routes
+app.options('*', (req, res) => {
+  const origin = req.headers.origin;
+  
+  if (isDevelopment) {
+    logger.debug('Handling OPTIONS preflight request', {
+      component: 'CORS',
+      operation: 'PREFLIGHT',
+      origin,
+      method: req.method,
+      url: req.url,
+      headers: req.headers
+    });
+  }
+  
+  res.header('Access-Control-Allow-Origin', origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Request-ID');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.sendStatus(200);
+});
+
+// Add CORS debugging middleware for development
+if (isDevelopment) {
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (req.method !== 'OPTIONS') {
+      logger.debug('Processing request with CORS headers', {
+        component: 'CORS',
+        operation: 'REQUEST',
+        method: req.method,
+        url: req.url,
+        origin,
+        userAgent: req.headers['user-agent']
+      });
     }
-  },
-  credentials: true,
-}));
+    next();
+  });
+}
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -158,6 +240,7 @@ app.get('/health', (_req, res) => {
       }
     });
   } catch (error) {
+    console.error('Health check error:', error);
     res.status(503).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
@@ -194,6 +277,7 @@ app.get('/api/health', (_req, res) => {
       }
     });
   } catch (error) {
+    console.error('API health check error:', error);
     res.status(503).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
@@ -215,6 +299,7 @@ app.get('/api/startup-status', (_req, res) => {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
+    console.error('Startup status error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to get startup status',
@@ -233,7 +318,7 @@ app.use('/api/logs', requireServerReady, logsRoutes);
 app.use('/api/monitoring', requireServerReady, monitoringRoutes);
 app.use('/api/options', requireSymbolData, optionsRoutes);
 app.use('/api/symbols', requireSymbolData, symbolsRoutes);
-app.use('/api', requireSymbolData, symbolLifecycleRoutes);
+app.use('/api/symbol-lifecycle', requireSymbolData, symbolLifecycleRoutes);
 app.use('/api/symbol-initialization', requireServerReady, symbolInitializationRoutes);
 app.use('/api/symbol-health', requireServerReady, symbolHealthRoutes);
 app.use('/api/notifications', requireServerReady, notificationRoutes);
@@ -265,6 +350,7 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(publicPath, 'index.html'), (err) => {
       if (err) {
         // Error serving index.html - using console.error as this is in production static file serving
+        console.error('Error serving index.html:', err);
         res.status(500).json({
           success: false,
           message: 'Error serving application',
@@ -534,7 +620,7 @@ async function checkPortInUse(port: number): Promise<boolean> {
 async function killExistingProcesses(): Promise<void> {
   return new Promise((resolve) => {
     const { exec } = require('child_process');
-    exec(`pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true`, () => {
+    exec(`pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true`, (_error: any) => {
       resolve();
     });
   });
