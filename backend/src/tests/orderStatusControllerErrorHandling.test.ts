@@ -7,58 +7,13 @@ import './testSetup';
 import { Response } from 'express';
 import { checkOrderStatus, refreshOrderStatus, refreshAllOrderStatus } from '../controllers/brokerController';
 import { AuthenticatedRequest } from '../middleware/auth';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { expect } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { beforeEach } from '@jest/globals';
-import { jest } from '@jest/globals';
-import { jest } from '@jest/globals';
+import { jest, expect, beforeEach } from '@jest/globals';
+
+// Mock the services
+jest.mock('../services/databaseCompatibility');
+jest.mock('../services/orderStatusService');
+
+
 
 // Create mock request and response objects
 const createMockRequest = (body: any = {}, user: any = { id: 'test-user-123' }, params: any = {}): AuthenticatedRequest => ({
@@ -147,7 +102,9 @@ describe('Order Status Controller Standardized Error Handling', () => {
 
     it('should return standardized error for order not found', async () => {
       const { userDatabase } = require('../services/databaseCompatibility');
+      // @ts-ignore
       userDatabase.getOrderHistoryById = jest.fn().mockResolvedValue(null);
+      // @ts-ignore
       userDatabase.getOrderHistoryByBrokerOrderId = jest.fn().mockResolvedValue(null);
 
       const req = createMockRequest({
@@ -180,6 +137,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
         status: 'PENDING'
       };
       
+      // @ts-ignore
       userDatabase.getOrderHistoryById = jest.fn().mockResolvedValue(mockOrder);
 
       const req = createMockRequest({
@@ -204,6 +162,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
 
     it('should return standardized error for database error', async () => {
       const { userDatabase } = require('../services/databaseCompatibility');
+      // @ts-ignore
       userDatabase.getOrderHistoryById = jest.fn().mockRejectedValue(new Error('Database connection failed'));
 
       const req = createMockRequest({
@@ -251,7 +210,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
       const orderStatusService = require('../services/orderStatusService');
       
       // Mock the service method to return success
-      (orderStatusService.default.refreshOrderStatus as jest.Mock).mockResolvedValue({
+      (orderStatusService.default.refreshOrderStatus as any).mockResolvedValue({
         success: true,
         message: 'Order status refreshed successfully'
       });
@@ -297,7 +256,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
       const orderStatusService = require('../services/orderStatusService');
       
       // Mock the service method to return success
-      (orderStatusService.default.refreshAllOrderStatus as jest.Mock).mockResolvedValue({
+      (orderStatusService.default.refreshAllOrderStatus as any).mockResolvedValue({
         success: true,
         message: 'All order statuses refreshed successfully',
         refreshedCount: 5,
@@ -326,7 +285,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
       const orderStatusService = require('../services/orderStatusService');
       
       // Mock the service method to return failure
-      (orderStatusService.default.refreshAllOrderStatus as jest.Mock).mockResolvedValue({
+      (orderStatusService.default.refreshAllOrderStatus as any).mockResolvedValue({
         success: false,
         message: 'Failed to refresh order statuses'
       });
@@ -357,10 +316,10 @@ describe('Order Status Controller Standardized Error Handling', () => {
 
       await checkOrderStatus(req, res);
 
-      const callArgs = (res.json as jest.Mock).mock.calls[0][0];
+      const callArgs = (res.json as any).mock.calls[0]?.[0];
       expect(callArgs).toHaveProperty('timestamp');
-      expect(typeof callArgs.timestamp).toBe('string');
-      expect(new Date(callArgs.timestamp)).toBeInstanceOf(Date);
+      expect(typeof callArgs?.timestamp).toBe('string');
+      expect(new Date(callArgs?.timestamp)).toBeInstanceOf(Date);
     });
 
     it('should include requestId when provided', async () => {
@@ -370,7 +329,7 @@ describe('Order Status Controller Standardized Error Handling', () => {
 
       await checkOrderStatus(req, res);
 
-      const callArgs = (res.json as jest.Mock).mock.calls[0][0];
+      const callArgs = (res.json as any).mock.calls[0]?.[0];
       expect(callArgs).toHaveProperty('requestId', 'custom-request-id');
     });
 
@@ -381,10 +340,10 @@ describe('Order Status Controller Standardized Error Handling', () => {
 
       await checkOrderStatus(req, res);
 
-      const callArgs = (res.json as jest.Mock).mock.calls[0][0];
+      const callArgs = (res.json as any).mock.calls[0]?.[0];
       expect(callArgs).toHaveProperty('requestId');
-      expect(typeof callArgs.requestId).toBe('string');
-      expect(callArgs.requestId).toMatch(/^req_\d+_[a-z0-9]+$/);
+      expect(typeof callArgs?.requestId).toBe('string');
+      expect(callArgs?.requestId).toMatch(/^req_\d+_[a-z0-9]+$/);
     });
   });
 });

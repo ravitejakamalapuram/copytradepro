@@ -271,8 +271,8 @@ Always save your PM2 configuration and set up startup scripts for production ser
 
 ### Example Deployment Script
 ```bash
-#!/bin/bash
-# deploy.sh
+#!/usr/bin/env node
+// deploy.js
 
 echo "🚀 Deploying CopyTrade Pro..."
 

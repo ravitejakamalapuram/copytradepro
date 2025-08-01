@@ -1,475 +1,522 @@
+/**
+ * Notification Service
+ * Handles various types of notifications for the symbol management system
+ */
+
+import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
-import { userDatabase } from './databaseCompatibility';
+import { symbolAlertingService } from './symbolAlertingService';
+import { symbolMonitoringService } from './symbolMonitoringService';
 
-export interface NotificationPreferences {
-  userId: string;
-  pushEnabled: boolean;
-  emailEnabled: boolean;
-  smsEnabled: boolean;
-  orderStatusChanges: boolean;
-  orderExecutions: boolean;
-  orderRejections: boolean;
-  portfolioAlerts: boolean;
-  marketAlerts: boolean;
-  quietHours: {
+export interface NotificationConfig {
+  email?: {
     enabled: boolean;
-    startTime: string; // HH:MM format
-    endTime: string;   // HH:MM format
+    recipients: string[];
+    smtpConfig: {
+      host: string;
+      port: number;
+      secure: boolean;
+      auth: {
+        user: string;
+        pass: string;
+      };
+    };
+  };
+  webhook?: {
+    enabled: boolean;
+    url: string;
+    headers?: Record<string, string>;
+  };
+  slack?: {
+    enabled: boolean;
+    webhookUrl: string;
+    channel: string;
+    username: string;
   };
 }
 
-export interface PushSubscription {
-  userId: string;
-  endpoint: string;
-  keys: {
-    p256dh: string;
-    auth: string;
-  };
-  userAgent?: string;
-  createdAt: Date;
-}
-
-export interface NotificationPayload {
+export interface Notification {
+  id: string;
+  type: 'alert' | 'update_complete' | 'system_status' | 'performance_warning';
   title: string;
-  body: string;
-  icon?: string;
-  badge?: string;
-  image?: string;
-  data?: any;
-  actions?: Array<{
-    action: string;
-    title: string;
-    icon?: string;
-  }>;
-  tag?: string;
-  requireInteraction?: boolean;
-  silent?: boolean;
+  message: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  timestamp: Date;
+  data?: Record<string, any>;
 }
 
-export interface OrderNotificationData {
-  orderId: string;
-  symbol: string;
-  action: 'BUY' | 'SELL';
-  quantity: number;
-  price?: number;
-  oldStatus: string;
-  newStatus: string;
-  brokerName: string;
-  timestamp: string;
-}
-
-class NotificationService {
-  private vapidKeys: { publicKey: string; privateKey: string } | null = null;
-  private webpush: any = null;
+export class NotificationService extends EventEmitter {
+  private config: NotificationConfig;
+  private isInitialized = false;
 
   constructor() {
-    this.initializeWebPush();
+    super();
+    this.config = this.loadConfiguration();
   }
 
   /**
-   * Initialize web push with VAPID keys
+   * Initialize the notification service
    */
-  private async initializeWebPush(): Promise<void> {
+  async initialize(): Promise<void> {
     try {
-      // Import web-push dynamically to avoid issues if not installed
-      this.webpush = await import('web-push');
+      // Set up alert monitoring
+      symbolMonitoringService.on('alert:created', (alert) => {
+        this.handleSymbolAlert(alert);
+      });
+
+      // Set up update completion notifications
+      symbolMonitoringService.on('metrics:update', (metrics) => {
+        this.handleUpdateMetrics(metrics);
+      });
+
+      this.isInitialized = true;
       
-      // Set VAPID details from environment variables
-      const publicKey = process.env.VAPID_PUBLIC_KEY;
-      const privateKey = process.env.VAPID_PRIVATE_KEY;
-      const email = process.env.VAPID_EMAIL || 'mailto:admin@copytradepro.com';
+      logger.info('Notification service initialized', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'INITIALIZE'
+      });
 
-      if (publicKey && privateKey) {
-        this.vapidKeys = { publicKey, privateKey };
-        this.webpush.setVapidDetails(email, publicKey, privateKey);
-        logger.info('✅ Web Push initialized with VAPID keys');
-      } else {
-        logger.warn('⚠️ VAPID keys not found in environment variables. Push notifications will be disabled.');
-      }
+      this.emit('initialized');
     } catch (error) {
-      logger.warn('⚠️ web-push package not installed. Push notifications will be disabled.');
-      logger.debug('Install with: npm install web-push');
+      logger.error('Failed to initialize notification service', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'INITIALIZE_ERROR'
+      }, error);
+      throw error;
     }
   }
 
   /**
-   * Generate VAPID keys for development
+   * Load notification configuration from environment
    */
-  generateVapidKeys(): { publicKey: string; privateKey: string } | null {
-    if (!this.webpush) {
-      logger.error('web-push not available');
-      return null;
-    }
+  private loadConfiguration(): NotificationConfig {
+    const config: NotificationConfig = {};
 
-    try {
-      const keys = this.webpush.generateVAPIDKeys();
-      logger.info('Generated VAPID keys:');
-      logger.info(`VAPID_PUBLIC_KEY=${keys.publicKey}`);
-      logger.info(`VAPID_PRIVATE_KEY=${keys.privateKey}`);
-      return keys;
-    } catch (error) {
-      logger.error('Failed to generate VAPID keys:', error);
-      return null;
-    }
-  }
-
-  /**
-   * Subscribe user to push notifications
-   */
-  async subscribeToPush(userId: string, subscription: any): Promise<boolean> {
-    try {
-      // Store subscription in database
-      const subscriptionData: PushSubscription = {
-        userId,
-        endpoint: subscription.endpoint,
-        keys: subscription.keys,
-        userAgent: subscription.userAgent,
-        createdAt: new Date()
-      };
-
-      const success = userDatabase.savePushSubscription(subscriptionData);
-      
-      if (success) {
-        logger.info(`✅ User ${userId} subscribed to push notifications`);
-        
-        // Send welcome notification
-        await this.sendWelcomeNotification(userId);
-        
-        return true;
-      } else {
-        logger.error(`❌ Failed to save push subscription for user ${userId}`);
-        return false;
-      }
-    } catch (error) {
-      logger.error(`Failed to subscribe user ${userId} to push notifications:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Unsubscribe user from push notifications
-   */
-  async unsubscribeFromPush(userId: string, endpoint?: string): Promise<boolean> {
-    try {
-      const success = userDatabase.removePushSubscription(userId, endpoint || '');
-      
-      if (success) {
-        logger.info(`✅ User ${userId} unsubscribed from push notifications`);
-        return true;
-      } else {
-        logger.warn(`⚠️ No subscription found for user ${userId}`);
-        return false;
-      }
-    } catch (error) {
-      logger.error(`Failed to unsubscribe user ${userId} from push notifications:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * Send welcome notification to new subscriber
-   */
-  private async sendWelcomeNotification(userId: string): Promise<void> {
-    const payload: NotificationPayload = {
-      title: '🎉 Push Notifications Enabled!',
-      body: 'You\'ll now receive real-time updates about your trades and portfolio.',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
-      tag: 'welcome',
-      data: {
-        type: 'welcome',
-        userId,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    await this.sendNotificationToUser(userId, payload);
-  }
-
-  /**
-   * Send order status change notification
-   */
-  async sendOrderStatusNotification(userId: string, orderData: OrderNotificationData): Promise<void> {
-    try {
-      // Check if user has notifications enabled for order status changes
-      const preferences = await this.getUserNotificationPreferences(userId);
-      if (!preferences.pushEnabled || !preferences.orderStatusChanges) {
-        logger.debug(`User ${userId} has order status notifications disabled`);
-        return;
-      }
-
-      // Check quiet hours
-      if (this.isInQuietHours(preferences.quietHours)) {
-        logger.debug(`User ${userId} is in quiet hours, skipping notification`);
-        return;
-      }
-
-      const { title, body, icon } = this.formatOrderStatusNotification(orderData);
-      
-      const payload: NotificationPayload = {
-        title,
-        body,
-        icon,
-        badge: '/icons/badge-72x72.png',
-        tag: `order-${orderData.orderId}`,
-        data: {
-          type: 'order_status',
-          orderId: orderData.orderId,
-          symbol: orderData.symbol,
-          newStatus: orderData.newStatus,
-          timestamp: orderData.timestamp
-        },
-        actions: [
-          {
-            action: 'view_order',
-            title: 'View Order',
-            icon: '/icons/view-icon.png'
-          },
-          {
-            action: 'view_portfolio',
-            title: 'View Portfolio',
-            icon: '/icons/portfolio-icon.png'
+    // Email configuration
+    if (process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS) {
+      config.email = {
+        enabled: process.env.NOTIFICATIONS_EMAIL_ENABLED === 'true',
+        recipients: process.env.NOTIFICATION_EMAIL_RECIPIENTS?.split(',') || [],
+        smtpConfig: {
+          host: process.env.SMTP_HOST,
+          port: parseInt(process.env.SMTP_PORT || '587'),
+          secure: process.env.SMTP_SECURE === 'true',
+          auth: {
+            user: process.env.SMTP_USER,
+            pass: process.env.SMTP_PASS
           }
-        ],
-        requireInteraction: ['EXECUTED', 'REJECTED', 'CANCELLED'].includes(orderData.newStatus)
+        }
+      };
+    }
+
+    // Webhook configuration
+    if (process.env.NOTIFICATION_WEBHOOK_URL) {
+      config.webhook = {
+        enabled: process.env.NOTIFICATIONS_WEBHOOK_ENABLED === 'true',
+        url: process.env.NOTIFICATION_WEBHOOK_URL,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(process.env.NOTIFICATION_WEBHOOK_TOKEN && {
+            'Authorization': `Bearer ${process.env.NOTIFICATION_WEBHOOK_TOKEN}`
+          })
+        }
+      };
+    }
+
+    // Slack configuration
+    if (process.env.SLACK_WEBHOOK_URL) {
+      config.slack = {
+        enabled: process.env.NOTIFICATIONS_SLACK_ENABLED === 'true',
+        webhookUrl: process.env.SLACK_WEBHOOK_URL,
+        channel: process.env.SLACK_CHANNEL || '#alerts',
+        username: process.env.SLACK_USERNAME || 'CopyTrade Pro'
+      };
+    }
+
+    return config;
+  }
+
+  /**
+   * Handle symbol alerts
+   */
+  private async handleSymbolAlert(alert: any): Promise<void> {
+    try {
+      const notification: Notification = {
+        id: `alert_${alert.id}`,
+        type: 'alert',
+        title: `Symbol System Alert: ${alert.type}`,
+        message: alert.message,
+        severity: alert.severity,
+        timestamp: alert.timestamp,
+        data: {
+          alertId: alert.id,
+          alertType: alert.type,
+          details: alert.details
+        }
       };
 
-      await this.sendNotificationToUser(userId, payload);
-      
-      logger.info(`📱 Sent order status notification to user ${userId}: ${orderData.symbol} ${orderData.newStatus}`);
+      await this.sendNotification(notification);
     } catch (error) {
-      logger.error(`Failed to send order status notification to user ${userId}:`, error);
+      logger.error('Failed to handle symbol alert notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'HANDLE_ALERT'
+      }, error);
     }
   }
 
   /**
-   * Format order status notification content
+   * Handle update metrics for completion notifications
    */
-  private formatOrderStatusNotification(orderData: OrderNotificationData): { title: string; body: string; icon: string } {
-    const { symbol, action, quantity, newStatus, oldStatus } = orderData;
-    
-    let title = '';
-    let body = '';
-    let icon = '/icons/icon-192x192.png';
+  private async handleUpdateMetrics(metrics: any): Promise<void> {
+    try {
+      // Only send notifications for significant updates or errors
+      if (metrics.errorRate > 10 || metrics.newSymbols > 100) {
+        const notification: Notification = {
+          id: `update_${Date.now()}`,
+          type: 'update_complete',
+          title: 'Symbol Update Completed',
+          message: `Symbol update from ${metrics.source} completed with ${metrics.errorRate.toFixed(2)}% error rate`,
+          severity: metrics.errorRate > 20 ? 'high' : metrics.errorRate > 10 ? 'medium' : 'low',
+          timestamp: metrics.timestamp,
+          data: {
+            source: metrics.source,
+            totalProcessed: metrics.totalProcessed,
+            successCount: metrics.successCount,
+            failureCount: metrics.failureCount,
+            errorRate: metrics.errorRate,
+            newSymbols: metrics.newSymbols,
+            updatedSymbols: metrics.updatedSymbols
+          }
+        };
 
-    switch (newStatus.toUpperCase()) {
-      case 'EXECUTED':
-      case 'FILLED':
-        title = `✅ Order Executed`;
-        body = `${action} ${quantity} ${symbol} order has been executed successfully`;
-        icon = '/icons/success-icon.png';
-        break;
-      
-      case 'REJECTED':
-        title = `❌ Order Rejected`;
-        body = `${action} ${quantity} ${symbol} order was rejected`;
-        icon = '/icons/error-icon.png';
-        break;
-      
-      case 'CANCELLED':
-        title = `🚫 Order Cancelled`;
-        body = `${action} ${quantity} ${symbol} order has been cancelled`;
-        icon = '/icons/warning-icon.png';
-        break;
-      
-      case 'PARTIALLY_FILLED':
-        title = `🔄 Order Partially Filled`;
-        body = `${action} ${quantity} ${symbol} order is partially executed`;
-        icon = '/icons/partial-icon.png';
-        break;
-      
-      case 'PENDING':
-        title = `⏳ Order Pending`;
-        body = `${action} ${quantity} ${symbol} order is now pending`;
-        icon = '/icons/pending-icon.png';
-        break;
-      
-      default:
-        title = `📋 Order Status Updated`;
-        body = `${action} ${quantity} ${symbol} order status: ${oldStatus} → ${newStatus}`;
-        break;
+        await this.sendNotification(notification);
+      }
+    } catch (error) {
+      logger.error('Failed to handle update metrics notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'HANDLE_UPDATE_METRICS'
+      }, error);
     }
-
-    return { title, body, icon };
   }
 
   /**
-   * Send notification to specific user
+   * Send a notification through all configured channels
    */
-  private async sendNotificationToUser(userId: string, payload: NotificationPayload): Promise<void> {
-    if (!this.webpush || !this.vapidKeys) {
-      logger.debug('Push notifications not configured, skipping');
+  async sendNotification(notification: Notification): Promise<void> {
+    if (!this.isInitialized) {
+      logger.warn('Notification service not initialized, skipping notification');
       return;
     }
 
-    try {
-      // Get user's push subscriptions
-      const subscriptions = userDatabase.getUserPushSubscriptions(userId);
-      
-      if (!subscriptions || subscriptions.length === 0) {
-        logger.debug(`No push subscriptions found for user ${userId}`);
-        return;
-      }
+    const promises: Promise<void>[] = [];
 
-      // Send to all user's devices
-      const sendPromises = subscriptions.map(async (subscription) => {
-        try {
-          await this.webpush.sendNotification(
-            {
-              endpoint: subscription.endpoint,
-              keys: subscription.keys
-            },
-            JSON.stringify(payload)
-          );
-          
-          logger.debug(`✅ Notification sent to device: ${subscription.endpoint.substring(0, 50)}...`);
-        } catch (error: any) {
-          logger.error(`❌ Failed to send notification to device:`, error.message);
-          
-          // Remove invalid subscriptions
-          if (error.statusCode === 410 || error.statusCode === 404) {
-            logger.info(`Removing invalid subscription for user ${userId}`);
-            userDatabase.removePushSubscription(userId, subscription.endpoint);
-          }
-        }
+    // Send via email if configured and enabled
+    if (this.config.email?.enabled) {
+      promises.push(this.sendEmailNotification(notification));
+    }
+
+    // Send via webhook if configured and enabled
+    if (this.config.webhook?.enabled) {
+      promises.push(this.sendWebhookNotification(notification));
+    }
+
+    // Send via Slack if configured and enabled
+    if (this.config.slack?.enabled) {
+      promises.push(this.sendSlackNotification(notification));
+    }
+
+    // Always log to console
+    promises.push(this.logNotification(notification));
+
+    try {
+      await Promise.allSettled(promises);
+      
+      logger.info('Notification sent', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'SEND_NOTIFICATION'
+      }, {
+        notificationId: notification.id,
+        type: notification.type,
+        severity: notification.severity,
+        channelsCount: promises.length
       });
 
-      await Promise.allSettled(sendPromises);
+      this.emit('notification:sent', notification);
     } catch (error) {
-      logger.error(`Failed to send notification to user ${userId}:`, error);
+      logger.error('Failed to send notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'SEND_NOTIFICATION_ERROR'
+      }, error);
     }
   }
 
   /**
-   * Get user notification preferences
+   * Send email notification
    */
-  async getUserNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  private async sendEmailNotification(notification: Notification): Promise<void> {
     try {
-      const preferences = await userDatabase.getUserNotificationPreferences(parseInt(userId));
+      const nodemailer = require('nodemailer');
       
-      if (preferences) {
-        return preferences;
-      }
+      const transporter = nodemailer.createTransporter(this.config.email!.smtpConfig);
 
-      // Return default preferences if none found
-      const defaultPreferences: NotificationPreferences = {
-        userId,
-        pushEnabled: true,
-        emailEnabled: false,
-        smsEnabled: false,
-        orderStatusChanges: true,
-        orderExecutions: true,
-        orderRejections: true,
-        portfolioAlerts: true,
-        marketAlerts: false,
-        quietHours: {
-          enabled: false,
-          startTime: '22:00',
-          endTime: '08:00'
-        }
+      const subject = `[${notification.severity.toUpperCase()}] ${notification.title}`;
+      const html = this.generateEmailHTML(notification);
+
+      await transporter.sendMail({
+        from: this.config.email!.smtpConfig.auth.user,
+        to: this.config.email!.recipients.join(','),
+        subject,
+        html
+      });
+
+      logger.debug('Email notification sent', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'EMAIL_SENT'
+      });
+    } catch (error) {
+      logger.error('Failed to send email notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'EMAIL_ERROR'
+      }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send webhook notification
+   */
+  private async sendWebhookNotification(notification: Notification): Promise<void> {
+    try {
+      const axios = require('axios');
+      
+      const payload = {
+        notification: {
+          id: notification.id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          severity: notification.severity,
+          timestamp: notification.timestamp.toISOString(),
+          data: notification.data
+        },
+        service: 'copytrade-pro',
+        component: 'symbol-management'
       };
 
-      // Save default preferences
-      userDatabase.saveUserNotificationPreferences(defaultPreferences);
-      
-      return defaultPreferences;
+      await axios.post(this.config.webhook!.url, payload, {
+        headers: this.config.webhook!.headers,
+        timeout: 10000
+      });
+
+      logger.debug('Webhook notification sent', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'WEBHOOK_SENT'
+      });
     } catch (error) {
-      logger.error(`Failed to get notification preferences for user ${userId}:`, error);
-      
-      // Return safe defaults
-      return {
-        userId,
-        pushEnabled: true,
-        emailEnabled: false,
-        smsEnabled: false,
-        orderStatusChanges: true,
-        orderExecutions: true,
-        orderRejections: true,
-        portfolioAlerts: true,
-        marketAlerts: false,
-        quietHours: {
-          enabled: false,
-          startTime: '22:00',
-          endTime: '08:00'
-        }
-      };
+      logger.error('Failed to send webhook notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'WEBHOOK_ERROR'
+      }, error);
+      throw error;
     }
   }
 
   /**
-   * Check if current time is in user's quiet hours
+   * Send Slack notification
    */
-  private isInQuietHours(quietHours: { enabled: boolean; startTime: string; endTime: string }): boolean {
-    if (!quietHours.enabled) return false;
-
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    
-    const { startTime, endTime } = quietHours;
-    
-    // Handle overnight quiet hours (e.g., 22:00 to 08:00)
-    if (startTime > endTime) {
-      return currentTime >= startTime || currentTime <= endTime;
-    } else {
-      return currentTime >= startTime && currentTime <= endTime;
-    }
-  }
-
-  /**
-   * Update user notification preferences
-   */
-  async updateNotificationPreferences(userId: string, preferences: Partial<NotificationPreferences>): Promise<boolean> {
+  private async sendSlackNotification(notification: Notification): Promise<void> {
     try {
-      const currentPreferences = await this.getUserNotificationPreferences(userId);
-      const updatedPreferences = { ...currentPreferences, ...preferences, userId };
+      const axios = require('axios');
       
-      const success = await userDatabase.saveUserNotificationPreferences(updatedPreferences);
+      const color = {
+        low: '#36a64f',
+        medium: '#ff9500',
+        high: '#ff0000',
+        critical: '#8b0000'
+      };
 
-      if (await success) {
-        logger.info(`✅ Updated notification preferences for user ${userId}`);
-        return true;
-      } else {
-        logger.error(`❌ Failed to update notification preferences for user ${userId}`);
-        return false;
-      }
+      const payload = {
+        channel: this.config.slack!.channel,
+        username: this.config.slack!.username,
+        attachments: [{
+          color: color[notification.severity],
+          title: notification.title,
+          text: notification.message,
+          fields: [
+            {
+              title: 'Severity',
+              value: notification.severity.toUpperCase(),
+              short: true
+            },
+            {
+              title: 'Type',
+              value: notification.type,
+              short: true
+            },
+            {
+              title: 'Time',
+              value: notification.timestamp.toISOString(),
+              short: false
+            }
+          ],
+          footer: 'CopyTrade Pro Symbol Management',
+          ts: Math.floor(notification.timestamp.getTime() / 1000)
+        }]
+      };
+
+      await axios.post(this.config.slack!.webhookUrl, payload);
+
+      logger.debug('Slack notification sent', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'SLACK_SENT'
+      });
     } catch (error) {
-      logger.error(`Failed to update notification preferences for user ${userId}:`, error);
-      return false;
+      logger.error('Failed to send Slack notification', {
+        component: 'NOTIFICATION_SERVICE',
+        operation: 'SLACK_ERROR'
+      }, error);
+      throw error;
     }
   }
 
   /**
-   * Get VAPID public key for client
+   * Log notification to console
    */
-  getVapidPublicKey(): string | null {
-    return this.vapidKeys?.publicKey || null;
+  private async logNotification(notification: Notification): Promise<void> {
+    const severityEmoji = {
+      low: '🟢',
+      medium: '🟡',
+      high: '🟠',
+      critical: '🔴'
+    };
+
+    console.log(`\n${severityEmoji[notification.severity]} NOTIFICATION [${notification.severity.toUpperCase()}]`);
+    console.log(`Title: ${notification.title}`);
+    console.log(`Message: ${notification.message}`);
+    console.log(`Type: ${notification.type}`);
+    console.log(`Time: ${notification.timestamp.toISOString()}`);
+    if (notification.data) {
+      console.log(`Data:`, JSON.stringify(notification.data, null, 2));
+    }
+    console.log('─'.repeat(80));
   }
 
   /**
-   * Test notification for user
+   * Generate HTML email content
    */
-  async sendTestNotification(userId: string): Promise<boolean> {
-    const payload: NotificationPayload = {
-      title: '🧪 Test Notification',
-      body: 'This is a test notification from CopyTrade Pro. Your notifications are working correctly!',
-      icon: '/icons/icon-192x192.png',
-      badge: '/icons/badge-72x72.png',
-      tag: 'test',
+  private generateEmailHTML(notification: Notification): string {
+    const severityColor = {
+      low: '#10b981',
+      medium: '#f59e0b',
+      high: '#ef4444',
+      critical: '#7c2d12'
+    };
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <title>CopyTrade Pro Notification</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background-color: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+          .header { background-color: ${severityColor[notification.severity]}; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; }
+          .notification-info { background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 15px 0; }
+          .data { background-color: #f1f3f4; padding: 15px; border-radius: 4px; font-family: monospace; white-space: pre-wrap; }
+          .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #666; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>${notification.title}</h1>
+            <p>Severity: ${notification.severity.toUpperCase()}</p>
+          </div>
+          <div class="content">
+            <div class="notification-info">
+              <h3>Notification Details</h3>
+              <p><strong>Type:</strong> ${notification.type}</p>
+              <p><strong>Message:</strong> ${notification.message}</p>
+              <p><strong>Time:</strong> ${notification.timestamp.toISOString()}</p>
+              <p><strong>ID:</strong> ${notification.id}</p>
+            </div>
+            ${notification.data ? `
+            <h3>Additional Data</h3>
+            <div class="data">${JSON.stringify(notification.data, null, 2)}</div>
+            ` : ''}
+          </div>
+          <div class="footer">
+            <p>CopyTrade Pro Symbol Management System</p>
+            <p>This is an automated notification. Please check the system dashboard for more information.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Send a test notification
+   */
+  async sendTestNotification(severity: 'low' | 'medium' | 'high' | 'critical' = 'medium'): Promise<void> {
+    const testNotification: Notification = {
+      id: `test_${Date.now()}`,
+      type: 'system_status',
+      title: 'Test Notification',
+      message: `This is a test notification with ${severity} severity to verify the notification system is working correctly.`,
+      severity,
+      timestamp: new Date(),
       data: {
-        type: 'test',
+        test: true,
+        environment: process.env.NODE_ENV || 'development',
         timestamp: new Date().toISOString()
       }
     };
 
-    try {
-      await this.sendNotificationToUser(userId, payload);
-      logger.info(`📱 Sent test notification to user ${userId}`);
-      return true;
-    } catch (error) {
-      logger.error(`Failed to send test notification to user ${userId}:`, error);
-      return false;
-    }
+    await this.sendNotification(testNotification);
+  }
+
+  /**
+   * Get notification configuration status
+   */
+  getConfigurationStatus(): {
+    email: { configured: boolean; enabled: boolean; recipients: number };
+    webhook: { configured: boolean; enabled: boolean };
+    slack: { configured: boolean; enabled: boolean };
+  } {
+    return {
+      email: {
+        configured: !!this.config.email,
+        enabled: this.config.email?.enabled || false,
+        recipients: this.config.email?.recipients.length || 0
+      },
+      webhook: {
+        configured: !!this.config.webhook,
+        enabled: this.config.webhook?.enabled || false
+      },
+      slack: {
+        configured: !!this.config.slack,
+        enabled: this.config.slack?.enabled || false
+      }
+    };
+  }
+
+  /**
+   * Update notification configuration
+   */
+  updateConfiguration(newConfig: Partial<NotificationConfig>): void {
+    this.config = { ...this.config, ...newConfig };
+    
+    logger.info('Notification configuration updated', {
+      component: 'NOTIFICATION_SERVICE',
+      operation: 'CONFIG_UPDATE'
+    });
+
+    this.emit('config:updated', this.config);
   }
 }
 
+// Export singleton instance
 export const notificationService = new NotificationService();

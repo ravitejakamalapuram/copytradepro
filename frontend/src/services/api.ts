@@ -472,7 +472,7 @@ const createEnhancedRequest = (originalApi: AxiosInstance) => {
 
 // Cache invalidation helper
 const invalidateCacheForUrl = (url: string) => {
-  let tagsToInvalidate: string[] = [];
+  const tagsToInvalidate: string[] = [];
   
   if (url.includes('/accounts')) {
     tagsToInvalidate.push('account-data');

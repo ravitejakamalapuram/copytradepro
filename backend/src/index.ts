@@ -17,6 +17,13 @@ import advancedOrdersRoutes from './routes/advancedOrders';
 import marketDataRoutes from './routes/marketData';
 import logsRoutes from './routes/logs';
 import monitoringRoutes from './routes/monitoring';
+import optionsRoutes from './routes/options';
+import symbolsRoutes from './routes/symbols';
+import symbolLifecycleRoutes from './routes/symbolLifecycleRoutes';
+import symbolInitializationRoutes from './routes/symbolInitialization';
+import symbolHealthRoutes from './routes/symbolHealth';
+import notificationRoutes from './routes/notifications';
+import startupRoutes from './routes/startup';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -25,13 +32,20 @@ import { logger } from './utils/logger';
 import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
 import { realTimeDataService } from './services/realTimeDataService';
+import { optionsDataService } from './services/optionsDataService';
 // Auto-initialize services on import
-import './services/nseCSVService';
-import './services/bseCSVService';
 import './services/symbolDatabaseService';
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 import { initializeBrokerAccountCache } from './controllers/brokerController';
 import { productionMonitoringService } from './services/productionMonitoringService';
+import { symbolLifecycleManager } from './services/symbolLifecycleManager';
+import { startupSymbolInitializationService } from './services/startupSymbolInitializationService';
+import { symbolMonitoringService } from './services/symbolMonitoringService';
+// Removed unused import: symbolAlertingService
+import { notificationService } from './services/notificationService';
+import { startupStatusService } from './services/startupStatusService';
+import { startupMonitoringService } from './services/startupMonitoringService';
+import { requireSymbolData, requireServerReady, addStartupStatusHeaders } from './middleware/symbolDataReadyMiddleware';
 
 // Load environment variables
 dotenv.config();
@@ -73,27 +87,10 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// CORS configuration
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map(origin => origin.trim())
-  : [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      `http://localhost:${PORT}`, // Allow the production server origin
-      `http://127.0.0.1:${PORT}`, // Allow localhost variations
-    ];
-
+// Minimal CORS configuration - allow all origins
 app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
+  origin: true,
+  credentials: true
 }));
 
 // Body parsing middleware
@@ -109,6 +106,9 @@ app.use(performanceMonitoring);
 // Enhanced logging middleware
 app.use(loggingMiddleware);
 
+// Add startup status headers for debugging
+app.use(addStartupStatusHeaders);
+
 // Morgan logging middleware (keep for compatibility)
 const logFormat = process.env.NODE_ENV === 'production' ? 'combined' : 'dev';
 if (process.env.ENABLE_REQUEST_LOGGING !== 'false') {
@@ -118,19 +118,30 @@ if (process.env.ENABLE_REQUEST_LOGGING !== 'false') {
 // Health check endpoint
 app.get('/health', (_req, res) => {
   try {
-    res.status(200).json({
-      status: 'OK',
+    const startupStatus = startupStatusService.getStatus();
+    const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
+    
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
+      startup: {
+        phase: startupStatus.startupPhase,
+        serverReady: startupStatus.serverReady,
+        symbolDataReady: startupStatus.symbolDataReady,
+        fullyReady: startupStatusService.isFullyReady()
+      },
       services: {
         database: 'MongoDB',
         websocket: 'Socket.IO',
-        orderMonitoring: 'Active'
+        orderMonitoring: 'Active',
+        symbolData: startupStatus.symbolDataReady ? 'Ready' : 'Initializing'
       }
     });
   } catch (error) {
+    console.error('Health check error:', error);
     res.status(503).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
@@ -142,19 +153,32 @@ app.get('/health', (_req, res) => {
 // API Health check endpoint
 app.get('/api/health', (_req, res) => {
   try {
-    res.status(200).json({
-      status: 'OK',
+    const startupStatus = startupStatusService.getStatus();
+    const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
+    
+    res.status(isHealthy ? 200 : 503).json({
+      status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
+      startup: {
+        phase: startupStatus.startupPhase,
+        serverReady: startupStatus.serverReady,
+        symbolDataReady: startupStatus.symbolDataReady,
+        fullyReady: startupStatusService.isFullyReady(),
+        symbolInitProgress: startupStatus.symbolInitStatus?.progress || 0,
+        currentStep: startupStatus.symbolInitStatus?.currentStep || 'Unknown'
+      },
       services: {
         database: 'MongoDB',
         websocket: 'Socket.IO',
-        orderMonitoring: 'Active'
+        orderMonitoring: 'Active',
+        symbolData: startupStatus.symbolDataReady ? 'Ready' : 'Initializing'
       }
     });
   } catch (error) {
+    console.error('API health check error:', error);
     res.status(503).json({
       status: 'ERROR',
       timestamp: new Date().toISOString(),
@@ -163,15 +187,43 @@ app.get('/api/health', (_req, res) => {
   }
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/broker', brokerRoutes);
-app.use('/api/portfolio', portfolioRoutes);
-app.use('/api/advanced-orders', advancedOrdersRoutes);
-app.use('/api/market-data', marketDataRoutes);
-app.use('/api/logs', logsRoutes);
-app.use('/api/monitoring', monitoringRoutes);
-app.use('/api/notifications', require('./routes/notifications').default);
+// Startup status endpoint
+app.get('/api/startup-status', (_req, res) => {
+  try {
+    const status = startupStatusService.getStatus();
+    const metrics = startupStatusService.getStartupMetrics();
+    
+    res.status(200).json({
+      success: true,
+      status,
+      metrics,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Startup status error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get startup status',
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// API routes with startup status middleware
+app.use('/api/auth', requireServerReady, authRoutes);
+app.use('/api/broker', requireServerReady, brokerRoutes);
+app.use('/api/portfolio', requireSymbolData, portfolioRoutes);
+app.use('/api/advanced-orders', requireSymbolData, advancedOrdersRoutes);
+app.use('/api/market-data', requireSymbolData, marketDataRoutes);
+app.use('/api/logs', requireServerReady, logsRoutes);
+app.use('/api/monitoring', requireServerReady, monitoringRoutes);
+app.use('/api/options', requireSymbolData, optionsRoutes);
+app.use('/api/symbols', requireSymbolData, symbolsRoutes);
+app.use('/api/symbol-lifecycle', requireSymbolData, symbolLifecycleRoutes);
+app.use('/api/symbol-initialization', requireServerReady, symbolInitializationRoutes);
+app.use('/api/symbol-health', requireServerReady, symbolHealthRoutes);
+app.use('/api/notifications', requireServerReady, notificationRoutes);
+app.use('/api/startup', requireServerReady, startupRoutes);
 
 
 
@@ -199,6 +251,7 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(publicPath, 'index.html'), (err) => {
       if (err) {
         // Error serving index.html - using console.error as this is in production static file serving
+        console.error('Error serving index.html:', err);
         res.status(500).json({
           success: false,
           message: 'Error serving application',
@@ -328,35 +381,83 @@ async function startServer() {
     // Initialize broker account cache
     await initializeBrokerAccountCache();
 
-    // Start order status monitoring
-    orderStatusService.startMonitoring().catch((error: any) => {
-      logger.error('Failed to start order status monitoring', {
-        component: 'SERVER_STARTUP',
-        operation: 'ORDER_STATUS_MONITORING_ERROR'
-      }, error);
+    // Initialize options data service
+    logger.info('Initializing options data service', {
+      component: 'SERVER_STARTUP',
+      operation: 'OPTIONS_SERVICE_INIT'
+    });
+    await optionsDataService.initialize();
+    logger.info('Options data service initialized', {
+      component: 'SERVER_STARTUP',
+      operation: 'OPTIONS_SERVICE_INIT_SUCCESS'
     });
 
-    // Start production monitoring service
-    logger.info('Starting production monitoring service', {
+    // Initialize symbol lifecycle manager
+    logger.info('Initializing symbol lifecycle manager', {
       component: 'SERVER_STARTUP',
-      operation: 'PRODUCTION_MONITORING_START'
+      operation: 'SYMBOL_LIFECYCLE_INIT'
     });
-    productionMonitoringService.start();
-    logger.info('Production monitoring service started', {
+    await symbolLifecycleManager.initialize();
+    logger.info('Symbol lifecycle manager initialized', {
       component: 'SERVER_STARTUP',
-      operation: 'PRODUCTION_MONITORING_STARTED'
+      operation: 'SYMBOL_LIFECYCLE_INIT_SUCCESS'
     });
 
-    // Start server with error handling - bind to 0.0.0.0 for EC2 access
-    server.listen(Number(PORT), '0.0.0.0', () => {
+    // Start server first, then initialize symbol data in background
+    // This allows the server to be responsive while symbol data loads
+    server.listen(Number(PORT), '0.0.0.0', async () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`💾 Database: ${DatabaseFactory.getDatabaseType().toUpperCase()}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`🔄 Socket.IO enabled for real-time updates`);
       console.log(`📊 Order status monitoring active`);
-      console.log(`📈 NSE & BSE CSV Databases initialized with daily auto-updates`);
       console.log(`⚡ Real-time price streaming active`);
+
+      // Start startup monitoring
+      startupMonitoringService.startMonitoring();
+      
+      // Mark server as ready
+      startupStatusService.markServerReady();
+      
+      // Start monitoring startup status
+      startupStatusService.startMonitoring();
+
+      // Start monitoring services
+      logger.info('Starting monitoring services', {
+        component: 'SERVER_STARTUP',
+        operation: 'MONITORING_INIT'
+      });
+      
+      productionMonitoringService.start();
+      symbolMonitoringService.start();
+      
+      // Initialize notification service
+      await notificationService.initialize();
+      
+      console.log(`📊 Symbol monitoring active`);
+      console.log(`🚨 Alert system active`);
+      console.log(`📧 Notification system active`);
+      console.log(`📈 Starting symbol data initialization in background...`);
+
+      // Mark symbol initialization as started
+      startupStatusService.markSymbolInitStarted();
+
+      // Initialize symbol data in background after server starts
+      startupSymbolInitializationService.initializeSymbolData()
+        .then(() => {
+          console.log(`✅ Symbol data initialization completed successfully`);
+          startupStatusService.markSymbolInitCompleted();
+        })
+        .catch((error: any) => {
+          console.error(`❌ Symbol data initialization failed: ${error.message}`);
+          logger.error('Symbol data initialization failed during startup', {
+            component: 'SERVER_STARTUP',
+            operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
+          }, error);
+          startupStatusService.markStartupFailed(error.message);
+          // Don't exit the server - it can still function with cached data or manual initialization
+        });
     });
 
     // Handle server errors
@@ -376,6 +477,25 @@ async function startServer() {
         }, error);
         process.exit(1);
       }
+    });
+
+    // Start order status monitoring
+    orderStatusService.startMonitoring().catch((error: any) => {
+      logger.error('Failed to start order status monitoring', {
+        component: 'SERVER_STARTUP',
+        operation: 'ORDER_STATUS_MONITORING_ERROR'
+      }, error);
+    });
+
+    // Start production monitoring service
+    logger.info('Starting production monitoring service', {
+      component: 'SERVER_STARTUP',
+      operation: 'PRODUCTION_MONITORING_START'
+    });
+    productionMonitoringService.start();
+    logger.info('Production monitoring service started', {
+      component: 'SERVER_STARTUP',
+      operation: 'PRODUCTION_MONITORING_STARTED'
     });
 
   } catch (error) {
@@ -401,7 +521,7 @@ async function checkPortInUse(port: number): Promise<boolean> {
 async function killExistingProcesses(): Promise<void> {
   return new Promise((resolve) => {
     const { exec } = require('child_process');
-    exec(`pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true`, () => {
+    exec(`pkill -f 'node.*index' || pkill -f 'ts-node.*index' || pkill -f 'nodemon' || true`, (_error: any) => {
       resolve();
     });
   });

@@ -56,5 +56,6 @@ export default {
 
 // Named exports for manual usage
 export { ShoonyaServiceAdapter };
+export { ShoonyaSymbolFormatter } from './symbolFormatter';
 export * from './types';
 export * from './helpers';

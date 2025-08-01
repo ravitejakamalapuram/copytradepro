@@ -274,7 +274,7 @@ class MarketDataService {
   }
 
   /**
-   * Search symbols using NSE API with caching
+   * Search symbols using NSE API with caching (legacy method)
    */
   async searchSymbols(query: string, limit: number = 10, exchange: string = 'NSE'): Promise<any> {
     if (query.length < 2) {
@@ -320,6 +320,136 @@ class MarketDataService {
       return result;
     } catch (error) {
       console.error('Symbol search failed:', error);
+      return { success: false, data: [] };
+    }
+  }
+
+  /**
+   * NEW: Unified search for all instruments (equity + F&O) with caching
+   */
+  async searchUnifiedSymbols(
+    query: string, 
+    type: 'all' | 'equity' | 'options' | 'futures' = 'all',
+    limit: number = 20,
+    includePrices: boolean = false
+  ): Promise<any> {
+    if (query.length < 2) {
+      return { 
+        success: false, 
+        data: { equity: [], options: [], futures: [], total: 0 } 
+      };
+    }
+
+    // Check cache first
+    const cacheKey = `unified:${query.toLowerCase()}:${type}:${limit}:${includePrices}`;
+    const cachedEntry = this.cache.searches.get(cacheKey);
+    
+    if (cachedEntry && this.isCacheValid(cachedEntry)) {
+      console.log(`📊 Returning cached unified search results for "${query}"`);
+      return { success: true, data: cachedEntry!.data };
+    }
+
+    try {
+      const params = new URLSearchParams({
+        type,
+        limit: limit.toString(),
+        ...(includePrices && { includePrices: 'true' })
+      });
+
+      const response = await fetch(
+        `/api/market-data/search-unified/${encodeURIComponent(query)}?${params}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      // Cache the search results
+      if (result.success && result.data) {
+        const cacheEntry: CacheEntry<any> = {
+          data: result.data,
+          timestamp: new Date(),
+          ttl: this.CACHE_TTL.SEARCH,
+          source: 'rest'
+        };
+        this.cache.searches.set(cacheKey, cacheEntry);
+        console.log(`📊 Cached unified search results for "${query}"`);
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Unified symbol search failed:', error);
+      return { 
+        success: false, 
+        data: { equity: [], options: [], futures: [], total: 0 } 
+      };
+    }
+  }
+
+  /**
+   * Get option chain for an underlying symbol
+   */
+  async getOptionChain(underlying: string, expiry?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (expiry) {
+        params.append('expiry', expiry);
+      }
+
+      const response = await fetch(
+        `/api/market-data/option-chain/${encodeURIComponent(underlying)}?${params}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Option chain fetch failed:', error);
+      return { success: false, data: null };
+    }
+  }
+
+  /**
+   * Get expiry dates for an underlying symbol
+   */
+  async getExpiryDates(underlying: string): Promise<any> {
+    try {
+      const response = await fetch(
+        `/api/market-data/expiry-dates/${encodeURIComponent(underlying)}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Expiry dates fetch failed:', error);
       return { success: false, data: [] };
     }
   }

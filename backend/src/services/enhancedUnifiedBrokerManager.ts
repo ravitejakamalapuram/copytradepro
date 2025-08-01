@@ -394,7 +394,7 @@ export class EnhancedUnifiedBrokerManager {
       totalConnections: this.connections.size
     });
     
-    for (const [key, connection] of this.connections) {
+    for (const [key, connection] of Array.from(this.connections)) {
       logger.debug('Connection details', {
         component: 'ENHANCED_BROKER_MANAGER',
         operation: 'DEBUG_CONNECTION',
@@ -509,7 +509,7 @@ export class EnhancedUnifiedBrokerManager {
     let cleanedCount = 0;
     const connectionsToRemove: string[] = [];
 
-    for (const [key, connection] of this.connections.entries()) {
+    for (const [key, connection] of Array.from(this.connections.entries())) {
       const timeSinceLastActivity = now - connection.lastActivity.getTime();
       
       // Clean up connections that are inactive and haven't been used recently
@@ -588,7 +588,7 @@ export class EnhancedUnifiedBrokerManager {
    * Find connection by database account ID
    */
   findConnectionByDatabaseId(databaseAccountId: string): EnhancedBrokerConnection | null {
-    for (const connection of this.connections.values()) {
+    for (const connection of Array.from(this.connections.values())) {
       if (connection.databaseAccountId === databaseAccountId) {
         return connection;
       }

@@ -7,6 +7,12 @@
 import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
 import { ShoonyaService } from './shoonyaService';
 import { ShoonyaCredentials } from './types';
+import { ShoonyaSymbolFormatter } from './symbolFormatter';
+
+// Import standardized symbol services
+// TODO: These should be properly exported from shared packages
+// import { BrokerSymbolConverterFactory } from '../../../backend/src/services/brokerSymbolConverters/BrokerSymbolConverterFactory';
+// import { symbolDatabaseService } from '../../../backend/src/services/symbolDatabaseService';
 
 export class ShoonyaServiceAdapter extends IBrokerService {
   private shoonyaService: ShoonyaService;
@@ -95,13 +101,51 @@ export class ShoonyaServiceAdapter extends IBrokerService {
         };
         const shoonyaProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
+        // Convert symbol using standardized symbol system
+        let formattedData: { tradingSymbol: string; exchange: string };
+        try {
+          // First, try to find the symbol in the standardized database
+          const standardizedSymbol = await this.lookupStandardizedSymbol(orderRequest.symbol, orderRequest.exchange);
+          
+          if (standardizedSymbol) {
+            // TODO: Re-enable when symbol converter is properly exported
+            // const converter = BrokerSymbolConverterFactory.getConverter('shoonya');
+            // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
+            formattedData = {
+              tradingSymbol: standardizedSymbol.tradingSymbol,
+              exchange: standardizedSymbol.exchange || 'NSE'
+            };
+            
+            console.log(`🔄 Shoonya standardized symbol conversion: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+          } else {
+            // Fallback to legacy symbol formatter
+            formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(
+              orderRequest.symbol,
+              orderRequest.exchange || 'NSE'
+            );
+            
+            console.log(`🔄 Shoonya legacy symbol formatting: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+          }
+        } catch (error: any) {
+          console.warn(`⚠️ Symbol conversion failed for ${orderRequest.symbol}, using fallback:`, error.message);
+          // Final fallback to original logic
+          let tradingSymbol = orderRequest.symbol;
+          if ((orderRequest.exchange || 'NSE') === 'NSE' && !tradingSymbol.includes('-EQ')) {
+            tradingSymbol = `${tradingSymbol}-EQ`;
+          }
+          formattedData = {
+            tradingSymbol: tradingSymbol,
+            exchange: orderRequest.exchange || 'NSE'
+          };
+        }
+
         // Transform to Shoonya-specific order format
         const shoonyaOrderRequest = {
           userId: orderRequest.accountId || this.accountId || '',
           buyOrSell: orderRequest.action === 'BUY' ? 'B' as const : 'S' as const,
           productType: shoonyaProductType,
-          exchange: orderRequest.exchange || 'NSE',
-          tradingSymbol: orderRequest.symbol,
+          exchange: formattedData.exchange,
+          tradingSymbol: formattedData.tradingSymbol,
           quantity: orderRequest.quantity,
           discloseQty: 0,
           priceType: shoonyaPriceType,
@@ -451,7 +495,36 @@ export class ShoonyaServiceAdapter extends IBrokerService {
 
   async getQuote(symbol: string, exchange: string): Promise<Quote> {
     try {
-      const response = await this.shoonyaService.getQuotes(exchange, symbol);
+      // Convert symbol using standardized symbol system
+      let formattedData: { tradingSymbol: string; exchange: string };
+      try {
+        // First, try to find the symbol in the standardized database
+        const standardizedSymbol = await this.lookupStandardizedSymbol(symbol, exchange);
+        
+        if (standardizedSymbol) {
+          // TODO: Re-enable when symbol converter is properly exported
+          // const converter = BrokerSymbolConverterFactory.getConverter('shoonya');
+          // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
+          formattedData = {
+            tradingSymbol: standardizedSymbol.tradingSymbol,
+            exchange: standardizedSymbol.exchange || exchange
+          };
+          
+          console.log(`🔄 Shoonya standardized quote symbol conversion: ${symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        } else {
+          // Fallback to legacy symbol formatter
+          formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(symbol, exchange);
+          console.log(`🔄 Shoonya legacy quote symbol formatting: ${symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ Quote symbol conversion failed for ${symbol}, using fallback:`, error.message);
+        formattedData = {
+          tradingSymbol: symbol,
+          exchange: exchange
+        };
+      }
+
+      const response = await this.shoonyaService.getQuotes(formattedData.exchange, formattedData.tradingSymbol);
 
       return {
         symbol: response.tsym || symbol,
@@ -578,4 +651,37 @@ export class ShoonyaServiceAdapter extends IBrokerService {
   }
 
   // Legacy error handling methods removed - now using comprehensive error handler
+
+  /**
+   * Look up standardized symbol from database
+   */
+  private async lookupStandardizedSymbol(symbol: string, exchange?: string): Promise<any> {
+    try {
+      // TODO: Re-enable when symbol database service is properly exported
+      // Check if symbol database service is available and initialized
+      // if (!symbolDatabaseService || !symbolDatabaseService.isReady()) {
+      //   console.warn('Symbol database service not available, using legacy formatting');
+      //   return null;
+      // }
+
+      // Try to find by trading symbol first
+      // let standardizedSymbol = await symbolDatabaseService.getSymbolByTradingSymbol(symbol, exchange);
+      
+      // if (!standardizedSymbol) {
+      //   // Try to find by ID if the symbol looks like an ID
+      //   if (symbol.length === 24 && /^[0-9a-fA-F]{24}$/.test(symbol)) {
+      //     standardizedSymbol = await symbolDatabaseService.getSymbolById(symbol);
+      //   }
+      // }
+
+      // return standardizedSymbol;
+      
+      // Temporary fallback - return null to use legacy formatting
+      console.warn('Symbol database service not available, using legacy formatting');
+      return null;
+    } catch (error) {
+      console.warn('Failed to lookup standardized symbol:', error);
+      return null;
+    }
+  }
 }

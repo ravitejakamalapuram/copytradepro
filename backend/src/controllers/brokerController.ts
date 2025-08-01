@@ -13,6 +13,7 @@ import { OrderStatusErrorCode } from '../types/orderStatusTypes';
 import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
 import { oauthStateManager } from '../services/oauthStateManager';
 import { brokerSessionManager } from '../services/brokerSessionManager';
+import { symbolValidationService } from '../services/symbolValidationService';
 
 import {
   ActivateAccountResponse,
@@ -1744,13 +1745,69 @@ export const placeMultiAccountOrder = async (
       accounts.push(account);
     }
 
-    // Create unified order request template
+    // Validate and resolve symbol using standardized symbol system
+    console.log(`🔍 Validating symbol for multi-account order: ${symbol}`);
+    const symbolValidation = await symbolValidationService.validateAndResolveSymbol(symbol, exchange);
+
+    if (!symbolValidation.isValid) {
+      res.status(400).json({
+        success: false,
+        message: `Symbol validation failed: ${symbolValidation.error}`,
+        data: {
+          symbolInput: symbol,
+          exchange: exchange
+        }
+      });
+      return;
+    }
+
+    // Get comprehensive symbol information
+    const symbolInfo = await symbolValidationService.getOrderSymbolInfo(symbol, exchange);
+    let resolvedSymbol = symbol;
+    let symbolWarnings: string[] = [];
+
+    if (symbolInfo) {
+      // Use the standardized symbol's trading symbol for the order
+      resolvedSymbol = symbolInfo.standardizedSymbol.tradingSymbol;
+      symbolWarnings = symbolInfo.validationWarnings;
+      
+      // Validate order parameters against symbol constraints
+      const paramValidation = symbolValidationService.validateOrderParameters(
+        symbolInfo.standardizedSymbol,
+        {
+          quantity: parseInt(quantity),
+          ...(price ? { price: parseFloat(price) } : {}),
+          orderType: orderType as string
+        }
+      );
+
+      if (!paramValidation.isValid) {
+        res.status(400).json({
+          success: false,
+          message: `Order parameter validation failed: ${paramValidation.errors.join(', ')}`,
+          data: {
+            symbol: symbolInfo.standardizedSymbol.displayName,
+            errors: paramValidation.errors
+          }
+        });
+        return;
+      }
+
+      console.log(`✅ Symbol validated for multi-account order: ${symbol} -> ${resolvedSymbol} (${symbolInfo.standardizedSymbol.displayName})`);
+      if (symbolWarnings.length > 0) {
+        console.log(`⚠️ Symbol warnings: ${symbolWarnings.join(', ')}`);
+      }
+    } else {
+      console.log(`⚠️ Using legacy symbol format for multi-account order: ${symbol}`);
+    }
+
+    // Create unified order request template using resolved symbol
     const baseOrderRequest = {
-      symbol,
+      symbol: resolvedSymbol, // Use resolved symbol instead of original input
       action: action as 'BUY' | 'SELL',
       quantity: parseInt(quantity),
       orderType: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-      price: price ? parseFloat(price) : undefined,
+      ...(price ? { price: parseFloat(price) } : {}),
       triggerPrice: triggerPrice ? parseFloat(triggerPrice) : undefined,
       exchange: exchange || 'NSE',
       productType: rawProductType,
@@ -1901,7 +1958,7 @@ export const placeMultiAccountOrder = async (
           symbol,
           action,
           quantity,
-          orderType
+          orderType: orderType as string
         },
         successfulOrders,
         failedOrders,
@@ -2108,7 +2165,68 @@ export const placeOrder = async (
       return;
     }
 
-    brokerName = account.broker_name;
+    brokerName = account.broker_name || 'unknown';
+
+    // Validate and resolve symbol using standardized symbol system
+    console.log(`🔍 Validating symbol: ${symbol} for broker: ${brokerName}`);
+    const symbolValidation = await symbolValidationService.validateSymbolForBroker(
+      symbol,
+      brokerName || 'unknown',
+      exchange
+    );
+
+    if (!symbolValidation.isValid) {
+      res.status(400).json({
+        success: false,
+        message: `Symbol validation failed: ${symbolValidation.error}`,
+        data: {
+          symbolInput: symbol,
+          exchange: exchange,
+          broker: brokerName
+        }
+      });
+      return;
+    }
+
+    // Get comprehensive symbol information
+    const symbolInfo = await symbolValidationService.getOrderSymbolInfo(symbol, exchange);
+    let resolvedSymbol = symbol;
+    let symbolWarnings: string[] = [];
+
+    if (symbolInfo) {
+      // Use the standardized symbol's trading symbol for the order
+      resolvedSymbol = symbolInfo.standardizedSymbol.tradingSymbol;
+      symbolWarnings = symbolInfo.validationWarnings;
+      
+      // Validate order parameters against symbol constraints
+      const paramValidation = symbolValidationService.validateOrderParameters(
+        symbolInfo.standardizedSymbol,
+        {
+          quantity: parseInt(quantity),
+          ...(price ? { price: parseFloat(price) } : {}),
+          orderType: orderType as string
+        }
+      );
+
+      if (!paramValidation.isValid) {
+        res.status(400).json({
+          success: false,
+          message: `Order parameter validation failed: ${paramValidation.errors.join(', ')}`,
+          data: {
+            symbol: symbolInfo.standardizedSymbol.displayName,
+            errors: paramValidation.errors
+          }
+        });
+        return;
+      }
+
+      console.log(`✅ Symbol validated: ${symbol} -> ${resolvedSymbol} (${symbolInfo.standardizedSymbol.displayName})`);
+      if (symbolWarnings.length > 0) {
+        console.log(`⚠️ Symbol warnings: ${symbolWarnings.join(', ')}`);
+      }
+    } else {
+      console.log(`⚠️ Using legacy symbol format: ${symbol}`);
+    }
 
     // Ensure account is active (auto-reactivate if needed)
     const isAccountActive = await ensureAccountActive(userId, accountId);
@@ -2120,13 +2238,13 @@ export const placeOrder = async (
       return;
     }
 
-    // Create unified order request
+    // Create unified order request using resolved symbol
     const unifiedOrderRequest = {
-      symbol,
+      symbol: resolvedSymbol, // Use resolved symbol instead of original input
       action: action as 'BUY' | 'SELL',
       quantity: parseInt(quantity),
       orderType: orderType as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET',
-      price: price ? parseFloat(price) : undefined,
+      ...(price ? { price: parseFloat(price) } : {}),
       triggerPrice: triggerPrice ? parseFloat(triggerPrice) : undefined,
       exchange: exchange || 'NSE',
       productType: rawProductType,
@@ -2161,7 +2279,7 @@ export const placeOrder = async (
           account_id: account.id.toString(),
           broker_name: brokerName,
           broker_order_id: orderResponse.data?.brokerOrderId || orderResponse.data?.orderId,
-          symbol: symbol,
+          symbol: resolvedSymbol, // Use resolved symbol for consistency
           action: action as 'BUY' | 'SELL',
           quantity: parseInt(quantity),
           price: price ? parseFloat(price) : 0,
@@ -2169,7 +2287,7 @@ export const placeOrder = async (
           status: 'PLACED' as const,
           exchange: exchange || 'NSE',
           product_type: rawProductType,
-          remarks: remarks || `Order placed via CopyTrade Pro`,
+          remarks: remarks || `Order placed via CopyTrade Pro${symbolInfo ? ` | Original input: ${symbol}` : ''}${symbolWarnings.length > 0 ? ` | Warnings: ${symbolWarnings.join(', ')}` : ''}`,
           executed_at: new Date().toISOString(),
         };
 

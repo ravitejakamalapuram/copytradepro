@@ -3,6 +3,8 @@ import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, Grid, Flex } from '../components/ui/Layout';
 
 interface Holding {
   symbol: string;
@@ -128,16 +130,18 @@ const Holdings: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
-            <Button
-              variant="primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </Button>
-          </div>
+          <Card style={{ textAlign: 'center', padding: '2rem' }}>
+            <CardContent>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+              <Button
+                variant="primary"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -148,31 +152,32 @@ const Holdings: React.FC = () => {
       <AppNavigation />
       
       <div className="app-main">
-        {/* Portfolio Summary */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Holdings ({holdings.length})</h2>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Button variant="primary">
-                📊 Analytics
-              </Button>
-              <Button variant="outline">
-                📥 Download
-              </Button>
-            </div>
-          </div>
+        <Stack gap={6}>
+          {/* Portfolio Summary */}
+          <Card>
+            <CardHeader
+              title={`Holdings (${holdings.length})`}
+              action={
+                <Flex gap={2}>
+                  <Button variant="primary">
+                    📊 Analytics
+                  </Button>
+                  <Button variant="outline">
+                    📥 Download
+                  </Button>
+                </Flex>
+              }
+            />
 
-          {/* Summary Stats */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1.5rem',
-            marginBottom: '2rem',
-            padding: '1rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: 'var(--radius-lg)'
-          }}>
-            <div>
+            <CardContent>
+              {/* Summary Stats */}
+              <Grid cols={4} gap={6} style={{ 
+                marginBottom: '2rem',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-lg)'
+              }}>
+                <div>
               <div style={{ 
                 fontSize: '0.75rem', 
                 color: 'var(--text-secondary)',
@@ -239,11 +244,11 @@ const Holdings: React.FC = () => {
               }}>
                 {portfolioSummary.totalPnL >= 0 ? '+' : ''}{formatCurrency(Math.abs(portfolioSummary.totalPnL))} ({portfolioSummary.totalPnLPercent.toFixed(2)}%)
               </div>
-            </div>
-          </div>
+                </div>
+              </Grid>
 
-          {/* Holdings Table */}
-          <div style={{ overflowX: 'auto' }}>
+              {/* Holdings Table */}
+              <div style={{ overflowX: 'auto' }}>
             <table className="table table-trading">
               <thead>
                 <tr>
@@ -306,8 +311,10 @@ const Holdings: React.FC = () => {
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
+              </div>
+            </CardContent>
+          </Card>
+        </Stack>
       </div>
     </div>
   );

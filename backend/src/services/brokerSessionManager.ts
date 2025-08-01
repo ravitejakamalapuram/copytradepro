@@ -490,7 +490,7 @@ export class BrokerSessionManager {
   debugListSessions(): void {
     console.log(`🏥 Broker Session Manager - Monitoring ${this.sessionMetrics.size} sessions:`);
     
-    for (const [key, metrics] of this.sessionMetrics.entries()) {
+    for (const [key, metrics] of Array.from(this.sessionMetrics.entries())) {
       const status = metrics.isHealthy ? '✅' : '❌';
       const refresh = metrics.needsRefresh ? '🔄' : '';
       console.log(`  ${status}${refresh} ${key}: Health ${metrics.healthScore}% | Failures: ${metrics.consecutiveFailures} | Avg Response: ${Math.round(metrics.averageResponseTime)}ms`);

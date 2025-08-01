@@ -103,7 +103,8 @@ router.get('/indices', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Search for symbols (for autocomplete) using live broker APIs
+ * Search for symbols (for autocomplete) - LEGACY ENDPOINT
+ * Use /search-unified for new unified search with F&O support
  */
 router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
   try {
@@ -142,6 +143,7 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
         displaySymbol: result.symbol,  // Original symbol for display
         name: result.name,
         exchange: result.exchange,
+        instrument_type: result.instrument_type,
         isin: result.isin,
         series: result.series,
         group: result.group,
@@ -202,6 +204,97 @@ router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
+ * NEW: Unified search for all instruments (equity + F&O)
+ */
+router.get('/search-unified/:query', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { query } = req.params;
+    const { limit = 20, type = 'all', includePrices = 'false' } = req.query;
+    const userId = req.user?.id;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query must be at least 2 characters long'
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    console.log(`🔍 Unified search request: query="${query}", limit=${limit}, type=${type}, userId=${userId}`);
+
+    let searchResults: any;
+
+    if (type === 'all') {
+      // Search all instrument types
+      searchResults = await symbolDatabaseService.searchAllInstruments(query, parseInt(limit as string));
+    } else if (type === 'equity') {
+      // Search equity only
+      const equity = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
+      searchResults = { equity, options: [], futures: [], total: equity.length };
+    } else if (type === 'options') {
+      // Search options only
+      const options = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
+      searchResults = { equity: [], options, futures: [], total: options.length };
+    } else if (type === 'futures') {
+      // Search futures only
+      const futures = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
+      searchResults = { equity: [], options: [], futures, total: futures.length };
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid type. Use: all, equity, options, or futures'
+      });
+    }
+
+    // Optionally fetch prices for equity instruments
+    if (includePrices === 'true' && searchResults.equity.length > 0) {
+      try {
+        const equitySymbols = searchResults.equity.map((r: any) => r.tradingSymbol);
+        console.log(`💰 Fetching prices for ${equitySymbols.length} equity symbols...`);
+        const prices = await marketDataService.getPrices(equitySymbols, 'NSE');
+        
+        // Enrich equity results with prices
+        searchResults.equity = searchResults.equity.map((stock: any) => ({
+          ...stock,
+          price: prices.get(stock.tradingSymbol)?.price || null,
+          change: prices.get(stock.tradingSymbol)?.change || null,
+          changePercent: prices.get(stock.tradingSymbol)?.changePercent || null
+        }));
+        
+        console.log(`💰 Fetched prices for ${prices.size} equity symbols`);
+      } catch (error) {
+        console.warn('⚠️ Failed to fetch live prices, continuing without prices');
+      }
+    }
+
+    console.log(`✅ Unified search completed: ${searchResults.total} total results`);
+
+    return res.json({
+      success: true,
+      data: {
+        ...searchResults,
+        query,
+        type,
+        source: 'unified_search'
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to perform unified search:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to perform unified search',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Check symbol database status (for debugging)
  */
 router.get('/symbol-status', authenticateToken, async (req: any, res: any) => {
@@ -225,6 +318,160 @@ router.get('/symbol-status', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
+ * Get cache statistics
+ */
+router.get('/cache/stats', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    const stats = symbolCacheService.getStats();
+    const memoryUsage = symbolCacheService.getMemoryUsage();
+
+    return res.json({
+      success: true,
+      data: {
+        ...stats,
+        memoryUsage
+      }
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache stats failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get cache statistics',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Warm cache manually
+ */
+router.post('/cache/warm', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    
+    // Start cache warming in background
+    symbolCacheService.warmCache(symbolDatabaseService).catch(error => {
+      console.error('🚨 Background cache warming failed:', error);
+    });
+
+    return res.json({
+      success: true,
+      message: 'Cache warming started in background'
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache warm failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to start cache warming',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Clear cache
+ */
+router.post('/cache/clear', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { symbolCacheService } = await import('../services/symbolCacheService');
+    const { type } = req.body;
+
+    if (type === 'search') {
+      symbolCacheService.clearSearchCache();
+    } else if (type === 'all') {
+      symbolCacheService.invalidateAll();
+    } else {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid cache type. Use "search" or "all"'
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Cache ${type === 'all' ? 'completely' : type} cleared`
+    });
+  } catch (error: any) {
+    console.error('🚨 Cache clear failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to clear cache',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get database performance statistics
+ */
+router.get('/database/stats', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    const stats = await databaseOptimizationService.getPerformanceStats();
+
+    return res.json({
+      success: true,
+      data: {
+        ...stats,
+        uptime: databaseOptimizationService.getUptime()
+      }
+    });
+  } catch (error: any) {
+    console.error('🚨 Database stats failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get database statistics',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Optimize database performance
+ */
+router.post('/database/optimize', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    const result = await databaseOptimizationService.optimizeDatabase();
+
+    return res.json({
+      success: true,
+      data: result
+    });
+  } catch (error: any) {
+    console.error('🚨 Database optimization failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to optimize database',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Clear database metrics
+ */
+router.post('/database/clear-metrics', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { databaseOptimizationService } = await import('../services/databaseOptimizationService');
+    databaseOptimizationService.clearMetrics();
+
+    return res.json({
+      success: true,
+      message: 'Database metrics cleared'
+    });
+  } catch (error: any) {
+    console.error('🚨 Clear database metrics failed:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to clear database metrics',
+      details: error.message
+    });
+  }
+});
+
+/**
  * Get NSE market status - DISABLED
  * Disabled due to NSE API reliability issues causing timeouts
  */
@@ -241,23 +488,63 @@ router.get('/market-status', authenticateToken, async (req: any, res: any) => {
   });
 });
 
+
+
 /**
- * Force update NSE CSV data
+ * Force update F&O instruments from Upstox
  */
-router.post('/force-update-csv', authenticateToken, async (req: any, res: any) => {
+router.post('/force-update-fo', authenticateToken, async (req: any, res: any) => {
   try {
-    console.log('🔄 Manual NSE CSV update triggered');
-    await symbolDatabaseService.forceUpdate();
+    console.log('🔄 Manual F&O instruments update triggered');
+    const { optionsDataService } = await import('../services/optionsDataService');
+    await optionsDataService.refreshInstruments();
 
     return res.json({
       success: true,
-      message: 'NSE CSV data updated successfully'
+      message: 'F&O instruments updated successfully from Upstox'
     });
   } catch (error: any) {
-    console.error('❌ Failed to update NSE CSV:', error);
+    console.error('❌ Failed to update F&O instruments:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to update NSE CSV data',
+      error: 'Failed to update F&O instruments',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Debug endpoint to check F&O database status
+ */
+router.get('/debug-fo-status', authenticateToken, async (req: any, res: any) => {
+  try {
+    const mongoose = require('mongoose');
+    const db = mongoose.connection.db;
+    const collection = db.collection('fo_instruments');
+    
+    const totalCount = await collection.countDocuments();
+    const sampleDocs = await collection.find({}).limit(5).toArray();
+    
+    // Check different instrument types
+    const ceCount = await collection.countDocuments({ instrument_type: 'CE' });
+    const peCount = await collection.countDocuments({ instrument_type: 'PE' });
+    const futCount = await collection.countDocuments({ instrument_type: 'FUT' });
+    
+    return res.json({
+      success: true,
+      data: {
+        totalDocuments: totalCount,
+        callOptionsCount: ceCount,
+        putOptionsCount: peCount,
+        futuresCount: futCount,
+        sampleDocuments: sampleDocs
+      }
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to check F&O database status:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to check F&O database status',
       details: error.message
     });
   }
@@ -384,6 +671,197 @@ router.post('/cache/clear', authenticateToken, async (req: any, res: any) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to clear cache',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get option chain for an underlying symbol
+ */
+router.get('/option-chain/:underlying', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { underlying } = req.params;
+    const { expiry } = req.query;
+
+    console.log(`📊 Fetching option chain for ${underlying}${expiry ? ` (expiry: ${expiry})` : ''}`);
+
+    const optionChain = await symbolDatabaseService.getOptionChain(underlying, expiry as string);
+
+    return res.json({
+      success: true,
+      data: {
+        underlying: underlying.toUpperCase(),
+        expiry: expiry || 'all',
+        options: optionChain,
+        count: optionChain.length
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Failed to fetch option chain for ${req.params.underlying}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch option chain',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get expiry dates for an underlying symbol
+ */
+router.get('/expiry-dates/:underlying', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { underlying } = req.params;
+
+    console.log(`📅 Fetching expiry dates for ${underlying}`);
+
+    const expiryDates = await symbolDatabaseService.getExpiryDates(underlying);
+
+    return res.json({
+      success: true,
+      data: {
+        underlying: underlying.toUpperCase(),
+        expiry_dates: expiryDates,
+        count: expiryDates.length
+      }
+    });
+  } catch (error: any) {
+    console.error(`❌ Failed to fetch expiry dates for ${req.params.underlying}:`, error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch expiry dates',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Search instruments by type (for unified trading interface)
+ */
+router.get('/search-instruments', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { query, instrumentType, limit = 10 } = req.query;
+    const userId = req.user?.id;
+
+    if (!query || query.length < 2) {
+      return res.status(400).json({
+        success: false,
+        error: 'Query must be at least 2 characters long'
+      });
+    }
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    if (!instrumentType || !['EQUITY', 'OPTION', 'FUTURE'].includes(instrumentType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid instrumentType required: EQUITY, OPTION, or FUTURE'
+      });
+    }
+
+    console.log(`🔍 Instrument search: query="${query}", type=${instrumentType}, limit=${limit}, userId=${userId}`);
+
+    let searchResults: any[] = [];
+
+    if (instrumentType === 'EQUITY') {
+      searchResults = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
+    } else if (instrumentType === 'OPTION') {
+      searchResults = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
+    } else if (instrumentType === 'FUTURE') {
+      searchResults = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
+    }
+
+    // Transform results to match frontend interface
+    const transformedResults = searchResults.map((result: any) => ({
+      symbol: result.tradingSymbol || result.symbol,
+      name: result.name || result.symbol,
+      exchange: result.exchange,
+      token: result.token || null,
+      instrumentType: instrumentType,
+      optionType: result.optionType,
+      strikePrice: result.strikePrice,
+      expiryDate: result.expiryDate
+    }));
+
+    console.log(`✅ Found ${transformedResults.length} ${instrumentType} instruments for "${query}"`);
+
+    return res.json({
+      success: true,
+      data: transformedResults
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to search instruments:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to search instruments',
+      details: error.message
+    });
+  }
+});
+
+/**
+ * Get instruments by type (for unified trading interface)
+ */
+router.get('/instruments', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { instrumentType, limit = 50 } = req.query;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
+
+    if (!instrumentType || !['EQUITY', 'OPTION', 'FUTURE'].includes(instrumentType)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Valid instrumentType required: EQUITY, OPTION, or FUTURE'
+      });
+    }
+
+    console.log(`📊 Getting ${instrumentType} instruments, limit=${limit}, userId=${userId}`);
+
+    let instruments: any[] = [];
+
+    if (instrumentType === 'EQUITY') {
+      instruments = await symbolDatabaseService.getEquityInstruments(parseInt(limit as string));
+    } else if (instrumentType === 'OPTION') {
+      instruments = await symbolDatabaseService.getOptionsInstruments(parseInt(limit as string));
+    } else if (instrumentType === 'FUTURE') {
+      instruments = await symbolDatabaseService.getFuturesInstruments(parseInt(limit as string));
+    }
+
+    // Transform results to match frontend interface
+    const transformedResults = instruments.map((result: any) => ({
+      symbol: result.tradingSymbol || result.symbol,
+      name: result.name || result.symbol,
+      exchange: result.exchange,
+      token: result.token || null,
+      instrumentType: instrumentType,
+      optionType: result.optionType,
+      strikePrice: result.strikePrice,
+      expiryDate: result.expiryDate
+    }));
+
+    console.log(`✅ Retrieved ${transformedResults.length} ${instrumentType} instruments`);
+
+    return res.json({
+      success: true,
+      data: transformedResults
+    });
+  } catch (error: any) {
+    console.error('❌ Failed to get instruments:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to get instruments',
       details: error.message
     });
   }

@@ -6,6 +6,12 @@
 import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
 import { FyersService } from './fyersService';
 import { FyersCredentials } from './types';
+import { FyersSymbolFormatter } from './symbolFormatter';
+
+// Import standardized symbol services
+// TODO: These should be properly exported from shared packages
+// import { BrokerSymbolConverterFactory } from '../../../backend/src/services/brokerSymbolConverters/BrokerSymbolConverterFactory';
+// import { symbolDatabaseService } from '../../../backend/src/services/symbolDatabaseService';
 
 export class FyersServiceAdapter extends IBrokerService {
   private fyersService: FyersService;
@@ -139,9 +145,37 @@ export class FyersServiceAdapter extends IBrokerService {
         };
         const fyersProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
+        // Convert symbol using standardized symbol system
+        let formattedSymbol: string;
+        try {
+          // First, try to find the symbol in the standardized database
+          const standardizedSymbol = await this.lookupStandardizedSymbol(orderRequest.symbol, orderRequest.exchange);
+          
+          if (standardizedSymbol) {
+            // TODO: Re-enable when symbol converter is properly exported
+            // const converter = BrokerSymbolConverterFactory.getConverter('fyers');
+            // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
+            formattedSymbol = standardizedSymbol.tradingSymbol;
+            
+            console.log(`🔄 Fyers standardized symbol conversion: ${orderRequest.symbol} -> ${formattedSymbol}`);
+          } else {
+            // Fallback to legacy symbol formatter
+            formattedSymbol = FyersSymbolFormatter.formatSymbol(
+              orderRequest.symbol,
+              orderRequest.exchange || 'NSE'
+            );
+            
+            console.log(`🔄 Fyers legacy symbol formatting: ${orderRequest.symbol} -> ${formattedSymbol}`);
+          }
+        } catch (error: any) {
+          console.warn(`⚠️ Symbol conversion failed for ${orderRequest.symbol}, using fallback:`, error.message);
+          // Final fallback to original format
+          formattedSymbol = `${orderRequest.exchange || 'NSE'}:${orderRequest.symbol}`;
+        }
+
         // Transform to Fyers-specific order format
         const fyersOrderRequest = {
-          symbol: `${orderRequest.exchange}:${orderRequest.symbol}`,
+          symbol: formattedSymbol,
           qty: orderRequest.quantity,
           type: fyersOrderType,
           side: orderRequest.action, // Keep as 'BUY' | 'SELL' string
@@ -367,7 +401,30 @@ export class FyersServiceAdapter extends IBrokerService {
 
   async getQuote(symbol: string, exchange: string): Promise<Quote> {
     try {
-      const response = await this.fyersService.getQuotes([`${exchange}:${symbol}`]);
+      // Convert symbol using standardized symbol system
+      let formattedSymbol: string;
+      try {
+        // First, try to find the symbol in the standardized database
+        const standardizedSymbol = await this.lookupStandardizedSymbol(symbol, exchange);
+        
+        if (standardizedSymbol) {
+          // TODO: Re-enable when symbol converter is properly exported
+          // const converter = BrokerSymbolConverterFactory.getConverter('fyers');
+          // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
+          formattedSymbol = standardizedSymbol.tradingSymbol;
+          
+          console.log(`🔄 Fyers standardized quote symbol conversion: ${symbol} -> ${formattedSymbol}`);
+        } else {
+          // Fallback to legacy symbol formatter
+          formattedSymbol = FyersSymbolFormatter.formatSymbol(symbol, exchange);
+          console.log(`🔄 Fyers legacy quote symbol formatting: ${symbol} -> ${formattedSymbol}`);
+        }
+      } catch (error: any) {
+        console.warn(`⚠️ Quote symbol conversion failed for ${symbol}, using fallback:`, error.message);
+        formattedSymbol = `${exchange}:${symbol}`;
+      }
+
+      const response = await this.fyersService.getQuotes([formattedSymbol]);
 
       if (!response || response.length === 0) {
         throw new Error('No quote data received');
@@ -503,5 +560,38 @@ export class FyersServiceAdapter extends IBrokerService {
 
   private async delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Look up standardized symbol from database
+   */
+  private async lookupStandardizedSymbol(symbol: string, exchange?: string): Promise<any> {
+    try {
+      // TODO: Re-enable when symbol database service is properly exported
+      // Check if symbol database service is available and initialized
+      // if (!symbolDatabaseService || !symbolDatabaseService.isReady()) {
+      //   console.warn('Symbol database service not available, using legacy formatting');
+      //   return null;
+      // }
+
+      // Try to find by trading symbol first
+      // let standardizedSymbol = await symbolDatabaseService.getSymbolByTradingSymbol(symbol, exchange);
+      
+      // if (!standardizedSymbol) {
+      //   // Try to find by ID if the symbol looks like an ID
+      //   if (symbol.length === 24 && /^[0-9a-fA-F]{24}$/.test(symbol)) {
+      //     standardizedSymbol = await symbolDatabaseService.getSymbolById(symbol);
+      //   }
+      // }
+
+      // return standardizedSymbol;
+      
+      // Temporary fallback - return null to use legacy formatting
+      console.warn('Symbol database service not available, using legacy formatting');
+      return null;
+    } catch (error) {
+      console.warn('Failed to lookup standardized symbol:', error);
+      return null;
+    }
   }
 }

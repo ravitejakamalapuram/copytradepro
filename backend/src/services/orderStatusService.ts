@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './databaseCompatibility';
 import { BrokerRegistry, IBrokerService, IUnifiedBrokerService } from '@copytrade/unified-broker';
-import { notificationService, OrderNotificationData } from './notificationService';
+import { notificationService } from './notificationService';
 
 // Import enhanced unified broker manager
 import { enhancedUnifiedBrokerManager } from './enhancedUnifiedBrokerManager';
@@ -837,19 +837,25 @@ class OrderStatusService extends EventEmitter {
       try {
         const notificationStartTime = performance.now();
         
-        const orderNotificationData: OrderNotificationData = {
-          orderId: order.id,
-          symbol: order.symbol,
-          action: order.action as 'BUY' | 'SELL',
-          quantity: order.quantity,
-          price: order.price,
-          oldStatus,
-          newStatus,
-          brokerName: order.broker_name,
-          timestamp: now
-        };
-
-        await notificationService.sendOrderStatusNotification(order.user_id.toString(), orderNotificationData);
+        // Send order status notification
+        await notificationService.sendNotification({
+          id: `order_status_${order.id}_${Date.now()}`,
+          type: 'alert',
+          title: 'Order Status Update',
+          message: `Order ${order.id} status changed from ${oldStatus} to ${newStatus}`,
+          severity: newStatus === 'REJECTED' ? 'high' : 'medium',
+          timestamp: new Date(now),
+          data: {
+            orderId: order.id,
+            symbol: order.symbol,
+            action: order.action,
+            quantity: order.quantity,
+            price: order.price,
+            oldStatus,
+            newStatus,
+            brokerName: order.broker_name
+          }
+        });
         
         const notificationDuration = performance.now() - notificationStartTime;
         notificationSuccess = true;

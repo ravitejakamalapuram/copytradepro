@@ -44,8 +44,7 @@ Run the setup script for your operating system:
 ```bash
 git clone <repository-url>
 cd copytradepro
-chmod +x setup.sh
-./setup.sh
+npm run setup
 ```
 
 **Windows (Command Prompt):**
@@ -109,9 +108,10 @@ The setup script will:
 
 #### Quick Start (After Setup)
 
-**Using startup scripts:**
-- Linux/macOS: `./start-dev.sh`
-- Windows: `start-dev.bat` or `.\start-dev.ps1`
+**Using npm scripts:**
+```bash
+npm run dev
+```
 
 **Manual start:**
 
@@ -131,6 +131,38 @@ The setup script will:
 
 3. **Open your browser**
    Navigate to http://localhost:5173
+
+#### CORS Issues in Development
+
+If you encounter CORS (Cross-Origin Resource Sharing) errors:
+
+**Quick Fix:**
+```bash
+# Test CORS functionality
+npm run test:cors
+
+# Manual server restart if needed
+cd backend && npm run dev
+```
+
+**Test CORS Configuration:**
+```bash
+npm run test:cors
+```
+
+**Manual Fix:**
+1. Ensure `NODE_ENV=development` in `backend/.env`
+2. Restart backend server: `cd backend && npm run dev`
+3. Clear browser cache (Ctrl+F5 or Cmd+Shift+R)
+4. Check browser console for specific CORS errors
+
+**Common CORS Solutions:**
+- ✅ Frontend on `http://localhost:5173` (Vite default)
+- ✅ Frontend on `http://localhost:3000` (Create React App)
+- ✅ Both `localhost` and `127.0.0.1` variants supported
+- ✅ Development mode allows all origins for easier development
+
+For detailed CORS troubleshooting, see [CORS_TROUBLESHOOTING.md](CORS_TROUBLESHOOTING.md).
 
 ## Project Structure
 
@@ -205,9 +237,11 @@ copyTradeV2/
 
 #### Quick Production Start
 
-**Using startup scripts:**
-- Linux/macOS: `./start-prod.sh`
-- Windows: `start-prod.bat` or `.\start-prod.ps1`
+**Using npm scripts:**
+```bash
+npm run build
+npm start
+```
 
 #### Manual Production Deployment
 

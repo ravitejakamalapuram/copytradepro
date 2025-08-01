@@ -117,7 +117,7 @@ export interface ConnectedAccountResponse {
 // ============================================================================
 
 /**
- * Order History - Database representation
+ * Order History - Database representation (supports both equity and F&O)
  */
 export interface OrderHistory {
   id: number | string;
@@ -149,10 +149,18 @@ export interface OrderHistory {
     user_name: string;
     email: string;
   };
+  
+  // NEW: F&O specific fields
+  instrument_type?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  underlying_symbol?: string;
+  strike_price?: number | undefined;
+  expiry_date?: string;
+  option_type?: 'CE' | 'PE';
+  lot_size?: number;
 }
 
 /**
- * Data for creating order history
+ * Data for creating order history (supports both equity and F&O)
  */
 export interface CreateOrderHistoryData {
   user_id: number | string;
@@ -176,6 +184,14 @@ export interface CreateOrderHistoryData {
   executed_at?: string; // Legacy field for backward compatibility
   error_message?: string;
   remarks?: string; // Legacy field for backward compatibility
+  
+  // NEW: F&O specific fields
+  instrument_type?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  underlying_symbol?: string;
+  strike_price?: number | undefined;
+  expiry_date?: string;
+  option_type?: 'CE' | 'PE';
+  lot_size?: number;
 }
 
 /**

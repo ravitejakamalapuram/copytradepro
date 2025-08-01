@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import {
   IDatabaseAdapter,
   User,
@@ -299,11 +299,11 @@ export class MongoDatabase implements IDatabaseAdapter {
       broker_name: doc.broker_name || '',
       broker_order_id: doc.broker_order_id || '',
       symbol: doc.symbol || '',
-      action: doc.action || '',
+      action: (doc.action as 'BUY' | 'SELL') || 'BUY',
       quantity: doc.quantity || 0,
       price: doc.price || 0,
-      order_type: doc.order_type || '',
-      status: doc.status || '',
+      order_type: (doc.order_type as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET') || 'MARKET',
+      status: (doc.status as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED') || 'PLACED',
       exchange: doc.exchange || '',
       product_type: doc.product_type || '',
       remarks: doc.remarks || '',

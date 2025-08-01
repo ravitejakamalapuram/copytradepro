@@ -5,6 +5,8 @@ import { brokerService } from '../services/brokerService';
 import { accountService } from '../services/accountService';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, Flex } from '../components/ui/Layout';
 import { useToast } from '../components/Toast';
 import Popover from '../components/ui/Popover';
 
@@ -50,14 +52,39 @@ const Orders: React.FC = () => {
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
-
   const [dateFilter, setDateFilter] = useState<'today' | 'week'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   const [selectedAccounts, setSelectedAccounts] = useState<string[]>(['all']); // Array of selected account IDs
-  const [availableAccounts, setAvailableAccounts] = useState<Array<{id: string, name: string, broker: string, mongoId: string}>>([]);
+  const [availableAccounts, setAvailableAccounts] = useState<Array<{ id: string, name: string, broker: string, mongoId: string }>>([]);
   const [showAccountFilter, setShowAccountFilter] = useState(false);
+
+  // Function to get broker symbol/icon
+  const getBrokerSymbol = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return '🔥';
+      case 'shoonya': return '🏛️';
+      case 'zerodha': return '⚡';
+      case 'angel': return '👼';
+      case 'upstox': return '📈';
+      case 'dhan': return '💰';
+      default: return '🏢';
+    }
+  };
+
+  // Function to get broker display name
+  const getBrokerDisplayName = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return 'Fyers';
+      case 'shoonya': return 'Shoonya';
+      case 'zerodha': return 'Zerodha';
+      case 'angel': return 'Angel';
+      case 'upstox': return 'Upstox';
+      case 'dhan': return 'Dhan';
+      default: return brokerName || 'Unknown';
+    }
+  };
 
   // Function to get date range based on filter
   const getDateRange = () => {
@@ -104,7 +131,7 @@ const Orders: React.FC = () => {
 
       const accountOptions = accounts.map((account: any) => ({
         id: account.accountId, // Use the broker account ID (like "FN135006") as the filter value
-        name: `${account.userName || account.accountId || 'Unknown'} (${account.brokerDisplayName || account.brokerName})`,
+        name: `${getBrokerSymbol(account.brokerName)} ${account.userName || account.accountId || 'Unknown'} (${getBrokerDisplayName(account.brokerName)})`,
         broker: account.brokerName,
         mongoId: account.id // Keep the MongoDB ObjectId for reference
       }));
@@ -370,10 +397,10 @@ const Orders: React.FC = () => {
         const { statusChanged, previousStatus, status: currentStatus } = response.data;
 
         // Show success message based on status change
-        const message = statusChanged 
+        const message = statusChanged
           ? `Order status changed from ${previousStatus} to ${currentStatus}`
           : `Order status confirmed: ${currentStatus}`;
-        
+
         setStatusMessage(message);
         setTimeout(() => setStatusMessage(null), 5000);
 
@@ -412,19 +439,20 @@ const Orders: React.FC = () => {
         console.error('Failed to check order status:', errorMessage);
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to check order status:', error);
-      
+
       // Handle both network errors and API error responses
       let errorMessage = 'Failed to check order status.';
-      if (error.response?.data?.error?.message) {
-        errorMessage = error.response.data.error.message;
-      } else if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
+      const err = error as unknown;
+      if ((err as any)?.response?.data?.error?.message) {
+        errorMessage = (err as any).response.data.error.message;
+      } else if ((err as any)?.response?.data?.message) {
+        errorMessage = (err as any).response.data.message;
+      } else if ((err as any)?.message) {
+        errorMessage = (err as any).message;
       }
-      
+
       showToast({
         type: 'error',
         title: 'Status Check Error',
@@ -546,16 +574,18 @@ const Orders: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
-            <Button
-              variant="primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </Button>
-          </div>
+          <Card style={{ textAlign: 'center', padding: '2rem' }}>
+            <CardContent>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+              <Button
+                variant="primary"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -657,18 +687,21 @@ const Orders: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 0.25rem;
+          min-height: 2.5rem;
+          justify-content: center;
         }
 
         .symbol-row {
           display: flex;
           align-items: center;
           gap: 0.5rem;
+          flex-wrap: wrap;
         }
 
         .account-row {
           display: flex;
-          align-items: center;
-          gap: 0.25rem;
+          flex-direction: column;
+          gap: 0.1rem;
           font-size: 0.7rem;
           color: var(--text-secondary);
         }
@@ -679,6 +712,18 @@ const Orders: React.FC = () => {
           border-radius: 0.25rem;
           font-weight: 600;
           letter-spacing: 0.5px;
+        }
+
+        .exchange-badge.nse {
+          background-color: #1e40af;
+        }
+
+        .exchange-badge.bse {
+          background-color: #7c3aed;
+        }
+
+        .exchange-badge.nfo {
+          background-color: #059669;
         }
 
         .account-badge {
@@ -739,29 +784,27 @@ const Orders: React.FC = () => {
       <AppNavigation />
 
       <div className="app-main">
-        {/* Compact Header */}
-        <div className="orders-header">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-            <div>
-              <h1 style={{ margin: 0, fontSize: '1.25rem', fontWeight: '600', color: 'var(--text-primary)' }}>Orders</h1>
-              {lastRefresh && (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  Updated: {lastRefresh.toLocaleTimeString('en-IN')} • {getSelectedAccountsText()}
-                </div>
-              )}
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <Button variant="secondary" onClick={fetchOrders} disabled={loading} size="sm">
-                🔄 {loading ? 'Loading...' : 'Refresh'}
-              </Button>
-              <Button variant="primary" onClick={() => navigate('/trade-setup')} size="sm">
-                + Place Order
-              </Button>
-            </div>
-          </div>
+        <Stack gap={6}>
+          {/* Page Header */}
+        <Card>
+          <CardHeader
+            title="Orders"
+            subtitle={lastRefresh ? `Updated: ${lastRefresh.toLocaleTimeString('en-IN')} • ${getSelectedAccountsText()}` : undefined}
+            action={
+              <Flex gap={2}>
+                <Button variant="secondary" onClick={fetchOrders} disabled={loading} size="sm">
+                  🔄 {loading ? 'Loading...' : 'Refresh'}
+                </Button>
+                <Button variant="primary" onClick={() => navigate('/trade-setup')} size="sm">
+                  + Place Order
+                </Button>
+              </Flex>
+            }
+          />
+          <CardContent>
 
-          {/* Compact Filters */}
-          <div className="orders-filters">
+            {/* Filters */}
+            <div className="orders-filters">
             {/* Date Filter */}
             <div className="filter-group">
               <span className="filter-label">Date:</span>
@@ -961,27 +1004,29 @@ const Orders: React.FC = () => {
             </div>
           )}
 
-          {statusMessage && (
-            <div style={{
-              marginTop: '0.75rem',
-              padding: '0.5rem',
-              fontSize: '0.8rem',
-              color: statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)',
-              fontWeight: '500',
-              backgroundColor: statusMessage.includes('Failed') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-              borderRadius: 'var(--radius-sm)',
-              border: `1px solid ${statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)'}`
-            }}>
-              {statusMessage}
-            </div>
-          )}
-        </div>
+            {statusMessage && (
+              <div style={{
+                marginTop: '0.75rem',
+                padding: '0.5rem',
+                fontSize: '0.8rem',
+                color: statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)',
+                fontWeight: '500',
+                backgroundColor: statusMessage.includes('Failed') ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
+                borderRadius: 'var(--radius-sm)',
+                border: `1px solid ${statusMessage.includes('Failed') ? 'var(--color-loss)' : 'var(--color-profit)'}`
+              }}>
+                {statusMessage}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-        {/* Optimized Orders Table */}
+        {/* Orders Table */}
         {filteredOrders.length > 0 ? (
-          <div className="orders-table-container">
-            <div style={{ overflowX: 'auto' }}>
-              <table className="orders-table">
+          <Card>
+            <CardContent>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="orders-table">
                 <thead>
                   <tr>
                     <th className="time-cell">Time</th>
@@ -1011,21 +1056,32 @@ const Orders: React.FC = () => {
                             </span>
                             {order.exchange && (
                               <span className="exchange-badge" style={{
-                                backgroundColor: order.exchange === 'NSE' ? '#1e40af' : '#7c3aed',
+                                backgroundColor:
+                                  order.exchange === 'NSE' ? '#1e40af' :
+                                    order.exchange === 'BSE' ? '#7c3aed' :
+                                      order.exchange === 'NFO' ? '#059669' : '#6b7280',
                                 color: 'white'
                               }}>
                                 {order.exchange}
                               </span>
                             )}
                           </div>
-                          {order.accountInfo && (
-                            <div className="account-row">
-                              <span className="account-badge">
-                                {order.accountInfo.account_id}
+                          <div className="account-row">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              <span style={{ fontSize: '0.7rem' }}>
+                                {getBrokerSymbol(order.brokerName || '')}
                               </span>
-                              <span>{order.accountInfo.user_name}</span>
+                              <span className="account-badge">
+                                {order.accountInfo?.account_id || 'N/A'}
+                              </span>
+                              <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                                {getBrokerDisplayName(order.brokerName || '')}
+                              </span>
                             </div>
-                          )}
+                            <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
+                              {order.accountInfo?.user_name || ''}
+                            </span>
+                          </div>
                         </div>
                       </td>
                       <td>
@@ -1201,52 +1257,41 @@ const Orders: React.FC = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="orders-table-container">
-            <div style={{
-              textAlign: 'center',
-              padding: '3rem 1rem',
-              color: 'var(--text-secondary)'
-            }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
-              <div style={{ fontSize: '1rem', marginBottom: '0.5rem', fontWeight: '500' }}>
-                No {activeTab === 'all' ? '' : activeTab} orders
-              </div>
-              <div style={{ fontSize: '0.8rem', marginBottom: '1.5rem' }}>
-                {activeTab === 'all'
-                  ? 'Place your first order to get started'
-                  : `No ${activeTab} orders found`
-                }
-              </div>
-              <Button
-                variant="primary"
-                onClick={() => navigate('/trade-setup')}
-                size="sm"
-              >
-                Place Order
-              </Button>
+          <Card padding="lg" style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>📋</div>
+            <div style={{ fontSize: '1rem', marginBottom: '0.5rem', fontWeight: '500' }}>
+              No {activeTab === 'all' ? '' : activeTab} orders
             </div>
-          </div>
+            <div style={{ fontSize: '0.8rem', marginBottom: '1.5rem' }}>
+              {activeTab === 'all'
+                ? 'Place your first order to get started'
+                : `No ${activeTab} orders found`
+              }
+            </div>
+            <Button
+              variant="primary"
+              onClick={() => navigate('/trade-setup')}
+              size="sm"
+            >
+              Place Order
+            </Button>
+          </Card>
         )}
 
-        {/* Compact Summary */}
+        {/* Summary */}
         {orders.length > 0 && (
-          <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border-primary)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1rem',
-            marginTop: '1rem',
-            boxShadow: 'var(--shadow-sm)'
-          }}>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: '1rem',
-              textAlign: 'center'
-            }}>
+          <Card>
+            <CardContent>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+                gap: '1rem',
+                textAlign: 'center'
+              }}>
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--text-primary)' }}>
                   {orders.length}
@@ -1280,20 +1325,22 @@ const Orders: React.FC = () => {
                 </div>
               </div>
 
-              {/* Show retry stats if there are retryable failed orders */}
-              {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable).length > 0 && (
-                <div>
-                  <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-warning)' }}>
-                    {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable && (o.retryCount || 0) < (o.maxRetries || 3)).length}
+                {/* Show retry stats if there are retryable failed orders */}
+                {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-warning)' }}>
+                      {orders.filter(o => ['FAILED', 'REJECTED'].includes(o.status) && o.isRetryable && (o.retryCount || 0) < (o.maxRetries || 3)).length}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Retryable
+                    </div>
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                    Retryable
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         )}
+        </Stack>
       </div>
     </div>
   );

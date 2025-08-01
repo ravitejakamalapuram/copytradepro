@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import AppNavigation from '../components/AppNavigation';
 import { portfolioService } from '../services/portfolioService';
 import '../styles/app-theme.css';
-import Button from '../components/ui/Button'; // Added import for Button
+import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, Grid, Flex } from '../components/ui/Layout';
 
 interface Position {
   symbol: string;
@@ -128,16 +130,18 @@ const Positions: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div className="card" style={{ textAlign: 'center', padding: '2rem' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
-            <Button
-              variant="primary"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </Button>
-          </div>
+          <Card style={{ textAlign: 'center', padding: '2rem' }}>
+            <CardContent>
+              <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ color: 'var(--color-loss)', marginBottom: '1rem' }}>{error}</div>
+              <Button
+                variant="primary"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -147,78 +151,79 @@ const Positions: React.FC = () => {
     <div className="app-theme app-layout">
       <AppNavigation />
       <div className="app-main">
-        {/* Positions Summary */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Positions ({positions.length})</h2>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Button variant="primary">
-                + New Position
-              </Button>
-              <Button variant="secondary">
-                📊 Analytics
-              </Button>
-              <Button variant="outline">
-                📥 Export
-              </Button>
-            </div>
-          </div>
+        <Stack gap={6}>
+          {/* Positions Summary */}
+          <Card>
+            <CardHeader
+              title={`Positions (${positions.length})`}
+              action={
+                <Flex gap={2}>
+                  <Button variant="primary">
+                    + New Position
+                  </Button>
+                  <Button variant="secondary">
+                    📊 Analytics
+                  </Button>
+                  <Button variant="outline">
+                    📥 Export
+                  </Button>
+                </Flex>
+              }
+            />
 
-          {/* Summary Stats */}
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1.5rem',
-            marginBottom: '2rem',
-            padding: '1rem',
-            backgroundColor: 'var(--bg-tertiary)',
-            borderRadius: 'var(--radius-lg)'
-          }}>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                Total P&L
-              </div>
-              <div style={{
-                fontSize: '1.25rem',
-                fontWeight: '600',
-                fontFamily: 'var(--font-mono)',
-                color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
+            <CardContent>
+              {/* Summary Stats */}
+              <Grid cols={4} gap={6} style={{ 
+                marginBottom: '2rem',
+                padding: '1rem',
+                backgroundColor: 'var(--bg-tertiary)',
+                borderRadius: 'var(--radius-lg)'
               }}>
-                {positionsSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(positionsSummary.totalPnL))}
-              </div>
-              <div style={{
-                fontSize: '0.875rem',
-                color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)',
-                marginTop: '0.25rem'
-              }}>
-                {positionsSummary.totalPnLPercent >= 0 ? '+' : ''}{positionsSummary.totalPnLPercent.toFixed(2)}%
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                Total Value
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                ₹{formatCurrency(positionsSummary.totalValue)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                Long Positions
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-profit)' }}>
-                {positions.filter(p => p.qty > 0).length}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
-                Short Positions
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-loss)' }}>
-                {positions.filter(p => p.qty < 0).length}
-              </div>
-            </div>
-          </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    Total P&L
+                  </div>
+                  <div style={{
+                    fontSize: '1.25rem',
+                    fontWeight: '600',
+                    fontFamily: 'var(--font-mono)',
+                    color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)'
+                  }}>
+                    {positionsSummary.totalPnL >= 0 ? '+' : ''}₹{formatCurrency(Math.abs(positionsSummary.totalPnL))}
+                  </div>
+                  <div style={{
+                    fontSize: '0.875rem',
+                    color: positionsSummary.totalPnL >= 0 ? 'var(--color-profit)' : 'var(--color-loss)',
+                    marginTop: '0.25rem'
+                  }}>
+                    {positionsSummary.totalPnLPercent >= 0 ? '+' : ''}{positionsSummary.totalPnLPercent.toFixed(2)}%
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    Total Value
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                    ₹{formatCurrency(positionsSummary.totalValue)}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    Long Positions
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-profit)' }}>
+                    {positions.filter(p => p.qty > 0).length}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.25rem' }}>
+                    Short Positions
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--color-loss)' }}>
+                    {positions.filter(p => p.qty < 0).length}
+                  </div>
+                </div>
+              </Grid>
 
           {/* Positions Table */}
           {positions.length > 0 ? (
@@ -322,59 +327,57 @@ const Positions: React.FC = () => {
               </Button>
             </div>
           )}
-        </div>
+            </CardContent>
+          </Card>
 
-        {/* Risk Management */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">Risk Management</h2>
-          </div>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '1rem'
-          }}>
-            <div style={{ 
-              padding: '1rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-secondary)'
-            }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Available Margin
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
-                ₹{formatCurrency(125000)}
-              </div>
-            </div>
-            <div style={{ 
-              padding: '1rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-secondary)'
-            }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Used Margin
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
-                ₹{formatCurrency(75000)}
-              </div>
-            </div>
-            <div style={{ 
-              padding: '1rem',
-              backgroundColor: 'var(--bg-tertiary)',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-secondary)'
-            }}>
-              <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Margin Utilization
-              </div>
-              <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
-                37.5%
-              </div>
-            </div>
-          </div>
-        </div>
+          {/* Risk Management */}
+          <Card>
+            <CardHeader title="Risk Management" />
+            <CardContent>
+              <Grid cols={3} gap={4}>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-secondary)'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                    Available Margin
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)' }}>
+                    ₹{formatCurrency(125000)}
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-secondary)'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                    Used Margin
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
+                    ₹{formatCurrency(75000)}
+                  </div>
+                </div>
+                <div style={{ 
+                  padding: '1rem',
+                  backgroundColor: 'var(--bg-tertiary)',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-secondary)'
+                }}>
+                  <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                    Margin Utilization
+                  </div>
+                  <div style={{ fontSize: '1.25rem', fontWeight: '600', fontFamily: 'var(--font-mono)', color: 'var(--color-neutral)' }}>
+                    37.5%
+                  </div>
+                </div>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Stack>
       </div>
     </div>
   );
