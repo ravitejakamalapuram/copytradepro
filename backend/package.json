@@ -17,11 +17,20 @@
     "test:coverage": "jest --coverage",
     "health-check": "node scripts/health-check.js",
     "deploy": "../scripts/deploy.sh deploy",
+    "deploy:symbol-service": "../scripts/deploy-symbol-service.sh deploy",
     "rollback": "../scripts/deploy.sh rollback",
     "monitoring:start": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.start()\"",
     "monitoring:stop": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.stop()\"",
     "kill-port": "lsof -ti:3001 | xargs kill -9 || echo 'Port 3001 is free'",
-    "dev:clean": "npm run kill-port && npm run dev"
+    "dev:clean": "npm run kill-port && npm run dev",
+    "db:schema": "node scripts/create-database-schema.js",
+    "db:init": "node dist/scripts/initializeSymbolDatabase.js",
+    "env:create": "node scripts/manage-environment.js --create",
+    "env:validate": "node scripts/manage-environment.js --validate",
+    "env:show": "node scripts/manage-environment.js --show",
+    "env:backup": "node scripts/manage-environment.js --backup",
+    "health-check:deployment": "node scripts/deployment-health-check.js",
+    "validate:deployment": "node scripts/validate-deployment.js"
   },
   "dependencies": {
     "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",

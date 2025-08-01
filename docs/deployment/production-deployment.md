@@ -1,228 +1,382 @@
-# CopyTrade Pro - Production Deployment Guide
+# Production Deployment Guide
 
-## 🏗️ Architecture Overview
+This guide covers the deployment of the standardized symbol management system to production environments.
 
-CopyTrade Pro uses a **unified deployment architecture** where:
-- **Frontend**: React + TypeScript + Vite (builds to static files)
-- **Backend**: Node.js + Express + TypeScript (serves API + static files)
-- **Database**: MongoDB (document-based, persistent storage)
-- **Real-time**: Socket.IO for live order updates
-- **Deployment**: Single Render.com web service (full-stack)
+## Prerequisites
 
-## 🚀 Render.com Deployment
+### System Requirements
+- Node.js 18+ 
+- MongoDB 4.4+
+- PM2 (for process management)
+- Nginx (recommended for reverse proxy)
+- SSL certificate (for HTTPS)
 
-### Prerequisites
+### Environment Setup
+- Production server with adequate resources (minimum 2GB RAM, 2 CPU cores)
+- MongoDB instance (local or cloud-based like MongoDB Atlas)
+- Domain name configured with DNS
+- SSL certificate installed
 
-1. GitHub repository with the code
-2. Render.com account
-3. Environment variables configured
+## Deployment Steps
 
-### Deployment Configuration
-
-The application uses a **single web service** that:
-
-1. Builds both frontend and backend
-2. Serves frontend static files through Node.js
-3. Provides API endpoints
-4. Handles client-side routing (SPA)
-
-### Build Process
-
-The deployment follows this build sequence:
+### 1. Server Preparation
 
 ```bash
-# 1. Install backend dependencies (production only)
-cd backend && npm ci --only=production
+# Update system packages
+sudo apt update && sudo apt upgrade -y
 
-# 2. Install frontend dependencies and build
-cd ../frontend && npm ci && npm run build
+# Install Node.js 18
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
-# 3. Copy frontend build to backend public directory
-cd ../backend && mkdir -p public && cp -r ../frontend/dist/* public/
+# Install PM2 globally
+sudo npm install -g pm2
 
-# 4. Build backend TypeScript
-npm run build
+# Install MongoDB (if using local instance)
+wget -qO - https://www.mongodb.org/static/pgp/server-4.4.asc | sudo apt-key add -
+echo "deb [ arch=amd64,arm64 ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/4.4 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-4.4.list
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+sudo systemctl start mongod
+sudo systemctl enable mongod
 ```
 
-### File Structure After Build
+### 2. Application Deployment
 
-```
-backend/
-├── dist/           # Compiled TypeScript backend
-├── public/         # Frontend static files (from frontend/dist)
-├── data/           # Application data directory
-└── node_modules/   # Backend dependencies only
-```
-
-## 🔧 Environment Variables
-
-#### Backend Environment Variables (Required)
 ```bash
+# Clone the repository
+git clone <your-repository-url>
+cd copytrade-pro
+
+# Install dependencies
+npm run install:all
+
+# Create production environment configuration
+cd backend
+npm run env:create production
+
+# Edit the production environment file
+nano .env.production
+```
+
+### 3. Environment Configuration
+
+Edit the `.env.production` file with your production values:
+
+```bash
+# Required configurations to update:
 NODE_ENV=production
 PORT=3001
-JWT_SECRET=your-super-secure-jwt-secret-key-here-minimum-32-characters
-ENCRYPTION_KEY=your-32-character-encryption-key-here
-FRONTEND_URL=https://your-frontend-domain.onrender.com
-ALLOWED_ORIGINS=https://your-frontend-domain.onrender.com
-MONGODB_URI=mongodb://localhost:27017/copytrade
-LOG_LEVEL=info
-ENABLE_REQUEST_LOGGING=true
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
+FRONTEND_URL=https://your-domain.com
+JWT_SECRET=your-actual-jwt-secret-32-chars-minimum
+MONGODB_URI=mongodb://localhost:27017/copytrade_prod
+ENCRYPTION_KEY=your-actual-32-character-encryption-key
+
+# Update broker API credentials
+UPSTOX_API_KEY=your-actual-upstox-api-key
+UPSTOX_API_SECRET=your-actual-upstox-api-secret
+FYERS_CLIENT_ID=your-actual-fyers-client-id
+FYERS_SECRET_KEY=your-actual-fyers-secret-key
+
+# Configure monitoring
+ALERTING_ENABLED=true
+ALERT_WEBHOOK_URL=https://your-monitoring-webhook.com
 ```
 
-#### Frontend Environment Variables
+### 4. Database Setup
+
 ```bash
-VITE_API_URL=https://your-backend-domain.onrender.com/api
-VITE_APP_NAME=CopyTrade Pro
-VITE_APP_VERSION=1.0.0
-VITE_NODE_ENV=production
-VITE_ENABLE_DEBUG=false
-VITE_ENABLE_ANALYTICS=true
+# Create database schema
+npm run db:schema
+
+# Initialize symbol database
+npm run db:init
+
+# Verify database setup
+npm run health-check:deployment
 ```
 
-### 2. Deploy Using render.yaml (Recommended)
+### 5. Build and Deploy
 
-1. Push your code to GitHub
-2. Connect your GitHub repository to Render.com
-3. Render will automatically detect the `render.yaml` file
-4. Review and deploy both services
-
-### 3. Manual Deployment (Alternative)
-
-#### Backend Service
-1. Create a new Web Service on Render.com
-2. Connect your GitHub repository
-3. Configure:
-   - **Build Command**: `cd backend && npm install && npm run build`
-   - **Start Command**: `cd backend && npm start`
-   - **Environment**: Node
-   - **Plan**: Starter or higher
-   - **Health Check Path**: `/health`
-
-#### Frontend Service
-1. Create a new Static Site on Render.com
-2. Connect your GitHub repository
-3. Configure:
-   - **Build Command**: `cd frontend && npm install && npm run build`
-   - **Publish Directory**: `frontend/dist`
-   - **Environment**: Static Site
-
-### 4. Post-Deployment Configuration
-
-#### Update Frontend API URL
-After backend deployment, update the frontend environment variable:
 ```bash
-VITE_API_URL=https://your-actual-backend-url.onrender.com/api
+# Build the application
+npm run build
+
+# Deploy symbol service specifically
+npm run deploy:symbol-service
+
+# Or use the full deployment script
+npm run deploy
 ```
 
-#### Update Backend CORS
-After frontend deployment, update the backend environment variables:
+### 6. Process Management with PM2
+
 ```bash
-FRONTEND_URL=https://your-actual-frontend-url.onrender.com
-ALLOWED_ORIGINS=https://your-actual-frontend-url.onrender.com
+# Start the application with PM2
+npm run pm2:start
+
+# Check status
+pm2 status
+
+# View logs
+pm2 logs copytrade-pro
+
+# Save PM2 configuration
+pm2 save
+
+# Setup PM2 startup script
+pm2 startup
+sudo env PATH=$PATH:/usr/bin /usr/lib/node_modules/pm2/bin/pm2 startup systemd -u $USER --hp $HOME
 ```
 
-### 5. Verification
+### 7. Nginx Configuration (Optional but Recommended)
 
-#### Backend Health Check
-Visit: `https://your-backend-url.onrender.com/health`
+Create `/etc/nginx/sites-available/copytrade-pro`:
 
-Expected response:
-```json
-{
-  "status": "OK",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "uptime": 123.456,
-  "environment": "production",
-  "version": "1.0.0",
-  "services": {
-    "database": "MongoDB",
-    "websocket": "Socket.IO",
-    "orderMonitoring": "Active"
-  }
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /path/to/your/certificate.crt;
+    ssl_certificate_key /path/to/your/private.key;
+
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512:ECDHE-RSA-AES256-GCM-SHA384:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # Security headers
+    add_header X-Frame-Options DENY;
+    add_header X-Content-Type-Options nosniff;
+    add_header X-XSS-Protection "1; mode=block";
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload";
+
+    # Proxy to Node.js application
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+        
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # Static files caching
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
 }
 ```
 
-#### Frontend Access
-Visit: `https://your-frontend-url.onrender.com`
-
-## Environment Variables Reference
-
-### Required Backend Variables
-- `NODE_ENV`: Set to "production"
-- `JWT_SECRET`: Secure random string (min 32 chars)
-- `ENCRYPTION_KEY`: 32-character encryption key for database
-
-### Optional Backend Variables
-- `PORT`: Server port (default: 3001)
-- `MONGODB_URI`: MongoDB connection string
-- `LOG_LEVEL`: Logging level (info, debug, warn, error)
-- `RATE_LIMIT_WINDOW_MS`: Rate limiting window
-- `RATE_LIMIT_MAX_REQUESTS`: Max requests per window
-
-### Broker API Variables (Optional)
+Enable the site:
 ```bash
-# Shoonya Broker
-SHOONYA_VENDOR_CODE=your-vendor-code
-SHOONYA_IMEI=your-imei
-SHOONYA_API_KEY=your-api-key
-SHOONYA_AUTH_TOKEN=your-auth-token
+sudo ln -s /etc/nginx/sites-available/copytrade-pro /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
 
-# Fyers Broker
-FYERS_CLIENT_ID=your-client-id
-FYERS_SECRET_KEY=your-secret-key
-FYERS_REDIRECT_URI=https://your-backend-domain.onrender.com/api/broker/fyers/callback
+## Post-Deployment Verification
+
+### 1. Health Checks
+
+```bash
+# Run comprehensive health check
+npm run health-check:deployment
+
+# Check specific endpoints
+curl https://your-domain.com/health
+curl https://your-domain.com/api/health
+curl https://your-domain.com/api/symbols/health
+```
+
+### 2. Validate Deployment
+
+```bash
+# Run deployment validation
+npm run validate:deployment
+
+# Check symbol data
+curl "https://your-domain.com/api/symbols/search?query=NIFTY"
+curl "https://your-domain.com/api/symbols/statistics"
+```
+
+### 3. Monitor Performance
+
+```bash
+# Check PM2 status
+pm2 status
+pm2 monit
+
+# View application logs
+pm2 logs copytrade-pro --lines 100
+
+# Check system resources
+htop
+df -h
+```
+
+## Monitoring and Maintenance
+
+### Log Management
+
+Logs are stored in `backend/logs/`:
+- `combined.log` - All application logs
+- `error.log` - Error logs only
+- `symbol.log` - Symbol operation logs
+- `performance.log` - Performance metrics
+- `security.log` - Security events
+- `request.log` - HTTP request logs
+
+### Automated Monitoring
+
+The application includes built-in monitoring that:
+- Tracks response times and error rates
+- Monitors memory usage and performance
+- Alerts on symbol update failures
+- Logs security events
+
+Configure webhook alerts in your environment:
+```bash
+ALERTING_ENABLED=true
+ALERT_WEBHOOK_URL=https://your-monitoring-service.com/webhook
+```
+
+### Database Maintenance
+
+```bash
+# Create database backup
+mongodump --uri="mongodb://localhost:27017/copytrade_prod" --out=/backup/$(date +%Y%m%d)
+
+# Monitor database performance
+mongo copytrade_prod --eval "db.stats()"
+mongo copytrade_prod --eval "db.standardizedsymbols.stats()"
+```
+
+### Symbol Data Updates
+
+The system automatically updates symbol data daily. Monitor the process:
+
+```bash
+# Check symbol processing logs
+tail -f backend/logs/symbol.log
+
+# Manually trigger symbol update if needed
+curl -X POST https://your-domain.com/api/symbols/update \
+  -H "Authorization: Bearer your-admin-token"
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Build Failures**
-   - Check Node.js version compatibility
-   - Verify all dependencies are in package.json
-   - Check TypeScript compilation errors
+1. **Application won't start**
+   - Check environment configuration: `npm run env:validate`
+   - Verify database connection: `npm run health-check:deployment`
+   - Check logs: `pm2 logs copytrade-pro`
 
-2. **Database Issues**
-   - Ensure data directory has write permissions
-   - Check MONGODB_URI environment variable
-   - Verify MongoDB connection
+2. **Symbol data not loading**
+   - Check symbol database: `npm run db:init`
+   - Verify Upstox API credentials
+   - Check symbol processing logs
 
-3. **CORS Errors**
-   - Verify FRONTEND_URL and ALLOWED_ORIGINS
-   - Check frontend VITE_API_URL configuration
-   - Ensure both services are deployed
+3. **High memory usage**
+   - Monitor with: `pm2 monit`
+   - Adjust cache settings in environment
+   - Consider enabling clustering
 
-4. **WebSocket Connection Issues**
-   - Check if Render.com supports WebSocket connections
-   - Verify Socket.IO configuration
-   - Check browser console for connection errors
+4. **Database connection issues**
+   - Verify MongoDB is running: `sudo systemctl status mongod`
+   - Check connection string in environment
+   - Review database logs: `sudo journalctl -u mongod`
 
-### Logs and Monitoring
+### Performance Optimization
 
-- Backend logs: Available in Render.com dashboard
-- Health check: Monitor `/health` endpoint
-- Database: MongoDB data persists across deployments
+1. **Enable clustering** (for high-traffic deployments):
+   ```bash
+   ENABLE_CLUSTERING=true
+   WORKER_COUNT=4
+   ```
+
+2. **Optimize caching**:
+   ```bash
+   ENABLE_CACHING=true
+   CACHE_SIZE=2000
+   API_RESPONSE_CACHING=true
+   ```
+
+3. **Database optimization**:
+   ```bash
+   MONGO_MAX_POOL_SIZE=100
+   SYMBOL_BATCH_SIZE=2000
+   ```
 
 ## Security Considerations
 
-1. **Environment Variables**: Never commit secrets to Git
-2. **JWT Secret**: Use a strong, random secret key
-3. **Database Encryption**: Use a secure encryption key
-4. **CORS**: Restrict to specific domains only
-5. **Rate Limiting**: Configure appropriate limits
+1. **Environment Variables**: Never commit production environment files to version control
+2. **Database Security**: Use MongoDB authentication and SSL in production
+3. **API Security**: Implement proper authentication and rate limiting
+4. **SSL/TLS**: Always use HTTPS in production
+5. **Firewall**: Configure firewall to only allow necessary ports
+6. **Updates**: Keep dependencies and system packages updated
 
-## Performance Optimization
+## Backup and Recovery
 
-1. **Database**: MongoDB is suitable for small to large loads
-2. **Caching**: Consider adding Redis for session storage
-3. **CDN**: Use Render.com's CDN for static assets
-4. **Monitoring**: Set up health checks and alerts
+### Automated Backups
 
-## Scaling Considerations
+Set up automated backups using cron:
 
-- **Database**: Consider PostgreSQL for higher loads
-- **File Storage**: Use external storage for large files
-- **Load Balancing**: Render.com handles this automatically
-- **Caching**: Add Redis for improved performance
+```bash
+# Edit crontab
+crontab -e
+
+# Add daily backup at 2 AM
+0 2 * * * /usr/bin/mongodump --uri="mongodb://localhost:27017/copytrade_prod" --out=/backup/$(date +\%Y\%m\%d) && find /backup -type d -mtime +7 -exec rm -rf {} \;
+```
+
+### Recovery Process
+
+1. **Application Recovery**:
+   ```bash
+   # Rollback to previous version
+   npm run rollback
+   
+   # Or redeploy from backup
+   git checkout <previous-commit>
+   npm run deploy
+   ```
+
+2. **Database Recovery**:
+   ```bash
+   # Restore from backup
+   mongorestore --uri="mongodb://localhost:27017/copytrade_prod" /backup/20240131/copytrade_prod/
+   ```
+
+## Support and Maintenance
+
+- Monitor application logs regularly
+- Set up automated alerts for critical issues
+- Perform regular security updates
+- Monitor database performance and optimize as needed
+- Review and update environment configuration periodically
