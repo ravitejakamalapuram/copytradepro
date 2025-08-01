@@ -87,31 +87,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Simplified CORS configuration - allow all origins for now
+// Minimal CORS configuration - allow all origins
 app.use(cors({
-  origin: true, // Allow all origins
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
-  exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
-  optionsSuccessStatus: 200
+  origin: true,
+  credentials: true
 }));
-
-logger.info('CORS configured to allow all origins', {
-  component: 'SERVER_STARTUP',
-  operation: 'CORS_CONFIG',
-  mode: 'permissive'
-});
-
-// Handle preflight OPTIONS requests for all routes
-app.options('*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Request-ID');
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  res.sendStatus(200);
-});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
