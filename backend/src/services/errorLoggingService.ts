@@ -3,6 +3,7 @@ import { ErrorLog, IErrorLog } from '../models/errorLogModels';
 import { traceIdService } from './traceIdService';
 import { logger } from '../utils/logger';
 import { ErrorType, ErrorSeverity, ErrorClassification } from '../types/errorTypes';
+import { ErrorClassificationService } from './errorClassificationService';
 
 export interface ErrorLogEntry {
   id: string;
@@ -43,6 +44,10 @@ export interface ErrorAnalytics {
   errorsByType: Record<string, number>;
   errorsByComponent: Record<string, number>;
   errorsBySource: Record<string, number>;
+  errorsByCategory: Record<string, number>;
+  errorsByBroker: Record<string, number>;
+  errorsByUser: Record<string, number>;
+  severityDistribution: Record<string, number>;
   errorsByTimeRange: Array<{ timestamp: Date; count: number }>;
   topErrors: Array<{ message: string; count: number; lastOccurred: Date }>;
   errorTrends: {
@@ -72,6 +77,11 @@ export interface ErrorSearchFilters {
 
 export class ErrorLoggingService {
   private static instance: ErrorLoggingService;
+  private errorClassificationService: ErrorClassificationService;
+
+  private constructor() {
+    this.errorClassificationService = ErrorClassificationService.getInstance();
+  }
 
   public static getInstance(): ErrorLoggingService {
     if (!ErrorLoggingService.instance) {
@@ -111,8 +121,9 @@ export class ErrorLoggingService {
     const timestamp = new Date();
     const traceId = context.traceId || traceIdService.generateTraceId();
 
-    // Determine error classification
-    const classification = this.classifyError(error, context.errorType);
+    // Determine error classification and categorization
+    const classification = this.classifyError(error, context.errorType, context);
+    const categorization = this.categorizeError(error, context);
     
     // Extract stack trace
     const stackTrace = error?.stack || (error instanceof Error ? error.stack : undefined);
@@ -166,13 +177,15 @@ export class ErrorLoggingService {
         { errorId, errorType: errorLogEntry.errorType }
       );
 
-      // Log to console for immediate visibility
-      logger.error(`[${errorLogEntry.source}] ${message}`, {
+      // Log to console for immediate visibility with categorization
+      logger.error(`[${errorLogEntry.source}] [${categorization.category}] ${message}`, {
         component: context.component,
         operation: context.operation,
         traceId,
         errorId,
         errorType: errorLogEntry.errorType,
+        category: categorization.category,
+        businessImpact: categorization.businessImpact,
         userId: context.userId,
         brokerName: context.brokerName
       }, error);
@@ -330,7 +343,7 @@ export class ErrorLoggingService {
   }
 
   /**
-   * Get error analytics
+   * Get comprehensive error analytics with enhanced categorization
    */
   public async getErrorAnalytics(timeWindow: number = 86400000): Promise<ErrorAnalytics> {
     const cutoff = new Date(Date.now() - timeWindow);
@@ -342,7 +355,13 @@ export class ErrorLoggingService {
         errorsByComponent,
         errorsBySource,
         topErrors,
-        hourlyTrends
+        hourlyTrends,
+        errorsByCategory,
+        errorsByBroker,
+        errorsByUser,
+        severityDistribution,
+        dailyTrends,
+        weeklyTrends
       ] = await Promise.all([
         // Total error statistics
         ErrorLog.aggregate([
@@ -412,6 +431,78 @@ export class ErrorLoggingService {
             }
           },
           { $sort: { '_id.date': 1, '_id.hour': 1 } }
+        ]),
+
+        // Errors by business category (derived from component analysis)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff } } },
+          {
+            $addFields: {
+              category: {
+                $switch: {
+                  branches: [
+                    { case: { $regexMatch: { input: '$component', regex: /broker|order|trading/i } }, then: 'TRADING' },
+                    { case: { $regexMatch: { input: '$component', regex: /auth|login/i } }, then: 'AUTHENTICATION' },
+                    { case: { $regexMatch: { input: '$component', regex: /database|data/i } }, then: 'DATA' },
+                    { case: { $regexMatch: { input: '$component', regex: /api|network/i } }, then: 'NETWORK' },
+                    { case: { $eq: ['$source', 'UI'] }, then: 'USER_INTERFACE' }
+                  ],
+                  default: 'SYSTEM'
+                }
+              }
+            }
+          },
+          { $group: { _id: '$category', count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ]),
+
+        // Errors by broker
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff }, 'context.brokerName': { $exists: true, $ne: null } } },
+          { $group: { _id: '$context.brokerName', count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ]),
+
+        // Errors by user (top 10)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff }, 'context.userId': { $exists: true, $ne: null } } },
+          { $group: { _id: '$context.userId', count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+          { $limit: 10 }
+        ]),
+
+        // Error severity distribution
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff } } },
+          { $group: { _id: '$level', count: { $sum: 1 } } },
+          { $sort: { count: -1 } }
+        ]),
+
+        // Daily error trends (last 30 days)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
+          {
+            $group: {
+              _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { '_id': 1 } }
+        ]),
+
+        // Weekly error trends (last 12 weeks)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: new Date(Date.now() - 12 * 7 * 24 * 60 * 60 * 1000) } } },
+          {
+            $group: {
+              _id: {
+                year: { $year: '$timestamp' },
+                week: { $week: '$timestamp' }
+              },
+              count: { $sum: 1 }
+            }
+          },
+          { $sort: { '_id.year': 1, '_id.week': 1 } }
         ])
       ]);
 
@@ -439,6 +530,22 @@ export class ErrorLoggingService {
           acc[item._id] = item.count;
           return acc;
         }, {}),
+        errorsByCategory: errorsByCategory.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        errorsByBroker: errorsByBroker.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        errorsByUser: errorsByUser.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        severityDistribution: severityDistribution.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
         errorsByTimeRange: hourlyTrends.map(item => ({
           timestamp: new Date(`${item._id.date}T${item._id.hour.toString().padStart(2, '0')}:00:00`),
           count: item.count
@@ -450,8 +557,8 @@ export class ErrorLoggingService {
         })),
         errorTrends: {
           hourly: this.generateHourlyTrends(hourlyTrends),
-          daily: [], // TODO: Implement daily trends
-          weekly: [] // TODO: Implement weekly trends
+          daily: this.generateDailyTrends(dailyTrends),
+          weekly: this.generateWeeklyTrends(weeklyTrends)
         }
       };
     } catch (error) {
@@ -468,6 +575,10 @@ export class ErrorLoggingService {
         errorsByType: {},
         errorsByComponent: {},
         errorsBySource: {},
+        errorsByCategory: {},
+        errorsByBroker: {},
+        errorsByUser: {},
+        severityDistribution: {},
         errorsByTimeRange: [],
         topErrors: [],
         errorTrends: {
@@ -477,6 +588,379 @@ export class ErrorLoggingService {
         }
       };
     }
+  }
+
+  /**
+   * Get error patterns and insights
+   */
+  public async getErrorPatterns(timeWindow: number = 86400000): Promise<{
+    recurringErrors: Array<{
+      pattern: string;
+      count: number;
+      firstSeen: Date;
+      lastSeen: Date;
+      affectedComponents: string[];
+      suggestedFix: string;
+    }>;
+    errorSpikes: Array<{
+      timestamp: Date;
+      errorCount: number;
+      primaryCause: string;
+      affectedSystems: string[];
+    }>;
+    correlatedErrors: Array<{
+      traceId: string;
+      errorChain: Array<{
+        component: string;
+        operation: string;
+        timestamp: Date;
+        message: string;
+      }>;
+    }>;
+  }> {
+    const cutoff = new Date(Date.now() - timeWindow);
+
+    try {
+      const [recurringErrors, errorSpikes, correlatedErrors] = await Promise.all([
+        // Find recurring error patterns
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff } } },
+          {
+            $group: {
+              _id: {
+                message: '$message',
+                component: '$component',
+                errorType: '$errorType'
+              },
+              count: { $sum: 1 },
+              firstSeen: { $min: '$timestamp' },
+              lastSeen: { $max: '$timestamp' },
+              components: { $addToSet: '$component' }
+            }
+          },
+          { $match: { count: { $gte: 3 } } }, // Errors that occurred 3+ times
+          { $sort: { count: -1 } },
+          { $limit: 20 }
+        ]),
+
+        // Detect error spikes (periods with unusually high error rates)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff } } },
+          {
+            $group: {
+              _id: {
+                hour: { $hour: '$timestamp' },
+                date: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } }
+              },
+              count: { $sum: 1 },
+              primaryErrors: { $push: { component: '$component', errorType: '$errorType' } }
+            }
+          },
+          { $match: { count: { $gte: 10 } } }, // Hours with 10+ errors
+          { $sort: { count: -1 } },
+          { $limit: 10 }
+        ]),
+
+        // Find correlated errors (errors in the same trace)
+        ErrorLog.aggregate([
+          { $match: { timestamp: { $gte: cutoff } } },
+          {
+            $group: {
+              _id: '$traceId',
+              errors: {
+                $push: {
+                  component: '$component',
+                  operation: '$operation',
+                  timestamp: '$timestamp',
+                  message: '$message'
+                }
+              },
+              errorCount: { $sum: 1 }
+            }
+          },
+          { $match: { errorCount: { $gte: 2 } } }, // Traces with multiple errors
+          { $sort: { errorCount: -1 } },
+          { $limit: 15 }
+        ])
+      ]);
+
+      return {
+        recurringErrors: recurringErrors.map(item => ({
+          pattern: `${item._id.component}: ${item._id.message}`,
+          count: item.count,
+          firstSeen: item.firstSeen,
+          lastSeen: item.lastSeen,
+          affectedComponents: item.components,
+          suggestedFix: this.generateSuggestedFix(item._id.errorType, item._id.component)
+        })),
+        errorSpikes: errorSpikes.map(item => ({
+          timestamp: new Date(`${item._id.date}T${item._id.hour.toString().padStart(2, '0')}:00:00`),
+          errorCount: item.count as number,
+          primaryCause: this.identifyPrimaryCause(item.primaryErrors),
+          affectedSystems: [...new Set(item.primaryErrors.map((e: any) => e.component as string))] as string[]
+        })),
+        correlatedErrors: correlatedErrors.map(item => ({
+          traceId: item._id,
+          errorChain: item.errors.sort((a: any, b: any) => a.timestamp.getTime() - b.timestamp.getTime())
+        }))
+      };
+    } catch (error) {
+      logger.error('Failed to get error patterns', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERROR_PATTERNS'
+      }, error);
+
+      return {
+        recurringErrors: [],
+        errorSpikes: [],
+        correlatedErrors: []
+      };
+    }
+  }
+
+  /**
+   * Generate actionable insights from error data
+   */
+  public async generateErrorInsights(timeWindow: number = 86400000): Promise<{
+    criticalIssues: Array<{
+      title: string;
+      description: string;
+      impact: string;
+      recommendedActions: string[];
+      priority: 'low' | 'medium' | 'high' | 'critical';
+    }>;
+    performanceImpacts: Array<{
+      component: string;
+      avgErrorRate: number;
+      impactOnUserExperience: string;
+      optimizationSuggestions: string[];
+    }>;
+    systemHealthScore: {
+      overall: number;
+      breakdown: {
+        trading: number;
+        authentication: number;
+        data: number;
+        network: number;
+        ui: number;
+      };
+    };
+  }> {
+    try {
+      const analytics = await this.getErrorAnalytics(timeWindow);
+      const patterns = await this.getErrorPatterns(timeWindow);
+
+      const criticalIssues = this.identifyCriticalIssues(analytics, patterns);
+      const performanceImpacts = this.analyzePerformanceImpacts(analytics);
+      const systemHealthScore = this.calculateSystemHealthScore(analytics);
+
+      return {
+        criticalIssues,
+        performanceImpacts,
+        systemHealthScore
+      };
+    } catch (error) {
+      logger.error('Failed to generate error insights', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GENERATE_ERROR_INSIGHTS'
+      }, error);
+
+      return {
+        criticalIssues: [],
+        performanceImpacts: [],
+        systemHealthScore: {
+          overall: 0,
+          breakdown: {
+            trading: 0,
+            authentication: 0,
+            data: 0,
+            network: 0,
+            ui: 0
+          }
+        }
+      };
+    }
+  }
+
+  private generateSuggestedFix(errorType: string, component: string): string {
+    const fixes: Record<string, string> = {
+      'BROKER_API_ERROR': 'Check broker API credentials and connection settings',
+      'DATABASE_ERROR': 'Review database connection pool and query optimization',
+      'NETWORK_ERROR': 'Implement retry logic and check network connectivity',
+      'AUTHENTICATION': 'Review token expiration and refresh mechanisms',
+      'VALIDATION_ERROR': 'Add client-side validation and improve error messages'
+    };
+
+    return fixes[errorType] || 'Review error logs and implement appropriate error handling';
+  }
+
+  private identifyPrimaryCause(errors: any[]): string {
+    const errorCounts = errors.reduce((acc, error) => {
+      acc[error.errorType] = (acc[error.errorType] || 0) + 1;
+      return acc;
+    }, {});
+
+    return Object.keys(errorCounts).reduce((a, b) => 
+      errorCounts[a] > errorCounts[b] ? a : b
+    );
+  }
+
+  private identifyCriticalIssues(analytics: any, patterns: any): any[] {
+    const issues = [];
+
+    // High error rate
+    if (analytics.totalErrors > 100) {
+      issues.push({
+        title: 'High Error Rate Detected',
+        description: `System generated ${analytics.totalErrors} errors in the analyzed period`,
+        impact: 'Significant impact on user experience and system reliability',
+        recommendedActions: [
+          'Review error logs for common patterns',
+          'Implement additional error handling',
+          'Consider scaling infrastructure'
+        ],
+        priority: 'high' as const
+      });
+    }
+
+    // Critical errors
+    if (analytics.criticalErrors > 10) {
+      issues.push({
+        title: 'Critical Errors Present',
+        description: `${analytics.criticalErrors} critical errors detected`,
+        impact: 'System stability and data integrity at risk',
+        recommendedActions: [
+          'Immediate investigation required',
+          'Review system logs',
+          'Consider emergency maintenance'
+        ],
+        priority: 'critical' as const
+      });
+    }
+
+    // Recurring patterns
+    if (patterns.recurringErrors.length > 5) {
+      issues.push({
+        title: 'Multiple Recurring Error Patterns',
+        description: `${patterns.recurringErrors.length} recurring error patterns identified`,
+        impact: 'Indicates systematic issues requiring attention',
+        recommendedActions: [
+          'Prioritize fixing recurring errors',
+          'Implement preventive measures',
+          'Review code quality'
+        ],
+        priority: 'medium' as const
+      });
+    }
+
+    return issues;
+  }
+
+  private analyzePerformanceImpacts(analytics: any): Array<{
+    component: string;
+    avgErrorRate: number;
+    impactOnUserExperience: string;
+    optimizationSuggestions: string[];
+  }> {
+    const impacts: Array<{
+      component: string;
+      avgErrorRate: number;
+      impactOnUserExperience: string;
+      optimizationSuggestions: string[];
+    }> = [];
+
+    Object.entries(analytics.errorsByComponent).forEach(([component, count]) => {
+      const errorCount = count as number;
+      if (errorCount > 20) {
+        impacts.push({
+          component,
+          avgErrorRate: errorCount,
+          impactOnUserExperience: this.getUXImpact(component, errorCount),
+          optimizationSuggestions: this.getOptimizationSuggestions(component)
+        });
+      }
+    });
+
+    return impacts;
+  }
+
+  private getUXImpact(component: string, errorCount: number): string {
+    if (component.toLowerCase().includes('broker') || component.toLowerCase().includes('trading')) {
+      return errorCount > 50 ? 'Severe impact on trading operations' : 'Moderate impact on trading reliability';
+    }
+    if (component.toLowerCase().includes('auth')) {
+      return 'Impact on user login and session management';
+    }
+    return errorCount > 30 ? 'Significant user experience degradation' : 'Minor user experience impact';
+  }
+
+  private getOptimizationSuggestions(component: string): string[] {
+    const suggestions = [];
+    
+    if (component.toLowerCase().includes('broker')) {
+      suggestions.push('Implement circuit breaker pattern', 'Add retry logic with exponential backoff');
+    }
+    if (component.toLowerCase().includes('database')) {
+      suggestions.push('Optimize database queries', 'Review connection pooling');
+    }
+    if (component.toLowerCase().includes('api')) {
+      suggestions.push('Add request caching', 'Implement rate limiting');
+    }
+    
+    suggestions.push('Add comprehensive error handling', 'Implement monitoring and alerting');
+    return suggestions;
+  }
+
+  private calculateSystemHealthScore(analytics: any): any {
+    const totalErrors = analytics.totalErrors;
+    const criticalErrors = analytics.criticalErrors;
+    
+    // Base score calculation (0-100)
+    let overallScore = Math.max(0, 100 - (totalErrors * 0.5) - (criticalErrors * 2));
+    
+    const breakdown = {
+      trading: this.calculateCategoryScore(analytics.errorsByCategory?.TRADING || 0),
+      authentication: this.calculateCategoryScore(analytics.errorsByCategory?.AUTHENTICATION || 0),
+      data: this.calculateCategoryScore(analytics.errorsByCategory?.DATA || 0),
+      network: this.calculateCategoryScore(analytics.errorsByCategory?.NETWORK || 0),
+      ui: this.calculateCategoryScore(analytics.errorsByCategory?.USER_INTERFACE || 0)
+    };
+
+    return {
+      overall: Math.round(overallScore),
+      breakdown
+    };
+  }
+
+  private calculateCategoryScore(errorCount: number): number {
+    return Math.max(0, Math.round(100 - (errorCount * 2)));
+  }
+
+  private generateDailyTrends(dailyData: any[]): number[] {
+    const trends = new Array(30).fill(0);
+    const today = new Date();
+    
+    dailyData.forEach(item => {
+      const date = new Date(item._id);
+      const daysDiff = Math.floor((today.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+      if (daysDiff >= 0 && daysDiff < 30) {
+        trends[29 - daysDiff] = item.count;
+      }
+    });
+
+    return trends;
+  }
+
+  private generateWeeklyTrends(weeklyData: any[]): number[] {
+    const trends = new Array(12).fill(0);
+    
+    weeklyData.forEach((item, index) => {
+      if (index < 12) {
+        trends[index] = item.count;
+      }
+    });
+
+    return trends;
   }
 
   /**
@@ -542,77 +1026,163 @@ export class ErrorLoggingService {
   }
 
   /**
-   * Classify error based on type and context
+   * Classify error using the enhanced error classification service
    */
-  private classifyError(error: any, errorType?: string): ErrorClassification {
-    // Default classification
-    let classification: ErrorClassification = {
-      type: 'system' as ErrorType,
-      severity: 'medium' as ErrorSeverity,
-      retryable: false,
-      userMessage: 'An unexpected error occurred',
-      technicalDetails: error?.message || 'Unknown error',
-      suggestedActions: ['Contact support if the issue persists']
+  private classifyError(error: any, errorType?: string, context?: any): ErrorClassification {
+    // Use the enhanced error classification service
+    const enhancedError = this.errorClassificationService.classifyError(error, context);
+    return enhancedError.classification;
+  }
+
+  /**
+   * Categorize errors by business domain
+   */
+  public categorizeError(error: any, context: any): {
+    category: string;
+    subcategory: string;
+    businessImpact: 'low' | 'medium' | 'high' | 'critical';
+    affectedFeatures: string[];
+  } {
+    const component = context.component?.toLowerCase() || '';
+    const operation = context.operation?.toLowerCase() || '';
+    const brokerName = context.brokerName?.toLowerCase() || '';
+
+    // Trading-related errors
+    if (component.includes('broker') || component.includes('order') || component.includes('trading')) {
+      return {
+        category: 'TRADING',
+        subcategory: this.getTradingSubcategory(operation, error),
+        businessImpact: this.getTradingBusinessImpact(error, context),
+        affectedFeatures: this.getTradingAffectedFeatures(component, operation)
+      };
+    }
+
+    // Authentication and authorization errors
+    if (component.includes('auth') || operation.includes('login') || operation.includes('auth')) {
+      return {
+        category: 'AUTHENTICATION',
+        subcategory: this.getAuthSubcategory(operation, error),
+        businessImpact: 'high',
+        affectedFeatures: ['User Login', 'Session Management', 'API Access']
+      };
+    }
+
+    // Data and database errors
+    if (component.includes('database') || component.includes('data') || operation.includes('query')) {
+      return {
+        category: 'DATA',
+        subcategory: this.getDataSubcategory(operation, error),
+        businessImpact: this.getDataBusinessImpact(error, context),
+        affectedFeatures: this.getDataAffectedFeatures(component, operation)
+      };
+    }
+
+    // API and network errors
+    if (component.includes('api') || component.includes('network') || error?.code?.startsWith('E')) {
+      return {
+        category: 'NETWORK',
+        subcategory: this.getNetworkSubcategory(error),
+        businessImpact: 'medium',
+        affectedFeatures: ['API Communication', 'External Services', 'Real-time Data']
+      };
+    }
+
+    // UI and frontend errors
+    if (context.source === 'UI' || component.includes('ui') || component.includes('frontend')) {
+      return {
+        category: 'USER_INTERFACE',
+        subcategory: this.getUISubcategory(operation, error),
+        businessImpact: 'low',
+        affectedFeatures: ['User Experience', 'Frontend Components']
+      };
+    }
+
+    // Default system category
+    return {
+      category: 'SYSTEM',
+      subcategory: 'GENERAL',
+      businessImpact: 'medium',
+      affectedFeatures: ['System Stability']
     };
+  }
 
-    // Classify based on error type or error properties
-    if (errorType) {
-      switch (errorType.toLowerCase()) {
-        case 'broker_api_error':
-        case 'broker':
-          classification.type = 'broker';
-          classification.severity = 'high';
-          classification.retryable = true;
-          classification.userMessage = 'Broker service is temporarily unavailable';
-          classification.suggestedActions = ['Retry the operation', 'Check broker connection'];
-          break;
+  private getTradingSubcategory(operation: string, error: any): string {
+    if (operation.includes('place') || operation.includes('order')) return 'ORDER_PLACEMENT';
+    if (operation.includes('cancel')) return 'ORDER_CANCELLATION';
+    if (operation.includes('modify')) return 'ORDER_MODIFICATION';
+    if (operation.includes('portfolio') || operation.includes('position')) return 'PORTFOLIO_MANAGEMENT';
+    if (operation.includes('market') || operation.includes('data')) return 'MARKET_DATA';
+    return 'GENERAL_TRADING';
+  }
 
-        case 'authentication':
-        case 'auth_error':
-          classification.type = 'authentication';
-          classification.severity = 'high';
-          classification.retryable = false;
-          classification.userMessage = 'Authentication failed';
-          classification.suggestedActions = ['Please log in again', 'Check your credentials'];
-          break;
+  private getTradingBusinessImpact(error: any, context: any): 'low' | 'medium' | 'high' | 'critical' {
+    const message = error?.message?.toLowerCase() || '';
+    if (message.includes('insufficient') || message.includes('funds')) return 'medium';
+    if (message.includes('market') && message.includes('closed')) return 'low';
+    if (message.includes('connection') || message.includes('timeout')) return 'high';
+    if (context.operation?.includes('place') || context.operation?.includes('order')) return 'high';
+    return 'medium';
+  }
 
-        case 'validation':
-        case 'validation_error':
-          classification.type = 'validation';
-          classification.severity = 'low';
-          classification.retryable = false;
-          classification.userMessage = 'Invalid input provided';
-          classification.suggestedActions = ['Check your input and try again'];
-          break;
+  private getTradingAffectedFeatures(component: string, operation: string): string[] {
+    const features = ['Trading Operations'];
+    if (component.includes('broker')) features.push('Broker Integration');
+    if (operation.includes('order')) features.push('Order Management');
+    if (operation.includes('portfolio')) features.push('Portfolio Tracking');
+    return features;
+  }
 
-        case 'network':
-        case 'network_error':
-          classification.type = 'network';
-          classification.severity = 'medium';
-          classification.retryable = true;
-          classification.userMessage = 'Network connection issue';
-          classification.suggestedActions = ['Check your internet connection', 'Retry the operation'];
-          break;
-      }
-    }
+  private getAuthSubcategory(operation: string, error: any): string {
+    if (operation.includes('login')) return 'LOGIN';
+    if (operation.includes('logout')) return 'LOGOUT';
+    if (operation.includes('token') || operation.includes('refresh')) return 'TOKEN_MANAGEMENT';
+    if (operation.includes('session')) return 'SESSION_MANAGEMENT';
+    return 'GENERAL_AUTH';
+  }
 
-    // Classify based on error message or properties
-    if (error?.message) {
-      const message = error.message.toLowerCase();
-      
-      if (message.includes('timeout') || message.includes('network')) {
-        classification.type = 'network';
-        classification.retryable = true;
-      } else if (message.includes('unauthorized') || message.includes('forbidden')) {
-        classification.type = 'authentication';
-        classification.severity = 'high';
-      } else if (message.includes('validation') || message.includes('invalid')) {
-        classification.type = 'validation';
-        classification.severity = 'low';
-      }
-    }
+  private getDataSubcategory(operation: string, error: any): string {
+    if (operation.includes('query') || operation.includes('find')) return 'DATA_RETRIEVAL';
+    if (operation.includes('save') || operation.includes('create')) return 'DATA_CREATION';
+    if (operation.includes('update') || operation.includes('modify')) return 'DATA_MODIFICATION';
+    if (operation.includes('delete') || operation.includes('remove')) return 'DATA_DELETION';
+    if (operation.includes('connection')) return 'DATABASE_CONNECTION';
+    return 'GENERAL_DATA';
+  }
 
-    return classification;
+  private getDataBusinessImpact(error: any, context: any): 'low' | 'medium' | 'high' | 'critical' {
+    const message = error?.message?.toLowerCase() || '';
+    if (message.includes('connection') || message.includes('timeout')) return 'critical';
+    if (message.includes('duplicate') || message.includes('constraint')) return 'medium';
+    if (context.operation?.includes('critical') || context.operation?.includes('order')) return 'high';
+    return 'medium';
+  }
+
+  private getDataAffectedFeatures(component: string, operation: string): string[] {
+    const features = ['Data Management'];
+    if (component.includes('symbol')) features.push('Symbol Management');
+    if (component.includes('user')) features.push('User Management');
+    if (component.includes('order')) features.push('Order Data');
+    if (component.includes('portfolio')) features.push('Portfolio Data');
+    return features;
+  }
+
+  private getNetworkSubcategory(error: any): string {
+    const code = error?.code || '';
+    const message = error?.message?.toLowerCase() || '';
+    
+    if (code === 'ECONNREFUSED' || message.includes('connection refused')) return 'CONNECTION_REFUSED';
+    if (code === 'ETIMEDOUT' || message.includes('timeout')) return 'TIMEOUT';
+    if (code === 'ENOTFOUND' || message.includes('not found')) return 'DNS_RESOLUTION';
+    if (message.includes('rate limit')) return 'RATE_LIMITING';
+    return 'GENERAL_NETWORK';
+  }
+
+  private getUISubcategory(operation: string, error: any): string {
+    if (operation.includes('render') || operation.includes('component')) return 'COMPONENT_RENDERING';
+    if (operation.includes('navigation') || operation.includes('route')) return 'NAVIGATION';
+    if (operation.includes('form') || operation.includes('input')) return 'FORM_HANDLING';
+    if (operation.includes('api') || operation.includes('request')) return 'API_INTEGRATION';
+    return 'GENERAL_UI';
   }
 
   /**

@@ -27,6 +27,7 @@ import startupRoutes from './routes/startup';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
+import { traceMiddleware } from './middleware/traceMiddleware';
 import { validateEnv } from './utils/validateEnv';
 import { logger } from './utils/logger';
 import websocketService from './services/websocketService';
@@ -99,6 +100,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request ID middleware
 app.use(requestIdMiddleware);
+
+// Trace ID middleware (must be before other middleware that might use trace context)
+app.use(traceMiddleware);
 
 // Performance monitoring middleware
 app.use(performanceMonitoring);

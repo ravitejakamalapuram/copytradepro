@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { traceIdService } from '../services/traceIdService';
 import { logger } from '../utils/logger';
+import { TraceContext, TraceContextData } from '../utils/traceContext';
 
 // Extend Express Request interface to include trace context
 declare global {
@@ -36,6 +37,21 @@ export const traceMiddleware = async (
 
     // Add trace ID to response headers
     res.setHeader('x-trace-id', traceId);
+
+    // Create trace context data
+    const traceContextData: TraceContextData = {
+      traceId,
+      userId: (req as any).user?.id,
+      sessionId: (req as any).sessionID,
+      requestId: traceId,
+      userAgent: req.get('User-Agent') || undefined,
+      ipAddress: req.ip || undefined,
+      operation: 'HTTP_REQUEST',
+      component: 'REQUEST_HANDLER'
+    };
+
+    // Set trace context for the entire request lifecycle
+    TraceContext.setContext(traceContextData);
 
     // Log request start
     await traceIdService.addOperation(
@@ -111,7 +127,10 @@ export const traceMiddleware = async (
       return originalEnd.call(this, chunk, encoding, cb);
     };
 
-    next();
+    // Execute the rest of the middleware chain within trace context
+    TraceContext.run(traceContextData, () => {
+      next();
+    });
   } catch (error) {
     logger.error('Error in trace middleware', {
       component: 'TRACE_MIDDLEWARE',
