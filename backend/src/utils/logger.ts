@@ -4,6 +4,8 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { EnhancedError, ErrorContext } from '../types/errorTypes';
+import { errorLoggingService } from '../services/errorLoggingService';
+import { traceIdService } from '../services/traceIdService';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'critical';
 
@@ -53,6 +55,11 @@ export interface Logger {
   logBrokerOperation(operation: string, brokerName: string, context?: LogContext, data?: any): void;
   logSystemEvent(event: string, context?: LogContext, data?: any): void;
   logError(error: EnhancedError): void;
+  
+  // Enhanced error logging with trace ID
+  logErrorWithTrace(message: string, error: any, context: LogContext & { component: string; operation: string }): Promise<string>;
+  logWarningWithTrace(message: string, context: LogContext & { component: string; operation: string }): Promise<string>;
+  logInfoWithTrace(message: string, context: LogContext & { component: string; operation: string }): Promise<string>;
   
   // Context management
   createChildLogger(context: LogContext): Logger;
@@ -277,6 +284,98 @@ export class EnhancedLogger implements Logger {
       classification: error.classification,
       originalError: error.originalError
     });
+  }
+
+  // Enhanced error logging with trace ID integration
+  async logErrorWithTrace(
+    message: string, 
+    error: any, 
+    context: LogContext & { component: string; operation: string }
+  ): Promise<string> {
+    // Log to console immediately
+    this.error(message, context, error);
+
+    // Log to enhanced error logging service
+    try {
+      const errorId = await errorLoggingService.logError(message, error, {
+        traceId: context.requestId, // Use requestId as traceId if available
+        component: context.component,
+        operation: context.operation,
+        source: 'BE',
+        userId: context.userId,
+        sessionId: context.sessionId,
+        brokerName: context.brokerName,
+        accountId: context.accountId,
+        url: context.url,
+        method: context.method,
+        statusCode: context.status,
+        duration: context.duration,
+        retryCount: context.retryCount,
+        userAgent: context.userAgent,
+        ipAddress: context.ipAddress
+      });
+      return errorId;
+    } catch (loggingError) {
+      this.error('Failed to log error to enhanced logging service', {
+        component: 'LOGGER',
+        operation: 'LOG_ERROR_WITH_TRACE'
+      }, loggingError);
+      return '';
+    }
+  }
+
+  async logWarningWithTrace(
+    message: string, 
+    context: LogContext & { component: string; operation: string }
+  ): Promise<string> {
+    // Log to console immediately
+    this.warn(message, context);
+
+    // Log to enhanced error logging service
+    try {
+      const errorId = await errorLoggingService.logWarning(message, {
+        traceId: context.requestId,
+        component: context.component,
+        operation: context.operation,
+        source: 'BE',
+        userId: context.userId,
+        brokerName: context.brokerName
+      });
+      return errorId;
+    } catch (loggingError) {
+      this.error('Failed to log warning to enhanced logging service', {
+        component: 'LOGGER',
+        operation: 'LOG_WARNING_WITH_TRACE'
+      }, loggingError);
+      return '';
+    }
+  }
+
+  async logInfoWithTrace(
+    message: string, 
+    context: LogContext & { component: string; operation: string }
+  ): Promise<string> {
+    // Log to console immediately
+    this.info(message, context);
+
+    // Log to enhanced error logging service
+    try {
+      const errorId = await errorLoggingService.logInfo(message, {
+        traceId: context.requestId,
+        component: context.component,
+        operation: context.operation,
+        source: 'BE',
+        userId: context.userId,
+        brokerName: context.brokerName
+      });
+      return errorId;
+    } catch (loggingError) {
+      this.error('Failed to log info to enhanced logging service', {
+        component: 'LOGGER',
+        operation: 'LOG_INFO_WITH_TRACE'
+      }, loggingError);
+      return '';
+    }
   }
 
   // Context management
