@@ -273,65 +273,17 @@ class MarketDataService {
     }
   }
 
-  /**
-   * Search symbols using NSE API with caching (legacy method)
-   */
-  async searchSymbols(query: string, limit: number = 10, exchange: string = 'NSE'): Promise<any> {
-    if (query.length < 2) {
-      return { success: false, data: [] };
-    }
-
-    // Check cache first
-    const cacheKey = `${query.toLowerCase()}:${exchange}:${limit}`;
-    const cachedEntry = this.cache.searches.get(cacheKey);
-    
-    if (cachedEntry && this.isCacheValid(cachedEntry)) {
-      console.log(`📊 Returning cached search results for "${query}"`);
-      return { success: true, data: cachedEntry!.data };
-    }
-
-    try {
-      const response = await fetch(`/api/market-data/search/${encodeURIComponent(query)}?limit=${limit}&exchange=${exchange}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result = await response.json();
-      
-      // Cache the search results
-      if (result.success && result.data) {
-        const cacheEntry: CacheEntry<SymbolSearchResult[]> = {
-          data: result.data,
-          timestamp: new Date(),
-          ttl: this.CACHE_TTL.SEARCH,
-          source: 'rest'
-        };
-        this.cache.searches.set(cacheKey, cacheEntry);
-        console.log(`📊 Cached search results for "${query}"`);
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Symbol search failed:', error);
-      return { success: false, data: [] };
-    }
-  }
+  // Legacy searchSymbols method removed - use searchUnifiedSymbols instead
 
   /**
-   * NEW: Unified search for all instruments (equity + F&O) with caching
+   * NEW: Enhanced unified search for all instruments (equity + F&O) with fuzzy matching
    */
   async searchUnifiedSymbols(
     query: string, 
     type: 'all' | 'equity' | 'options' | 'futures' = 'all',
     limit: number = 20,
-    includePrices: boolean = false
+    includePrices: boolean = false,
+    enableFuzzy: boolean = true
   ): Promise<any> {
     if (query.length < 2) {
       return { 
@@ -341,11 +293,11 @@ class MarketDataService {
     }
 
     // Check cache first
-    const cacheKey = `unified:${query.toLowerCase()}:${type}:${limit}:${includePrices}`;
+    const cacheKey = `unified:${query.toLowerCase()}:${type}:${limit}:${includePrices}:${enableFuzzy}`;
     const cachedEntry = this.cache.searches.get(cacheKey);
     
     if (cachedEntry && this.isCacheValid(cachedEntry)) {
-      console.log(`📊 Returning cached unified search results for "${query}"`);
+      console.log(`📊 Returning cached enhanced search results for "${query}"`);
       return { success: true, data: cachedEntry!.data };
     }
 
@@ -353,6 +305,7 @@ class MarketDataService {
       const params = new URLSearchParams({
         type,
         limit: limit.toString(),
+        fuzzy: enableFuzzy ? 'true' : 'false',
         ...(includePrices && { includePrices: 'true' })
       });
 
@@ -382,12 +335,12 @@ class MarketDataService {
           source: 'rest'
         };
         this.cache.searches.set(cacheKey, cacheEntry);
-        console.log(`📊 Cached unified search results for "${query}"`);
+        console.log(`📊 Cached enhanced search results for "${query}" (fuzzy: ${enableFuzzy})`);
       }
 
       return result;
     } catch (error) {
-      console.error('Unified symbol search failed:', error);
+      console.error('Enhanced unified symbol search failed:', error);
       return { 
         success: false, 
         data: { equity: [], options: [], futures: [], total: 0 } 
@@ -577,7 +530,7 @@ class MarketDataService {
   /**
    * Get top value stocks
    */
-  async getTopValueStocks(): Promise<any> {
+  async getTopValueStocks(): Promise<unknown> {
     try {
       const response = await fetch('/api/market-data/top-value', {
         method: 'GET',

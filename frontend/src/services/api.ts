@@ -3,6 +3,7 @@ import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, Inte
 import { frontendLogger } from './loggingService';
 import { apiCache } from './cacheManager';
 import { performanceMonitorService } from './performanceMonitorService';
+import { shouldLogoutOnError, handleSessionExpiry } from '../utils/sessionUtils';
 
 // Enhanced request configuration with retry metadata
 interface EnhancedAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -189,23 +190,21 @@ api.interceptors.response.use(
       }
     }
 
-    // Handle authentication errors
+    // Handle authentication errors - only logout for actual session expiry
     if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
       const url = config?.url || '';
       const isDevelopment = import.meta.env.DEV;
-
-      if (isDevelopment) {
-        console.log('🔍 Auth error in development, keeping user logged in:', url);
+      
+      if (shouldLogoutOnError(axiosError, url, isDevelopment)) {
+        handleSessionExpiry(`API call to ${url} failed with session expiry`);
       } else {
-        // Production: Only logout for authentication-related endpoints
-        if (url.includes('/auth/') || url.includes('/profile')) {
-          console.log('🚨 User authentication failed, logging out');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/';
-        } else {
-          console.log('🔍 Broker operation failed, keeping user logged in');
-        }
+        const errorMessage = (axiosError.response?.data as any)?.message || '';
+        console.log('🔍 API error (not session expiry), keeping user logged in:', { 
+          url, 
+          errorMessage, 
+          status: axiosError.response?.status,
+          isDevelopment 
+        });
       }
     }
 

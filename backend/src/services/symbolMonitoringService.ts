@@ -49,7 +49,7 @@ export interface DatabasePerformanceMetrics {
   operation: string;
   collection: string;
   duration: number;
-  queryType: 'find' | 'findOne' | 'countDocuments' | 'updateMany' | 'insertMany' | 'deleteMany';
+  queryType: 'find' | 'findOne' | 'countDocuments' | 'updateMany' | 'insertMany' | 'deleteMany' | 'aggregate';
   indexUsed: boolean;
   documentsExamined: number;
   documentsReturned: number;

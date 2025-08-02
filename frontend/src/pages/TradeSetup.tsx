@@ -6,7 +6,7 @@ import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/b
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
 import { marketDataService } from '../services/marketDataService';
-import { symbolDatabaseService } from '../services/symbolDatabaseService';
+
 import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
 import Button from '../components/ui/Button';
@@ -27,6 +27,7 @@ type SymbolSearchResult = {
   optionType?: 'CE' | 'PE';
   strikePrice?: number;
   expiryDate?: string;
+  relevanceScore?: number;
 };
 type FailedOrderResult = { accountId: string };
 
@@ -172,33 +173,47 @@ const TradeSetup: React.FC = () => {
 
         let results: SymbolSearchResult[] = [];
 
-        if (activeTab === 'EQUITY') {
-          // Use existing market data service for equity
-          const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
-          const equityResults = response.success ? response.data.results : [];
-          
-          results = equityResults.map((result: { symbol: string; name: string; exchange: string; token?: string }) => ({
-            symbol: result.symbol,
-            name: result.name,
-            exchange: result.exchange,
-            ltp: 0,
-            token: result.token || null,
-            instrumentType: 'EQUITY' as const
-          }));
-        } else {
-          // Use symbol database service for F&O instruments
-          const foResults = await symbolDatabaseService.searchInstruments(searchTerm, activeTab, 8);
-          
-          results = foResults.map(result => ({
-            symbol: result.symbol,
-            name: result.name || result.symbol,
-            exchange: result.exchange,
-            token: result.token || null,
-            instrumentType: result.instrumentType,
-            optionType: result.optionType,
-            strikePrice: result.strikePrice,
-            expiryDate: result.expiryDate
-          }));
+        // Use unified search API for all instrument types
+        const searchType = activeTab === 'EQUITY' ? 'equity' : 
+                          activeTab === 'OPTION' ? 'options' : 
+                          activeTab === 'FUTURE' ? 'futures' : 'all';
+        
+        const response = await marketDataService.searchUnifiedSymbols(searchTerm, searchType, 8, false, true);
+        
+        if (response.success && response.data) {
+          if (activeTab === 'EQUITY' && response.data.equity) {
+            results = response.data.equity.map((result: any) => ({
+              symbol: result.tradingSymbol || result.symbol,
+              name: result.name || result.displayName,
+              exchange: result.exchange,
+              ltp: result.price || 0,
+              token: result.token || null,
+              instrumentType: 'EQUITY' as const,
+              relevanceScore: result.relevanceScore || 0
+            }));
+          } else if (activeTab === 'OPTION' && response.data.options) {
+            results = response.data.options.map((result: any) => ({
+              symbol: result.tradingSymbol || result.symbol,
+              name: result.name || result.displayName,
+              exchange: result.exchange,
+              token: result.token || null,
+              instrumentType: 'OPTION' as const,
+              optionType: result.optionType,
+              strikePrice: result.strikePrice,
+              expiryDate: result.expiryDate,
+              relevanceScore: result.relevanceScore || 0
+            }));
+          } else if (activeTab === 'FUTURE' && response.data.futures) {
+            results = response.data.futures.map((result: unknown) => ({
+              symbol: result.tradingSymbol || result.symbol,
+              name: result.name || result.displayName,
+              exchange: result.exchange,
+              token: result.token || null,
+              instrumentType: 'FUTURE' as const,
+              expiryDate: result.expiryDate,
+              relevanceScore: result.relevanceScore || 0
+            }));
+          }
         }
 
         console.log(`✅ Frontend: Found ${results.length} results for ${activeTab}:`, results);
@@ -219,7 +234,7 @@ const TradeSetup: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [orderForm.exchange, activeTab]);
+  }, [activeTab]);
 
   const handleSymbolSelect = (selectedSymbol: unknown) => {
     if (

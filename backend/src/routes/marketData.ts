@@ -2,6 +2,7 @@ import express from 'express';
 import { marketDataService } from '../services/marketDataService';
 import { authenticateToken } from '../middleware/auth';
 import { symbolDatabaseService } from '../services/symbolDatabaseService';
+import { logger } from '../utils/logger';
 
 const router = express.Router();
 
@@ -102,114 +103,18 @@ router.get('/indices', authenticateToken, async (req: any, res: any) => {
   });
 });
 
-/**
- * Search for symbols (for autocomplete) - LEGACY ENDPOINT
- * Use /search-unified for new unified search with F&O support
- */
-router.get('/search/:query', authenticateToken, async (req: any, res: any) => {
-  try {
-    const { query } = req.params;
-    const { limit = 10, exchange = 'NSE', includePrices = 'false' } = req.query;
-    const userId = req.user?.id;
-
-    if (!query || query.length < 2) {
-      return res.status(400).json({
-        success: false,
-        error: 'Query must be at least 2 characters long'
-      });
-    }
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
-
-    console.log(`🔍 Symbol search request: query="${query}", limit=${limit}, exchange=${exchange}, userId=${userId}`);
-
-    // Use NSE official symbol database for search (broker-independent)
-    let searchResults: any[] = [];
-
-    try {
-      console.log(`🔍 Searching symbols for query: "${query}" on ${exchange}`);
-
-      // Search using symbol database service with exchange filter
-      const exchangeFilter = exchange === 'NSE' ? 'NSE' : exchange === 'BSE' ? 'BSE' : 'ALL';
-      const unifiedResults = await symbolDatabaseService.searchSymbols(query, parseInt(limit as string), exchangeFilter);
-
-      searchResults = unifiedResults.map((result: any) => ({
-        symbol: result.tradingSymbol,  // Use trading symbol for order placement
-        displaySymbol: result.symbol,  // Original symbol for display
-        name: result.name,
-        exchange: result.exchange,
-        instrument_type: result.instrument_type,
-        isin: result.isin,
-        series: result.series,
-        group: result.group,
-        source: `${result.exchange.toLowerCase()}_official`
-      }));
-
-      console.log(`📊 Search results: ${searchResults.length} symbols found across ${exchangeFilter}`);
-
-    } catch (error: any) {
-      console.error('❌ NSE symbol search failed:', error.message);
-      searchResults = [];
-    }
-
-    // Fetch live prices for search results (only if requested)
-    const symbols = searchResults.map((r: any) => r.symbol);
-    let prices = new Map();
-
-    if (includePrices === 'true' && symbols.length > 0) {
-      try {
-        console.log(`💰 Fetching prices for ${symbols.length} symbols...`);
-        prices = await marketDataService.getPrices(symbols, exchange as string);
-        console.log(`💰 Fetched prices for ${prices.size} symbols`);
-      } catch (error) {
-        console.warn('⚠️ Failed to fetch live prices, continuing without prices');
-      }
-    } else {
-      console.log(`⚡ Skipping price fetch for faster search response`);
-    }
-
-    const enrichedResults = searchResults.map((stock: any) => ({
-      ...stock,
-      price: prices.get(stock.symbol)?.price || null,
-      change: prices.get(stock.symbol)?.change || null,
-      changePercent: prices.get(stock.symbol)?.changePercent || null
-    }));
-
-    // Determine actual source based on what happened
-    const source = 'live_broker_api';
-
-    return res.json({
-      success: true,
-      data: {
-        results: enrichedResults,
-        count: enrichedResults.length,
-        query,
-        source: source,
-        exchange: exchange
-      }
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to search symbols:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to search symbols',
-      details: error.message
-    });
-  }
-});
+// Legacy search endpoint removed - use /search-unified instead
 
 /**
- * NEW: Unified search for all instruments (equity + F&O)
+ * Unified search for all instruments using new unified service
  */
 router.get('/search-unified/:query', authenticateToken, async (req: any, res: any) => {
   try {
+    const { unifiedInstrumentService } = require('../services/unifiedInstrumentService');
+    const { formatSearchResults, createSearchErrorResponse } = require('../utils/searchHelpers');
+    
     const { query } = req.params;
-    const { limit = 20, type = 'all', includePrices = 'false' } = req.query;
+    const { limit = 20, type = 'all', includePrices = 'false', fuzzy = 'true' } = req.query;
     const userId = req.user?.id;
 
     if (!query || query.length < 2) {
@@ -226,25 +131,36 @@ router.get('/search-unified/:query', authenticateToken, async (req: any, res: an
       });
     }
 
-    console.log(`🔍 Unified search request: query="${query}", limit=${limit}, type=${type}, userId=${userId}`);
+    logger.info('Unified search request', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'SEARCH_UNIFIED',
+      query: query.substring(0, 50),
+      type,
+      limit: parseInt(limit as string),
+      fuzzy: fuzzy === 'true',
+      userId
+    });
 
+    const startTime = Date.now();
     let searchResults: any;
+    const enableFuzzy = fuzzy === 'true';
+    const searchLimit = parseInt(limit as string);
 
     if (type === 'all') {
-      // Search all instrument types
-      searchResults = await symbolDatabaseService.searchAllInstruments(query, parseInt(limit as string));
+      // Search all instrument types with categorized results
+      searchResults = await unifiedInstrumentService.searchAllCategorized(query, searchLimit, enableFuzzy);
     } else if (type === 'equity') {
       // Search equity only
-      const equity = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
-      searchResults = { equity, options: [], futures: [], total: equity.length };
+      const equity = await unifiedInstrumentService.searchEquity(query, searchLimit, enableFuzzy);
+      searchResults = { equity, options: [], futures: [], total: equity.length, searchTime: Date.now() - startTime };
     } else if (type === 'options') {
       // Search options only
-      const options = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
-      searchResults = { equity: [], options, futures: [], total: options.length };
+      const options = await unifiedInstrumentService.searchOptions(query, searchLimit, enableFuzzy);
+      searchResults = { equity: [], options, futures: [], total: options.length, searchTime: Date.now() - startTime };
     } else if (type === 'futures') {
       // Search futures only
-      const futures = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
-      searchResults = { equity: [], options: [], futures, total: futures.length };
+      const futures = await unifiedInstrumentService.searchFutures(query, searchLimit, enableFuzzy);
+      searchResults = { equity: [], options: [], futures, total: futures.length, searchTime: Date.now() - startTime };
     } else {
       return res.status(400).json({
         success: false,
@@ -253,10 +169,15 @@ router.get('/search-unified/:query', authenticateToken, async (req: any, res: an
     }
 
     // Optionally fetch prices for equity instruments
-    if (includePrices === 'true' && searchResults.equity.length > 0) {
+    if (includePrices === 'true' && searchResults.equity && searchResults.equity.length > 0) {
       try {
         const equitySymbols = searchResults.equity.map((r: any) => r.tradingSymbol);
-        console.log(`💰 Fetching prices for ${equitySymbols.length} equity symbols...`);
+        logger.info('Fetching prices for equity symbols', {
+          component: 'MARKET_DATA_ROUTE',
+          operation: 'FETCH_PRICES',
+          symbolCount: equitySymbols.length
+        });
+        
         const prices = await marketDataService.getPrices(equitySymbols, 'NSE');
         
         // Enrich equity results with prices
@@ -267,13 +188,28 @@ router.get('/search-unified/:query', authenticateToken, async (req: any, res: an
           changePercent: prices.get(stock.tradingSymbol)?.changePercent || null
         }));
         
-        console.log(`💰 Fetched prices for ${prices.size} equity symbols`);
+        logger.info('Prices fetched successfully', {
+          component: 'MARKET_DATA_ROUTE',
+          operation: 'FETCH_PRICES_SUCCESS',
+          priceCount: prices.size
+        });
       } catch (error) {
-        console.warn('⚠️ Failed to fetch live prices, continuing without prices');
+        logger.warn('Failed to fetch live prices, continuing without prices', {
+          component: 'MARKET_DATA_ROUTE',
+          operation: 'FETCH_PRICES_WARNING'
+        }, error);
       }
     }
 
-    console.log(`✅ Unified search completed: ${searchResults.total} total results`);
+    const searchTime = searchResults.searchTime || (Date.now() - startTime);
+    
+    logger.info('Unified search completed', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'SEARCH_UNIFIED_SUCCESS',
+      totalResults: searchResults.total,
+      searchTime,
+      fuzzyEnabled: enableFuzzy
+    });
 
     return res.json({
       success: true,
@@ -281,14 +217,25 @@ router.get('/search-unified/:query', authenticateToken, async (req: any, res: an
         ...searchResults,
         query,
         type,
-        source: 'unified_search'
+        fuzzyEnabled: enableFuzzy,
+        source: 'unified_instrument_service'
+      },
+      meta: {
+        searchTime,
+        timestamp: new Date().toISOString()
       }
     });
   } catch (error: any) {
-    console.error('❌ Failed to perform unified search:', error);
+    const searchTime = Date.now() - (req.startTime || Date.now());
+    logger.error('Unified search failed', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'SEARCH_UNIFIED_ERROR'
+    }, error);
+
+    const { createSearchErrorResponse } = require('../utils/searchHelpers');
+    const errorResponse = createSearchErrorResponse(error, searchTime);
     return res.status(500).json({
-      success: false,
-      error: 'Failed to perform unified search',
+      ...errorResponse,
       details: error.message
     });
   }
@@ -513,42 +460,7 @@ router.post('/force-update-fo', authenticateToken, async (req: any, res: any) =>
   }
 });
 
-/**
- * Debug endpoint to check F&O database status
- */
-router.get('/debug-fo-status', authenticateToken, async (req: any, res: any) => {
-  try {
-    const mongoose = require('mongoose');
-    const db = mongoose.connection.db;
-    const collection = db.collection('fo_instruments');
-    
-    const totalCount = await collection.countDocuments();
-    const sampleDocs = await collection.find({}).limit(5).toArray();
-    
-    // Check different instrument types
-    const ceCount = await collection.countDocuments({ instrument_type: 'CE' });
-    const peCount = await collection.countDocuments({ instrument_type: 'PE' });
-    const futCount = await collection.countDocuments({ instrument_type: 'FUT' });
-    
-    return res.json({
-      success: true,
-      data: {
-        totalDocuments: totalCount,
-        callOptionsCount: ceCount,
-        putOptionsCount: peCount,
-        futuresCount: futCount,
-        sampleDocuments: sampleDocs
-      }
-    });
-  } catch (error: any) {
-    console.error('❌ Failed to check F&O database status:', error);
-    return res.status(500).json({
-      success: false,
-      error: 'Failed to check F&O database status',
-      details: error.message
-    });
-  }
-});
+// Legacy debug endpoint removed - using unified database instead
 
 /**
  * Get NSE gainers - DISABLED
@@ -677,28 +589,53 @@ router.post('/cache/clear', authenticateToken, async (req: any, res: any) => {
 });
 
 /**
- * Get option chain for an underlying symbol
+ * Get option chain for an underlying symbol using unified service
  */
 router.get('/option-chain/:underlying', authenticateToken, async (req: any, res: any) => {
   try {
+    const { unifiedInstrumentService } = require('../services/unifiedInstrumentService');
     const { underlying } = req.params;
     const { expiry } = req.query;
 
-    console.log(`📊 Fetching option chain for ${underlying}${expiry ? ` (expiry: ${expiry})` : ''}`);
+    logger.info('Option chain request', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GET_OPTION_CHAIN',
+      underlying,
+      expiry
+    });
 
-    const optionChain = await symbolDatabaseService.getOptionChain(underlying, expiry as string);
+    const optionChain = await unifiedInstrumentService.getOptionChain(underlying, expiry as string);
+
+    logger.info('Option chain retrieved', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GET_OPTION_CHAIN_SUCCESS',
+      underlying,
+      callsCount: optionChain.calls.length,
+      putsCount: optionChain.puts.length,
+      expiriesCount: optionChain.expiries.length
+    });
 
     return res.json({
       success: true,
       data: {
         underlying: underlying.toUpperCase(),
         expiry: expiry || 'all',
-        options: optionChain,
-        count: optionChain.length
+        calls: optionChain.calls,
+        puts: optionChain.puts,
+        expiries: optionChain.expiries,
+        totalOptions: optionChain.calls.length + optionChain.puts.length
+      },
+      meta: {
+        timestamp: new Date().toISOString()
       }
     });
   } catch (error: any) {
-    console.error(`❌ Failed to fetch option chain for ${req.params.underlying}:`, error);
+    logger.error('Failed to get option chain', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GET_OPTION_CHAIN_ERROR',
+      underlying: req.params.underlying
+    }, error);
+
     return res.status(500).json({
       success: false,
       error: 'Failed to fetch option chain',
@@ -736,70 +673,89 @@ router.get('/expiry-dates/:underlying', authenticateToken, async (req: any, res:
   }
 });
 
+// Search instruments endpoint removed - use /search-unified instead
+
 /**
- * Search instruments by type (for unified trading interface)
+ * General search endpoint with unified service
  */
-router.get('/search-instruments', authenticateToken, async (req: any, res: any) => {
+router.get('/search', authenticateToken, async (req: any, res: any) => {
   try {
-    const { query, instrumentType, limit = 10 } = req.query;
-    const userId = req.user?.id;
+    const { parseSearchQuery, validateSearchQuery, formatSearchResults, createSearchErrorResponse } = require('../utils/searchHelpers');
+    const { unifiedInstrumentService } = require('../services/unifiedInstrumentService');
 
-    if (!query || query.length < 2) {
+    const searchQuery = parseSearchQuery(req.query);
+    const validation = validateSearchQuery(searchQuery);
+
+    if (!validation.isValid) {
       return res.status(400).json({
         success: false,
-        error: 'Query must be at least 2 characters long'
+        error: 'Invalid search parameters',
+        details: validation.errors,
+        data: []
       });
     }
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        error: 'User not authenticated'
-      });
-    }
+    logger.info('General search request', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GENERAL_SEARCH',
+      hasQuery: !!searchQuery.text,
+      instrumentType: searchQuery.instrumentType,
+      limit: searchQuery.limit
+    });
 
-    if (!instrumentType || !['EQUITY', 'OPTION', 'FUTURE'].includes(instrumentType)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Valid instrumentType required: EQUITY, OPTION, or FUTURE'
-      });
-    }
+    const result = await unifiedInstrumentService.searchInstruments(searchQuery);
+    const response = formatSearchResults(result.instruments, result.total, result.searchTime);
 
-    console.log(`🔍 Instrument search: query="${query}", type=${instrumentType}, limit=${limit}, userId=${userId}`);
+    logger.info('General search completed', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GENERAL_SEARCH_SUCCESS',
+      resultCount: result.instruments.length,
+      searchTime: result.searchTime
+    });
 
-    let searchResults: any[] = [];
+    return res.json(response);
 
-    if (instrumentType === 'EQUITY') {
-      searchResults = await symbolDatabaseService.searchEquityInstruments(query, parseInt(limit as string));
-    } else if (instrumentType === 'OPTION') {
-      searchResults = await symbolDatabaseService.searchOptionsInstruments(query, parseInt(limit as string));
-    } else if (instrumentType === 'FUTURE') {
-      searchResults = await symbolDatabaseService.searchFuturesInstruments(query, parseInt(limit as string));
-    }
+  } catch (error: any) {
+    const searchTime = Date.now() - (req.startTime || Date.now());
+    logger.error('General search failed', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GENERAL_SEARCH_ERROR'
+    }, error);
 
-    // Transform results to match frontend interface
-    const transformedResults = searchResults.map((result: any) => ({
-      symbol: result.tradingSymbol || result.symbol,
-      name: result.name || result.symbol,
-      exchange: result.exchange,
-      token: result.token || null,
-      instrumentType: instrumentType,
-      optionType: result.optionType,
-      strikePrice: result.strikePrice,
-      expiryDate: result.expiryDate
-    }));
+    const { createSearchErrorResponse } = require('../utils/searchHelpers');
+    const errorResponse = createSearchErrorResponse(error, searchTime);
+    return res.status(500).json(errorResponse);
+  }
+});
 
-    console.log(`✅ Found ${transformedResults.length} ${instrumentType} instruments for "${query}"`);
+// Legacy migration endpoint removed - using direct data import instead
+
+/**
+ * Get database statistics
+ */
+router.get('/database-stats', authenticateToken, async (req: any, res: any) => {
+  try {
+    const { unifiedInstrumentService } = require('../services/unifiedInstrumentService');
+
+    const stats = await unifiedInstrumentService.getDatabaseStats();
 
     return res.json({
       success: true,
-      data: transformedResults
+      data: stats,
+      meta: {
+        timestamp: new Date().toISOString()
+      }
     });
+
   } catch (error: any) {
-    console.error('❌ Failed to search instruments:', error);
+    logger.error('Failed to get database stats', {
+      component: 'MARKET_DATA_ROUTE',
+      operation: 'GET_DATABASE_STATS_ERROR'
+    }, error);
+
     return res.status(500).json({
       success: false,
-      error: 'Failed to search instruments',
+      error: 'Failed to get database statistics',
       details: error.message
     });
   }

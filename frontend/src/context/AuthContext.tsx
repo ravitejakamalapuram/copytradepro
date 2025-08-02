@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { User, AuthContextType, LoginCredentials, RegisterCredentials } from '../types/auth';
 import { authService } from '../services/authService';
+import { isSessionExpiredError } from '../utils/sessionUtils';
 
 // Auth state interface
 interface AuthState {
@@ -96,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   payload: { user: response.data.user, token },
                 });
               } else {
-                // Token is invalid - check environment
+                // Token is invalid - check environment and error type
                 const isDevelopment = import.meta.env.DEV;
                 if (isDevelopment) {
                   console.warn('🔑 Token validation failed in development, keeping user logged in');
@@ -110,6 +111,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             } catch (error: any) {
               console.warn(`🔄 Token verification failed (${4 - retries}/3):`, error.message);
+
+              // Check if this is a session expiry error
+              if (isSessionExpiredError(error)) {
+                // Session expired - logout immediately
+                console.warn('🔑 Session expired during token verification, logging out');
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                dispatch({ type: 'LOGOUT' });
+                return;
+              }
 
               if (retries > 1) {
                 // Retry after delay (server might be restarting)

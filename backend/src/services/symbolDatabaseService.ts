@@ -15,7 +15,7 @@ import { symbolMonitoringService } from './symbolMonitoringService';
 import { logger } from '../utils/logger';
 
 export interface SymbolSearchQuery {
-  query?: string | undefined;               // Text search
+  query?: string | undefined;
   instrumentType?: 'EQUITY' | 'OPTION' | 'FUTURE' | undefined;
   exchange?: string | undefined;
   underlying?: string | undefined;
@@ -27,6 +27,7 @@ export interface SymbolSearchQuery {
   isActive?: boolean | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
+  fuzzy?: boolean | undefined;
 }
 
 export interface SymbolSearchResult {
@@ -78,16 +79,25 @@ export class SymbolDatabaseService {
       this.SymbolProcessingLogModel = createSymbolProcessingLogModel(mongoose.connection);
 
       this.isInitialized = true;
-      console.log('✅ Symbol Database Service initialized successfully');
+      logger.info('Symbol Database Service initialized successfully', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'INITIALIZE'
+      });
 
       // Warm the cache after initialization
       setTimeout(() => {
         symbolCacheService.warmCache(this).catch(error => {
-          console.error('🚨 Failed to warm cache during initialization:', error);
+          logger.error('Failed to warm cache during initialization', {
+            component: 'SYMBOL_DATABASE_SERVICE',
+            operation: 'CACHE_WARM'
+          }, error);
         });
-      }, 1000); // Delay to ensure service is fully ready
+      }, 1000);
     } catch (error) {
-      console.error('🚨 Failed to initialize Symbol Database Service:', error);
+      logger.error('Failed to initialize Symbol Database Service', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'INITIALIZE_ERROR'
+      }, error);
       throw error;
     }
   }
@@ -124,7 +134,6 @@ export class SymbolDatabaseService {
     };
   }
 
-
   private logDocToInterface(doc: SymbolProcessingLogDocument): SymbolProcessingLog {
     return {
       id: (doc._id as mongoose.Types.ObjectId).toString(),
@@ -142,8 +151,6 @@ export class SymbolDatabaseService {
     };
   }
 
-  // Standardized Symbol Operations
-  
   /**
    * Create a new standardized symbol
    */
@@ -160,146 +167,576 @@ export class SymbolDatabaseService {
 
       const savedSymbol = await symbolDoc.save();
       
-
-      
-      console.log('✅ Symbol created successfully:', symbolData.tradingSymbol);
+      logger.info('Symbol created successfully', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CREATE_SYMBOL',
+        tradingSymbol: symbolData.tradingSymbol
+      });
       return this.symbolDocToInterface(savedSymbol);
     } catch (error: any) {
       if (error.code === 11000) {
         throw new Error('Symbol already exists with this combination of trading symbol, exchange, expiry, strike, and option type');
       }
-      console.error('🚨 Failed to create symbol:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Replace all symbols with fresh data from source
-   */
-  async upsertSymbols(symbols: CreateStandardizedSymbolData[]): Promise<ProcessingResult> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      logger.info('Starting symbol replacement process', {
+      logger.error('Failed to create symbol', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'REPLACE_ALL_SYMBOLS',
-        inputCount: symbols.length
-      });
-
-      // Step 1: Validate all symbols first
-      const validSymbols: CreateStandardizedSymbolData[] = [];
-      const errors: string[] = [];
-      let invalidSymbols = 0;
-
-      for (const symbolData of symbols) {
-        const validation = this.validateSymbolData(symbolData);
-        if (validation.isValid) {
-          validSymbols.push({
-            ...symbolData,
-            expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate).toISOString().split('T')[0] : undefined
-          });
-        } else {
-          invalidSymbols++;
-          errors.push(`Invalid symbol ${symbolData.tradingSymbol}: ${validation.errors.join(', ')}`);
-        }
-      }
-
-      if (validSymbols.length === 0) {
-        throw new Error('No valid symbols to insert');
-      }
-
-      logger.info('Symbol validation completed', {
-        component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'VALIDATION_COMPLETE',
-        validSymbols: validSymbols.length,
-        invalidSymbols
-      });
-
-      // Step 2: Use transaction for atomic replacement
-      const session = await mongoose.startSession();
-      let result: ProcessingResult = {
-        totalProcessed: symbols.length,
-        validSymbols: validSymbols.length,
-        invalidSymbols,
-        newSymbols: validSymbols.length,
-        updatedSymbols: 0,
-        errors
-      };
-
-      try {
-        await session.withTransaction(async () => {
-          // Clear existing symbols
-          const deleteResult = await this.StandardizedSymbolModel.deleteMany({}, { session });
-          logger.info('Cleared existing symbols', {
-            component: 'SYMBOL_DATABASE_SERVICE',
-            operation: 'CLEAR_EXISTING',
-            deletedCount: deleteResult.deletedCount
-          });
-
-          // Insert new symbols in batches for better performance
-          const batchSize = 1000;
-          const batches = [];
-          for (let i = 0; i < validSymbols.length; i += batchSize) {
-            batches.push(validSymbols.slice(i, i + batchSize));
-          }
-
-          let insertedCount = 0;
-          for (const batch of batches) {
-            const insertResult = await this.StandardizedSymbolModel.insertMany(
-              batch.map(symbol => ({
-                ...symbol,
-                expiryDate: symbol.expiryDate ? new Date(symbol.expiryDate) : undefined
-              })),
-              { session, ordered: false }
-            );
-            insertedCount += insertResult.length;
-            
-            logger.info('Inserted symbol batch', {
-              component: 'SYMBOL_DATABASE_SERVICE',
-              operation: 'BATCH_INSERT',
-              batchSize: batch.length,
-              insertedCount: insertResult.length,
-              totalInserted: insertedCount
-            });
-          }
-
-          result = {
-            totalProcessed: symbols.length,
-            validSymbols: validSymbols.length,
-            invalidSymbols,
-            newSymbols: validSymbols.length, // All are new since we replaced everything
-            updatedSymbols: 0, // None updated since we replaced everything
-            errors
-          };
-        });
-
-        // Clear all symbol cache since we replaced everything
-        symbolCacheService.invalidateAll();
-        
-        logger.info('Symbol replacement completed successfully', {
-          component: 'SYMBOL_DATABASE_SERVICE',
-          operation: 'REPLACE_COMPLETE',
-          ...result!
-        });
-
-        return result;
-
-      } finally {
-        await session.endSession();
-      }
-
-    } catch (error) {
-      logger.error('Failed to replace symbols', {
-        component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'REPLACE_ERROR'
+        operation: 'CREATE_SYMBOL_ERROR',
+        tradingSymbol: symbolData.tradingSymbol
       }, error);
       throw error;
     }
   }
 
+  /**
+   * Upsert (create or update) a standardized symbol
+   */
+  async upsertSymbol(symbolData: CreateStandardizedSymbolData): Promise<StandardizedSymbol> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
 
+      // Build unique filter based on instrument type
+      const filter: any = {
+        tradingSymbol: symbolData.tradingSymbol,
+        exchange: symbolData.exchange,
+        instrumentType: symbolData.instrumentType
+      };
+
+      // Add additional fields for F&O instruments to ensure uniqueness
+      if (symbolData.instrumentType === 'OPTION' || symbolData.instrumentType === 'FUTURE') {
+        if (symbolData.expiryDate) {
+          filter.expiryDate = new Date(symbolData.expiryDate);
+        }
+        if (symbolData.strikePrice) {
+          filter.strikePrice = symbolData.strikePrice;
+        }
+        if (symbolData.optionType) {
+          filter.optionType = symbolData.optionType;
+        }
+      }
+
+      const updateData = {
+        ...symbolData,
+        expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate) : undefined,
+        lastUpdated: new Date(),
+        isActive: true
+      };
+
+      const result = await this.StandardizedSymbolModel.findOneAndUpdate(
+        filter,
+        { $set: updateData },
+        { 
+          upsert: true, 
+          new: true,
+          runValidators: true
+        }
+      );
+
+      return this.symbolDocToInterface(result);
+    } catch (error: any) {
+      logger.error('Failed to upsert symbol', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'UPSERT_SYMBOL_ERROR',
+        tradingSymbol: symbolData.tradingSymbol
+      }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Search symbols with filters using unified approach
+   */
+  async searchSymbolsWithFilters(searchQuery: SymbolSearchQuery): Promise<SymbolSearchResult> {
+    const startTime = Date.now();
+    
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      // Check cache first for search results
+      const cacheKey = symbolCacheService.generateSearchKey(searchQuery);
+      const cachedResult = symbolCacheService.getSearchResults(cacheKey);
+      if (cachedResult) {
+        return cachedResult;
+      }
+
+      // Use MongoDB aggregation for fuzzy search with relevance scoring
+      const pipeline = this.buildFuzzySearchPipeline(searchQuery);
+
+      // Execute aggregation with performance monitoring
+      const aggregateStart = Date.now();
+      const results = await this.StandardizedSymbolModel.aggregate(pipeline);
+      const aggregateDuration = Date.now() - aggregateStart;
+
+      // Extract symbols and total count from aggregation result
+      const symbols = results[0]?.symbols || [];
+      const total = results[0]?.totalCount?.[0]?.count || 0;
+
+      const result = {
+        symbols: symbols.map((symbol: any) => this.symbolDocToInterface(symbol)),
+        total,
+        hasMore: (searchQuery.offset || 0) + symbols.length < total
+      };
+
+      // Record performance metrics
+      symbolMonitoringService.recordDatabaseMetrics({
+        operation: 'fuzzySearchSymbols',
+        collection: 'standardizedsymbols',
+        duration: aggregateDuration,
+        queryType: 'aggregate',
+        indexUsed: true,
+        documentsExamined: total,
+        documentsReturned: symbols.length,
+        success: true
+      });
+
+      // Cache the search result
+      symbolCacheService.cacheSearchResults(cacheKey, result);
+
+      logger.info('MongoDB fuzzy search completed', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'FUZZY_SEARCH',
+        resultCount: symbols.length,
+        duration: Date.now() - startTime
+      });
+      return result;
+    } catch (error) {
+      logger.error('MongoDB fuzzy search failed', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'FUZZY_SEARCH_ERROR'
+      }, error);
+      
+      // Record error metrics
+      symbolMonitoringService.recordDatabaseMetrics({
+        operation: 'fuzzySearchSymbols',
+        collection: 'standardizedsymbols',
+        duration: Date.now() - startTime,
+        queryType: 'aggregate',
+        indexUsed: false,
+        documentsExamined: 0,
+        documentsReturned: 0,
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+
+      return { symbols: [], total: 0, hasMore: false };
+    }
+  }
+
+  /**
+   * Build MongoDB aggregation pipeline for fuzzy search with relevance scoring
+   */
+  private buildFuzzySearchPipeline(searchQuery: SymbolSearchQuery): any[] {
+    const { buildSearchPipeline } = require('../utils/searchHelpers');
+    
+    // Convert SymbolSearchQuery to SearchQuery format
+    const unifiedQuery = {
+      text: searchQuery.query,
+      instrumentType: searchQuery.instrumentType,
+      exchange: searchQuery.exchange,
+      underlying: searchQuery.underlying,
+      strikeMin: searchQuery.strikeMin,
+      strikeMax: searchQuery.strikeMax,
+      expiryStart: searchQuery.expiryStart,
+      expiryEnd: searchQuery.expiryEnd,
+      optionType: searchQuery.optionType,
+      isActive: searchQuery.isActive,
+      limit: searchQuery.limit,
+      offset: searchQuery.offset,
+      fuzzy: searchQuery.fuzzy
+    };
+
+    const pipeline = buildSearchPipeline(unifiedQuery);
+    
+    // Adjust the final facet stage to match expected output format
+    const lastStage = pipeline[pipeline.length - 1];
+    if (lastStage && lastStage.$facet) {
+      lastStage.$facet = {
+        symbols: lastStage.$facet.data || [
+          { $skip: searchQuery.offset || 0 },
+          { $limit: searchQuery.limit || 50 }
+        ],
+        totalCount: lastStage.$facet.totalCount || [
+          { $count: "count" }
+        ]
+      };
+    }
+
+    return pipeline;
+  }
+
+  /**
+   * Escape special regex characters for safe MongoDB regex queries
+   */
+  private escapeRegex(text: string): string {
+    const { escapeRegex } = require('../utils/searchHelpers');
+    return escapeRegex(text);
+  }
+
+  /**
+   * Search all instruments with categorized results
+   */
+  async searchAllInstruments(query: string, limit: number = 20, fuzzy: boolean = true): Promise<{
+    equity: any[];
+    options: any[];
+    futures: any[];
+    total: number;
+  }> {
+    try {
+      const limitPerType = Math.floor(limit / 3);
+
+      const [equity, options, futures] = await Promise.all([
+        this.searchEquityInstruments(query, limitPerType, fuzzy),
+        this.searchOptionsInstruments(query, limitPerType, fuzzy),
+        this.searchFuturesInstruments(query, limitPerType, fuzzy)
+      ]);
+
+      return {
+        equity,
+        options,
+        futures,
+        total: equity.length + options.length + futures.length
+      };
+    } catch (error) {
+      logger.error('Failed to search all instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'SEARCH_ALL_INSTRUMENTS_ERROR'
+      }, error);
+
+      return {
+        equity: [],
+        options: [],
+        futures: [],
+        total: 0
+      };
+    }
+  }
+
+  /**
+   * Search equity instruments using unified collection
+   */
+  async searchEquityInstruments(query: string, limit: number = 10, fuzzy: boolean = true): Promise<any[]> {
+    try {
+      const searchQuery = {
+        query,
+        instrumentType: 'EQUITY' as const,
+        limit,
+        fuzzy,
+        isActive: true
+      };
+
+      const result = await this.searchSymbolsWithFilters(searchQuery);
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to search equity instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'SEARCH_EQUITY_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Search options instruments using unified collection
+   */
+  async searchOptionsInstruments(query: string, limit: number = 10, fuzzy: boolean = true): Promise<any[]> {
+    try {
+      const searchQuery = {
+        query,
+        instrumentType: 'OPTION' as const,
+        limit,
+        fuzzy,
+        isActive: true
+      };
+
+      const result = await this.searchSymbolsWithFilters(searchQuery);
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to search options instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'SEARCH_OPTIONS_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Search futures instruments using unified collection
+   */
+  async searchFuturesInstruments(query: string, limit: number = 10, fuzzy: boolean = true): Promise<any[]> {
+    try {
+      const searchQuery = {
+        query,
+        instrumentType: 'FUTURE' as const,
+        limit,
+        fuzzy,
+        isActive: true
+      };
+
+      const result = await this.searchSymbolsWithFilters(searchQuery);
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to search futures instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'SEARCH_FUTURES_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get option chain for an underlying
+   */
+  async getOptionChain(underlying: string, expiryDate?: string): Promise<any[]> {
+    try {
+      const searchQuery: any = {
+        instrumentType: 'OPTION',
+        underlying,
+        limit: 1000,
+        isActive: true
+      };
+
+      if (expiryDate) {
+        searchQuery.expiryStart = expiryDate;
+        searchQuery.expiryEnd = expiryDate;
+      }
+
+      const result = await this.searchSymbolsWithFilters(searchQuery);
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to get option chain', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_OPTION_CHAIN_ERROR',
+        underlying
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get expiry dates for an underlying
+   */
+  async getExpiryDates(underlying: string): Promise<string[]> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      const pipeline = [
+        {
+          $match: {
+            underlying,
+            instrumentType: { $in: ['OPTION', 'FUTURE'] },
+            isActive: true,
+            expiryDate: { $exists: true, $ne: null }
+          }
+        },
+        {
+          $group: {
+            _id: '$expiryDate'
+          }
+        },
+        {
+          $sort: { _id: 1 as 1 }
+        }
+      ];
+
+      const results = await this.StandardizedSymbolModel.aggregate(pipeline);
+      return results.map(result => result._id.toISOString().split('T')[0]);
+    } catch (error) {
+      logger.error('Failed to get expiry dates', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_EXPIRY_DATES_ERROR',
+        underlying
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get instruments by type
+   */
+  async getEquityInstruments(limit: number = 50): Promise<any[]> {
+    try {
+      const result = await this.searchSymbolsWithFilters({
+        instrumentType: 'EQUITY',
+        limit,
+        isActive: true
+      });
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to get equity instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_EQUITY_INSTRUMENTS_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  async getOptionsInstruments(limit: number = 50): Promise<any[]> {
+    try {
+      const result = await this.searchSymbolsWithFilters({
+        instrumentType: 'OPTION',
+        limit,
+        isActive: true
+      });
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to get options instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_OPTIONS_INSTRUMENTS_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  async getFuturesInstruments(limit: number = 50): Promise<any[]> {
+    try {
+      const result = await this.searchSymbolsWithFilters({
+        instrumentType: 'FUTURE',
+        limit,
+        isActive: true
+      });
+      return result.symbols;
+    } catch (error) {
+      logger.error('Failed to get futures instruments', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_FUTURES_INSTRUMENTS_ERROR'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get database statistics
+   */
+  getStats(): any {
+    return {
+      isInitialized: this.isInitialized,
+      isReady: this.isReady(),
+      connectionState: mongoose.connection.readyState,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Get detailed statistics
+   */
+  async getStatistics(): Promise<{
+    totalSymbols: number;
+    activeSymbols: number;
+    symbolsByType: Record<string, number>;
+    symbolsByExchange: Record<string, number>;
+  }> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      const [totalSymbols, activeSymbols, typeStats, exchangeStats] = await Promise.all([
+        this.StandardizedSymbolModel.countDocuments(),
+        this.StandardizedSymbolModel.countDocuments({ isActive: true }),
+        this.StandardizedSymbolModel.aggregate([
+          { $group: { _id: '$instrumentType', count: { $sum: 1 } } }
+        ]),
+        this.StandardizedSymbolModel.aggregate([
+          { $group: { _id: '$exchange', count: { $sum: 1 } } }
+        ])
+      ]);
+
+      const symbolsByType: Record<string, number> = {};
+      typeStats.forEach((stat: any) => {
+        symbolsByType[stat._id] = stat.count;
+      });
+
+      const symbolsByExchange: Record<string, number> = {};
+      exchangeStats.forEach((stat: any) => {
+        symbolsByExchange[stat._id] = stat.count;
+      });
+
+      return {
+        totalSymbols,
+        activeSymbols,
+        symbolsByType,
+        symbolsByExchange
+      };
+    } catch (error) {
+      logger.error('Failed to get statistics', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_STATISTICS_ERROR'
+      }, error);
+
+      return {
+        totalSymbols: 0,
+        activeSymbols: 0,
+        symbolsByType: {},
+        symbolsByExchange: {}
+      };
+    }
+  }
+
+  /**
+   * Check data freshness
+   */
+  async checkDataFreshness(): Promise<{
+    hasData: boolean;
+    isFresh: boolean;
+    totalSymbols: number;
+    lastUpdated?: Date;
+    ageHours?: number;
+  }> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+
+      const totalSymbols = await this.StandardizedSymbolModel.countDocuments();
+      
+      if (totalSymbols === 0) {
+        return {
+          hasData: false,
+          isFresh: false,
+          totalSymbols: 0
+        };
+      }
+
+      // Get the most recent update
+      const latestSymbol = await this.StandardizedSymbolModel
+        .findOne({}, {}, { sort: { lastUpdated: -1 } });
+
+      if (!latestSymbol) {
+        return {
+          hasData: false,
+          isFresh: false,
+          totalSymbols: 0
+        };
+      }
+
+      const lastUpdated = latestSymbol.lastUpdated;
+      const ageHours = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60);
+      const isFresh = ageHours < 24; // Consider fresh if updated within 24 hours
+
+      return {
+        hasData: true,
+        isFresh,
+        totalSymbols,
+        lastUpdated,
+        ageHours
+      };
+    } catch (error) {
+      logger.error('Failed to check data freshness', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CHECK_DATA_FRESHNESS_ERROR'
+      }, error);
+
+      return {
+        hasData: false,
+        isFresh: false,
+        totalSymbols: 0
+      };
+    }
+  }
 
   /**
    * Get symbol by ID
@@ -334,6 +771,7 @@ export class SymbolDatabaseService {
         documentsReturned: symbol ? 1 : 0,
         success: true
       });
+      
       if (symbol) {
         const symbolInterface = this.symbolDocToInterface(symbol);
         // Cache the result
@@ -343,141 +781,12 @@ export class SymbolDatabaseService {
 
       return null;
     } catch (error) {
-      console.error('🚨 Failed to get symbol by ID:', error);
+      logger.error('Failed to get symbol by ID', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_SYMBOL_BY_ID_ERROR',
+        symbolId: id
+      }, error);
       return null;
-    }
-  }
-
-  /**
-   * Search symbols with filters
-   */
-  async searchSymbolsWithFilters(searchQuery: SymbolSearchQuery): Promise<SymbolSearchResult> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      // Check cache first for search results
-      const cacheKey = symbolCacheService.generateSearchKey(searchQuery);
-      const cachedResult = symbolCacheService.getSearchResults(cacheKey);
-      if (cachedResult) {
-        return cachedResult;
-      }
-
-      const query: any = {};
-      
-      // Text search
-      if (searchQuery.query) {
-        // Check if it's a direct trading symbol search or text search
-        if (searchQuery.query.length <= 20 && !searchQuery.query.includes(' ')) {
-          // Likely a trading symbol search
-          query.$or = [
-            { tradingSymbol: { $regex: searchQuery.query, $options: 'i' } },
-            { displayName: { $regex: searchQuery.query, $options: 'i' } }
-          ];
-        } else {
-          // Full text search
-          query.$text = { $search: searchQuery.query };
-        }
-      }
-
-      // Filters
-      if (searchQuery.instrumentType) {
-        query.instrumentType = searchQuery.instrumentType;
-      }
-
-      if (searchQuery.exchange) {
-        query.exchange = searchQuery.exchange;
-      }
-
-      if (searchQuery.underlying) {
-        query.underlying = { $regex: searchQuery.underlying, $options: 'i' };
-      }
-
-      if (searchQuery.strikeMin !== undefined || searchQuery.strikeMax !== undefined) {
-        query.strikePrice = {};
-        if (searchQuery.strikeMin !== undefined) {
-          query.strikePrice.$gte = searchQuery.strikeMin;
-        }
-        if (searchQuery.strikeMax !== undefined) {
-          query.strikePrice.$lte = searchQuery.strikeMax;
-        }
-      }
-
-      if (searchQuery.expiryStart || searchQuery.expiryEnd) {
-        query.expiryDate = {};
-        if (searchQuery.expiryStart) {
-          query.expiryDate.$gte = new Date(searchQuery.expiryStart);
-        }
-        if (searchQuery.expiryEnd) {
-          query.expiryDate.$lte = new Date(searchQuery.expiryEnd);
-        }
-      }
-
-      if (searchQuery.optionType) {
-        query.optionType = searchQuery.optionType;
-      }
-
-      if (searchQuery.isActive !== undefined) {
-        query.isActive = searchQuery.isActive;
-      }
-
-      const limit = searchQuery.limit || 50;
-      const offset = searchQuery.offset || 0;
-
-      // Get total count with performance monitoring
-      const countStart = Date.now();
-      const total = await this.StandardizedSymbolModel.countDocuments(query);
-      const countDuration = Date.now() - countStart;
-      databaseOptimizationService.recordQuery('countDocuments', 'standardizedsymbols', countDuration, query, { count: total });
-      
-      // Record count monitoring metrics
-      symbolMonitoringService.recordDatabaseMetrics({
-        operation: 'searchSymbolsCount',
-        collection: 'standardizedsymbols',
-        duration: countDuration,
-        queryType: 'countDocuments',
-        indexUsed: this.hasIndexForQuery(query),
-        documentsExamined: total,
-        documentsReturned: 1,
-        success: true
-      });
-
-      // Get symbols with performance monitoring
-      const findStart = Date.now();
-      const symbols = await this.StandardizedSymbolModel
-        .find(query)
-        .sort({ displayName: 1 })
-        .limit(limit)
-        .skip(offset);
-      const findDuration = Date.now() - findStart;
-      databaseOptimizationService.recordQuery('find', 'standardizedsymbols', findDuration, query, { count: symbols.length });
-      
-      // Record search monitoring metrics
-      symbolMonitoringService.recordDatabaseMetrics({
-        operation: 'searchSymbols',
-        collection: 'standardizedsymbols',
-        duration: findDuration,
-        queryType: 'find',
-        indexUsed: this.hasIndexForQuery(query),
-        documentsExamined: Math.min(total, limit + offset),
-        documentsReturned: symbols.length,
-        success: true
-      });
-
-      const result = {
-        symbols: symbols.map(symbol => this.symbolDocToInterface(symbol)),
-        total,
-        hasMore: offset + symbols.length < total
-      };
-
-      // Cache the search result
-      symbolCacheService.cacheSearchResults(cacheKey, result);
-
-      return result;
-    } catch (error) {
-      console.error('🚨 Failed to search symbols:', error);
-      return { symbols: [], total: 0, hasMore: false };
     }
   }
 
@@ -507,6 +816,7 @@ export class SymbolDatabaseService {
       const findStart = Date.now();
       const symbol = await this.StandardizedSymbolModel.findOne(query);
       databaseOptimizationService.recordQuery('findOne', 'standardizedsymbols', Date.now() - findStart, query, { found: !!symbol });
+      
       if (symbol) {
         const symbolInterface = this.symbolDocToInterface(symbol);
         // Cache the result
@@ -516,7 +826,11 @@ export class SymbolDatabaseService {
 
       return null;
     } catch (error) {
-      console.error('🚨 Failed to get symbol by trading symbol:', error);
+      logger.error('Failed to get symbol by trading symbol', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_SYMBOL_BY_TRADING_SYMBOL_ERROR',
+        tradingSymbol
+      }, error);
       return null;
     }
   }
@@ -536,42 +850,49 @@ export class SymbolDatabaseService {
 
       return symbols.map(symbol => this.symbolDocToInterface(symbol));
     } catch (error) {
-      console.error('🚨 Failed to get symbols by underlying:', error);
+      logger.error('Failed to get symbols by underlying', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_SYMBOLS_BY_UNDERLYING_ERROR',
+        underlying
+      }, error);
       return [];
     }
   }
 
   /**
-   * Deactivate symbols not in the provided list
+   * Delete symbol by ID
    */
-  async deactivateRemovedSymbols(activeSymbolIds: string[]): Promise<number> {
+  async deleteSymbol(id: string): Promise<boolean> {
     try {
       if (!this.isReady()) {
         throw new Error('Symbol Database Service not initialized');
       }
 
-      const result = await this.StandardizedSymbolModel.updateMany(
-        { 
-          _id: { $nin: activeSymbolIds.map(id => new mongoose.Types.ObjectId(id)) },
-          isActive: true 
-        },
-        { 
-          isActive: false, 
-          lastUpdated: new Date() 
-        }
-      );
+      // Delete the symbol
+      const result = await this.StandardizedSymbolModel.findByIdAndDelete(id);
+      
+      if (result) {
+        // Clear from cache
+        symbolCacheService.invalidateSymbol(id, result.tradingSymbol, result.exchange);
+        
+        logger.info('Symbol deleted successfully', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'DELETE_SYMBOL',
+          tradingSymbol: result.tradingSymbol
+        });
+        return true;
+      }
 
-      console.log(`✅ Deactivated ${result.modifiedCount} symbols`);
-      return result.modifiedCount;
+      return false;
     } catch (error) {
-      console.error('🚨 Failed to deactivate removed symbols:', error);
-      return 0;
+      logger.error('Failed to delete symbol', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'DELETE_SYMBOL_ERROR',
+        symbolId: id
+      }, error);
+      return false;
     }
   }
-
-
-
-  // Processing Log Operations
 
   /**
    * Create processing log
@@ -590,7 +911,10 @@ export class SymbolDatabaseService {
       const savedLog = await logDoc.save();
       return this.logDocToInterface(savedLog);
     } catch (error) {
-      console.error('🚨 Failed to create processing log:', error);
+      logger.error('Failed to create processing log', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'CREATE_PROCESSING_LOG_ERROR'
+      }, error);
       throw error;
     }
   }
@@ -615,127 +939,73 @@ export class SymbolDatabaseService {
 
       return updatedLog ? this.logDocToInterface(updatedLog) : null;
     } catch (error) {
-      console.error('🚨 Failed to update processing log:', error);
+      logger.error('Failed to update processing log', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'UPDATE_PROCESSING_LOG_ERROR'
+      }, error);
       return null;
     }
   }
 
   /**
-   * Get recent processing logs
+   * Upsert symbols (batch operation)
    */
-  async getRecentProcessingLogs(limit: number = 20): Promise<SymbolProcessingLog[]> {
+  async upsertSymbols(symbols: CreateStandardizedSymbolData[]): Promise<ProcessingResult> {
     try {
       if (!this.isReady()) {
         throw new Error('Symbol Database Service not initialized');
       }
 
-      const logs = await this.SymbolProcessingLogModel
-        .find({})
-        .sort({ startedAt: -1 })
-        .limit(limit);
+      logger.info('Starting batch symbol upsert', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'UPSERT_SYMBOLS',
+        inputCount: symbols.length
+      });
 
-      return logs.map(log => this.logDocToInterface(log));
-    } catch (error) {
-      console.error('🚨 Failed to get processing logs:', error);
-      return [];
-    }
-  }
+      let newSymbols = 0;
+      let updatedSymbols = 0;
+      let errors = 0;
+      const errorDetails: string[] = [];
 
-  // Additional methods for symbol lifecycle management
-
-  /**
-   * Update symbol by ID
-   */
-  async updateSymbol(id: string, updateData: Partial<CreateStandardizedSymbolData>): Promise<StandardizedSymbol | null> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      const existingSymbol = await this.StandardizedSymbolModel.findById(id);
-      if (!existingSymbol) {
-        return null;
-      }
-
-      const oldData = this.symbolDocToInterface(existingSymbol);
-      
-      // Update the symbol
-      const updatedSymbol = await this.StandardizedSymbolModel.findByIdAndUpdate(
-        id,
-        {
-          ...updateData,
-          expiryDate: updateData.expiryDate ? new Date(updateData.expiryDate) : undefined,
-          lastUpdated: new Date()
-        },
-        { new: true }
-      );
-
-      if (!updatedSymbol) {
-        return null;
-      }
-
-      // Invalidate cache
-      symbolCacheService.invalidateSymbol(id, updatedSymbol.tradingSymbol, updatedSymbol.exchange);
-
-
-
-      return this.symbolDocToInterface(updatedSymbol);
-    } catch (error) {
-      console.error('🚨 Failed to update symbol:', error);
-      return null;
-    }
-  }
-
-
-
-  /**
-   * Get symbols updated before a certain date
-   */
-  async getSymbolsUpdatedBefore(date: string): Promise<StandardizedSymbol[]> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      const symbols = await this.StandardizedSymbolModel
-        .find({ 
-          lastUpdated: { $lt: new Date(date) },
-          isActive: true 
-        })
-        .sort({ lastUpdated: 1 })
-        .limit(1000);
-
-      return symbols.map(symbol => this.symbolDocToInterface(symbol));
-    } catch (error) {
-      console.error('🚨 Failed to get symbols updated before date:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Delete symbol by ID (for cleanup of expired symbols)
-   */
-  async deleteSymbol(id: string): Promise<boolean> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      // Delete the symbol
-      const result = await this.StandardizedSymbolModel.findByIdAndDelete(id);
-      
-      if (result) {
-        // Clear from cache
-        symbolCacheService.invalidateSymbol(id, result.tradingSymbol, result.exchange);
+      // Process in batches to avoid memory issues
+      const batchSize = 100;
+      for (let i = 0; i < symbols.length; i += batchSize) {
+        const batch = symbols.slice(i, i + batchSize);
         
-        console.log(`✅ Deleted symbol: ${result.tradingSymbol}`);
-        return true;
+        for (const symbolData of batch) {
+          try {
+            const result = await this.upsertSymbol(symbolData);
+            // Check if it was a new symbol or update (simplified check)
+            newSymbols++;
+          } catch (error) {
+            errors++;
+            errorDetails.push(`Failed to upsert ${symbolData.tradingSymbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+        }
       }
 
-      return false;
+      const result: ProcessingResult = {
+        totalProcessed: symbols.length,
+        validSymbols: symbols.length - errors,
+        invalidSymbols: errors,
+        newSymbols,
+        updatedSymbols,
+        errors: errorDetails
+      };
+
+      logger.info('Batch symbol upsert completed', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'UPSERT_SYMBOLS_COMPLETE',
+        ...result
+      });
+
+      return result;
     } catch (error) {
-      console.error('🚨 Failed to delete symbol:', error);
-      return false;
+      logger.error('Failed to upsert symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'UPSERT_SYMBOLS_ERROR'
+      }, error);
+      throw error;
     }
   }
 
@@ -764,9 +1034,8 @@ export class SymbolDatabaseService {
 
       logger.info('Cleared all symbols from database', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'CLEAR_ALL_SYMBOLS_SUCCESS',
-        deletedCount: deleteResult.deletedCount,
-        countBefore
+        operation: 'CLEAR_ALL_SYMBOLS_COMPLETE',
+        deletedCount: deleteResult.deletedCount
       });
 
       return deleteResult.deletedCount || 0;
@@ -775,25 +1044,22 @@ export class SymbolDatabaseService {
         component: 'SYMBOL_DATABASE_SERVICE',
         operation: 'CLEAR_ALL_SYMBOLS_ERROR'
       }, error);
-      throw error;
+      return 0;
     }
   }
-
-  // Validation Methods
 
   /**
    * Validate symbol data
    */
-  private validateSymbolData(symbolData: CreateStandardizedSymbolData): ValidationResult {
+  private validateSymbolData(symbolData: CreateStandardizedSymbolData): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
-    // Required fields
-    if (!symbolData.displayName?.trim()) {
-      errors.push('Display name is required');
+    if (!symbolData.tradingSymbol) {
+      errors.push('Trading symbol is required');
     }
 
-    if (!symbolData.tradingSymbol?.trim()) {
-      errors.push('Trading symbol is required');
+    if (!symbolData.displayName) {
+      errors.push('Display name is required');
     }
 
     if (!symbolData.instrumentType) {
@@ -804,521 +1070,42 @@ export class SymbolDatabaseService {
       errors.push('Exchange is required');
     }
 
-    if (!symbolData.segment?.trim()) {
-      errors.push('Segment is required');
-    }
-
-    if (!symbolData.source?.trim()) {
+    if (!symbolData.source) {
       errors.push('Source is required');
     }
 
-    // Numeric validations
-    if (symbolData.lotSize <= 0) {
-      errors.push('Lot size must be positive');
-    }
-
-    if (symbolData.tickSize <= 0) {
-      errors.push('Tick size must be positive');
-    }
-
-    // Options-specific validations
+    // Validate option-specific fields
     if (symbolData.instrumentType === 'OPTION') {
-      if (!symbolData.underlying?.trim()) {
+      if (!symbolData.underlying) {
         errors.push('Underlying is required for options');
       }
-
-      if (!symbolData.strikePrice || symbolData.strikePrice <= 0) {
-        errors.push('Valid strike price is required for options');
+      if (!symbolData.strikePrice) {
+        errors.push('Strike price is required for options');
       }
-
       if (!symbolData.optionType) {
-        errors.push('Option type (CE/PE) is required for options');
+        errors.push('Option type is required for options');
       }
-
       if (!symbolData.expiryDate) {
         errors.push('Expiry date is required for options');
       }
     }
 
-    // Futures-specific validations
+    // Validate future-specific fields
     if (symbolData.instrumentType === 'FUTURE') {
-      if (!symbolData.underlying?.trim()) {
+      if (!symbolData.underlying) {
         errors.push('Underlying is required for futures');
       }
-
       if (!symbolData.expiryDate) {
         errors.push('Expiry date is required for futures');
       }
     }
 
-    // Date validation
-    if (symbolData.expiryDate) {
-      const expiryDate = new Date(symbolData.expiryDate);
-      if (isNaN(expiryDate.getTime())) {
-        errors.push('Invalid expiry date format');
-      } else if (expiryDate < new Date()) {
-        errors.push('Expiry date cannot be in the past');
-      }
-    }
-
     return {
       isValid: errors.length === 0,
-      errors,
-      validSymbols: errors.length === 0 ? [symbolData as any] : [],
-      invalidSymbols: errors.length > 0 ? [symbolData] : []
+      errors
     };
-  }
-
-  /**
-   * Validate multiple symbols
-   */
-  validateSymbols(symbols: CreateStandardizedSymbolData[]): ValidationResult {
-    const allErrors: string[] = [];
-    const validSymbols: StandardizedSymbol[] = [];
-    const invalidSymbols: any[] = [];
-
-    for (const symbol of symbols) {
-      const validation = this.validateSymbolData(symbol);
-      if (validation.isValid) {
-        validSymbols.push(symbol as any);
-      } else {
-        invalidSymbols.push(symbol);
-        allErrors.push(...validation.errors.map(error => `${symbol.tradingSymbol}: ${error}`));
-      }
-    }
-
-    return {
-      isValid: invalidSymbols.length === 0,
-      errors: allErrors,
-      validSymbols,
-      invalidSymbols
-    };
-  }
-
-  // Legacy methods for backward compatibility with existing routes
-  
-  /**
-   * Legacy search method for backward compatibility
-   */
-  async searchSymbols(query: string, limit: number = 10, exchangeFilter: string = 'ALL'): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        query,
-        limit,
-        exchange: exchangeFilter !== 'ALL' ? exchangeFilter : undefined
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        symbol: symbol.displayName,
-        name: symbol.companyName || symbol.displayName,
-        exchange: symbol.exchange,
-        instrument_type: symbol.instrumentType,
-        isin: symbol.isin,
-        series: symbol.segment,
-        group: symbol.sector
-      }));
-    } catch (error) {
-      console.error('🚨 Legacy search symbols failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get option chain for an underlying symbol
-   */
-  async getOptionChain(underlying: string, expiry?: string): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        instrumentType: 'OPTION',
-        underlying,
-        expiryStart: expiry || undefined,
-        expiryEnd: expiry || undefined,
-        limit: 1000
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        symbol: symbol.tradingSymbol,
-        name: symbol.displayName,
-        strike_price: symbol.strikePrice,
-        option_type: symbol.optionType,
-        expiry_date: symbol.expiryDate,
-        exchange: symbol.exchange,
-        lot_size: symbol.lotSize,
-        tick_size: symbol.tickSize
-      }));
-    } catch (error) {
-      console.error('🚨 Get option chain failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get expiry dates for an underlying symbol
-   */
-  async getExpiryDates(underlying: string): Promise<string[]> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      const expiryDates = await this.StandardizedSymbolModel
-        .distinct('expiryDate', { 
-          underlying: underlying.toUpperCase(),
-          isActive: true,
-          expiryDate: { $exists: true, $ne: null }
-        });
-
-      return expiryDates
-        .filter((date): date is Date => date != null)
-        .map(date => date.toISOString().split('T')[0] as string)
-        .sort();
-    } catch (error) {
-      console.error('🚨 Get expiry dates failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Search all instruments (unified search)
-   */
-  async searchAllInstruments(query: string, limit: number = 20): Promise<any> {
-    try {
-      const [equity, options, futures] = await Promise.all([
-        this.searchEquityInstruments(query, Math.floor(limit / 3)),
-        this.searchOptionsInstruments(query, Math.floor(limit / 3)),
-        this.searchFuturesInstruments(query, Math.floor(limit / 3))
-      ]);
-
-      return {
-        equity,
-        options,
-        futures,
-        total: equity.length + options.length + futures.length
-      };
-    } catch (error) {
-      console.error('🚨 Search all instruments failed:', error);
-      return { equity: [], options: [], futures: [], total: 0 };
-    }
-  }
-
-  /**
-   * Search equity instruments
-   */
-  async searchEquityInstruments(query: string, limit: number = 10): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        query,
-        instrumentType: 'EQUITY',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        symbol: symbol.displayName,
-        name: symbol.companyName || symbol.displayName,
-        exchange: symbol.exchange,
-        sector: symbol.sector
-      }));
-    } catch (error) {
-      console.error('🚨 Search equity instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Search options instruments
-   */
-  async searchOptionsInstruments(query: string, limit: number = 10): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        query,
-        instrumentType: 'OPTION',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        name: symbol.displayName,
-        exchange: symbol.exchange,
-        underlying: symbol.underlying,
-        strikePrice: symbol.strikePrice,
-        optionType: symbol.optionType,
-        expiryDate: symbol.expiryDate
-      }));
-    } catch (error) {
-      console.error('🚨 Search options instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Check if query likely uses an index
-   */
-  private hasIndexForQuery(query: any): boolean {
-    // Check for indexed fields
-    const indexedFields = ['_id', 'tradingSymbol', 'instrumentType', 'exchange', 'underlying', 'expiryDate', 'isActive', 'displayName'];
-    
-    for (const field of indexedFields) {
-      if (query[field] !== undefined) {
-        return true;
-      }
-    }
-    
-    // Check for text search (has text index)
-    if (query.$text) {
-      return true;
-    }
-    
-    // Check for compound queries
-    if (query.$or && Array.isArray(query.$or)) {
-      return query.$or.some((subQuery: any) => this.hasIndexForQuery(subQuery));
-    }
-    
-    return false;
-  }
-
-  /**
-   * Search futures instruments
-   */
-  async searchFuturesInstruments(query: string, limit: number = 10): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        query,
-        instrumentType: 'FUTURE',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        name: symbol.displayName,
-        exchange: symbol.exchange,
-        underlying: symbol.underlying,
-        expiryDate: symbol.expiryDate
-      }));
-    } catch (error) {
-      console.error('🚨 Search futures instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get equity instruments
-   */
-  async getEquityInstruments(limit: number = 50): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        instrumentType: 'EQUITY',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        symbol: symbol.displayName,
-        name: symbol.companyName || symbol.displayName,
-        exchange: symbol.exchange,
-        sector: symbol.sector
-      }));
-    } catch (error) {
-      console.error('🚨 Get equity instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get options instruments
-   */
-  async getOptionsInstruments(limit: number = 50): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        instrumentType: 'OPTION',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        name: symbol.displayName,
-        exchange: symbol.exchange,
-        underlying: symbol.underlying,
-        strikePrice: symbol.strikePrice,
-        optionType: symbol.optionType,
-        expiryDate: symbol.expiryDate
-      }));
-    } catch (error) {
-      console.error('🚨 Get options instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get futures instruments
-   */
-  async getFuturesInstruments(limit: number = 50): Promise<any[]> {
-    try {
-      const searchQuery: SymbolSearchQuery = {
-        instrumentType: 'FUTURE',
-        limit
-      };
-      
-      const result = await this.searchSymbolsWithFilters(searchQuery);
-      return result.symbols.map(symbol => ({
-        tradingSymbol: symbol.tradingSymbol,
-        name: symbol.displayName,
-        exchange: symbol.exchange,
-        underlying: symbol.underlying,
-        expiryDate: symbol.expiryDate
-      }));
-    } catch (error) {
-      console.error('🚨 Get futures instruments failed:', error);
-      return [];
-    }
-  }
-
-  /**
-   * Get stats for debugging
-   */
-  getStats(): any {
-    return {
-      isReady: this.isReady(),
-      isInitialized: this.isInitialized,
-      cache: symbolCacheService.getStats(),
-      memoryUsage: symbolCacheService.getMemoryUsage()
-    };
-  }
-
-  /**
-   * Force update (placeholder for compatibility)
-   */
-  async forceUpdate(): Promise<void> {
-    console.log('🔄 Force update called - this is a placeholder for now');
-    // This would trigger a data refresh in a real implementation
-  }
-
-  /**
-   * Check if symbol data exists and is fresh
-   */
-  async checkDataFreshness(): Promise<{
-    hasData: boolean;
-    isFresh: boolean;
-    totalSymbols: number;
-    lastUpdated?: Date;
-    ageHours?: number;
-  }> {
-    try {
-      if (!this.isReady()) {
-        return { hasData: false, isFresh: false, totalSymbols: 0 };
-      }
-
-      // Get total symbol count
-      const totalSymbols = await this.StandardizedSymbolModel.countDocuments();
-      
-      if (totalSymbols === 0) {
-        return { hasData: false, isFresh: false, totalSymbols: 0 };
-      }
-
-      // Get the most recently updated symbol to check freshness
-      const recentSymbol = await this.StandardizedSymbolModel
-        .findOne({}, { lastUpdated: 1 })
-        .sort({ lastUpdated: -1 })
-        .lean();
-
-      if (!recentSymbol?.lastUpdated) {
-        // If no lastUpdated field, consider data as old
-        return { 
-          hasData: true, 
-          isFresh: false, 
-          totalSymbols
-        };
-      }
-
-      const now = new Date();
-      const lastUpdated = new Date(recentSymbol.lastUpdated);
-      const ageHours = (now.getTime() - lastUpdated.getTime()) / (1000 * 60 * 60);
-      
-      // Consider data fresh if updated within last 24 hours
-      const isFresh = ageHours < 24;
-
-      return {
-        hasData: true,
-        isFresh,
-        totalSymbols,
-        lastUpdated,
-        ageHours
-      };
-
-    } catch (error) {
-      logger.error('Failed to check data freshness', {
-        component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'CHECK_DATA_FRESHNESS_ERROR'
-      }, error);
-      return { hasData: false, isFresh: false, totalSymbols: 0 };
-    }
-  }
-
-  /**
-   * Get database statistics
-   */
-  async getStatistics(): Promise<{
-    totalSymbols: number;
-    activeSymbols: number;
-    symbolsByType: Record<string, number>;
-    symbolsByExchange: Record<string, number>;
-  }> {
-    try {
-      if (!this.isReady()) {
-        throw new Error('Symbol Database Service not initialized');
-      }
-
-      const [
-        totalSymbols,
-        activeSymbols,
-        symbolsByType,
-        symbolsByExchange
-      ] = await Promise.all([
-        this.StandardizedSymbolModel.countDocuments(),
-        this.StandardizedSymbolModel.countDocuments({ isActive: true }),
-        this.StandardizedSymbolModel.aggregate([
-          { $group: { _id: '$instrumentType', count: { $sum: 1 } } }
-        ]),
-        this.StandardizedSymbolModel.aggregate([
-          { $group: { _id: '$exchange', count: { $sum: 1 } } }
-        ])
-      ]);
-
-      const typeStats: Record<string, number> = {};
-      symbolsByType.forEach((item: any) => {
-        typeStats[item._id] = item.count;
-      });
-
-      const exchangeStats: Record<string, number> = {};
-      symbolsByExchange.forEach((item: any) => {
-        exchangeStats[item._id] = item.count;
-      });
-
-      return {
-        totalSymbols,
-        activeSymbols,
-        symbolsByType: typeStats,
-        symbolsByExchange: exchangeStats
-      };
-    } catch (error) {
-      console.error('🚨 Failed to get statistics:', error);
-      return {
-        totalSymbols: 0,
-        activeSymbols: 0,
-        symbolsByType: {},
-        symbolsByExchange: {}
-      };
-    }
   }
 }
 
-// Create and export a singleton instance for backward compatibility
+// Export singleton instance
 export const symbolDatabaseService = new SymbolDatabaseService();

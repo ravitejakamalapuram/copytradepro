@@ -229,12 +229,14 @@ export class OptionsDataService {
       // Get MongoDB connection directly
       const mongoose = require('mongoose');
       const db = mongoose.connection.db;
-      const collection = db.collection('fo_instruments');
+      const collection = db.collection('standardizedsymbols');
       
-      // Clear existing data
-      await collection.deleteMany({});
+      // Clear existing F&O data only (keep equity data)
+      await collection.deleteMany({ 
+        instrumentType: { $in: ['OPTION', 'FUTURE'] }
+      });
       
-      // Transform and insert new data
+      // Transform and insert new data in standardized format
       const transformedInstruments = instruments.map(instrument => {
         // Extract underlying symbol and strike from trading_symbol
         // Format: "INDUSINDBK 780 CE 30 SEP 25" or "NIFTY 21000 CE 30 JAN 25"
@@ -251,24 +253,36 @@ export class OptionsDataService {
             }
           }
         }
+
+        const instrumentType = instrument.instrument_type === 'FUT' ? 'FUTURE' : 'OPTION';
+        const optionType = instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' 
+          ? instrument.instrument_type as 'CE' | 'PE' 
+          : undefined;
         
         return {
+          // Standardized format
+          displayName: instrument.trading_symbol || instrument.name || 'Unknown',
+          tradingSymbol: instrument.trading_symbol,
+          instrumentType,
+          exchange: (instrument.exchange || 'NSE') as 'NSE' | 'BSE' | 'NFO' | 'BFO' | 'MCX',
+          segment: instrument.segment || 'NSE_FO',
+          underlying: underlying || instrument.underlying,
+          strikePrice: strike || instrument.strike,
+          optionType,
+          expiryDate: instrument.expiry ? new Date(instrument.expiry).toISOString().split('T')[0] : undefined,
+          lotSize: instrument.lot_size || 1,
+          tickSize: instrument.tick_size || 0.05,
+          source: 'upstox_api',
+          companyName: instrument.name,
+          isActive: true,
+          
+          // Legacy fields for backward compatibility (can be removed later)
           instrument_key: instrument.instrument_key,
           exchange_token: instrument.exchange_token,
-          trading_symbol: instrument.trading_symbol,
-          name: instrument.name,
           last_price: instrument.last_price,
-          expiry: instrument.expiry,
-          strike: strike || instrument.strike,
-          tick_size: instrument.tick_size,
-          lot_size: instrument.lot_size,
-          instrument_type: instrument.instrument_type,
-          option_type: instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' ? instrument.instrument_type : instrument.option_type,
-          exchange: instrument.exchange,
-          segment: instrument.segment,
-          underlying: underlying || instrument.underlying,
-          created_at: new Date(),
-          updated_at: new Date()
+          
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
       });
       
@@ -429,19 +443,23 @@ export class OptionsDataService {
       // Get MongoDB connection directly
       const mongoose = require('mongoose');
       const db = mongoose.connection.db;
-      const collection = db.collection('fo_instruments');
+      const collection = db.collection('standardizedsymbols');
       
-      // Check if database has data
-      const totalCount = await collection.countDocuments();
+      // Check if database has F&O data
+      const totalCount = await collection.countDocuments({ 
+        instrumentType: { $in: ['OPTION', 'FUTURE'] }
+      });
       if (totalCount === 0) {
         console.log('⚠️ No F&O instruments found in database. Run force-update-fo to fetch data.');
         return [];
       }
       
       const searchQuery: any = {
+        instrumentType: { $in: ['OPTION', 'FUTURE'] },
         $or: [
-          { trading_symbol: { $regex: query, $options: 'i' } },
-          { name: { $regex: query, $options: 'i' } },
+          { tradingSymbol: { $regex: query, $options: 'i' } },
+          { displayName: { $regex: query, $options: 'i' } },
+          { companyName: { $regex: query, $options: 'i' } },
           { underlying: { $regex: query, $options: 'i' } }
         ]
       };
@@ -449,10 +467,11 @@ export class OptionsDataService {
       // Filter by instrument type if specified
       if (type) {
         if (type === 'FUT') {
-          searchQuery.instrument_type = 'FUT';
+          searchQuery.instrumentType = 'FUTURE';
         } else {
-          // For options, instrument_type is CE or PE directly
-          searchQuery.instrument_type = type;
+          // For options, filter by optionType
+          searchQuery.instrumentType = 'OPTION';
+          searchQuery.optionType = type;
         }
       }
       
