@@ -74,7 +74,7 @@ export const handleSessionExpiry = (reason?: string): void => {
  */
 export const shouldLogoutOnError = (
   error: any, 
-  url: string = '', 
+  _url: string = '', 
   isDevelopment: boolean = false
 ): boolean => {
   // Never logout in development mode

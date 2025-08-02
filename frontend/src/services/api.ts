@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { frontendLogger } from './loggingService';
+import { errorCaptureService } from './errorCaptureService';
 import { apiCache } from './cacheManager';
 import { performanceMonitorService } from './performanceMonitorService';
 import { shouldLogoutOnError, handleSessionExpiry } from '../utils/sessionUtils';
@@ -154,6 +155,16 @@ api.interceptors.response.use(
       retryCount: config?._retryCount || 0,
       data: axiosError.response?.data,
     };
+
+    // Capture API error using error capture service
+    const duration = config?._startTime ? Date.now() - config._startTime : undefined;
+    errorCaptureService.captureApiError(axiosError, {
+      method: config?.method?.toUpperCase(),
+      url: config?.url,
+      requestId: config?._requestId,
+      status: axiosError.response?.status,
+      duration
+    });
 
     // Log error using frontend logger
     frontendLogger.error('API request failed', {

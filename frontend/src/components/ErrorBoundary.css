@@ -49,18 +49,32 @@
   max-width: 400px;
 }
 
-.error-boundary-event-id {
+.error-boundary-ids {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.error-boundary-event-id,
+.error-boundary-trace-id {
   font-size: 0.875rem;
   color: var(--color-text-tertiary, #868e96);
   margin: 0;
 }
 
-.error-boundary-event-id code {
+.error-boundary-event-id code,
+.error-boundary-trace-id code {
   background-color: var(--color-background-subtle, #f8f9fa);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 0.8rem;
+}
+
+.error-boundary-trace-id code {
+  background-color: var(--color-background-info, #d1ecf1);
+  color: var(--color-text-info, #0c5460);
 }
 
 .error-boundary-actions {
@@ -143,12 +157,19 @@
     color: var(--color-text-secondary-dark, #b0b0b0);
   }
 
-  .error-boundary-event-id {
+  .error-boundary-event-id,
+  .error-boundary-trace-id {
     color: var(--color-text-tertiary-dark, #808080);
   }
 
-  .error-boundary-event-id code {
+  .error-boundary-event-id code,
+  .error-boundary-trace-id code {
     background-color: var(--color-background-subtle-dark, #1a1a1a);
+  }
+
+  .error-boundary-trace-id code {
+    background-color: var(--color-background-info-dark, #1a2e33);
+    color: var(--color-text-info-dark, #7dd3fc);
   }
 
   .error-boundary-stack,

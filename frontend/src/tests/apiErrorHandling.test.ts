@@ -502,7 +502,7 @@ const getUserFriendlyErrorMessage = (error: AxiosError): string => {
     case 504:
       return 'Service temporarily unavailable. Please try again later.';
     default:
-      return (error.response.data as unknown)?.message || 'An unexpected error occurred. Please try again.';
+      return (error.response.data as any)?.message || 'An unexpected error occurred. Please try again.';
   }
 };
 

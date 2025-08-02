@@ -11,6 +11,7 @@ import { memoryLeakDetector } from './services/memoryLeakDetector';
 import { resourceManager } from './utils/resourceManager';
 import { appCache, apiCache, marketDataCache } from './services/cacheManager';
 import { performanceMonitorService } from './services/performanceMonitorService';
+import { errorCaptureService } from './services/errorCaptureService';
 // Lazy load components for better performance
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const CopyTradeLogin = React.lazy(() => import('./pages/CopyTradeLogin'));
@@ -39,6 +40,7 @@ const AdminUserDetails = React.lazy(() => import('./pages/AdminUserDetails'));
 
 // Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
+import ErrorNotificationDisplay from './components/ErrorNotificationDisplay';
 import './styles/enterprise-base.css';
 import './styles/dark-theme.css';
 
@@ -375,6 +377,9 @@ const App: React.FC = () => {
     // Start performance monitoring
     performanceMonitorService.startMonitoring();
 
+    // Error capture service is automatically initialized
+    console.log('🛡️ Error capture service initialized');
+
     // Expose services globally for debugging
     (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor = memoryMonitorService;
     (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector = memoryLeakDetector;
@@ -383,6 +388,7 @@ const App: React.FC = () => {
     (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
     (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
     (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
+    (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture = errorCaptureService;
 
     // Setup memory alert handling
     const unsubscribeMemoryAlert = memoryMonitorService.onAlert((alert) => {
@@ -403,6 +409,7 @@ const App: React.FC = () => {
       memoryLeakDetector.shutdown();
       resourceManager.shutdown();
       performanceMonitorService.shutdown();
+      errorCaptureService.destroy();
 
       // Shutdown cache managers
       appCache.shutdown();
@@ -417,6 +424,7 @@ const App: React.FC = () => {
       delete (window as unknown as { apiCache?: typeof apiCache }).apiCache;
       delete (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache;
       delete (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor;
+      delete (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture;
     };
   }, []);
 
@@ -432,6 +440,7 @@ const App: React.FC = () => {
                   <AppContent />
                 </NavigationErrorBoundary>
                 <NotificationDisplay position="top-right" />
+                <ErrorNotificationDisplay position="top-right" />
               </ErrorBoundary>
             </ConditionalAccountStatusProvider>
           </AuthProvider>

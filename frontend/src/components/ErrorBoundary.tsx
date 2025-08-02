@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import Button from './ui/Button';
 import Card from './ui/Card';
+import { errorCaptureService } from '../services/errorCaptureService';
 import './ErrorBoundary.css';
 
 interface Props {
@@ -9,6 +10,9 @@ interface Props {
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
   resetOnPropsChange?: boolean;
   resetKeys?: Array<string | number>;
+  componentName?: string;
+  componentProps?: any;
+  componentState?: any;
 }
 
 interface State {
@@ -16,6 +20,7 @@ interface State {
   error: Error | null;
   errorInfo: ErrorInfo | null;
   eventId: string | null;
+  traceId: string | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
@@ -28,6 +33,7 @@ class ErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
       eventId: null,
+      traceId: null,
     };
   }
 
@@ -46,10 +52,18 @@ class ErrorBoundary extends Component<Props, State> {
     // Generate a unique event ID for this error
     const eventId = `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
+    // Capture error using the error capture service
+    const errorEntry = errorCaptureService.captureReactError(error, { componentStack: errorInfo.componentStack || undefined }, {
+      component: this.props.componentName || 'Unknown',
+      props: this.props.componentProps,
+      state: this.props.componentState
+    });
+    
     this.setState({
       error,
       errorInfo,
       eventId,
+      traceId: errorEntry.traceId,
     });
 
     // Call custom error handler if provided
@@ -57,7 +71,7 @@ class ErrorBoundary extends Component<Props, State> {
       this.props.onError(error, errorInfo);
     }
 
-    // Report to error tracking service (if available)
+    // Report to error tracking service (legacy support)
     this.reportError(error, errorInfo, eventId);
   }
 
@@ -106,6 +120,7 @@ class ErrorBoundary extends Component<Props, State> {
       error: null,
       errorInfo: null,
       eventId: null,
+      traceId: null,
     });
   };
 
@@ -118,13 +133,17 @@ class ErrorBoundary extends Component<Props, State> {
   };
 
   private copyErrorDetails = () => {
-    const { error, errorInfo, eventId } = this.state;
+    const { error, errorInfo, eventId, traceId } = this.state;
     const errorDetails = {
       eventId,
+      traceId,
       error: error?.message,
       stack: error?.stack,
       componentStack: errorInfo?.componentStack,
       timestamp: new Date().toISOString(),
+      component: this.props.componentName || 'Unknown',
+      url: window.location.href,
+      userAgent: navigator.userAgent,
     };
 
     navigator.clipboard.writeText(JSON.stringify(errorDetails, null, 2))
@@ -174,9 +193,16 @@ class ErrorBoundary extends Component<Props, State> {
               </p>
 
               {this.state.eventId && (
-                <p className="error-boundary-event-id">
-                  Error ID: <code>{this.state.eventId}</code>
-                </p>
+                <div className="error-boundary-ids">
+                  <p className="error-boundary-event-id">
+                    Error ID: <code>{this.state.eventId}</code>
+                  </p>
+                  {this.state.traceId && (
+                    <p className="error-boundary-trace-id">
+                      Trace ID: <code>{this.state.traceId}</code>
+                    </p>
+                  )}
+                </div>
               )}
 
               <div className="error-boundary-actions">
