@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { userDatabase } from '../services/databaseCompatibility';
+import { trackedUserDatabase } from '../services/trackedDatabaseCompatibility';
 
 import orderStatusService from '../services/orderStatusService';
 import BrokerConnectionHelper from '../helpers/brokerConnectionHelper';
@@ -11,6 +12,9 @@ import { OrderStatusErrorHandler } from '../utils/orderStatusErrorHandler';
 import { OrderStatusErrorCode } from '../types/orderStatusTypes';
 
 import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
+import { trackedBrokerManager } from '../services/trackedBrokerManager';
+import { createTrackedBrokerService } from '../services/trackedBrokerService';
+import { brokerErrorLoggingService } from '../services/brokerErrorLoggingService';
 import { oauthStateManager } from '../services/oauthStateManager';
 import { brokerSessionManager } from '../services/brokerSessionManager';
 import { symbolValidationService } from '../services/symbolValidationService';
@@ -42,7 +46,7 @@ async function logoutFromBroker(userId: string, brokerName: string, accountId: s
 }
 
 /**
- * Helper function to place order using unified broker manager
+ * Helper function to place order using tracked broker service with error logging
  */
 async function placeBrokerOrder(
   userId: string,
@@ -52,9 +56,32 @@ async function placeBrokerOrder(
 ): Promise<any> {
   try {
     // Get account details from database to find the broker's account ID
-    const account = await userDatabase.getConnectedAccountById(databaseAccountId);
+    const account = await trackedUserDatabase.getConnectedAccountById(databaseAccountId);
     if (!account) {
-      throw new Error(`Account ${databaseAccountId} not found in database`);
+      const error = new Error(`Account ${databaseAccountId} not found in database`);
+      
+      // Log the error with broker context
+      await brokerErrorLoggingService.logBrokerError(
+        `Account not found: ${databaseAccountId}`,
+        error,
+        brokerErrorLoggingService.createBrokerContext(
+          userId,
+          brokerName,
+          databaseAccountId,
+          'PLACE_ORDER',
+          {
+            orderDetails: {
+              symbol: orderRequest.symbol,
+              quantity: orderRequest.quantity,
+              price: orderRequest.price,
+              orderType: orderRequest.orderType,
+              side: orderRequest.side
+            }
+          }
+        )
+      );
+      
+      throw error;
     }
 
     // Use the broker's account ID (not the database account ID) for the connection lookup
@@ -62,10 +89,36 @@ async function placeBrokerOrder(
     const brokerService = enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, brokerAccountId);
 
     if (!brokerService) {
-      throw new Error(`No active connection found for ${brokerName} account ${brokerAccountId} (database ID: ${databaseAccountId})`);
+      const error = new Error(`No active connection found for ${brokerName} account ${brokerAccountId} (database ID: ${databaseAccountId})`);
+      
+      // Log the connection error
+      await brokerErrorLoggingService.logBrokerError(
+        `No active broker connection found`,
+        error,
+        brokerErrorLoggingService.createBrokerContext(
+          userId,
+          brokerName,
+          brokerAccountId,
+          'PLACE_ORDER',
+          {
+            orderDetails: {
+              symbol: orderRequest.symbol,
+              quantity: orderRequest.quantity,
+              price: orderRequest.price,
+              orderType: orderRequest.orderType,
+              side: orderRequest.side
+            }
+          }
+        )
+      );
+      
+      throw error;
     }
 
-    return await brokerService.placeOrder(orderRequest);
+    // Create tracked broker service for error logging
+    const trackedService = createTrackedBrokerService(brokerService, userId, brokerName, brokerAccountId);
+    
+    return await trackedService.placeOrder(orderRequest);
   } catch (error) {
     console.error(`🚨 Order placement failed for ${brokerName}:`, error);
     throw error;
@@ -81,7 +134,7 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
     console.log(`🔄 Ensuring account ${accountId} is active for user ${userId}`);
 
     // Get account details from database
-    const account = await userDatabase.getConnectedAccountById(accountId);
+    const account = await trackedUserDatabase.getConnectedAccountById(accountId);
     if (!account) {
       console.log(`❌ Account ${accountId} not found in database`);
       return false;
@@ -120,7 +173,7 @@ async function ensureAccountActive(userId: string, accountId: string): Promise<b
     console.log(`🔄 Auto-reactivating account ${accountId}...`);
 
     // Get decrypted credentials
-    const credentials = await userDatabase.getAccountCredentials(accountId);
+    const credentials = await trackedUserDatabase.getAccountCredentials(accountId);
     if (!credentials) {
       console.log(`❌ Failed to retrieve credentials for account ${accountId}`);
       return false;
@@ -336,9 +389,9 @@ export const completeOAuthAuth = async (
       return;
     }
 
-    // Complete OAuth authentication using enhanced unified broker manager
+    // Complete OAuth authentication using tracked broker manager with error logging
     try {
-      const result = await enhancedUnifiedBrokerManager.completeOAuthAuth(
+      const result = await trackedBrokerManager.completeOAuthAuth(
         userId,
         account.broker_name,
         authCode,
@@ -610,9 +663,9 @@ export const handleOAuthCallback = async (
 
     console.log(`🔄 Processing OAuth callback for ${broker} account ${accountId}`);
 
-    // Complete OAuth authentication using enhanced unified broker manager
+    // Complete OAuth authentication using tracked broker manager with error logging
     try {
-      const result = await enhancedUnifiedBrokerManager.completeOAuthAuth(
+      const result = await trackedBrokerManager.completeOAuthAuth(
         userId,
         broker as string,
         code as string,
@@ -758,9 +811,9 @@ export const connectBroker = async (
       return;
     }
 
-    // Use enhanced unified broker manager for connection
+    // Use tracked broker manager for connection with error logging
     try {
-      const result = await enhancedUnifiedBrokerManager.connectToBroker(userId, brokerName, credentials);
+      const result = await trackedBrokerManager.connectToBroker(userId, brokerName, credentials);
 
       if (result.success && result.accountInfo) {
         // Direct authentication successful (e.g., Shoonya)
@@ -3798,7 +3851,16 @@ export const getOrderBook = async (
       }
 
       const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
-      const orderBook = await brokerService!.getOrderHistory(userId);
+      
+      // Create tracked broker service for error logging
+      const trackedService = createTrackedBrokerService(
+        brokerService!,
+        userId,
+        brokerName,
+        resolvedAccountId || 'unknown'
+      );
+      
+      const orderBook = await trackedService.getOrderBook(userId);
 
       res.status(200).json({
         success: true,
@@ -3893,7 +3955,16 @@ export const getPositions = async (
       }
 
       const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
-      const positions = await brokerService!.getPositions(userId);
+      
+      // Create tracked broker service for error logging
+      const trackedService = createTrackedBrokerService(
+        brokerService!,
+        userId,
+        brokerName,
+        resolvedAccountId || 'unknown'
+      );
+      
+      const positions = await trackedService.getPositions(userId);
 
       res.status(200).json({
         success: true,
@@ -3994,8 +4065,16 @@ export const searchSymbol = async (
 
     const { connection: brokerService, accountId: resolvedAccountId } = connectionResult;
 
+    // Create tracked broker service for error logging
+    const trackedService = createTrackedBrokerService(
+      brokerService!,
+      userId,
+      brokerName,
+      resolvedAccountId || 'unknown'
+    );
+
     console.log(`🔍 Searching symbol ${symbol} on ${exchange} via ${brokerName} account ${resolvedAccountId}`);
-    const searchResults = await brokerService!.searchSymbols(symbol, exchange);
+    const searchResults = await trackedService.searchSymbols(`${symbol}:${exchange}`);
 
     res.status(200).json({
       success: true,
@@ -4061,6 +4140,14 @@ export const getQuotes = async (
 
     console.log(`📊 Getting quotes for ${exchange}:${token} via ${brokerName} account ${resolvedAccountId}`);
 
+    // Create tracked broker service for error logging
+    const trackedService = createTrackedBrokerService(
+      brokerService!,
+      userId,
+      brokerName,
+      resolvedAccountId || 'unknown'
+    );
+
     // Use enhanced unified broker interface for quotes
     const unifiedBrokerService = resolvedAccountId ?
       enhancedUnifiedBrokerManager.getBrokerService(userId, brokerName, resolvedAccountId) :
@@ -4068,8 +4155,14 @@ export const getQuotes = async (
     let quotes: any;
 
     if (unifiedBrokerService && 'getQuote' in unifiedBrokerService) {
-      // Use the unified interface
-      quotes = await unifiedBrokerService.getQuote(token, exchange);
+      // Use the unified interface with tracked service
+      const trackedUnifiedService = createTrackedBrokerService(
+        unifiedBrokerService,
+        userId,
+        brokerName,
+        resolvedAccountId || 'unknown'
+      );
+      quotes = await trackedUnifiedService.getQuotes([`${exchange}:${token}`]);
     } else if (brokerService) {
       // Use unified broker interface
       if (typeof brokerService.getQuote === 'function') {
