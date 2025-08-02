@@ -964,6 +964,284 @@ export class ErrorLoggingService {
   }
 
   /**
+   * Get error by ID
+   */
+  public async getErrorById(errorId: string): Promise<IErrorLog | null> {
+    try {
+      const error = await ErrorLog.findOne({ errorId }).lean();
+      return error as IErrorLog | null;
+    } catch (error) {
+      logger.error('Failed to get error by ID', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERROR_BY_ID',
+        errorId
+      }, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get errors by trace ID
+   */
+  public async getErrorsByTraceId(traceId: string): Promise<IErrorLog[]> {
+    try {
+      const errors = await ErrorLog.find({ traceId })
+        .sort({ timestamp: 1 })
+        .lean();
+      return errors as IErrorLog[];
+    } catch (error) {
+      logger.error('Failed to get errors by trace ID', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERRORS_BY_TRACE_ID',
+        traceId
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Update error details
+   */
+  public async updateError(
+    errorId: string,
+    updates: Partial<{
+      resolved: boolean;
+      resolvedBy: string;
+      resolution: string;
+      relatedErrors: string[];
+    }>
+  ): Promise<boolean> {
+    try {
+      const updateData: any = { ...updates };
+      if (updates.resolved) {
+        updateData.resolvedAt = new Date();
+      }
+
+      const result = await ErrorLog.updateOne(
+        { errorId },
+        { $set: updateData }
+      );
+
+      return result.modifiedCount > 0;
+    } catch (error) {
+      logger.error('Failed to update error', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'UPDATE_ERROR',
+        errorId
+      }, error);
+      return false;
+    }
+  }
+
+  /**
+   * Delete error by ID (soft delete by marking as resolved)
+   */
+  public async deleteError(errorId: string, deletedBy: string): Promise<boolean> {
+    try {
+      const result = await ErrorLog.updateOne(
+        { errorId },
+        {
+          $set: {
+            resolved: true,
+            resolvedAt: new Date(),
+            resolvedBy: deletedBy,
+            resolution: 'Deleted by administrator'
+          }
+        }
+      );
+
+      return result.modifiedCount > 0;
+    } catch (error) {
+      logger.error('Failed to delete error', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'DELETE_ERROR',
+        errorId
+      }, error);
+      return false;
+    }
+  }
+
+  /**
+   * Get error count by filters
+   */
+  public async getErrorCount(filters: Partial<ErrorSearchFilters>): Promise<number> {
+    try {
+      const query: any = {};
+
+      if (filters.level && filters.level.length > 0) {
+        query.level = { $in: filters.level };
+      }
+
+      if (filters.source && filters.source.length > 0) {
+        query.source = { $in: filters.source };
+      }
+
+      if (filters.component && filters.component.length > 0) {
+        query.component = { $in: filters.component };
+      }
+
+      if (filters.errorType && filters.errorType.length > 0) {
+        query.errorType = { $in: filters.errorType };
+      }
+
+      if (filters.userId) {
+        query['context.userId'] = filters.userId;
+      }
+
+      if (filters.brokerName) {
+        query['context.brokerName'] = filters.brokerName;
+      }
+
+      if (filters.resolved !== undefined) {
+        query.resolved = filters.resolved;
+      }
+
+      if (filters.startDate || filters.endDate) {
+        query.timestamp = {};
+        if (filters.startDate) {
+          query.timestamp.$gte = filters.startDate;
+        }
+        if (filters.endDate) {
+          query.timestamp.$lte = filters.endDate;
+        }
+      }
+
+      return await ErrorLog.countDocuments(query);
+    } catch (error) {
+      logger.error('Failed to get error count', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERROR_COUNT'
+      }, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get recent errors (last N errors)
+   */
+  public async getRecentErrors(limit: number = 50): Promise<IErrorLog[]> {
+    try {
+      const errors = await ErrorLog.find({})
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean();
+      return errors as IErrorLog[];
+    } catch (error) {
+      logger.error('Failed to get recent errors', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_RECENT_ERRORS'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get errors by component
+   */
+  public async getErrorsByComponent(
+    component: string,
+    timeWindow: number = 86400000,
+    limit: number = 100
+  ): Promise<IErrorLog[]> {
+    try {
+      const cutoff = new Date(Date.now() - timeWindow);
+      const errors = await ErrorLog.find({
+        component,
+        timestamp: { $gte: cutoff }
+      })
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .lean();
+      return errors as IErrorLog[];
+    } catch (error) {
+      logger.error('Failed to get errors by component', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERRORS_BY_COMPONENT',
+        targetComponent: component
+      }, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get error aggregation by time range
+   */
+  public async getErrorAggregationByTimeRange(
+    startDate: Date,
+    endDate: Date,
+    groupBy: 'hour' | 'day' | 'week' = 'day'
+  ): Promise<Array<{ timestamp: Date; count: number; level: Record<string, number> }>> {
+    try {
+      let groupExpression: any;
+      
+      switch (groupBy) {
+        case 'hour':
+          groupExpression = {
+            year: { $year: '$timestamp' },
+            month: { $month: '$timestamp' },
+            day: { $dayOfMonth: '$timestamp' },
+            hour: { $hour: '$timestamp' }
+          };
+          break;
+        case 'week':
+          groupExpression = {
+            year: { $year: '$timestamp' },
+            week: { $week: '$timestamp' }
+          };
+          break;
+        default: // day
+          groupExpression = {
+            year: { $year: '$timestamp' },
+            month: { $month: '$timestamp' },
+            day: { $dayOfMonth: '$timestamp' }
+          };
+      }
+
+      const results = await ErrorLog.aggregate([
+        {
+          $match: {
+            timestamp: { $gte: startDate, $lte: endDate }
+          }
+        },
+        {
+          $group: {
+            _id: groupExpression,
+            count: { $sum: 1 },
+            levels: {
+              $push: '$level'
+            }
+          }
+        },
+        {
+          $addFields: {
+            levelCounts: {
+              ERROR: { $size: { $filter: { input: '$levels', cond: { $eq: ['$$this', 'ERROR'] } } } },
+              WARN: { $size: { $filter: { input: '$levels', cond: { $eq: ['$$this', 'WARN'] } } } },
+              INFO: { $size: { $filter: { input: '$levels', cond: { $eq: ['$$this', 'INFO'] } } } },
+              DEBUG: { $size: { $filter: { input: '$levels', cond: { $eq: ['$$this', 'DEBUG'] } } } }
+            }
+          }
+        },
+        {
+          $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.hour': 1, '_id.week': 1 }
+        }
+      ]);
+
+      return results.map(item => ({
+        timestamp: this.constructDateFromGroup(item._id, groupBy),
+        count: item.count,
+        level: item.levelCounts || {}
+      }));
+    } catch (error) {
+      logger.error('Failed to get error aggregation by time range', {
+        component: 'ERROR_LOGGING_SERVICE',
+        operation: 'GET_ERROR_AGGREGATION_BY_TIME_RANGE'
+      }, error);
+      return [];
+    }
+  }
+
+  /**
    * Mark an error as resolved
    */
   public async resolveError(
@@ -1005,25 +1283,7 @@ export class ErrorLoggingService {
     }
   }
 
-  /**
-   * Get errors by trace ID
-   */
-  public async getErrorsByTraceId(traceId: string): Promise<IErrorLog[]> {
-    try {
-      const errors = await ErrorLog.find({ traceId })
-        .sort({ timestamp: 1 })
-        .lean();
 
-      return errors as IErrorLog[];
-    } catch (error) {
-      logger.error('Failed to get errors by trace ID', {
-        component: 'ERROR_LOGGING_SERVICE',
-        operation: 'GET_ERRORS_BY_TRACE_ID',
-        traceId
-      }, error);
-      return [];
-    }
-  }
 
   /**
    * Classify error using the enhanced error classification service
@@ -1199,6 +1459,23 @@ export class ErrorLoggingService {
     });
 
     return trends;
+  }
+
+  /**
+   * Construct date from aggregation group
+   */
+  private constructDateFromGroup(group: any, groupBy: 'hour' | 'day' | 'week'): Date {
+    switch (groupBy) {
+      case 'hour':
+        return new Date(group.year, group.month - 1, group.day, group.hour);
+      case 'week':
+        // Approximate week start date
+        const jan1 = new Date(group.year, 0, 1);
+        const weekStart = new Date(jan1.getTime() + (group.week - 1) * 7 * 24 * 60 * 60 * 1000);
+        return weekStart;
+      default: // day
+        return new Date(group.year, group.month - 1, group.day);
+    }
   }
 }
 
