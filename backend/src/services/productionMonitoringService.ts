@@ -423,7 +423,25 @@ export class ProductionMonitoringService extends EventEmitter {
     try {
       // Import alerting service dynamically to avoid circular dependencies
       const { alertingService } = await import('./alertingService');
-      await alertingService.sendAlert(alert);
+      
+      // Convert Alert to MonitoringAlert
+      const monitoringAlert = {
+        id: alert.id,
+        timestamp: alert.timestamp,
+        type: 'SYSTEM_DEGRADATION' as const,
+        severity: alert.severity.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+        title: `System Alert: ${alert.ruleId}`,
+        description: alert.message,
+        affectedComponents: ['SYSTEM'],
+        metrics: {
+          currentValue: 0 // Would need to extract from alert.metrics
+        },
+        acknowledged: false,
+        resolved: alert.resolved,
+        actions: ['Check system metrics', 'Review alert details']
+      };
+      
+      await alertingService.sendAlert(monitoringAlert);
       
       logger.info('📤 Alert sent to external systems', {
         component: 'MONITORING',
