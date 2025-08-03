@@ -192,7 +192,7 @@ const TradeSetup: React.FC = () => {
               relevanceScore: result.relevanceScore || 0
             }));
           } else if (activeTab === 'OPTION' && response.data.options) {
-            results = response.data.options.map((result: any) => ({
+            results = response.data.options.map((result: unknown) => ({
               symbol: result.tradingSymbol || result.symbol,
               name: result.name || result.displayName,
               exchange: result.exchange,
@@ -204,7 +204,7 @@ const TradeSetup: React.FC = () => {
               relevanceScore: result.relevanceScore || 0
             }));
           } else if (activeTab === 'FUTURE' && response.data.futures) {
-            results = response.data.futures.map((result: any) => ({
+            results = response.data.futures.map((result: unknown) => ({
               symbol: result.tradingSymbol || result.symbol,
               name: result.name || result.displayName,
               exchange: result.exchange,
@@ -578,32 +578,63 @@ const TradeSetup: React.FC = () => {
                                     <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
                                       {result.name}
                                     </div>
+                                    {result.instrumentType === 'EQUITY' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        {result.exchange}
+                                      </div>
+                                    )}
                                     {result.instrumentType === 'OPTION' && (
                                       <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                                        {result.optionType} | Strike: ₹{result.strikePrice} | Exp: {result.expiryDate}
+                                        {result.optionType} | Strike: ₹{result.strikePrice} | Exp: {result.expiryDate} | {result.exchange}
                                       </div>
                                     )}
                                     {result.instrumentType === 'FUTURE' && (
                                       <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                                        Future | Exp: {result.expiryDate}
+                                        Future | Exp: {result.expiryDate} | {result.exchange}
                                       </div>
                                     )}
                                   </div>
-                                  <div style={{
-                                    fontSize: '0.75rem',
-                                    padding: '0.25rem 0.5rem',
-                                    borderRadius: '0.25rem',
-                                    backgroundColor: 
-                                      result.instrumentType === 'EQUITY' ? 'var(--color-info-bg)' :
-                                      result.instrumentType === 'OPTION' ? 'var(--color-warning-bg)' :
-                                      'var(--color-success-bg)',
-                                    color:
-                                      result.instrumentType === 'EQUITY' ? 'var(--color-info)' :
-                                      result.instrumentType === 'OPTION' ? 'var(--color-warning)' :
-                                      'var(--color-success)',
-                                    fontWeight: '500'
-                                  }}>
-                                    {result.instrumentType}
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                                    <div style={{
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '0.25rem',
+                                      backgroundColor: 
+                                        result.instrumentType === 'EQUITY' ? 'var(--color-info-bg)' :
+                                        result.instrumentType === 'OPTION' ? 'var(--color-warning-bg)' :
+                                        'var(--color-success-bg)',
+                                      color:
+                                        result.instrumentType === 'EQUITY' ? 'var(--color-info)' :
+                                        result.instrumentType === 'OPTION' ? 'var(--color-warning)' :
+                                        'var(--color-success)',
+                                      fontWeight: '500'
+                                    }}>
+                                      {result.instrumentType}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.7rem',
+                                      padding: '0.2rem 0.4rem',
+                                      borderRadius: '0.25rem',
+                                      backgroundColor: 
+                                        result.exchange === 'NSE' ? 'var(--color-bg-secondary)' :
+                                        result.exchange === 'BSE' ? 'var(--color-bg-tertiary)' :
+                                        result.exchange === 'NFO' ? 'var(--color-bg-card)' :
+                                        'var(--color-bg-secondary)',
+                                      color:
+                                        result.exchange === 'NSE' ? 'var(--color-profit)' :
+                                        result.exchange === 'BSE' ? 'var(--color-secondary-light)' :
+                                        result.exchange === 'NFO' ? 'var(--color-accent)' :
+                                        'var(--color-text-secondary)',
+                                      fontWeight: '500',
+                                      border: '1px solid',
+                                      borderColor:
+                                        result.exchange === 'NSE' ? 'var(--color-profit)' :
+                                        result.exchange === 'BSE' ? 'var(--color-secondary-light)' :
+                                        result.exchange === 'NFO' ? 'var(--color-accent)' :
+                                        'var(--color-border-secondary)'
+                                    }}>
+                                      {result.exchange}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
