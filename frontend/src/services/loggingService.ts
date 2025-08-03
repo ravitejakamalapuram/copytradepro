@@ -67,7 +67,7 @@ class FrontendLogger {
       try {
         const userData = JSON.parse(user);
         this.globalContext.userId = userData.id || userData.userId;
-      } catch (e) {
+      } catch {
         // Ignore parsing errors
       }
     }

@@ -17,9 +17,9 @@ import './TradeSetup.css';
 
 type OrderType = 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
 type Product = 'CNC' | 'MIS' | 'NRML';
-type SymbolSearchResult = { 
-  symbol: string; 
-  exchange: string; 
+type SymbolSearchResult = {
+  symbol: string;
+  exchange: string;
   name: string;
   token?: string | null;
   ltp?: number;
@@ -29,6 +29,20 @@ type SymbolSearchResult = {
   expiryDate?: string;
   relevanceScore?: number;
 };
+
+// API response types for search results
+interface SearchResultItem {
+  tradingSymbol?: string;
+  symbol?: string;
+  name?: string;
+  displayName?: string;
+  exchange: string;
+  token?: string | null;
+  relevanceScore?: number;
+  optionType?: string;
+  strikePrice?: number;
+  expiryDate?: string;
+}
 type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
@@ -182,19 +196,19 @@ const TradeSetup: React.FC = () => {
         
         if (response.success && response.data) {
           if (activeTab === 'EQUITY' && response.data.equity) {
-            results = response.data.equity.map((result: any) => ({
-              symbol: result.tradingSymbol || result.symbol,
-              name: result.name || result.displayName,
+            results = response.data.equity.map((result: SearchResultItem) => ({
+              symbol: result.tradingSymbol || result.symbol || '',
+              name: result.name || result.displayName || '',
               exchange: result.exchange,
-              ltp: result.price || 0,
+              ltp: (result as any).price || 0,
               token: result.token || null,
               instrumentType: 'EQUITY' as const,
               relevanceScore: result.relevanceScore || 0
             }));
           } else if (activeTab === 'OPTION' && response.data.options) {
-            results = response.data.options.map((result: unknown) => ({
-              symbol: result.tradingSymbol || result.symbol,
-              name: result.name || result.displayName,
+            results = response.data.options.map((result: SearchResultItem) => ({
+              symbol: result.tradingSymbol || result.symbol || '',
+              name: result.name || result.displayName || '',
               exchange: result.exchange,
               token: result.token || null,
               instrumentType: 'OPTION' as const,
@@ -204,9 +218,9 @@ const TradeSetup: React.FC = () => {
               relevanceScore: result.relevanceScore || 0
             }));
           } else if (activeTab === 'FUTURE' && response.data.futures) {
-            results = response.data.futures.map((result: unknown) => ({
-              symbol: result.tradingSymbol || result.symbol,
-              name: result.name || result.displayName,
+            results = response.data.futures.map((result: SearchResultItem) => ({
+              symbol: result.tradingSymbol || result.symbol || '',
+              name: result.name || result.displayName || '',
               exchange: result.exchange,
               token: result.token || null,
               instrumentType: 'FUTURE' as const,

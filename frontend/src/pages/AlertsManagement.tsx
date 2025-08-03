@@ -75,7 +75,7 @@ const AlertsManagement: React.FC = () => {
           message: 'Daily loss exceeds ₹10,000'
         }
       ]);
-    } catch (error) {
+    } catch {
       showToast({ type: 'error', title: 'Failed to load alerts' });
     }
   };
@@ -102,7 +102,7 @@ const AlertsManagement: React.FC = () => {
       setNewAlert({ symbol: '', alertType: 'PRICE_ABOVE', condition: '', message: '' });
       showToast({ type: 'success', title: 'Alert created successfully' });
       setActiveTab('price');
-    } catch (error) {
+    } catch {
       showToast({ type: 'error', title: 'Failed to create alert' });
     }
   };
@@ -123,7 +123,7 @@ const AlertsManagement: React.FC = () => {
         );
       }
       showToast({ type: 'success', title: 'Alert updated' });
-    } catch (error) {
+    } catch {
       showToast({ type: 'error', title: 'Failed to update alert' });
     }
   };
@@ -136,7 +136,7 @@ const AlertsManagement: React.FC = () => {
         setPortfolioAlerts(prev => prev.filter(alert => alert.id !== id));
       }
       showToast({ type: 'success', title: 'Alert deleted' });
-    } catch (error) {
+    } catch {
       showToast({ type: 'error', title: 'Failed to delete alert' });
     }
   };

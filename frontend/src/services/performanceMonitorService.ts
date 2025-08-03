@@ -528,7 +528,7 @@ class PerformanceMonitorService {
           // Handle both string and DOMTokenList className
           const classNameStr = typeof target.className === 'string'
             ? target.className
-            : target.className.toString();
+            : (target.className as any)?.toString?.() || '';
 
           if (classNameStr && typeof classNameStr === 'string') {
             const firstClass = classNameStr.split(' ')[0];

@@ -207,7 +207,7 @@ class AdminService {
         return { success: true, data: logEntries };
       }
       return { success: true, data: [] };
-    } catch (error) {
+    } catch {
       return { success: true, data: [] };
     }
   }
@@ -278,7 +278,7 @@ class AdminService {
         success: true,
         data: statuses
       };
-    } catch (error) {
+    } catch {
       return { success: true, data: [] };
     }
   }

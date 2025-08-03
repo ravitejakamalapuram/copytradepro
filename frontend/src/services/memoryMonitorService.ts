@@ -237,7 +237,7 @@ class MemoryMonitorService {
           totalSize += (key.length + (value?.length || 0)) * 2; // UTF-16
         }
       }
-    } catch (error) {
+    } catch {
       // localStorage might not be available
     }
     
@@ -250,7 +250,7 @@ class MemoryMonitorService {
           totalSize += (key.length + (value?.length || 0)) * 2; // UTF-16
         }
       }
-    } catch (error) {
+    } catch {
       // sessionStorage might not be available
     }
     

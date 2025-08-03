@@ -48,10 +48,10 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
 
   const fetchHealthStatus = async () => {
     try {
-      const response = await api.get('/api/error-logging-health/status');
+      const response = await api.get<{ success: boolean; data: ErrorLoggingHealth }>('/error-logging-health/status');
       setHealth(response.data.data);
       setError(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError('Failed to fetch error logging health status');
       console.error('Error fetching health status:', err);
     }
@@ -59,9 +59,9 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
 
   const fetchMetrics = async () => {
     try {
-      const response = await api.get('/api/error-logging-health/metrics');
+      const response = await api.get<{ success: boolean; data: ErrorLoggingMetrics }>('/error-logging-health/metrics');
       setMetrics(response.data.data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error fetching metrics:', err);
     }
   };
@@ -69,10 +69,10 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
   const resetCircuitBreaker = async () => {
     setActionLoading('reset');
     try {
-      await api.post('/api/error-logging-health/reset-circuit-breaker');
+      await api.post('/error-logging-health/reset-circuit-breaker');
       await fetchHealthStatus();
       await fetchMetrics();
-    } catch (err: any) {
+    } catch {
       setError('Failed to reset circuit breaker');
     } finally {
       setActionLoading(null);
@@ -82,10 +82,10 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
   const forceProcessQueue = async () => {
     setActionLoading('process');
     try {
-      await api.post('/api/error-logging-health/force-process-queue');
+      await api.post('/error-logging-health/force-process-queue');
       await fetchHealthStatus();
       await fetchMetrics();
-    } catch (err: any) {
+    } catch {
       setError('Failed to process queue');
     } finally {
       setActionLoading(null);
@@ -96,13 +96,13 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
     if (!window.confirm('Are you sure you want to clear the error queue? This will permanently delete queued errors.')) {
       return;
     }
-    
+
     setActionLoading('clear');
     try {
-      await api.post('/api/error-logging-health/clear-queue');
+      await api.post('/error-logging-health/clear-queue');
       await fetchHealthStatus();
       await fetchMetrics();
-    } catch (err: any) {
+    } catch {
       setError('Failed to clear queue');
     } finally {
       setActionLoading(null);
@@ -123,24 +123,7 @@ const ErrorLoggingHealthMonitor: React.FC = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy':
-      case 'empty':
-      case 'normal':
-      case 'closed':
-        return 'text-green-600';
-      case 'warning':
-      case 'elevated':
-        return 'text-yellow-600';
-      case 'degraded':
-      case 'critical':
-      case 'open':
-        return 'text-red-600';
-      default:
-        return 'text-gray-600';
-    }
-  };
+
 
   const getStatusBadge = (status: string) => {
     const baseClasses = 'px-2 py-1 rounded-full text-xs font-medium';

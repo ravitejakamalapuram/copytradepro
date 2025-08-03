@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { portfolioService } from '../services/portfolioService';
-import { useAuth } from '../hooks/useAuth';
+
 import '../styles/app-theme.css';
 import Button from './ui/Button';
 import { UserDropdown } from './ui/UserDropdown';
@@ -18,7 +18,7 @@ interface PortfolioSummary {
 const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  // Auth context available if needed
   const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary>({
@@ -63,8 +63,7 @@ const AppNavigation: React.FC = () => {
 
 
 
-  // Check if user is admin
-  const isAdmin = user?.role === 'admin';
+  // Check if user is admin (removed unused variable)
 
   const navItems = [
     // { path: '/dashboard', label: 'Dashboard', icon: '📊' },

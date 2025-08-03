@@ -227,7 +227,7 @@ class ErrorCaptureService {
         // Handle both string and DOMTokenList className
         const classNameStr = typeof element.className === 'string'
           ? element.className
-          : element.className.toString();
+          : (element.className as any)?.toString?.() || '';
 
         if (classNameStr && typeof classNameStr === 'string') {
           const classes = classNameStr.split(' ').filter(c => c.trim());
@@ -341,7 +341,7 @@ class ErrorCaptureService {
         const userData = JSON.parse(user);
         context.userId = userData.id || userData.userId;
       }
-    } catch (e) {
+    } catch {
       // Ignore parsing errors
     }
 
@@ -739,10 +739,10 @@ class ErrorCaptureService {
       }
 
       return true;
-    } catch (error) {
+    } catch {
       // Record failure for circuit breaker
       this.recordFailure();
-      
+
       // Don't log this error to avoid infinite loops
       console.warn('Failed to send error to backend (circuit breaker will handle retries)');
       return false;

@@ -170,7 +170,7 @@ const AdminPanel: React.FC = () => {
       ]);
       setLastRefresh(new Date());
       showToast({ type: 'success', title: 'Data refreshed successfully' });
-    } catch (error) {
+    } catch {
       showToast({ type: 'error', title: 'Failed to refresh data' });
     } finally {
       setLoading(false);
@@ -557,7 +557,7 @@ const AdminPanel: React.FC = () => {
                                     await loadBrokerStatuses();
                                     showToast({ type: 'success', title: response.message });
                                   }
-                                } catch (error) {
+                                } catch {
                                   showToast({ type: 'error', title: `Failed to reconnect ${broker.name}` });
                                 } finally {
                                   setLoading(false);
