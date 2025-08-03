@@ -537,7 +537,7 @@ class ErrorCaptureService {
   /**
    * Sanitize value to remove sensitive data
    */
-  private sanitizeValue(value: any): unknown {
+  private sanitizeValue(value: unknown): unknown {
     if (typeof value === 'string' && value.length > 100) {
       return value.substring(0, 100) + '...';
     }
@@ -681,8 +681,8 @@ class ErrorCaptureService {
     }
 
     try {
-      // Use the correct endpoint
-      await api.post('/api/logs', {
+      // Use the correct endpoint (base URL already includes /api)
+      await api.post('/logs', {
         logs: [{
           level: 'error',
           message: errorEntry.message,

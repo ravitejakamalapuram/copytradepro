@@ -191,8 +191,9 @@ class FrontendLogger {
     this.logBuffer = [];
 
     try {
-      // Send logs to backend (implement based on your API structure)
-      await fetch('/api/logs', {
+      // Send logs to backend API
+      const apiBaseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+      await fetch(`${apiBaseUrl}/logs`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -259,7 +260,7 @@ class FrontendLogger {
     });
   }
 
-  logError(error: any, context: LogContext = {}): void {
+  logError(error: unknown, context: LogContext = {}): void {
     this.error('Application error', {
       ...context,
       component: 'ERROR_HANDLER'
