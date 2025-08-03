@@ -3,68 +3,44 @@ import AppNavigation from '../components/AppNavigation';
 import Card, { CardHeader, CardContent } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { Grid, Stack } from '../components/ui/Layout';
+import { useToast } from '../components/Toast';
+import { systemHealthService, type SystemHealthData } from '../services/systemHealthService';
 import '../styles/app-theme.css';
 
-interface HealthMetric {
-  name: string;
-  status: 'healthy' | 'warning' | 'critical';
-  value: string;
-  description: string;
-}
-
 const AdminSystemHealth: React.FC = () => {
-  const [healthMetrics, setHealthMetrics] = useState<HealthMetric[]>([]);
+  const { showToast } = useToast();
+  const [healthData, setHealthData] = useState<SystemHealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const loadHealthMetrics = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API calls
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setHealthMetrics([
-        {
-          name: 'Database Connection',
-          status: 'healthy',
-          value: 'Connected',
-          description: 'MongoDB connection is stable'
-        },
-        {
-          name: 'API Response Time',
-          status: 'healthy',
-          value: '45ms',
-          description: 'Average response time is within normal range'
-        },
-        {
-          name: 'Memory Usage',
-          status: 'warning',
-          value: '78%',
-          description: 'Memory usage is elevated but stable'
-        },
-        {
-          name: 'Error Rate',
-          status: 'healthy',
-          value: '2.3%',
-          description: 'Error rate is within acceptable limits'
-        },
-        {
-          name: 'Active Connections',
-          status: 'healthy',
-          value: '42',
-          description: 'Number of active user connections'
-        },
-        {
-          name: 'Queue Health',
-          status: 'healthy',
-          value: 'Normal',
-          description: 'All processing queues are healthy'
-        }
-      ]);
-      
-      setLastUpdated(new Date());
+      const response = await systemHealthService.getSystemHealth();
+
+      if (response.success) {
+        setHealthData(response.data);
+        setLastUpdated(new Date());
+        showToast({
+          type: 'success',
+          title: 'Health metrics updated',
+          message: 'System health data refreshed successfully'
+        });
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Failed to load health metrics',
+          message: 'Unable to fetch system health data'
+        });
+      }
     } catch (error) {
       console.error('Failed to load health metrics:', error);
+      showToast({
+        type: 'error',
+        title: 'Error loading health metrics',
+        message: 'An error occurred while fetching system health data'
+      });
     } finally {
       setLoading(false);
     }
@@ -104,8 +80,104 @@ const AdminSystemHealth: React.FC = () => {
     }
   };
 
-  const overallHealth = healthMetrics.some(m => m.status === 'critical') ? 'critical' :
-                       healthMetrics.some(m => m.status === 'warning') ? 'warning' : 'healthy';
+  const refreshMetrics = async () => {
+    await loadHealthMetrics();
+  };
+
+  const runDiagnostics = async () => {
+    setActionLoading('diagnostics');
+    try {
+      const response = await systemHealthService.runDiagnostics();
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Diagnostics completed',
+          message: 'System diagnostics completed successfully'
+        });
+        await loadHealthMetrics(); // Refresh data after diagnostics
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Diagnostics failed',
+          message: 'Unable to complete system diagnostics'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to run diagnostics:', error);
+      showToast({
+        type: 'error',
+        title: 'Error running diagnostics',
+        message: 'An error occurred while running system diagnostics'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const clearCache = async () => {
+    setActionLoading('cache');
+    try {
+      const response = await systemHealthService.clearCache('all');
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Cache cleared',
+          message: response.message || 'System cache cleared successfully'
+        });
+        await loadHealthMetrics(); // Refresh data after cache clear
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Failed to clear cache',
+          message: response.message || 'Unable to clear system cache'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to clear cache:', error);
+      showToast({
+        type: 'error',
+        title: 'Error clearing cache',
+        message: 'An error occurred while clearing cache'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const restartSymbolInit = async () => {
+    setActionLoading('restart');
+    try {
+      const response = await systemHealthService.restartSymbolInit();
+
+      if (response.success) {
+        showToast({
+          type: 'success',
+          title: 'Symbol initialization restarted',
+          message: response.message || 'Symbol initialization restarted successfully'
+        });
+        await loadHealthMetrics(); // Refresh data after restart
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Failed to restart symbol initialization',
+          message: response.message || 'Unable to restart symbol initialization'
+        });
+      }
+    } catch (error) {
+      console.error('Failed to restart symbol init:', error);
+      showToast({
+        type: 'error',
+        title: 'Error restarting symbol initialization',
+        message: 'An error occurred while restarting symbol initialization'
+      });
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const overallHealth = healthData?.overall || 'critical';
 
   return (
     <div className="app-theme app-layout">
@@ -127,12 +199,29 @@ const AdminSystemHealth: React.FC = () => {
             }}>
               System Health
             </h1>
-            <p style={{ 
+            <p style={{
               color: 'var(--text-secondary)',
-              fontSize: '1rem'
+              fontSize: '1rem',
+              marginBottom: '0.5rem'
             }}>
               Monitor system performance and health metrics
             </p>
+            {healthData && (
+              <div style={{
+                display: 'flex',
+                gap: '1rem',
+                fontSize: '0.875rem',
+                color: 'var(--text-muted)'
+              }}>
+                <span>
+                  Uptime: {Math.floor((healthData.uptime || 0) / 3600)}h {Math.floor(((healthData.uptime || 0) % 3600) / 60)}m
+                </span>
+                <span>•</span>
+                <span>
+                  Last updated: {lastUpdated.toLocaleTimeString()}
+                </span>
+              </div>
+            )}
           </div>
           
           <Button 
@@ -145,6 +234,78 @@ const AdminSystemHealth: React.FC = () => {
         </div>
 
         <Stack gap={6}>
+          {/* Active Alerts */}
+          {healthData?.alerts && healthData.alerts.length > 0 && (
+            <Card>
+              <CardHeader>
+                <h2 style={{
+                  fontSize: '1.25rem',
+                  fontWeight: '500',
+                  color: 'var(--color-loss)',
+                  margin: 0
+                }}>
+                  ⚠️ Active Alerts ({healthData.alerts.length})
+                </h2>
+              </CardHeader>
+              <CardContent>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {healthData.alerts.slice(0, 5).map((alert, index) => (
+                    <div
+                      key={alert.id || index}
+                      style={{
+                        padding: '0.75rem',
+                        borderRadius: '6px',
+                        backgroundColor: alert.severity === 'critical' ? 'rgba(239, 68, 68, 0.1)' :
+                                       alert.severity === 'high' ? 'rgba(245, 101, 101, 0.1)' :
+                                       alert.severity === 'medium' ? 'rgba(251, 191, 36, 0.1)' :
+                                       'rgba(156, 163, 175, 0.1)',
+                        border: `1px solid ${alert.severity === 'critical' ? 'rgba(239, 68, 68, 0.3)' :
+                                            alert.severity === 'high' ? 'rgba(245, 101, 101, 0.3)' :
+                                            alert.severity === 'medium' ? 'rgba(251, 191, 36, 0.3)' :
+                                            'rgba(156, 163, 175, 0.3)'}`
+                      }}
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        gap: '0.5rem'
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{
+                            fontSize: '0.875rem',
+                            fontWeight: '500',
+                            color: 'var(--text-primary)',
+                            marginBottom: '0.25rem'
+                          }}>
+                            {alert.message}
+                          </div>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--text-muted)'
+                          }}>
+                            {new Date(alert.timestamp).toLocaleString()}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: '0.75rem',
+                          fontWeight: '500',
+                          color: alert.severity === 'critical' ? 'var(--color-loss)' :
+                                 alert.severity === 'high' ? 'var(--color-loss)' :
+                                 alert.severity === 'medium' ? 'var(--color-neutral)' :
+                                 'var(--text-secondary)',
+                          textTransform: 'uppercase'
+                        }}>
+                          {alert.severity}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Overall Health Status */}
           <Card>
             <CardContent>
@@ -201,7 +362,7 @@ const AdminSystemHealth: React.FC = () => {
               </div>
             ) : (
               <Grid cols={2} gap={4}>
-                {healthMetrics.map((metric, index) => (
+                {(healthData?.metrics || []).map((metric, index) => (
                   <Card key={index}>
                     <CardContent>
                       <div style={{ 
@@ -264,22 +425,38 @@ const AdminSystemHealth: React.FC = () => {
               </h2>
             </CardHeader>
             <CardContent>
-              <div style={{ 
+              <div style={{
                 display: 'flex',
                 gap: '1rem',
                 flexWrap: 'wrap'
               }}>
-                <Button variant="outline">
-                  Clear Cache
+                <Button
+                  variant="outline"
+                  onClick={clearCache}
+                  disabled={actionLoading === 'cache'}
+                >
+                  {actionLoading === 'cache' ? 'Clearing...' : 'Clear Cache'}
                 </Button>
-                <Button variant="outline">
-                  Restart Services
+                <Button
+                  variant="outline"
+                  onClick={restartSymbolInit}
+                  disabled={actionLoading === 'restart'}
+                >
+                  {actionLoading === 'restart' ? 'Restarting...' : 'Restart Symbol Init'}
                 </Button>
-                <Button variant="outline">
-                  Run Diagnostics
+                <Button
+                  variant="outline"
+                  onClick={runDiagnostics}
+                  disabled={actionLoading === 'diagnostics'}
+                >
+                  {actionLoading === 'diagnostics' ? 'Running...' : 'Run Diagnostics'}
                 </Button>
-                <Button variant="outline">
-                  Export Logs
+                <Button
+                  variant="outline"
+                  onClick={refreshMetrics}
+                  disabled={loading}
+                >
+                  {loading ? 'Refreshing...' : 'Refresh Metrics'}
                 </Button>
               </div>
             </CardContent>
