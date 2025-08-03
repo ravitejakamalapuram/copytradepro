@@ -204,7 +204,7 @@ const TradeSetup: React.FC = () => {
               relevanceScore: result.relevanceScore || 0
             }));
           } else if (activeTab === 'FUTURE' && response.data.futures) {
-            results = response.data.futures.map((result: unknown) => ({
+            results = response.data.futures.map((result: any) => ({
               symbol: result.tradingSymbol || result.symbol,
               name: result.name || result.displayName,
               exchange: result.exchange,
