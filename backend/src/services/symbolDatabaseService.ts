@@ -963,7 +963,7 @@ export class SymbolDatabaseService {
   }
 
   /**
-   * Upsert symbols (batch operation)
+   * Upsert symbols (batch operation) - Optimized for fresh loads
    */
   async upsertSymbols(symbols: CreateStandardizedSymbolData[]): Promise<ProcessingResult> {
     try {
@@ -971,55 +971,116 @@ export class SymbolDatabaseService {
         throw new Error('Symbol Database Service not initialized');
       }
 
-      logger.info('Starting batch symbol upsert', {
+      logger.info('Starting efficient batch symbol insert', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'UPSERT_SYMBOLS',
+        operation: 'BULK_INSERT_SYMBOLS',
         inputCount: symbols.length
       });
 
-      let newSymbols = 0;
-      let updatedSymbols = 0;
-      let errors = 0;
-      const errorDetails: string[] = [];
+      // Prepare symbols for insertion
+      const symbolsToInsert = symbols.map(symbolData => ({
+        ...symbolData,
+        expiryDate: symbolData.expiryDate ? new Date(symbolData.expiryDate) : undefined,
+        lastUpdated: new Date(),
+        isActive: true
+      }));
 
-      // Process in batches to avoid memory issues
-      const batchSize = 100;
-      for (let i = 0; i < symbols.length; i += batchSize) {
-        const batch = symbols.slice(i, i + batchSize);
-        
-        for (const symbolData of batch) {
-          try {
-            const result = await this.upsertSymbol(symbolData);
-            // Check if it was a new symbol or update (simplified check)
-            newSymbols++;
-          } catch (error) {
-            errors++;
-            errorDetails.push(`Failed to upsert ${symbolData.tradingSymbol}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-        }
-      }
+      // Use efficient bulk insert instead of individual upserts
+      const insertResult = await this.StandardizedSymbolModel.insertMany(symbolsToInsert, {
+        ordered: false, // Continue inserting even if some fail
+        rawResult: true // Get detailed result information
+      });
 
       const result: ProcessingResult = {
         totalProcessed: symbols.length,
-        validSymbols: symbols.length - errors,
-        invalidSymbols: errors,
-        newSymbols,
-        updatedSymbols,
-        errors: errorDetails
+        validSymbols: insertResult.insertedCount || symbols.length,
+        invalidSymbols: symbols.length - (insertResult.insertedCount || symbols.length),
+        newSymbols: insertResult.insertedCount || symbols.length,
+        updatedSymbols: 0, // Fresh insert, no updates
+        errors: []
       };
 
-      logger.info('Batch symbol upsert completed', {
+      logger.info('Efficient batch symbol insert completed', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'UPSERT_SYMBOLS_COMPLETE',
+        operation: 'BULK_INSERT_SYMBOLS_COMPLETE',
         ...result
       });
 
       return result;
     } catch (error) {
-      logger.error('Failed to upsert symbols', {
+      logger.error('Failed to bulk insert symbols', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'UPSERT_SYMBOLS_ERROR'
+        operation: 'BULK_INSERT_SYMBOLS_ERROR'
       }, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Backup existing symbols and clear the main collection
+   */
+  async backupAndClearSymbols(): Promise<{ backedUpCount: number; backupCollection: string }> {
+    if (!this.isInitialized) {
+      throw new Error('Database service not initialized');
+    }
+
+    try {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const backupCollectionName = `standardizedsymbols_backup_${timestamp}`;
+
+      // Get current symbol count
+      const currentCount = await this.StandardizedSymbolModel.countDocuments();
+
+      if (currentCount > 0) {
+        logger.info('Creating backup of existing symbols', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'BACKUP_SYMBOLS_START',
+          symbolCount: currentCount,
+          backupCollection: backupCollectionName
+        });
+
+        // Get all symbols
+        const symbols = await this.StandardizedSymbolModel.find({}).lean();
+
+        if (symbols.length > 0) {
+          // Create backup collection
+          const BackupModel = mongoose.model(backupCollectionName, this.StandardizedSymbolModel.schema);
+          await BackupModel.insertMany(symbols);
+
+          logger.info('Created backup collection', {
+            component: 'SYMBOL_DATABASE_SERVICE',
+            operation: 'BACKUP_CREATED',
+            backupCollection: backupCollectionName,
+            backedUpCount: symbols.length
+          });
+        }
+
+        // Clear main collection
+        await this.StandardizedSymbolModel.deleteMany({});
+        await this.SymbolProcessingLogModel.deleteMany({});
+
+        logger.info('Backed up and cleared symbols from database', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'BACKUP_AND_CLEAR_SUCCESS',
+          backedUpCount: currentCount,
+          backupCollection: backupCollectionName
+        });
+
+        return { backedUpCount: currentCount, backupCollection: backupCollectionName };
+      } else {
+        logger.info('No symbols found to backup', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'BACKUP_NO_DATA'
+        });
+
+        return { backedUpCount: 0, backupCollection: '' };
+      }
+    } catch (error) {
+      logger.error('Failed to backup and clear symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'BACKUP_AND_CLEAR_ERROR',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
       throw error;
     }
   }

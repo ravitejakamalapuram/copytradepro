@@ -168,18 +168,9 @@ export const SymbolProcessingLogSchema = new Schema<SymbolProcessingLogDocument>
 
 // Compound indexes for efficient queries
 
-// Unique constraint indexes
-// For equity symbols (no expiry, strike, or option type)
-StandardizedSymbolSchema.index({ tradingSymbol: 1, exchange: 1, instrumentType: 1 }, { 
-  unique: true, 
-  partialFilterExpression: { instrumentType: 'EQUITY' } 
-});
-
-// For options and futures (with expiry, and strike/option type for options)
-StandardizedSymbolSchema.index({ tradingSymbol: 1, exchange: 1, expiryDate: 1, strikePrice: 1, optionType: 1 }, { 
-  unique: true,
-  partialFilterExpression: { instrumentType: { $in: ['OPTION', 'FUTURE'] } }
-});
+// Removed overly restrictive unique constraints that were rejecting valid market data
+// Upstox data contains legitimate duplicates (same symbol on different exchanges, etc.)
+// Using instrument_key from Upstox as the natural unique identifier instead
 
 // Search optimization indexes
 StandardizedSymbolSchema.index({ displayName: 'text', tradingSymbol: 'text', companyName: 'text' });

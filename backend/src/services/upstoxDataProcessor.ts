@@ -416,70 +416,98 @@ export class UpstoxDataProcessor {
 
     for (const rawSymbol of rawSymbols) {
       try {
-        // Determine instrument type
+        // Determine instrument type (more inclusive mapping)
         let instrumentType: 'EQUITY' | 'OPTION' | 'FUTURE';
-        switch (rawSymbol.instrument_type.toUpperCase()) {
-          case 'EQ':
-          case 'EQUITY':
-            instrumentType = 'EQUITY';
-            break;
-          case 'CE':
-          case 'PE':
-          case 'OPTION':
-            instrumentType = 'OPTION';
-            break;
-          case 'FUT':
-          case 'FUTURE':
-            instrumentType = 'FUTURE';
-            break;
-          default:
-            // Skip unsupported instrument types
-            continue;
+        const instType = rawSymbol.instrument_type.toUpperCase();
+
+        if (['EQ', 'EQUITY', 'BE', 'BZ', 'IL', 'IT', 'SM', 'ST', 'INDEX'].includes(instType)) {
+          instrumentType = 'EQUITY';
+        } else if (['CE', 'PE', 'OPTION', 'OPTSTK', 'OPTIDX'].includes(instType)) {
+          instrumentType = 'OPTION';
+        } else if (['FUT', 'FUTURE', 'FUTSTK', 'FUTIDX'].includes(instType)) {
+          instrumentType = 'FUTURE';
+        } else {
+          // Log unknown instrument types but don't skip - default to EQUITY
+          logger.debug('Unknown instrument type, defaulting to EQUITY', {
+            component: 'UPSTOX_DATA_PROCESSOR',
+            operation: 'TRANSFORM_UNKNOWN_INSTRUMENT_TYPE',
+            instrumentType: rawSymbol.instrument_type,
+            tradingSymbol: rawSymbol.tradingsymbol
+          });
+          instrumentType = 'EQUITY';
         }
 
-        // Map exchange
+        // Map exchange (handle Upstox format: BSE_EQ, NSE_EQ, BSE_FO, NSE_FO, etc.)
         let exchange: 'NSE' | 'BSE' | 'NFO' | 'BFO' | 'MCX';
-        switch (rawSymbol.exchange.toUpperCase()) {
-          case 'NSE':
-            exchange = instrumentType === 'EQUITY' ? 'NSE' : 'NFO';
-            break;
-          case 'BSE':
-            exchange = instrumentType === 'EQUITY' ? 'BSE' : 'BFO';
-            break;
-          case 'MCX':
-            exchange = 'MCX';
-            break;
-          case 'NFO':
-            exchange = 'NFO';
-            break;
-          case 'BFO':
-            exchange = 'BFO';
-            break;
-          default:
-            // Default to NSE for equity, NFO for derivatives
-            exchange = instrumentType === 'EQUITY' ? 'NSE' : 'NFO';
+        const exchangeUpper = rawSymbol.exchange.toUpperCase();
+
+        if (exchangeUpper.startsWith('BSE')) {
+          // BSE_EQ, BSE_FO, BSE_INDEX -> BSE or BFO
+          exchange = instrumentType === 'EQUITY' ? 'BSE' : 'BFO';
+        } else if (exchangeUpper.startsWith('NSE')) {
+          // NSE_EQ, NSE_FO, NSE_INDEX, NSE_COM -> NSE or NFO
+          exchange = instrumentType === 'EQUITY' ? 'NSE' : 'NFO';
+        } else if (exchangeUpper.startsWith('MCX')) {
+          // MCX_FO -> MCX
+          exchange = 'MCX';
+        } else {
+          // Handle legacy format and other cases
+          switch (exchangeUpper) {
+            case 'NSE':
+              exchange = instrumentType === 'EQUITY' ? 'NSE' : 'NFO';
+              break;
+            case 'BSE':
+              exchange = instrumentType === 'EQUITY' ? 'BSE' : 'BFO';
+              break;
+            case 'MCX':
+              exchange = 'MCX';
+              break;
+            case 'NFO':
+              exchange = 'NFO';
+              break;
+            case 'BFO':
+              exchange = 'BFO';
+              break;
+            default:
+              // Default to NSE for equity, NFO for derivatives
+              exchange = instrumentType === 'EQUITY' ? 'NSE' : 'NFO';
+              logger.debug('Unknown exchange format, using default', {
+                component: 'UPSTOX_DATA_PROCESSOR',
+                operation: 'EXCHANGE_MAPPING_DEFAULT',
+                originalExchange: rawSymbol.exchange,
+                mappedExchange: exchange,
+                tradingSymbol: rawSymbol.tradingsymbol
+              });
+          }
         }
 
-        // Create display name
-        let displayName = rawSymbol.name || rawSymbol.tradingsymbol;
-        if (instrumentType === 'OPTION') {
-          const optionType = rawSymbol.instrument_type.toUpperCase() === 'CE' ? 'CE' : 'PE';
-          const expiryDate = rawSymbol.expiry ? new Date(rawSymbol.expiry).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: '2-digit'
-          }).toUpperCase() : '';
-          displayName = `${rawSymbol.underlying || rawSymbol.tradingsymbol} ${rawSymbol.strike} ${optionType} ${expiryDate}`;
-        } else if (instrumentType === 'FUTURE') {
-          const expiryDate = rawSymbol.expiry ? new Date(rawSymbol.expiry).toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: '2-digit'
-          }).toUpperCase() : '';
-          displayName = `${rawSymbol.underlying || rawSymbol.tradingsymbol} ${expiryDate} FUT`;
+        // Create display name (handle missing fields gracefully)
+        let displayName = rawSymbol.name || rawSymbol.tradingsymbol || 'Unknown';
+
+        try {
+          if (instrumentType === 'OPTION') {
+            const optionType = rawSymbol.instrument_type.toUpperCase() === 'CE' ? 'CE' : 'PE';
+            const expiryDate = rawSymbol.expiry ? new Date(rawSymbol.expiry).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit'
+            }).toUpperCase() : '';
+            const strike = rawSymbol.strike ? rawSymbol.strike : '';
+            displayName = `${rawSymbol.underlying || rawSymbol.tradingsymbol} ${strike} ${optionType} ${expiryDate}`.trim();
+          } else if (instrumentType === 'FUTURE') {
+            const expiryDate = rawSymbol.expiry ? new Date(rawSymbol.expiry).toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: '2-digit'
+            }).toUpperCase() : '';
+            displayName = `${rawSymbol.underlying || rawSymbol.tradingsymbol} ${expiryDate} FUT`.trim();
+          }
+        } catch (error) {
+          // If display name generation fails, use fallback
+          displayName = rawSymbol.name || rawSymbol.tradingsymbol || 'Unknown';
         }
 
-        // Create standardized symbol
+        // Create standardized symbol (more permissive)
         const standardizedSymbol: CreateStandardizedSymbolData = {
           displayName,
           tradingSymbol: rawSymbol.tradingsymbol,
@@ -487,13 +515,19 @@ export class UpstoxDataProcessor {
           exchange,
           segment: rawSymbol.segment || (instrumentType === 'EQUITY' ? 'EQ' : 'FO'),
           underlying: (instrumentType !== 'EQUITY' && rawSymbol.underlying) ? rawSymbol.underlying : undefined,
-          strikePrice: (instrumentType === 'OPTION' && rawSymbol.strike > 0) ? rawSymbol.strike : undefined,
-          optionType: (instrumentType === 'OPTION') ? 
+          strikePrice: (instrumentType === 'OPTION' && rawSymbol.strike !== undefined) ? rawSymbol.strike : undefined, // Allow 0 strike
+          optionType: (instrumentType === 'OPTION') ?
             (rawSymbol.instrument_type.toUpperCase() === 'CE' ? 'CE' : 'PE') : undefined,
-          expiryDate: (instrumentType !== 'EQUITY' && rawSymbol.expiry) ? 
-            new Date(rawSymbol.expiry).toISOString().split('T')[0] : undefined,
-          lotSize: rawSymbol.lot_size || 1,
-          tickSize: rawSymbol.tick_size || 0.05,
+          expiryDate: (instrumentType !== 'EQUITY' && rawSymbol.expiry) ?
+            (() => {
+              try {
+                return new Date(rawSymbol.expiry).toISOString().split('T')[0];
+              } catch {
+                return undefined; // Handle invalid dates gracefully
+              }
+            })() : undefined,
+          lotSize: rawSymbol.lot_size !== undefined ? rawSymbol.lot_size : 1, // Allow 0 lot size
+          tickSize: rawSymbol.tick_size !== undefined ? rawSymbol.tick_size : 0.05, // Allow 0 tick size
           source: 'upstox',
           isin: rawSymbol.isin || undefined,
           companyName: (instrumentType === 'EQUITY') ? rawSymbol.name : undefined,
@@ -538,11 +572,7 @@ export class UpstoxDataProcessor {
     for (const symbol of symbols) {
       const symbolErrors: string[] = [];
 
-      // Required field validations
-      if (!symbol.displayName?.trim()) {
-        symbolErrors.push('Display name is required');
-      }
-
+      // Essential field validations (only truly required fields)
       if (!symbol.tradingSymbol?.trim()) {
         symbolErrors.push('Trading symbol is required');
       }
@@ -555,61 +585,35 @@ export class UpstoxDataProcessor {
         symbolErrors.push('Exchange is required');
       }
 
-      if (!symbol.segment?.trim()) {
-        symbolErrors.push('Segment is required');
+      // Relaxed validations - allow missing display name, segment, and source
+      // These can be derived or populated later if needed
+
+      // Numeric validations (relaxed)
+      if (symbol.lotSize !== undefined && symbol.lotSize < 0) {
+        symbolErrors.push('Lot size cannot be negative');
       }
 
-      if (!symbol.source?.trim()) {
-        symbolErrors.push('Source is required');
+      if (symbol.tickSize !== undefined && symbol.tickSize < 0) {
+        symbolErrors.push('Tick size cannot be negative');
       }
 
-      // Numeric validations
-      if (symbol.lotSize <= 0) {
-        symbolErrors.push('Lot size must be positive');
-      }
+      // Allow zero values for lot size and tick size as they may be valid in some cases
 
-      if (symbol.tickSize <= 0) {
-        symbolErrors.push('Tick size must be positive');
-      }
-
-      // Options-specific validations
+      // Options-specific validations (relaxed)
       if (symbol.instrumentType === 'OPTION') {
-        if (!symbol.underlying?.trim()) {
-          symbolErrors.push('Underlying is required for options');
-        }
-
-        if (!symbol.strikePrice || symbol.strikePrice <= 0) {
-          symbolErrors.push('Valid strike price is required for options');
-        }
-
-        if (!symbol.optionType) {
-          symbolErrors.push('Option type (CE/PE) is required for options');
-        }
-
-        if (!symbol.expiryDate) {
-          symbolErrors.push('Expiry date is required for options');
+        // Only validate option type if present - some options may not have underlying populated
+        if (symbol.optionType && !['CE', 'PE'].includes(symbol.optionType)) {
+          symbolErrors.push('Option type must be CE or PE if specified');
         }
       }
 
-      // Futures-specific validations
-      if (symbol.instrumentType === 'FUTURE') {
-        if (!symbol.underlying?.trim()) {
-          symbolErrors.push('Underlying is required for futures');
-        }
-
-        if (!symbol.expiryDate) {
-          symbolErrors.push('Expiry date is required for futures');
-        }
-      }
-
-      // Date validation
+      // Date validation (relaxed - allow expired contracts for historical data)
       if (symbol.expiryDate) {
         const expiryDate = new Date(symbol.expiryDate);
         if (isNaN(expiryDate.getTime())) {
           symbolErrors.push('Invalid expiry date format');
-        } else if (expiryDate < new Date()) {
-          symbolErrors.push('Expiry date cannot be in the past');
         }
+        // Removed future date check - expired contracts are valid for historical data
       }
 
       if (symbolErrors.length === 0) {

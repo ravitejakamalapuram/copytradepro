@@ -39,8 +39,9 @@ class RealTimeDataService {
   initialize(io: SocketIOServer): void {
     this.io = io;
     this.setupSocketHandlers();
-    this.startPriceUpdates();
-    console.log('✅ Real-time data service connected to Socket.IO');
+    // Price updates disabled per user request
+    // this.startPriceUpdates();
+    console.log('✅ Real-time data service connected to Socket.IO (price updates disabled)');
   }
 
   /**

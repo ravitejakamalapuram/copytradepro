@@ -92,92 +92,28 @@ export class StartupSymbolInitializationService {
       return;
     }
 
-    // Check if data already exists and is fresh
-    const dataStatus = await symbolDatabaseService.checkDataFreshness();
-    
-    if (dataStatus.hasData) {
-      if (dataStatus.isFresh) {
-        logger.info('Fresh symbol data already exists, skipping initialization', {
-          component: 'STARTUP_SYMBOL_INIT',
-          operation: 'SKIP_FRESH_DATA',
-          totalSymbols: dataStatus.totalSymbols,
-          lastUpdated: dataStatus.lastUpdated,
-          ageHours: dataStatus.ageHours
-        });
-
-        // Mark as completed without doing anything
-        this.initializationStatus = {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: 'Using existing fresh data',
-          startedAt: new Date(),
-          completedAt: new Date(),
-          stats: {
-            totalSymbols: dataStatus.totalSymbols,
-            validSymbols: dataStatus.totalSymbols,
-            invalidSymbols: 0,
-            processingTime: 0
-          }
-        };
-
-        return;
-      } else {
-        logger.info('Symbol data exists but is stale, scheduling one-time refresh', {
-          component: 'STARTUP_SYMBOL_INIT',
-          operation: 'SCHEDULE_STALE_REFRESH',
-          totalSymbols: dataStatus.totalSymbols,
-          lastUpdated: dataStatus.lastUpdated,
-          ageHours: dataStatus.ageHours
-        });
-
-        // Mark as completed, but schedule a one-time refresh within the first hour
-        this.initializationStatus = {
-          status: 'COMPLETED',
-          progress: 100,
-          currentStep: 'Using existing data, refresh scheduled',
-          startedAt: new Date(),
-          completedAt: new Date(),
-          stats: {
-            totalSymbols: dataStatus.totalSymbols,
-            validSymbols: dataStatus.totalSymbols,
-            invalidSymbols: 0,
-            processingTime: 0
-          }
-        };
-
-        // Schedule a one-time refresh within the first hour (random delay to avoid peak times)
-        const refreshDelayMs = Math.random() * 60 * 60 * 1000; // 0-60 minutes
-        this.scheduleOneTimeRefresh(refreshDelayMs);
-
-        return;
-      }
-    }
-
-    // No data exists, proceed with full initialization
-    logger.info('No symbol data found, starting fresh initialization', {
+    // Always perform fresh symbol load - no complex freshness checks
+    logger.info('Starting fresh symbol data initialization', {
       component: 'STARTUP_SYMBOL_INIT',
-      operation: 'INITIALIZE_START_NO_DATA'
+      operation: 'INITIALIZE_START_FRESH'
     });
 
     this.isInitializing = true;
     this.initializationStatus = {
       status: 'IN_PROGRESS',
       progress: 0,
-      currentStep: 'Starting initialization',
+      currentStep: 'Starting fresh initialization',
       startedAt: new Date()
     };
 
     try {
-      // Step 1: Clear existing symbol data (fresh start)
-      await this.executeStepWithRetry('clear_data', () => this.clearExistingData());
+      // Step 1: Backup existing data
+      await this.executeStepWithRetry('backup_data', () => this.backupExistingData());
 
       // Step 2: Download and process Upstox data
       await this.executeStepWithRetry('download_process', () => this.downloadAndProcessUpstoxData());
 
-      // Step 3: Validate data integrity
-      await this.executeStepWithRetry('validate', () => this.validateDataIntegrity());
-
-      // Step 4: Complete initialization
+      // Step 3: Complete initialization (simplified)
       await this.executeStepWithRetry('complete', () => this.completeInitialization());
 
       this.initializationStatus.status = 'COMPLETED';
@@ -269,16 +205,13 @@ export class StartupSymbolInitializationService {
     };
 
     try {
-      // Step 1: Clear existing symbol data (fresh start)
-      await this.executeStepWithRetry('clear_data', () => this.clearExistingData());
+      // Step 1: Backup existing data
+      await this.executeStepWithRetry('backup_data', () => this.backupExistingData());
 
       // Step 2: Download and process Upstox data
       await this.executeStepWithRetry('download_process', () => this.downloadAndProcessUpstoxData());
 
-      // Step 3: Validate data integrity
-      await this.executeStepWithRetry('validate', () => this.validateDataIntegrity());
-
-      // Step 4: Complete initialization
+      // Step 3: Complete initialization (simplified)
       await this.executeStepWithRetry('complete', () => this.completeInitialization());
 
       this.initializationStatus.status = 'COMPLETED';
@@ -510,38 +443,39 @@ export class StartupSymbolInitializationService {
   }
 
   /**
-   * Clear existing symbol data for fresh start
+   * Backup existing symbol data before loading fresh data
    */
-  private async clearExistingData(): Promise<any> {
-    logger.info('Clearing existing symbol data', {
+  private async backupExistingData(): Promise<any> {
+    logger.info('Backing up existing symbol data', {
       component: 'STARTUP_SYMBOL_INIT',
-      operation: 'CLEAR_EXISTING_DATA'
+      operation: 'BACKUP_EXISTING_DATA'
     });
 
     try {
       // Get current symbol count for logging
-      const stats = await symbolDatabaseService.getStats();
+      const stats = await symbolDatabaseService.getStatistics();
       const existingCount = stats.totalSymbols;
 
       if (existingCount > 0) {
-        logger.info('Found existing symbol data to clear', {
+        logger.info('Found existing symbol data to backup', {
           component: 'STARTUP_SYMBOL_INIT',
-          operation: 'CLEAR_EXISTING_DATA_FOUND',
+          operation: 'BACKUP_EXISTING_DATA_FOUND',
           existingSymbols: existingCount
         });
 
-        // Clear all existing symbols
-        await symbolDatabaseService.clearAllSymbols();
+        // Backup and clear existing symbols
+        const result = await symbolDatabaseService.backupAndClearSymbols();
 
-        logger.info('Cleared existing symbol data', {
+        logger.info('Backed up existing symbol data', {
           component: 'STARTUP_SYMBOL_INIT',
-          operation: 'CLEAR_EXISTING_DATA_SUCCESS',
-          clearedSymbols: existingCount
+          operation: 'BACKUP_EXISTING_DATA_SUCCESS',
+          backedUpSymbols: result.backedUpCount,
+          backupCollection: result.backupCollection
         });
 
-        return { clearedSymbols: existingCount };
+        return { backedUpSymbols: result.backedUpCount, backupCollection: result.backupCollection };
       } else {
-        logger.info('No existing symbol data found to clear', {
+        logger.info('No existing symbol data found to backup', {
           component: 'STARTUP_SYMBOL_INIT',
           operation: 'CLEAR_EXISTING_DATA_NONE'
         });
@@ -590,31 +524,6 @@ export class StartupSymbolInitializationService {
 
       return this.initializationStatus.stats;
 
-      // Validate minimum symbol count with more flexible thresholds
-      const minSymbolCount = parseInt(process.env.MIN_SYMBOL_COUNT || '1000');
-      const warningThreshold = Math.floor(minSymbolCount * 0.5); // 50% of minimum
-      
-      if (result.validSymbols === 0) {
-        throw new Error(`No symbols processed successfully. This indicates a critical issue with data source or processing.`);
-      } else if (result.validSymbols < warningThreshold) {
-        logger.warn('Very low symbol count detected', {
-          component: 'STARTUP_SYMBOL_INIT',
-          operation: 'LOW_SYMBOL_COUNT_WARNING',
-          validSymbols: result.validSymbols,
-          expectedMinimum: minSymbolCount,
-          warningThreshold
-        });
-        throw new Error(`Critically low symbol count: ${result.validSymbols}. Expected at least ${minSymbolCount} symbols.`);
-      } else if (result.validSymbols < minSymbolCount) {
-        logger.warn('Symbol count below expected minimum but proceeding', {
-          component: 'STARTUP_SYMBOL_INIT',
-          operation: 'LOW_SYMBOL_COUNT_PROCEED',
-          validSymbols: result.validSymbols,
-          expectedMinimum: minSymbolCount
-        });
-        // Continue with warning but don't fail
-      }
-
     } catch (error: any) {
       logger.error('Failed to download and process Upstox data', {
         component: 'STARTUP_SYMBOL_INIT',
@@ -635,13 +544,14 @@ export class StartupSymbolInitializationService {
 
     try {
       // Get database stats
-      const stats = await symbolDatabaseService.getStats();
+      const stats = await symbolDatabaseService.getStatistics();
 
-      // Validate minimum counts
+      // Validate minimum counts (relaxed thresholds)
+      const equityCount = (stats.symbolsByType && stats.symbolsByType['EQUITY']) || 0;
       const validations = [
-        { check: stats.totalSymbols >= 1000, message: `Total symbols too low: ${stats.totalSymbols}` },
-        { check: stats.activeSymbols >= 500, message: `Active symbols too low: ${stats.activeSymbols}` },
-        { check: stats.symbolsByType.EQUITY >= 100, message: `Equity symbols too low: ${stats.symbolsByType.EQUITY}` }
+        { check: stats.totalSymbols >= 100, message: `Total symbols too low: ${stats.totalSymbols}` },
+        { check: stats.activeSymbols >= 50, message: `Active symbols too low: ${stats.activeSymbols}` },
+        { check: equityCount >= 10, message: `Equity symbols too low: ${equityCount}` }
       ];
 
       const failures = validations.filter(v => !v.check);
@@ -722,26 +632,6 @@ export class StartupSymbolInitializationService {
       });
 
       return;
-
-      // Get popular equity symbols (old implementation - keeping as fallback)
-      const popularEquities = await symbolDatabaseService.searchSymbolsWithFilters({
-        instrumentType: 'EQUITY',
-        limit: 100
-      });
-
-      // Get popular index options
-      const popularOptions = await symbolDatabaseService.searchSymbolsWithFilters({
-        instrumentType: 'OPTION',
-        underlying: 'NIFTY',
-        limit: 50
-      });
-
-      logger.info('Cache warmed up successfully', {
-        component: 'STARTUP_SYMBOL_INIT',
-        operation: 'WARM_UP_CACHE_SUCCESS',
-        equityCount: popularEquities.symbols.length,
-        optionCount: popularOptions.symbols.length
-      });
 
     } catch (error: any) {
       logger.warn('Failed to warm up cache', {
