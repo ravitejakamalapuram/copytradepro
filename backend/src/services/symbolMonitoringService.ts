@@ -695,14 +695,33 @@ export class SymbolMonitoringService extends EventEmitter {
     this.alerts.push(alert);
     this.trimMetricsArray(this.alerts);
 
-    // Log alert
-    logger.error(`🚨 SYMBOL ALERT: ${alert.message}`, {
+    // Log alert with appropriate level based on severity
+    const logContext = {
       component: 'SYMBOL_MONITORING',
       operation: 'ALERT_CREATED',
       severity: alert.severity,
       alertId: alert.id,
       alertType: alert.type
-    }, alert.details);
+    };
+
+    const alertMessage = `🚨 SYMBOL ALERT: ${alert.message}`;
+
+    switch (alert.severity) {
+      case 'critical':
+        logger.error(alertMessage, logContext, alert.details);
+        break;
+      case 'high':
+        logger.error(alertMessage, logContext, alert.details);
+        break;
+      case 'medium':
+        logger.warn(alertMessage, logContext, alert.details);
+        break;
+      case 'low':
+        logger.info(alertMessage, logContext, alert.details);
+        break;
+      default:
+        logger.warn(alertMessage, logContext, alert.details);
+    }
 
     this.emit('alert:created', alert);
   }

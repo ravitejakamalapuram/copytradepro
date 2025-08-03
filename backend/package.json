@@ -16,7 +16,6 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "health-check": "node scripts/health-check.js",
-
     "monitoring:start": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.start()\"",
     "monitoring:stop": "node -e \"require('./dist/services/productionMonitoringService').productionMonitoringService.stop()\"",
     "kill-port": "lsof -ti:3001 | xargs kill -9 || echo 'Port 3001 is free'",

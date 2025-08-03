@@ -521,7 +521,12 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
       // Already formatted
       return symbol;
     }
-    
+
+    // Validate exchange parameter
+    if (!exchange || exchange === 'undefined') {
+      throw new Error('Exchange is required for Fyers symbol formatting');
+    }
+
     // Format as EXCHANGE:SYMBOL
     return `${exchange}:${symbol}`;
   }

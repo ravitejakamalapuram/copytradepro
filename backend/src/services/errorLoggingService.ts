@@ -177,8 +177,8 @@ export class ErrorLoggingService {
         { errorId, errorType: errorLogEntry.errorType }
       );
 
-      // Log to console for immediate visibility with categorization
-      logger.error(`[${errorLogEntry.source}] [${categorization.category}] ${message}`, {
+      // Log to console for immediate visibility with categorization using appropriate log level
+      const logContext = {
         component: context.component,
         operation: context.operation,
         traceId,
@@ -188,7 +188,27 @@ export class ErrorLoggingService {
         businessImpact: categorization.businessImpact,
         userId: context.userId,
         brokerName: context.brokerName
-      }, error);
+      };
+
+      const logMessage = `[${errorLogEntry.source}] [${categorization.category}] ${message}`;
+
+      // Use appropriate log level based on the entry level
+      switch (errorLogEntry.level) {
+        case 'ERROR':
+          logger.error(logMessage, logContext, error);
+          break;
+        case 'WARN':
+          logger.warn(logMessage, logContext, error);
+          break;
+        case 'INFO':
+          logger.info(logMessage, logContext, error);
+          break;
+        case 'DEBUG':
+          logger.debug(logMessage, logContext, error);
+          break;
+        default:
+          logger.error(logMessage, logContext, error);
+      }
 
       return errorId;
     } catch (dbError) {
@@ -200,13 +220,33 @@ export class ErrorLoggingService {
         traceId
       }, dbError);
 
-      // Still log the original error to console
-      logger.error(`[FALLBACK] [${errorLogEntry.source}] ${message}`, {
+      // Still log the original error to console using appropriate level
+      const fallbackLogContext = {
         component: context.component,
         operation: context.operation,
         traceId,
         errorType: errorLogEntry.errorType
-      }, error);
+      };
+
+      const fallbackLogMessage = `[FALLBACK] [${errorLogEntry.source}] ${message}`;
+
+      // Use appropriate log level for fallback logging
+      switch (errorLogEntry.level) {
+        case 'ERROR':
+          logger.error(fallbackLogMessage, fallbackLogContext, error);
+          break;
+        case 'WARN':
+          logger.warn(fallbackLogMessage, fallbackLogContext, error);
+          break;
+        case 'INFO':
+          logger.info(fallbackLogMessage, fallbackLogContext, error);
+          break;
+        case 'DEBUG':
+          logger.debug(fallbackLogMessage, fallbackLogContext, error);
+          break;
+        default:
+          logger.error(fallbackLogMessage, fallbackLogContext, error);
+      }
 
       return errorId;
     }

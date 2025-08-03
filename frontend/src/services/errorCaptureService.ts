@@ -223,9 +223,21 @@ class ErrorCaptureService {
     }
 
     if (element.className) {
-      const classes = element.className.split(' ').filter(c => c.trim());
-      if (classes.length > 0) {
-        return `.${classes.join('.')}`;
+      try {
+        // Handle both string and DOMTokenList className
+        const classNameStr = typeof element.className === 'string'
+          ? element.className
+          : element.className.toString();
+
+        if (classNameStr && typeof classNameStr === 'string') {
+          const classes = classNameStr.split(' ').filter(c => c.trim());
+          if (classes.length > 0) {
+            return `.${classes.join('.')}`;
+          }
+        }
+      } catch (error) {
+        // Fallback if className handling fails
+        console.warn('Error processing element className:', error);
       }
     }
 
