@@ -97,6 +97,7 @@ export class SymbolMonitoringService extends EventEmitter {
   private metricsInterval: NodeJS.Timeout | null = null;
   private dataQualityInterval: NodeJS.Timeout | null = null;
   private isRunning = false;
+  private startupTime: Date = new Date();
 
   // Performance thresholds
   private readonly SEARCH_PERFORMANCE_THRESHOLD = 200; // ms
@@ -134,8 +135,11 @@ export class SymbolMonitoringService extends EventEmitter {
       this.performDataQualityCheck();
     }, this.DATA_QUALITY_CHECK_INTERVAL);
 
-    // Collect initial metrics
-    this.collectCacheMetrics();
+    // Delay initial metrics collection to allow cache warming
+    setTimeout(() => {
+      this.collectCacheMetrics();
+    }, 10000); // 10 second delay for cache warming
+    
     this.performDataQualityCheck();
 
     logger.info('Symbol monitoring service started', {
@@ -535,7 +539,22 @@ export class SymbolMonitoringService extends EventEmitter {
    * Check for cache performance alerts
    */
   private checkCachePerformanceAlerts(metrics: CacheMetrics): void {
-    if (metrics.hitRate < this.CACHE_HIT_RATE_THRESHOLD) {
+    // Skip cache alerts during startup period (first 2 minutes) or if cache is empty
+    const startupPeriodMs = 2 * 60 * 1000; // 2 minutes
+    const timeSinceStartup = Date.now() - this.startupTime.getTime();
+    
+    if (timeSinceStartup < startupPeriodMs || metrics.totalKeys === 0) {
+      logger.debug('Skipping cache performance alert - within startup period or cache is empty', {
+        component: 'SYMBOL_MONITORING',
+        operation: 'CACHE_ALERT_SKIP',
+        timeSinceStartup: `${Math.round(timeSinceStartup / 1000)}s`,
+        totalKeys: metrics.totalKeys
+      });
+      return;
+    }
+
+    // Only alert if cache has been populated but hit rate is low
+    if (metrics.hitRate < this.CACHE_HIT_RATE_THRESHOLD && metrics.totalKeys > 0) {
       this.createAlert({
         type: 'cache_failure',
         severity: metrics.hitRate < 50 ? 'high' : 'medium',

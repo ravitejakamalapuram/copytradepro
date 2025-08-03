@@ -65,22 +65,54 @@ export class OptionsDataService {
     });
 
     // Fetch instruments immediately on startup
-    logger.info('Fetching F&O instruments on startup', {
-      component: 'OPTIONS_DATA_SERVICE',
-      operation: 'STARTUP_FETCH'
-    });
+    // Check if we need to fetch fresh data (with safety check)
+    const { symbolDatabaseService } = require('./symbolDatabaseService');
     
+    let dataStatus: any = { hasData: false, isFresh: false };
     try {
-      await this.refreshInstruments();
-      logger.info('F&O instruments fetched successfully on startup', {
+      // Ensure symbol database service is initialized first
+      if (!symbolDatabaseService.isReady()) {
+        await symbolDatabaseService.initialize();
+      }
+      dataStatus = await symbolDatabaseService.checkDataFreshness();
+    } catch (error: any) {
+      logger.warn('Failed to check data freshness, proceeding with fetch', {
         component: 'OPTIONS_DATA_SERVICE',
-        operation: 'STARTUP_FETCH_SUCCESS'
+        operation: 'CHECK_FRESHNESS_ERROR',
+        error: error?.message || 'Unknown error'
       });
-    } catch (error) {
-      logger.error('Failed to fetch F&O instruments on startup', {
+      // Continue with fetch if freshness check fails
+    }
+    
+    if (dataStatus.hasData && dataStatus.isFresh) {
+      logger.info('Fresh symbol data already exists, skipping startup fetch', {
         component: 'OPTIONS_DATA_SERVICE',
-        operation: 'STARTUP_FETCH_ERROR'
-      }, error);
+        operation: 'SKIP_STARTUP_FETCH',
+        totalSymbols: dataStatus.totalSymbols,
+        lastUpdated: dataStatus.lastUpdated,
+        ageHours: dataStatus.ageHours
+      });
+    } else {
+      logger.info('Fetching instruments on startup (data is stale or missing)', {
+        component: 'OPTIONS_DATA_SERVICE',
+        operation: 'STARTUP_FETCH',
+        hasData: dataStatus.hasData,
+        isFresh: dataStatus.isFresh,
+        ageHours: dataStatus.ageHours
+      });
+      
+      try {
+        await this.refreshInstruments();
+        logger.info('Instruments fetched successfully on startup', {
+          component: 'OPTIONS_DATA_SERVICE',
+          operation: 'STARTUP_FETCH_SUCCESS'
+        });
+      } catch (error) {
+        logger.error('Failed to fetch instruments on startup', {
+          component: 'OPTIONS_DATA_SERVICE',
+          operation: 'STARTUP_FETCH_ERROR'
+        }, error);
+      }
     }
 
     this.isInitialized = true;

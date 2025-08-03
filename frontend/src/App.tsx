@@ -37,6 +37,10 @@ const CopyTradingStrategies = React.lazy(() => import('./pages/CopyTradingStrate
 const UserSettings = React.lazy(() => import('./pages/UserSettings'));
 const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
 const AdminUserDetails = React.lazy(() => import('./pages/AdminUserDetails'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const AdminErrorLogs = React.lazy(() => import('./pages/AdminErrorLogs'));
+const AdminSystemHealth = React.lazy(() => import('./pages/AdminSystemHealth'));
+const AdminAnalytics = React.lazy(() => import('./pages/AdminAnalytics'));
 
 // Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
@@ -257,6 +261,26 @@ const AppContent: React.FC = () => {
           element={
             <ProtectedRoute>
               <ErrorBoundary>
+                <AdminDashboard />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/panel"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminPanel />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
                 <AdminPanel />
               </ErrorBoundary>
             </ProtectedRoute>
@@ -268,6 +292,36 @@ const AppContent: React.FC = () => {
             <ProtectedRoute>
               <ErrorBoundary>
                 <AdminUserDetails />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/error-logs"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminErrorLogs />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/system-health"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminSystemHealth />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminAnalytics />
               </ErrorBoundary>
             </ProtectedRoute>
           }

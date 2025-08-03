@@ -84,15 +84,30 @@ export class SymbolDatabaseService {
         operation: 'INITIALIZE'
       });
 
-      // Warm the cache after initialization
-      setTimeout(() => {
-        symbolCacheService.warmCache(this).catch(error => {
+      // Warm the cache after initialization (only if we have data)
+      setTimeout(async () => {
+        try {
+          const stats = await this.getStatistics();
+          if (stats.totalSymbols > 0) {
+            await symbolCacheService.warmCache(this);
+            logger.info('Cache warmed successfully after initialization', {
+              component: 'SYMBOL_DATABASE_SERVICE',
+              operation: 'CACHE_WARM_SUCCESS',
+              totalSymbols: stats.totalSymbols
+            });
+          } else {
+            logger.info('Skipping cache warming - no symbols available', {
+              component: 'SYMBOL_DATABASE_SERVICE',
+              operation: 'CACHE_WARM_SKIP'
+            });
+          }
+        } catch (error) {
           logger.error('Failed to warm cache during initialization', {
             component: 'SYMBOL_DATABASE_SERVICE',
-            operation: 'CACHE_WARM'
+            operation: 'CACHE_WARM_ERROR'
           }, error);
-        });
-      }, 1000);
+        }
+      }, 2000); // Increased delay to ensure data is loaded
     } catch (error) {
       logger.error('Failed to initialize Symbol Database Service', {
         component: 'SYMBOL_DATABASE_SERVICE',

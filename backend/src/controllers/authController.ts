@@ -12,7 +12,7 @@ import { User } from '../interfaces/IDatabaseAdapter';
 import { populateCacheForUser } from './brokerController';
 
 // Helper function to generate JWT token
-const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
+const generateToken = (user: Pick<User, 'id' | 'email' | 'name' | 'role'>): string => {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('JWT_SECRET not configured');
@@ -23,6 +23,7 @@ const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
       id: user.id.toString(),
       email: user.email,
       name: user.name,
+      role: user.role || 'user',
     },
     jwtSecret,
     { expiresIn: '24h' }
@@ -111,6 +112,7 @@ export const register = async (
       id: newUser.id,
       email: newUser.email,
       name: newUser.name,
+      role: newUser.role || 'user',
     });
 
     const duration = performance.now() - startTime;
@@ -333,6 +335,7 @@ export const login = async (
       id: user.id,
       email: user.email,
       name: user.name,
+      role: user.role || 'user',
     });
 
     // Populate broker account cache for this user
@@ -376,6 +379,7 @@ export const login = async (
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role || 'user', // Include role field
           createdAt: user.created_at,
         },
         token,

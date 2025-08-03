@@ -394,9 +394,22 @@ class ErrorCaptureService {
     reason: any;
     promise: Promise<any>;
   }): void {
-    const message = rejectionInfo.reason instanceof Error 
-      ? rejectionInfo.reason.message 
-      : String(rejectionInfo.reason);
+    let message: string;
+    
+    if (rejectionInfo.reason instanceof Error) {
+      message = rejectionInfo.reason.message;
+    } else if (typeof rejectionInfo.reason === 'string') {
+      message = rejectionInfo.reason;
+    } else if (typeof rejectionInfo.reason === 'object' && rejectionInfo.reason !== null) {
+      // Handle objects by serializing them properly
+      try {
+        message = JSON.stringify(rejectionInfo.reason);
+      } catch {
+        message = `[Object: ${Object.prototype.toString.call(rejectionInfo.reason)}]`;
+      }
+    } else {
+      message = String(rejectionInfo.reason);
+    }
 
     const errorEntry = this.createBaseErrorEntry('PROMISE_REJECTION', message);
     
@@ -530,7 +543,7 @@ class ErrorCaptureService {
   /**
    * Sanitize state to remove sensitive data
    */
-  private sanitizeState(state: any): any {
+  private sanitizeState(state: any): unknown {
     return this.sanitizeProps(state);
   }
 

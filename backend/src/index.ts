@@ -50,6 +50,8 @@ import { notificationService } from './services/notificationService';
 import { startupStatusService } from './services/startupStatusService';
 import { startupMonitoringService } from './services/startupMonitoringService';
 import { requireSymbolData, requireServerReady, addStartupStatusHeaders } from './middleware/symbolDataReadyMiddleware';
+import { logRotationService } from './services/logRotationService';
+import { errorLoggingMonitoringService } from './services/errorLoggingMonitoringService';
 
 // Load environment variables
 dotenv.config();
@@ -440,6 +442,28 @@ async function startServer() {
         operation: 'MONITORING_INIT'
       });
       
+      // Start file logging services
+      logger.info('Starting file logging services', {
+        component: 'SERVER_STARTUP',
+        operation: 'FILE_LOGGING_INIT'
+      });
+      
+      try {
+        await logRotationService.start();
+        await errorLoggingMonitoringService.start();
+        logger.info('File logging services started successfully', {
+          component: 'SERVER_STARTUP',
+          operation: 'FILE_LOGGING_STARTED'
+        });
+        console.log(`📝 File logging active: backend/logs/`);
+      } catch (error) {
+        logger.warn('File logging services failed to start', {
+          component: 'SERVER_STARTUP',
+          operation: 'FILE_LOGGING_ERROR'
+        }, error);
+        console.log(`⚠️  File logging disabled - using console only`);
+      }
+      
       productionMonitoringService.start();
       symbolMonitoringService.start();
       
@@ -554,6 +578,22 @@ async function gracefulShutdown(signal: string) {
     websocketService.shutdown();
     orderStatusService.stopMonitoring();
     productionMonitoringService.stop();
+    
+    // Stop file logging services
+    try {
+      logRotationService.stop();
+      errorLoggingMonitoringService.stop();
+      logger.shutdown(); // Close log file streams
+      logger.info('File logging services stopped', {
+        component: 'SERVER_SHUTDOWN',
+        operation: 'FILE_LOGGING_STOPPED'
+      });
+    } catch (error) {
+      logger.warn('Error stopping file logging services', {
+        component: 'SERVER_SHUTDOWN',
+        operation: 'FILE_LOGGING_STOP_ERROR'
+      }, error);
+    }
 
     // Close database connection
     await DatabaseFactory.closeConnection();

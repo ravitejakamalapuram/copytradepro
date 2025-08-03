@@ -712,7 +712,18 @@ export class StartupSymbolInitializationService {
         operation: 'WARM_UP_CACHE'
       });
 
-      // Get popular equity symbols
+      // Use the symbol cache service to warm the cache
+      const { symbolCacheService } = require('./symbolCacheService');
+      await symbolCacheService.warmCache(symbolDatabaseService);
+
+      logger.info('Cache warmed up successfully', {
+        component: 'STARTUP_SYMBOL_INIT',
+        operation: 'WARM_UP_CACHE_SUCCESS'
+      });
+
+      return;
+
+      // Get popular equity symbols (old implementation - keeping as fallback)
       const popularEquities = await symbolDatabaseService.searchSymbolsWithFilters({
         instrumentType: 'EQUITY',
         limit: 100

@@ -18,6 +18,7 @@ interface UserDocument extends Document {
   email: string;
   name: string;
   password: string;
+  role?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -75,6 +76,7 @@ const UserSchema = new Schema<UserDocument>({
   email: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
   password: { type: String, required: true },
+  role: { type: String, default: 'user' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -169,7 +171,7 @@ export class MongoDatabase implements IDatabaseAdapter {
 
   async initialize(): Promise<void> {
     try {
-      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/copytrade';
+      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/copytradepro';
       
       console.log('🔗 Connecting to MongoDB...');
       await mongoose.connect(mongoUri);
@@ -257,6 +259,7 @@ export class MongoDatabase implements IDatabaseAdapter {
       email: doc.email,
       name: doc.name,
       password: doc.password,
+      role: doc.role || 'user',
       created_at: doc.created_at.toISOString(),
       updated_at: doc.updated_at.toISOString()
     };

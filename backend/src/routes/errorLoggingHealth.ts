@@ -12,6 +12,22 @@ const router = Router();
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
+// Admin role check middleware
+const requireAdmin = (req: AuthenticatedRequest, res: any, next: any) => {
+  const user = req.user as any; // Type assertion to access role property
+  
+  if (user?.role !== 'admin') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin access required'
+    });
+  }
+  next();
+};
+
+// Apply admin check to all routes
+router.use(requireAdmin);
+
 /**
  * @route GET /api/error-logging-health/status
  * @desc Get error logging system status

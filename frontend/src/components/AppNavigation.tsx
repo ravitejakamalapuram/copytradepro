@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useResourceCleanup } from '../hooks/useResourceCleanup';
 import { portfolioService } from '../services/portfolioService';
+import { useAuth } from '../hooks/useAuth';
 import '../styles/app-theme.css';
 import Button from './ui/Button';
 import { UserDropdown } from './ui/UserDropdown';
@@ -17,6 +18,7 @@ interface PortfolioSummary {
 const AppNavigation: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const { registerInterval } = useResourceCleanup('AppNavigation');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary>({
@@ -61,6 +63,9 @@ const AppNavigation: React.FC = () => {
 
 
 
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
+
   const navItems = [
     // { path: '/dashboard', label: 'Dashboard', icon: '📊' },
     // { path: '/portfolio', label: 'Portfolio', icon: '📈' },
@@ -70,6 +75,18 @@ const AppNavigation: React.FC = () => {
     // { path: '/positions', label: 'Positions', icon: '🎯' },
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
+
+  // Admin-specific navigation items
+  const adminNavItems = [
+    { path: '/admin', label: 'Admin Panel', icon: '⚙️' },
+    { path: '/admin/users', label: 'User Management', icon: '👥' },
+    { path: '/admin/error-logs', label: 'Error Logs', icon: '🐛' },
+    { path: '/admin/system-health', label: 'System Health', icon: '💚' },
+    { path: '/admin/analytics', label: 'Analytics', icon: '📊' },
+  ];
+
+  // Combine nav items based on user role
+  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
   // Static watchlist items for demo
   const watchlistItems = [
@@ -91,12 +108,19 @@ const AppNavigation: React.FC = () => {
 
           {/* Main Navigation */}
           <div className="app-nav-links">
-            {navItems.map((item) => (
+            {allNavItems.map((item) => (
               <Button
                 key={item.path}
                 variant="ghost"
-                className={`app-nav-link ${location.pathname === item.path ? 'app-nav-link--active' : ''}`}
+                className={`app-nav-link ${location.pathname === item.path || location.pathname.startsWith(item.path) ? 'app-nav-link--active' : ''}`}
                 onClick={() => navigate(item.path)}
+                style={{
+                  // Add visual distinction for admin items
+                  ...(isAdmin && adminNavItems.some(adminItem => adminItem.path === item.path) ? {
+                    borderTop: '2px solid var(--color-accent)',
+                    backgroundColor: 'var(--color-bg-elevated)'
+                  } : {})
+                }}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>

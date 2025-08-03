@@ -215,12 +215,40 @@ copyTradeV2/
 - Input validation and sanitization
 - Secure credential storage
 
+## Admin Setup
+
+After setting up the application, you'll need to create an admin user to access admin features:
+
+### Create Admin User
+
+```bash
+cd backend
+npm run admin:create
+```
+
+This interactive script will prompt you for:
+- Admin name
+- Admin email
+- Admin password
+
+### Admin Features
+
+Once logged in as admin, you'll have access to:
+- **Admin Panel** (`/admin`) - Overview dashboard
+- **User Management** (`/admin/users`) - Manage user accounts
+- **Error Logs** (`/admin/error-logs`) - View system error logs
+- **System Health** (`/admin/system-health`) - Monitor system status
+- **Analytics** (`/admin/analytics`) - View usage analytics
+
+Admin navigation items are visually distinguished with a colored border in the navigation bar.
+
 ## Usage
 
 1. **Register/Login**: Create an account or login with existing credentials
 2. **Account Setup**: Add your broker accounts with API credentials
 3. **Trade Setup**: Configure and execute trades across multiple accounts
 4. **Monitor**: Track trade history and portfolio performance
+5. **Admin Access**: Use admin credentials to access administrative features
 
 ## Environment Variables
 
@@ -229,6 +257,9 @@ copyTradeV2/
 - `PORT`: Server port (default: 3001)
 - `JWT_SECRET`: Secret key for JWT tokens
 - `FRONTEND_URL`: Frontend URL for CORS
+- `MONGODB_URI`: MongoDB connection string (default: `mongodb://localhost:27017/copytradepro`)
+- `ENABLE_FILE_LOGGING`: Enable file-based logging (default: true)
+- `LOG_LEVEL`: Logging level (debug/info/warn/error/critical)
 
 ### Frontend
 - `VITE_API_URL`: Backend API URL
