@@ -113,6 +113,29 @@ class RobustErrorLoggingService {
   }
 
   /**
+   * Map source values to valid enum values
+   */
+  private mapSourceToEnum(source?: string): 'UI' | 'BE' | 'DB' | 'API' {
+    if (!source) return 'BE';
+    
+    switch (source.toLowerCase()) {
+      case 'frontend':
+      case 'ui':
+        return 'UI';
+      case 'backend':
+      case 'be':
+        return 'BE';
+      case 'database':
+      case 'db':
+        return 'DB';
+      case 'api':
+        return 'API';
+      default:
+        return 'BE';
+    }
+  }
+
+  /**
    * Try to log error to database
    */
   private async tryLogToDatabase(errorEntry: QueuedError): Promise<boolean> {
@@ -124,7 +147,7 @@ class RobustErrorLoggingService {
         traceId: errorEntry.context.traceId || errorEntry.id,
         timestamp: errorEntry.timestamp,
         level: errorEntry.level.toUpperCase(),
-        source: errorEntry.context.source || 'BE',
+        source: this.mapSourceToEnum(errorEntry.context.source) || 'BE',
         component: errorEntry.context.component || 'UNKNOWN',
         operation: errorEntry.context.operation || 'LOG_ERROR',
         message: errorEntry.message,

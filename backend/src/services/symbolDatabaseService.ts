@@ -130,7 +130,7 @@ export class SymbolDatabaseService {
       isin: doc.isin || undefined,
       companyName: doc.companyName || undefined,
       sector: doc.sector || undefined,
-      createdAt: doc.createdAt.toISOString()
+      createdAt: doc.createdAt instanceof Date ? doc.createdAt.toISOString() : doc.createdAt
     };
   }
 
@@ -1045,6 +1045,44 @@ export class SymbolDatabaseService {
         operation: 'CLEAR_ALL_SYMBOLS_ERROR'
       }, error);
       return 0;
+    }
+  }
+
+  /**
+   * Get total count of symbols in database
+   */
+  async getTotalCount(): Promise<number> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+      const count = await this.StandardizedSymbolModel.countDocuments();
+      return count;
+    } catch (error) {
+      logger.error('Failed to get total symbol count', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_TOTAL_COUNT_ERROR'
+      }, error);
+      return 0;
+    }
+  }
+
+  /**
+   * Get a few sample symbols for testing (bypassing search)
+   */
+  async getSampleSymbols(limit: number = 5): Promise<StandardizedSymbol[]> {
+    try {
+      if (!this.isReady()) {
+        throw new Error('Symbol Database Service not initialized');
+      }
+      const docs = await this.StandardizedSymbolModel.find({}).limit(limit).lean();
+      return docs.map(doc => this.symbolDocToInterface(doc));
+    } catch (error) {
+      logger.error('Failed to get sample symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'GET_SAMPLE_SYMBOLS_ERROR'
+      }, error);
+      return [];
     }
   }
 

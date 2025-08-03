@@ -27,7 +27,7 @@ router.post('/', authenticateToken, (req: AuthenticatedRequest, res): void => {
         const frontendContext = {
           ...context,
           component: `FRONTEND_${context.component || 'UNKNOWN'}`,
-          source: 'frontend'
+          source: context.source || 'UI' // Preserve original source or default to UI for frontend
         };
 
         // Log using the appropriate level

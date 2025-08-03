@@ -194,16 +194,22 @@ export class OptionsDataService {
       // Fetch from Upstox - no fallbacks
       instruments = await this.fetchUpstoxInstruments();
 
-      // Filter F&O instruments - try multiple possible field names
-      const foInstruments = instruments.filter(instrument => 
-        instrument.segment === 'NSE_FO' || 
-        instrument.exchange === 'NFO' ||
-        instrument.instrument_type === 'OPT' ||
-        instrument.instrument_type === 'FUT' ||
-        (instrument.exchange === 'NSE' && (instrument.instrument_type === 'OPT' || instrument.instrument_type === 'FUT'))
-      );
+      // Option 1: Store ALL instruments (remove filtering)
+      const allInstruments = instruments;
+      console.log(`📊 Storing ${allInstruments.length} total instruments (no filtering)`);
 
-      console.log(`📊 Filtered ${foInstruments.length} F&O instruments from ${instruments.length} total instruments`);
+      // Option 2: Store F&O + Equity instruments (selective filtering)
+      // const relevantInstruments = instruments.filter(instrument => 
+      //   instrument.segment === 'NSE_FO' || 
+      //   instrument.exchange === 'NFO' ||
+      //   instrument.instrument_type === 'OPT' ||
+      //   instrument.instrument_type === 'FUT' ||
+      //   instrument.instrument_type === 'EQ' ||
+      //   instrument.segment === 'NSE_EQ' ||
+      //   (instrument.exchange === 'NSE' && (instrument.instrument_type === 'OPT' || instrument.instrument_type === 'FUT' || instrument.instrument_type === 'EQ'))
+      // );
+
+      const foInstruments = allInstruments; // Use all instruments instead of filtered
 
       // Store in database
       await this.storeInstruments(foInstruments);
@@ -231,31 +237,41 @@ export class OptionsDataService {
       const db = mongoose.connection.db;
       const collection = db.collection('standardizedsymbols');
       
-      // Clear existing F&O data only (keep equity data)
-      await collection.deleteMany({ 
-        instrumentType: { $in: ['OPTION', 'FUTURE'] }
-      });
+      // Clear all existing data since we're now storing all instruments
+      await collection.deleteMany({});
       
       // Transform and insert new data in standardized format
       const transformedInstruments = instruments.map(instrument => {
-        // Extract underlying symbol and strike from trading_symbol
+        // Extract underlying symbol and strike from trading_symbol (only for F&O)
         // Format: "INDUSINDBK 780 CE 30 SEP 25" or "NIFTY 21000 CE 30 JAN 25"
         let underlying = null;
         let strike = null;
         
-        if (instrument.trading_symbol) {
-          const parts = instrument.trading_symbol.split(' ');
-          if (parts.length >= 3) {
-            underlying = parts[0]; // First part is underlying
-            const strikeStr = parts[1];
-            if (!isNaN(parseFloat(strikeStr))) {
-              strike = parseFloat(strikeStr);
+        // Only extract underlying and strike for F&O instruments
+        if (instrument.instrument_type === 'FUT' || instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' || instrument.instrument_type === 'OPT') {
+          if (instrument.trading_symbol) {
+            const parts = instrument.trading_symbol.split(' ');
+            if (parts.length >= 3) {
+              underlying = parts[0]; // First part is underlying
+              const strikeStr = parts[1];
+              if (!isNaN(parseFloat(strikeStr))) {
+                strike = parseFloat(strikeStr);
+              }
             }
           }
         }
 
-        const instrumentType = instrument.instrument_type === 'FUT' ? 'FUTURE' : 'OPTION';
-        const optionType = instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' 
+        // Determine instrument type based on the raw data
+        let instrumentType: 'EQUITY' | 'OPTION' | 'FUTURE';
+        if (instrument.instrument_type === 'FUT') {
+          instrumentType = 'FUTURE';
+        } else if (instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE' || instrument.instrument_type === 'OPT') {
+          instrumentType = 'OPTION';
+        } else {
+          instrumentType = 'EQUITY'; // Default for stocks, bonds, etc.
+        }
+
+        const optionType = (instrument.instrument_type === 'CE' || instrument.instrument_type === 'PE') 
           ? instrument.instrument_type as 'CE' | 'PE' 
           : undefined;
         
@@ -265,11 +281,11 @@ export class OptionsDataService {
           tradingSymbol: instrument.trading_symbol,
           instrumentType,
           exchange: (instrument.exchange || 'NSE') as 'NSE' | 'BSE' | 'NFO' | 'BFO' | 'MCX',
-          segment: instrument.segment || 'NSE_FO',
-          underlying: underlying || instrument.underlying,
-          strikePrice: strike || instrument.strike,
+          segment: instrument.segment || (instrumentType === 'EQUITY' ? 'NSE_EQ' : 'NSE_FO'),
+          underlying: instrumentType !== 'EQUITY' ? (underlying || instrument.underlying) : undefined,
+          strikePrice: instrumentType === 'OPTION' ? (strike || instrument.strike) : undefined,
           optionType,
-          expiryDate: instrument.expiry ? new Date(instrument.expiry).toISOString().split('T')[0] : undefined,
+          expiryDate: (instrumentType !== 'EQUITY' && instrument.expiry) ? new Date(instrument.expiry).toISOString().split('T')[0] : undefined,
           lotSize: instrument.lot_size || 1,
           tickSize: instrument.tick_size || 0.05,
           source: 'upstox_api',
