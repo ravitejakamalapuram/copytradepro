@@ -17,50 +17,56 @@ router.post('/', authenticateToken, (req: AuthenticatedRequest, res): void => {
       return;
     }
 
-    // Process each log entry
+    // Process each log entry with error handling to prevent infinite loops
+    let processedCount = 0;
     logs.forEach((logEntry: any) => {
-      const { level, message, context, data, error } = logEntry;
-      
-      // Add frontend prefix to distinguish from backend logs
-      const frontendContext = {
-        ...context,
-        component: `FRONTEND_${context.component || 'UNKNOWN'}`,
-        source: 'frontend'
-      };
+      try {
+        const { level, message, context, data, error } = logEntry;
+        
+        // Add frontend prefix to distinguish from backend logs
+        const frontendContext = {
+          ...context,
+          component: `FRONTEND_${context.component || 'UNKNOWN'}`,
+          source: 'frontend'
+        };
 
-      // Log using the appropriate level
-      switch (level) {
-        case 'debug':
-          logger.debug(`[Frontend] ${message}`, frontendContext, data);
-          break;
-        case 'info':
-          logger.info(`[Frontend] ${message}`, frontendContext, data);
-          break;
-        case 'warn':
-          logger.warn(`[Frontend] ${message}`, frontendContext, data);
-          break;
-        case 'error':
-          logger.error(`[Frontend] ${message}`, frontendContext, error);
-          break;
-        case 'critical':
-          logger.critical(`[Frontend] ${message}`, frontendContext, error);
-          break;
-        default:
-          logger.info(`[Frontend] ${message}`, frontendContext, data);
+        // Log using the appropriate level
+        switch (level) {
+          case 'debug':
+            logger.debug(`[Frontend] ${message}`, frontendContext, data);
+            break;
+          case 'info':
+            logger.info(`[Frontend] ${message}`, frontendContext, data);
+            break;
+          case 'warn':
+            logger.warn(`[Frontend] ${message}`, frontendContext, data);
+            break;
+          case 'error':
+            logger.error(`[Frontend] ${message}`, frontendContext, error);
+            break;
+          case 'critical':
+            logger.critical(`[Frontend] ${message}`, frontendContext, error);
+            break;
+          default:
+            logger.info(`[Frontend] ${message}`, frontendContext, data);
+        }
+        processedCount++;
+      } catch (logError) {
+        // Don't log this error to prevent infinite loops
+        // Just increment processed count to maintain response accuracy
+        console.error('Failed to process individual log entry:', logError);
       }
     });
 
     res.json({
       success: true,
-      message: `Processed ${logs.length} log entries`,
-      count: logs.length
+      message: `Processed ${processedCount} log entries`,
+      count: processedCount
     });
 
   } catch (error) {
-    logger.error('Failed to process frontend logs', {
-      component: 'LOGS_API',
-      userId: req.user?.id
-    }, error);
+    // Don't use logger.error here to prevent infinite loops if logger itself fails
+    console.error('Failed to process frontend logs:', error);
 
     res.status(500).json({
       success: false,

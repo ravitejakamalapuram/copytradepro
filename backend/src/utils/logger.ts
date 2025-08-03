@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { EnhancedError, ErrorContext } from '../types/errorTypes';
 import { errorLoggingService } from '../services/errorLoggingService';
 import { traceIdService } from '../services/traceIdService';
+import { robustErrorLoggingService } from '../services/robustErrorLoggingService';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'critical';
 
@@ -187,6 +188,16 @@ export class EnhancedLogger implements Logger {
           console.error(entry.stackTrace);
         }
         break;
+    }
+
+    // Use robust error logging service for error and critical levels
+    if (level === 'error' || level === 'critical') {
+      // Don't await to prevent blocking the main thread
+      robustErrorLoggingService.logError(level, message, context, { data, error })
+        .catch(loggingError => {
+          // Don't use logger.error here to prevent infinite loops
+          console.error('Robust error logging failed:', loggingError);
+        });
     }
 
     // In production, you might want to send critical errors to external logging service

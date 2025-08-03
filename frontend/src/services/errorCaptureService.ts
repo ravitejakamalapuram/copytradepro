@@ -83,6 +83,17 @@ class ErrorCaptureService {
   private isOnline = navigator.onLine;
   private retryInterval = 30000; // 30 seconds
   private retryTimer?: NodeJS.Timeout;
+  
+  // Circuit breaker for error logging API
+  private circuitBreaker = {
+    isOpen: false,
+    failureCount: 0,
+    maxFailures: 3,
+    resetTimeout: 60000, // 1 minute
+    lastFailureTime: 0,
+    halfOpenAttempts: 0,
+    maxHalfOpenAttempts: 1
+  };
 
   constructor() {
     this.initializeGlobalErrorHandlers();
@@ -526,7 +537,7 @@ class ErrorCaptureService {
   /**
    * Sanitize value to remove sensitive data
    */
-  private sanitizeValue(value: any): any {
+  private sanitizeValue(value: any): unknown {
     if (typeof value === 'string' && value.length > 100) {
       return value.substring(0, 100) + '...';
     }
@@ -616,11 +627,85 @@ class ErrorCaptureService {
   }
 
   /**
-   * Send error to backend
+   * Check if circuit breaker allows requests
+   */
+  private canSendToBackend(): boolean {
+    const now = Date.now();
+    
+    // If circuit is closed, allow requests
+    if (!this.circuitBreaker.isOpen) {
+      return true;
+    }
+    
+    // If enough time has passed, try to reset circuit breaker
+    if (now - this.circuitBreaker.lastFailureTime > this.circuitBreaker.resetTimeout) {
+      this.circuitBreaker.isOpen = false;
+      this.circuitBreaker.failureCount = 0;
+      this.circuitBreaker.halfOpenAttempts = 0;
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Record circuit breaker success
+   */
+  private recordSuccess(): void {
+    this.circuitBreaker.isOpen = false;
+    this.circuitBreaker.failureCount = 0;
+    this.circuitBreaker.halfOpenAttempts = 0;
+  }
+
+  /**
+   * Record circuit breaker failure
+   */
+  private recordFailure(): void {
+    this.circuitBreaker.failureCount++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+    
+    if (this.circuitBreaker.failureCount >= this.circuitBreaker.maxFailures) {
+      this.circuitBreaker.isOpen = true;
+      console.warn('Error logging circuit breaker opened - too many failures');
+    }
+  }
+
+  /**
+   * Send error to backend with circuit breaker protection
    */
   private async sendErrorToBackend(errorEntry: FrontendErrorEntry): Promise<boolean> {
+    // Check circuit breaker
+    if (!this.canSendToBackend()) {
+      console.warn('Error logging circuit breaker is open - skipping backend call');
+      return false;
+    }
+
     try {
-      await api.post('/error-logs/frontend', errorEntry);
+      // Use the correct endpoint
+      await api.post('/api/logs', {
+        logs: [{
+          level: 'error',
+          message: errorEntry.message,
+          context: {
+            component: 'ERROR_CAPTURE',
+            errorId: errorEntry.id,
+            traceId: errorEntry.traceId,
+            errorType: errorEntry.errorType,
+            source: errorEntry.source,
+            ...errorEntry.context
+          },
+          error: {
+            message: errorEntry.message,
+            stack: errorEntry.stackTrace,
+            componentStack: errorEntry.componentStack,
+            browserInfo: errorEntry.browserInfo,
+            timestamp: errorEntry.timestamp
+          }
+        }]
+      });
+      
+      // Record success
+      this.recordSuccess();
       
       // Remove from queue if successful
       const index = this.errorQueue.findIndex(e => e.id === errorEntry.id);
@@ -630,38 +715,68 @@ class ErrorCaptureService {
 
       return true;
     } catch (error) {
-      console.warn('Failed to send error to backend:', error);
+      // Record failure for circuit breaker
+      this.recordFailure();
+      
+      // Don't log this error to avoid infinite loops
+      console.warn('Failed to send error to backend (circuit breaker will handle retries)');
       return false;
     }
   }
 
   /**
-   * Process error queue for retry
+   * Process error queue for retry with backpressure control
    */
   private async processErrorQueue(): Promise<void> {
     if (this.errorQueue.length === 0) {
       return;
     }
 
-    const errorsToSend = [...this.errorQueue];
-    const results = await Promise.allSettled(
-      errorsToSend.map(error => this.sendErrorToBackend(error))
-    );
+    // Don't process if circuit breaker is open
+    if (!this.canSendToBackend()) {
+      return;
+    }
 
-    const successCount = results.filter(r => r.status === 'fulfilled' && r.value).length;
+    // Process errors in small batches to avoid backpressure
+    const batchSize = 5;
+    const batch = this.errorQueue.slice(0, batchSize);
     
-    if (import.meta.env.DEV) {
-      console.log(`Processed error queue: ${successCount}/${errorsToSend.length} sent successfully`);
+    // Process batch with delay between requests
+    let successCount = 0;
+    for (const error of batch) {
+      const success = await this.sendErrorToBackend(error);
+      if (success) {
+        successCount++;
+      } else {
+        // If one fails, stop processing to avoid overwhelming the server
+        break;
+      }
+      
+      // Small delay between requests to avoid backpressure
+      if (batch.indexOf(error) < batch.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    if (import.meta.env.DEV && batch.length > 0) {
+      console.log(`Processed error queue batch: ${successCount}/${batch.length} sent successfully`);
     }
   }
 
   /**
    * Get error queue status
    */
-  public getQueueStatus(): { queueSize: number; isOnline: boolean } {
+  public getQueueStatus(): { 
+    queueSize: number; 
+    isOnline: boolean; 
+    circuitBreakerOpen: boolean;
+    failureCount: number;
+  } {
     return {
       queueSize: this.errorQueue.length,
-      isOnline: this.isOnline
+      isOnline: this.isOnline,
+      circuitBreakerOpen: this.circuitBreaker.isOpen,
+      failureCount: this.circuitBreaker.failureCount
     };
   }
 

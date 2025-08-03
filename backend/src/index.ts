@@ -25,6 +25,7 @@ import symbolHealthRoutes from './routes/symbolHealth';
 import notificationRoutes from './routes/notifications';
 import startupRoutes from './routes/startup';
 import errorAnalyticsRoutes from './routes/errorAnalytics';
+import errorLoggingHealthRoutes from './routes/errorLoggingHealth';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -230,6 +231,7 @@ app.use('/api/symbol-health', requireServerReady, symbolHealthRoutes);
 app.use('/api/notifications', requireServerReady, notificationRoutes);
 app.use('/api/startup', requireServerReady, startupRoutes);
 app.use('/api/error-analytics', requireServerReady, errorAnalyticsRoutes);
+app.use('/api/error-logging-health', requireServerReady, errorLoggingHealthRoutes);
 
 
 
