@@ -68,14 +68,10 @@ const AdminAnalytics: React.FC = () => {
   ];
 
   return (
-    <div className="app-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
-      
-      <div style={{ 
-        padding: '2rem',
-        maxWidth: '1400px',
-        margin: '0 auto'
-      }}>
+
+      <div className="app-main">
         <div style={{ 
           display: 'flex',
           justifyContent: 'space-between',

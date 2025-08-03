@@ -7,14 +7,10 @@ import '../styles/app-theme.css';
 
 const AdminErrorLogs: React.FC = () => {
   return (
-    <div className="app-theme">
+    <div className="app-theme app-layout">
       <AppNavigation />
-      
-      <div style={{ 
-        padding: '2rem',
-        maxWidth: '1400px',
-        margin: '0 auto'
-      }}>
+
+      <div className="app-main">
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ 
             fontSize: '2rem',

@@ -13,6 +13,9 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ className = '' }) =>
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Check if user is admin
+  const isAdmin = user?.role === 'admin';
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -34,15 +37,8 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ className = '' }) =>
     }
   };
 
-  const menuItems = [
-    {
-      icon: '⚙️',
-      label: 'Settings',
-      onClick: () => {
-        navigate('/settings');
-        setIsOpen(false);
-      }
-    },
+  // Regular menu items
+  const regularMenuItems = [
     {
       icon: '👤',
       label: 'Profile',
@@ -52,13 +48,12 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ className = '' }) =>
       }
     },
     {
-      icon: '🛡️',
-      label: 'Admin Panel',
+      icon: '⚙️',
+      label: 'Settings',
       onClick: () => {
-        navigate('/admin');
+        navigate('/settings');
         setIsOpen(false);
-      },
-      adminOnly: true
+      }
     },
     {
       icon: '📊',
@@ -83,14 +78,60 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ className = '' }) =>
         navigate('/help');
         setIsOpen(false);
       }
-    },
-    {
-      icon: '🚪',
-      label: 'Logout',
-      onClick: handleLogout,
-      danger: true
     }
   ];
+
+  // Admin-specific menu items
+  const adminMenuItems = [
+    {
+      icon: '🛡️',
+      label: 'Admin Panel',
+      onClick: () => {
+        navigate('/admin');
+        setIsOpen(false);
+      }
+    },
+    {
+      icon: '👥',
+      label: 'User Management',
+      onClick: () => {
+        navigate('/admin/users');
+        setIsOpen(false);
+      }
+    },
+    {
+      icon: '🐛',
+      label: 'Error Logs',
+      onClick: () => {
+        navigate('/admin/error-logs');
+        setIsOpen(false);
+      }
+    },
+    {
+      icon: '💚',
+      label: 'System Health',
+      onClick: () => {
+        navigate('/admin/system-health');
+        setIsOpen(false);
+      }
+    },
+    {
+      icon: '📊',
+      label: 'Admin Analytics',
+      onClick: () => {
+        navigate('/admin/analytics');
+        setIsOpen(false);
+      }
+    }
+  ];
+
+  // Logout item
+  const logoutItem = {
+    icon: '🚪',
+    label: 'Logout',
+    onClick: handleLogout,
+    danger: true
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -196,47 +237,127 @@ export const UserDropdown: React.FC<UserDropdownProps> = ({ className = '' }) =>
             </div>
           </div>
 
-          {/* Menu Items */}
+          {/* Regular Menu Items */}
           <div style={{ padding: '0.5rem' }}>
-            {menuItems.map((item, index) => {
-              // Skip admin-only items for non-admin users
-              if (item.adminOnly && !(user as any)?.isAdmin) {
-                return null;
-              }
+            {regularMenuItems.map((item, index) => (
+              <button
+                key={index}
+                onClick={item.onClick}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.75rem',
+                  padding: '0.75rem',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'transparent',
+                  color: 'var(--text-primary)',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem',
+                  textAlign: 'left',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <span style={{ fontSize: '1rem' }}>{item.icon}</span>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </div>
 
-              return (
-                <button
-                  key={index}
-                  onClick={item.onClick}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    padding: '0.75rem',
-                    border: 'none',
-                    borderRadius: 'var(--radius-md)',
-                    backgroundColor: 'transparent',
-                    color: item.danger ? 'var(--color-loss)' : 'var(--text-primary)',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    textAlign: 'left',
-                    transition: 'all 0.2s ease'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = item.danger 
-                      ? 'rgba(239, 68, 68, 0.1)' 
-                      : 'var(--bg-tertiary)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span style={{ fontSize: '1rem' }}>{item.icon}</span>
-                  <span>{item.label}</span>
-                </button>
-              );
-            })}
+          {/* Admin Section */}
+          {isAdmin && (
+            <>
+              <div style={{
+                height: '1px',
+                backgroundColor: 'var(--border-secondary)',
+                margin: '0.5rem 0'
+              }} />
+              <div style={{
+                padding: '0.5rem 1rem 0.25rem',
+                fontSize: '0.75rem',
+                fontWeight: '600',
+                color: 'var(--text-secondary)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em'
+              }}>
+                Administration
+              </div>
+              <div style={{ padding: '0.25rem 0.5rem 0.5rem' }}>
+                {adminMenuItems.map((item, index) => (
+                  <button
+                    key={index}
+                    onClick={item.onClick}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      padding: '0.75rem',
+                      border: 'none',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'transparent',
+                      color: 'var(--text-primary)',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      textAlign: 'left',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = 'var(--bg-tertiary)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
+                    }}
+                  >
+                    <span style={{ fontSize: '1rem' }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Logout Section */}
+          <div style={{
+            height: '1px',
+            backgroundColor: 'var(--border-secondary)',
+            margin: '0.5rem 0'
+          }} />
+          <div style={{ padding: '0.5rem' }}>
+            <button
+              onClick={logoutItem.onClick}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.75rem',
+                border: 'none',
+                borderRadius: 'var(--radius-md)',
+                backgroundColor: 'transparent',
+                color: 'var(--color-loss)',
+                cursor: 'pointer',
+                fontSize: '0.875rem',
+                textAlign: 'left',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span style={{ fontSize: '1rem' }}>{logoutItem.icon}</span>
+              <span>{logoutItem.label}</span>
+            </button>
           </div>
         </div>
       )}

@@ -76,17 +76,8 @@ const AppNavigation: React.FC = () => {
     { path: '/account-setup', label: 'Accounts', icon: '🔗' },
   ];
 
-  // Admin-specific navigation items
-  const adminNavItems = [
-    { path: '/admin', label: 'Admin Panel', icon: '⚙️' },
-    { path: '/admin/users', label: 'User Management', icon: '👥' },
-    { path: '/admin/error-logs', label: 'Error Logs', icon: '🐛' },
-    { path: '/admin/system-health', label: 'System Health', icon: '💚' },
-    { path: '/admin/analytics', label: 'Analytics', icon: '📊' },
-  ];
-
-  // Combine nav items based on user role
-  const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
+  // Use only regular nav items - admin items moved to user dropdown
+  const allNavItems = navItems;
 
   // Static watchlist items for demo
   const watchlistItems = [
@@ -114,13 +105,6 @@ const AppNavigation: React.FC = () => {
                 variant="ghost"
                 className={`app-nav-link ${location.pathname === item.path || location.pathname.startsWith(item.path) ? 'app-nav-link--active' : ''}`}
                 onClick={() => navigate(item.path)}
-                style={{
-                  // Add visual distinction for admin items
-                  ...(isAdmin && adminNavItems.some(adminItem => adminItem.path === item.path) ? {
-                    borderTop: '2px solid var(--color-accent)',
-                    backgroundColor: 'var(--color-bg-elevated)'
-                  } : {})
-                }}
               >
                 <span>{item.icon}</span>
                 <span>{item.label}</span>
