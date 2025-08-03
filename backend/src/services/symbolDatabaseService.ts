@@ -1017,7 +1017,7 @@ export class SymbolDatabaseService {
   }
 
   /**
-   * Backup existing symbols and clear the main collection
+   * Backup existing symbols by renaming collection (fast operation)
    */
   async backupAndClearSymbols(): Promise<{ backedUpCount: number; backupCollection: string }> {
     if (!this.isInitialized) {
@@ -1025,60 +1025,72 @@ export class SymbolDatabaseService {
     }
 
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const backupCollectionName = `standardizedsymbols_backup_${timestamp}`;
-
       // Get current symbol count
       const currentCount = await this.StandardizedSymbolModel.countDocuments();
 
-      if (currentCount > 0) {
-        logger.info('Creating backup of existing symbols', {
-          component: 'SYMBOL_DATABASE_SERVICE',
-          operation: 'BACKUP_SYMBOLS_START',
-          symbolCount: currentCount,
-          backupCollection: backupCollectionName
-        });
-
-        // Get all symbols
-        const symbols = await this.StandardizedSymbolModel.find({}).lean();
-
-        if (symbols.length > 0) {
-          // Create backup collection
-          const BackupModel = mongoose.model(backupCollectionName, this.StandardizedSymbolModel.schema);
-          await BackupModel.insertMany(symbols);
-
-          logger.info('Created backup collection', {
-            component: 'SYMBOL_DATABASE_SERVICE',
-            operation: 'BACKUP_CREATED',
-            backupCollection: backupCollectionName,
-            backedUpCount: symbols.length
-          });
-        }
-
-        // Clear main collection
-        await this.StandardizedSymbolModel.deleteMany({});
-        await this.SymbolProcessingLogModel.deleteMany({});
-
-        logger.info('Backed up and cleared symbols from database', {
-          component: 'SYMBOL_DATABASE_SERVICE',
-          operation: 'BACKUP_AND_CLEAR_SUCCESS',
-          backedUpCount: currentCount,
-          backupCollection: backupCollectionName
-        });
-
-        return { backedUpCount: currentCount, backupCollection: backupCollectionName };
-      } else {
+      if (currentCount === 0) {
         logger.info('No symbols found to backup', {
           component: 'SYMBOL_DATABASE_SERVICE',
           operation: 'BACKUP_NO_DATA'
         });
-
         return { backedUpCount: 0, backupCollection: '' };
       }
-    } catch (error) {
-      logger.error('Failed to backup and clear symbols', {
+
+      // Create backup collection name with date suffix (YYYYMMDD format)
+      const today = new Date();
+      const dateString = today.toISOString().split('T')[0]?.replace(/-/g, '') || 'unknown'; // YYYYMMDD
+      let backupCollectionName = `standardizedsymbols_backup_${dateString}`;
+
+      logger.info('Creating fast backup by renaming collection', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'BACKUP_AND_CLEAR_ERROR',
+        operation: 'BACKUP_SYMBOLS_RENAME_START',
+        symbolCount: currentCount,
+        targetBackupName: backupCollectionName
+      });
+
+      // Check if backup collection already exists and add counter if needed
+      const db = mongoose.connection.db;
+      if (!db) {
+        throw new Error('Database connection not available');
+      }
+
+      const collections = await db.listCollections({ name: backupCollectionName }).toArray();
+
+      if (collections.length > 0) {
+        // Add counter suffix if collection exists
+        let counter = 1;
+        let finalBackupName = `${backupCollectionName}_${counter}`;
+
+        while (true) {
+          const existingCollections = await db.listCollections({ name: finalBackupName }).toArray();
+          if (existingCollections.length === 0) {
+            backupCollectionName = finalBackupName;
+            break;
+          }
+          counter++;
+          finalBackupName = `${backupCollectionName}_${counter}`;
+        }
+      }
+
+      // Rename collection (fast operation - no data copying)
+      await db.collection('standardizedsymbols').rename(backupCollectionName);
+
+      // Also clear processing logs
+      await this.SymbolProcessingLogModel.deleteMany({});
+
+      logger.info('Fast backup completed by renaming collection', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'BACKUP_RENAME_SUCCESS',
+        backedUpCount: currentCount,
+        backupCollection: backupCollectionName
+      });
+
+      return { backedUpCount: currentCount, backupCollection: backupCollectionName };
+
+    } catch (error) {
+      logger.error('Failed to backup symbols', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'BACKUP_ERROR',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
       throw error;
