@@ -174,20 +174,20 @@ export class FyersService {
     }
 
     try {
-      // Fyers API v3 expects specific payload structure
+      // Fyers API v3 expects specific payload structure with mixed case field names
       const payload = {
         symbol: orderData.symbol,
         qty: Math.abs(orderData.qty), // Ensure quantity is positive
         type: this.getOrderTypeCode(orderData.type),
         side: orderData.side === 'BUY' ? 1 : -1, // 1=BUY, -1=SELL
-        productType: this.getProductTypeCode(orderData.productType),
-        limitPrice: orderData.limitPrice || 0,
-        stopPrice: orderData.stopPrice || 0,
-        disclosedQty: orderData.disclosedQty || 0,
+        productType: this.getProductTypeCode(orderData.productType), // Keep camelCase
+        limitPrice: orderData.limitPrice || 0, // Keep camelCase
+        stopPrice: orderData.stopPrice || 0, // Keep camelCase
+        disclosedQty: orderData.disclosedQty || 0, // Keep camelCase
         validity: orderData.validity === 'DAY' ? 'DAY' : 'IOC',
-        offlineOrder: orderData.offlineOrder || false,
-        stopLoss: orderData.stopLoss || 0,
-        takeProfit: orderData.takeProfit || 0,
+        offlineOrder: orderData.offlineOrder || false, // Keep camelCase
+        stopLoss: orderData.stopLoss || 0, // Keep camelCase
+        takeProfit: orderData.takeProfit || 0, // Keep camelCase
       };
 
       console.log('🔄 Placing Fyers order with payload:', JSON.stringify(payload, null, 2));
@@ -329,11 +329,13 @@ export class FyersService {
   // Helper method to convert product type to code
   private getProductTypeCode(productType: string): string {
     const productMap: { [key: string]: string } = {
-      'CNC': 'CNC',
-      'INTRADAY': 'INTRADAY',
-      'MARGIN': 'MARGIN',
-      'CO': 'CO',
-      'BO': 'BO',
+      'CNC': 'CNC',        // Cash and Carry
+      'INTRADAY': 'INTRADAY', // Intraday/MIS
+      'MIS': 'INTRADAY',   // Map MIS to INTRADAY
+      'MARGIN': 'MARGIN',  // Margin/NRML
+      'NRML': 'MARGIN',    // Map NRML to MARGIN
+      'CO': 'CO',          // Cover Order
+      'BO': 'BO',          // Bracket Order
     };
     return productMap[productType] || 'CNC';
   }

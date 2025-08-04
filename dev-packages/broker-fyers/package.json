@@ -35,7 +35,7 @@
     "fyers-api-v3": "^1.4.2"
   },
   "peerDependencies": {
-    "@copytrade/unified-broker": "^1.1.0"
+    "@copytrade/unified-broker": "^1.1.9"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

@@ -167,14 +167,14 @@ export class FyersService {
         qty: orderData.qty,
         type: orderData.type === 'MARKET' ? 2 : 1, // 1=LIMIT, 2=MARKET
         side: orderData.side === 'BUY' ? 1 : -1, // 1=BUY, -1=SELL
-        productType: this.getProductTypeCode(orderData.productType),
-        limitPrice: orderData.limitPrice || 0,
-        stopPrice: orderData.stopPrice || 0,
-        disclosedQty: orderData.disclosedQty || 0,
+        productType: this.getProductTypeCode(orderData.productType), // Keep camelCase
+        limitPrice: orderData.limitPrice || 0, // Keep camelCase
+        stopPrice: orderData.stopPrice || 0, // Keep camelCase
+        disclosedQty: orderData.disclosedQty || 0, // Keep camelCase
         validity: orderData.validity === 'DAY' ? 'DAY' : 'IOC',
-        offlineOrder: orderData.offlineOrder || false,
-        stopLoss: orderData.stopLoss || 0,
-        takeProfit: orderData.takeProfit || 0,
+        offlineOrder: orderData.offlineOrder || false, // Keep camelCase
+        stopLoss: orderData.stopLoss || 0, // Keep camelCase
+        takeProfit: orderData.takeProfit || 0, // Keep camelCase
       };
 
       const response = await this.fyers.place_order(payload);

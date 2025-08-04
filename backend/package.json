@@ -33,7 +33,7 @@
     "@copytrade/broker-fyers": "file:../dev-packages/broker-fyers",
     "@copytrade/broker-shoonya": "file:../dev-packages/broker-shoonya",
     "@copytrade/shared-types": "file:../dev-packages/shared-types",
-    "@copytrade/unified-broker": "file:../dev-packages/unified-broker",
+    "@copytrade/unified-broker": "^1.1.9",
     "axios": "^1.6.0",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",

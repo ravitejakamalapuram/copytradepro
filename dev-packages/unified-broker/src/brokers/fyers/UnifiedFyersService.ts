@@ -515,8 +515,8 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
   }
 
   private formatSymbolForFyers(symbol: string, exchange: string): string {
-    // Fyers expects format: EXCHANGE:SYMBOL
-    // e.g., NSE:RELIANCE-EQ, BSE:RELIANCE
+    // Fyers expects format: EXCHANGE:SYMBOL-SUFFIX
+    // e.g., NSE:TCS-EQ, BSE:TCS
     if (symbol.includes(':')) {
       // Already formatted
       return symbol;
@@ -527,8 +527,17 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
       throw new Error('Exchange is required for Fyers symbol formatting');
     }
 
-    // Format as EXCHANGE:SYMBOL
-    return `${exchange}:${symbol}`;
+    // Format based on exchange
+    if (exchange === 'NSE') {
+      // NSE equity symbols require -EQ suffix
+      return `${exchange}:${symbol}-EQ`;
+    } else if (exchange === 'BSE') {
+      // BSE symbols don't require suffix
+      return `${exchange}:${symbol}`;
+    } else {
+      // Default format for other exchanges
+      return `${exchange}:${symbol}`;
+    }
   }
 
   private mapProductType(productType: string): 'CNC' | 'INTRADAY' | 'MARGIN' | 'CO' | 'BO' {
