@@ -205,16 +205,17 @@ api.interceptors.response.use(
     if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
       const url = config?.url || '';
       const isDevelopment = import.meta.env.DEV;
-      
+
       if (shouldLogoutOnError(axiosError, url, isDevelopment)) {
+        console.log('🚨 Session expired detected, logging out user');
         handleSessionExpiry(`API call to ${url} failed with session expiry`);
       } else {
         const errorMessage = (axiosError.response?.data as any)?.message || '';
-        console.log('🔍 API error (not session expiry), keeping user logged in:', { 
-          url, 
-          errorMessage, 
+        console.log('🔍 API error (not session expiry), keeping user logged in:', {
+          url,
+          errorMessage,
           status: axiosError.response?.status,
-          isDevelopment 
+          isDevelopment
         });
       }
     }

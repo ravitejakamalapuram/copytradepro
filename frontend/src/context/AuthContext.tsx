@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import type { User, AuthContextType, LoginCredentials, RegisterCredentials } from '../types/auth';
 import { authService } from '../services/authService';
-import { isSessionExpiredError } from '../utils/sessionUtils';
+import { isSessionExpiredError, getAndClearRedirectPath } from '../utils/sessionUtils';
 
 // Auth state interface
 interface AuthState {
@@ -148,23 +148,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   // Login function
-  const login = async (credentials: LoginCredentials): Promise<void> => {
+  const login = async (credentials: LoginCredentials): Promise<string> => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
-      
+
       const response = await authService.login(credentials);
-      
+
       if (response.success && response.data) {
         const { user, token } = response.data;
-        
+
         // Store in localStorage
         localStorage.setItem('token', token);
         localStorage.setItem('user', JSON.stringify(user));
-        
+
         dispatch({
           type: 'LOGIN_SUCCESS',
           payload: { user, token },
         });
+
+        // Get the redirect path for successful login
+        const redirectPath = getAndClearRedirectPath();
+        return redirectPath;
       } else {
         dispatch({ type: 'SET_LOADING', payload: false });
         throw new Error(response.message || 'Login failed');

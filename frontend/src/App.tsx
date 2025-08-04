@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AccountStatusProvider } from './context/AccountStatusContext';
 import { ToastProvider } from './components/Toast';
@@ -12,6 +12,7 @@ import { resourceManager } from './utils/resourceManager';
 import { appCache, apiCache, marketDataCache } from './services/cacheManager';
 import { performanceMonitorService } from './services/performanceMonitorService';
 import { errorCaptureService } from './services/errorCaptureService';
+import { storeRedirectPath } from './utils/sessionUtils';
 // Lazy load components for better performance
 const LandingPage = React.lazy(() => import('./pages/LandingPage'));
 const CopyTradeLogin = React.lazy(() => import('./pages/CopyTradeLogin'));
@@ -98,16 +99,23 @@ const LoadingFallback: React.FC = () => (
 // Protected Route Component with Suspense
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return <LoadingFallback />;
   }
 
-  return isAuthenticated ? (
+  if (!isAuthenticated) {
+    // Store current path for redirect after login
+    storeRedirectPath(location.pathname + location.search);
+    return <Navigate to="/" replace />;
+  }
+
+  return (
     <React.Suspense fallback={<LoadingFallback />}>
       {children}
     </React.Suspense>
-  ) : <Navigate to="/" replace />;
+  );
 };
 
 // Main App Component
