@@ -6,7 +6,8 @@
 import { Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { startupStatusService } from '../services/startupStatusService';
-import { startupSymbolInitializationService } from '../services/startupSymbolInitializationService';
+import { upstoxDataProcessor } from '../services/upstoxDataProcessor';
+import { startupSymbolInitializationService } from '../services/startupStatusService';
 import { startupMonitoringService } from '../services/startupMonitoringService';
 
 /**

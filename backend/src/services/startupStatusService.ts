@@ -4,7 +4,30 @@
  */
 
 import { logger } from '../utils/logger';
-import { startupSymbolInitializationService, StartupInitializationStatus } from './startupSymbolInitializationService';
+import { upstoxDataProcessor } from './upstoxDataProcessor';
+
+// Simple interface to replace deleted StartupInitializationStatus
+interface StartupInitializationStatus {
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED';
+  progress: number;
+  currentStep: string;
+  startedAt?: Date;
+  completedAt?: Date;
+  error?: string;
+}
+
+// Simple replacement for deleted startupSymbolInitializationService
+const startupSymbolInitializationService = {
+  getStatus: (): StartupInitializationStatus => ({
+    status: upstoxDataProcessor.isReady() ? 'COMPLETED' : 'PENDING',
+    progress: upstoxDataProcessor.isReady() ? 100 : 0,
+    currentStep: upstoxDataProcessor.isReady() ? 'Completed' : 'Pending'
+  }),
+  getInitializationStats: () => upstoxDataProcessor.getStats(),
+  isInProgress: () => false, // upstoxDataProcessor handles this internally
+  isSymbolDataReady: async () => upstoxDataProcessor.isReady(),
+  forceRestart: async () => upstoxDataProcessor.processUpstoxData()
+};
 import websocketService from './websocketService';
 
 export interface ServerStartupStatus {
@@ -277,3 +300,6 @@ export class StartupStatusService {
 
 // Export singleton instance
 export const startupStatusService = new StartupStatusService();
+
+// Export compatibility layer for backward compatibility
+export { startupSymbolInitializationService };

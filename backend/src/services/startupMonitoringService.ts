@@ -5,7 +5,8 @@
 
 import { logger } from '../utils/logger';
 import { startupStatusService } from './startupStatusService';
-import { startupSymbolInitializationService } from './startupSymbolInitializationService';
+import { upstoxDataProcessor } from './upstoxDataProcessor';
+import { startupSymbolInitializationService } from './startupStatusService';
 
 export interface StartupMetrics {
   serverStartupTime: number;

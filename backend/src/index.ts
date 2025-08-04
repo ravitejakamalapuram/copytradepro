@@ -36,14 +36,14 @@ import { logger } from './utils/logger';
 import websocketService from './services/websocketService';
 import orderStatusService from './services/orderStatusService';
 import { realTimeDataService } from './services/realTimeDataService';
-import { optionsDataService } from './services/optionsDataService';
+import { upstoxDataProcessor } from './services/upstoxDataProcessor';
 // Auto-initialize services on import
 import './services/symbolDatabaseService';
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
 import { initializeBrokerAccountCache } from './controllers/brokerController';
 import { productionMonitoringService } from './services/productionMonitoringService';
 import { symbolLifecycleManager } from './services/symbolLifecycleManager';
-import { startupSymbolInitializationService } from './services/startupSymbolInitializationService';
+
 import { symbolMonitoringService } from './services/symbolMonitoringService';
 // Removed unused import: symbolAlertingService
 import { notificationService } from './services/notificationService';
@@ -394,15 +394,15 @@ async function startServer() {
     // Initialize broker account cache
     await initializeBrokerAccountCache();
 
-    // Initialize options data service
-    logger.info('Initializing options data service', {
+    // Initialize unified symbol processor
+    logger.info('Initializing unified symbol processor', {
       component: 'SERVER_STARTUP',
-      operation: 'OPTIONS_SERVICE_INIT'
+      operation: 'SYMBOL_PROCESSOR_INIT'
     });
-    await optionsDataService.initialize();
-    logger.info('Options data service initialized', {
+    await upstoxDataProcessor.initialize();
+    logger.info('Unified symbol processor initialized', {
       component: 'SERVER_STARTUP',
-      operation: 'OPTIONS_SERVICE_INIT_SUCCESS'
+      operation: 'SYMBOL_PROCESSOR_INIT_SUCCESS'
     });
 
     // Initialize symbol lifecycle manager
@@ -479,7 +479,7 @@ async function startServer() {
       startupStatusService.markSymbolInitStarted();
 
       // Initialize symbol data in background after server starts
-      startupSymbolInitializationService.initializeSymbolData()
+      upstoxDataProcessor.processUpstoxData()
         .then(() => {
           console.log(`✅ Symbol data initialization completed successfully`);
           startupStatusService.markSymbolInitCompleted();

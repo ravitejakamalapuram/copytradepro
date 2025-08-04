@@ -5,7 +5,8 @@
 
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { startupSymbolInitializationService } from '../services/startupSymbolInitializationService';
+import { upstoxDataProcessor } from '../services/upstoxDataProcessor';
+import { startupSymbolInitializationService } from '../services/startupStatusService';
 import { logger } from '../utils/logger';
 
 const router = express.Router();

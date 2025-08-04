@@ -9,7 +9,8 @@ import { AuthenticatedRequest } from '../middleware/auth';
 import { symbolValidationService } from '../services/symbolValidationService';
 import { symbolSearchService } from '../services/symbolSearchService';
 import { symbolDatabaseService } from '../services/symbolDatabaseService';
-import { startupSymbolInitializationService } from '../services/startupSymbolInitializationService';
+import { upstoxDataProcessor } from '../services/upstoxDataProcessor';
+import { startupSymbolInitializationService } from '../services/startupStatusService';
 
 /**
  * Helper function to check if symbol data is ready

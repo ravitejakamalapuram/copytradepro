@@ -985,17 +985,83 @@ export class SymbolDatabaseService {
         isActive: true
       }));
 
-      // Use efficient bulk insert instead of individual upserts
-      const insertResult = await this.StandardizedSymbolModel.insertMany(symbolsToInsert, {
-        ordered: false, // Continue inserting even if some fail
-        rawResult: true // Get detailed result information
+      // Log sample symbols for debugging
+      logger.info('Sample symbols to insert', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'SAMPLE_SYMBOLS_DEBUG',
+        sampleCount: Math.min(3, symbolsToInsert.length),
+        samples: symbolsToInsert.slice(0, 3).map(s => ({
+          tradingSymbol: s.tradingSymbol,
+          exchange: s.exchange,
+          instrumentType: s.instrumentType,
+          displayName: s.displayName,
+          segment: s.segment,
+          lotSize: s.lotSize,
+          tickSize: s.tickSize,
+          source: s.source
+        }))
       });
+
+      // Log detailed sample symbols for debugging
+      if (symbolsToInsert.length > 0) {
+        logger.info('Detailed sample symbols for validation debugging', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'DETAILED_SAMPLE_DEBUG',
+          firstSymbol: JSON.stringify(symbolsToInsert[0], null, 2),
+          hasRequiredFields: {
+            tradingSymbol: !!symbolsToInsert[0]?.tradingSymbol,
+            displayName: !!symbolsToInsert[0]?.displayName,
+            instrumentType: !!symbolsToInsert[0]?.instrumentType,
+            exchange: !!symbolsToInsert[0]?.exchange,
+            segment: !!symbolsToInsert[0]?.segment,
+            source: !!symbolsToInsert[0]?.source
+          }
+        });
+      }
+
+      // Use efficient bulk insert instead of individual upserts
+      let insertResult;
+      try {
+        insertResult = await this.StandardizedSymbolModel.insertMany(symbolsToInsert, {
+          ordered: false, // Continue inserting even if some fail
+          rawResult: false // Get array of inserted documents
+        });
+      } catch (error: any) {
+        logger.error('insertMany operation failed', {
+          component: 'SYMBOL_DATABASE_SERVICE',
+          operation: 'INSERT_MANY_ERROR',
+          errorName: error.name,
+          errorMessage: error.message,
+          errorCode: error.code,
+          writeErrors: error.writeErrors ? error.writeErrors.slice(0, 3) : undefined,
+          sampleSymbol: symbolsToInsert[0] ? {
+            tradingSymbol: symbolsToInsert[0].tradingSymbol,
+            exchange: symbolsToInsert[0].exchange,
+            instrumentType: symbolsToInsert[0].instrumentType
+          } : 'none'
+        });
+        throw error;
+      }
+
+      // Log detailed insert result for debugging
+      logger.info('Insert result details', {
+        component: 'SYMBOL_DATABASE_SERVICE',
+        operation: 'INSERT_RESULT_DEBUG',
+        resultType: typeof insertResult,
+        resultLength: Array.isArray(insertResult) ? insertResult.length : 'not array',
+        hasInsertedCount: 'insertedCount' in insertResult,
+        resultKeys: Object.keys(insertResult)
+      });
+
+      // Get actual inserted count
+      const actualInsertedCount = Array.isArray(insertResult) ? insertResult.length :
+                                 ((insertResult as any).insertedCount || 0);
 
       const result: ProcessingResult = {
         totalProcessed: symbols.length,
-        validSymbols: insertResult.insertedCount || symbols.length,
-        invalidSymbols: symbols.length - (insertResult.insertedCount || symbols.length),
-        newSymbols: insertResult.insertedCount || symbols.length,
+        validSymbols: actualInsertedCount,
+        invalidSymbols: symbols.length - actualInsertedCount,
+        newSymbols: actualInsertedCount,
         updatedSymbols: 0, // Fresh insert, no updates
         errors: []
       };

@@ -443,8 +443,8 @@ router.get('/market-status', authenticateToken, async (req: any, res: any) => {
 router.post('/force-update-fo', authenticateToken, async (req: any, res: any) => {
   try {
     console.log('🔄 Manual F&O instruments update triggered');
-    const { optionsDataService } = await import('../services/optionsDataService');
-    await optionsDataService.refreshInstruments();
+    const { upstoxDataProcessor } = await import('../services/upstoxDataProcessor');
+    await upstoxDataProcessor.processUpstoxData();
 
     return res.json({
       success: true,

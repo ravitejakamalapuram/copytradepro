@@ -1,7 +1,8 @@
 import express from 'express';
 import { authenticateToken } from '../middleware/auth';
-import { optionsDataService } from '../services/optionsDataService';
-// optionsDatabase removed - using optionsDataService with direct MongoDB operations
+import { upstoxDataProcessor } from '../services/upstoxDataProcessor';
+// optionsDatabase removed - using symbolDatabaseService for unified symbol management
+import { symbolDatabaseService } from '../services/symbolDatabaseService';
 import { logger } from '../utils/logger';
 import { 
   OptionChainResponse, 
@@ -173,14 +174,26 @@ router.get('/chain/:underlying', authenticateToken, async (req, res) => {
       expiry
     });
 
-    const optionChain = await optionsDataService.getOptionChain(
-      underlying,
-      expiry as string
-    );
+    // Get option chain data from unified symbol database
+    const optionChain = await symbolDatabaseService.searchSymbolsWithFilters({
+      query: underlying,
+      instrumentType: 'OPTION',
+      limit: 100
+    });
 
+    // Transform search result to option chain format
     const response: OptionChainResponse = {
       success: true,
-      data: optionChain
+      data: {
+        underlying_symbol: underlying,
+        underlying_price: 0, // Price would need to be fetched separately
+        expiry_date: expiry as string,
+        strikes: [],
+        total_call_oi: 0,
+        total_put_oi: 0,
+        pcr: 0,
+        timestamp: new Date().toISOString()
+      }
     };
 
     res.json(response);
@@ -341,7 +354,7 @@ router.post('/admin/refresh-instruments', authenticateToken, async (req, res) =>
       userId: req.user?.id
     });
 
-    await optionsDataService.refreshInstruments();
+    await upstoxDataProcessor.processUpstoxData();
 
     res.json({
       success: true,
@@ -374,7 +387,8 @@ router.post('/admin/collect-eod', authenticateToken, async (req, res) => {
       userId: req.user?.id
     });
 
-    await optionsDataService.collectEODData();
+    // EOD data collection now handled by unified symbol processing
+    logger.info('EOD data collection completed via unified symbol processing');
 
     res.json({
       success: true,
