@@ -47,8 +47,7 @@ export default defineConfig({
           // Services and utilities
           'services': [
             './src/services/brokerService.ts',
-            './src/services/portfolioService.ts',
-            './src/services/marketDataService.ts'
+            './src/services/portfolioService.ts'
           ]
         }
       }

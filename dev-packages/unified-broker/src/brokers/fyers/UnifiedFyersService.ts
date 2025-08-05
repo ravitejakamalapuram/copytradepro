@@ -209,22 +209,44 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
 
     try {
       console.log('🔄 Refreshing Fyers access token...');
-      
-      // TODO: Implement actual refresh token API call
-      // For now, we'll simulate the refresh process
-      console.warn('⚠️ Fyers token refresh not fully implemented - triggering re-auth');
-      
-      // If refresh fails, user needs to re-authenticate
-      return UnifiedResponseHelper.createErrorResponse(
-        'Token refresh failed. Please re-authenticate.',
-        'REFRESH_TOKEN_EXPIRED',
-        'PROCEED_TO_OAUTH',
-        'OAUTH_REQUIRED'
-      ) as UnifiedTokenRefreshResponse;
-      
+
+      // Use the FyersService to refresh the token
+      const refreshResult = await this.fyersService.refreshAccessToken(this.tokenInfo.refreshToken);
+
+      if (refreshResult.success && refreshResult.accessToken) {
+        // Update token information
+        this.tokenInfo = {
+          accessToken: refreshResult.accessToken,
+          refreshToken: refreshResult.refreshToken || this.tokenInfo.refreshToken,
+          expiryTime: refreshResult.expiryTime || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          isExpired: false,
+          canRefresh: true
+        };
+
+        console.log('✅ Fyers access token refreshed successfully');
+
+        return UnifiedResponseHelper.createSuccessResponse(
+          'Fyers access token refreshed successfully',
+          'ACTIVE',
+          'TOKEN_REFRESH',
+          this.accountInfo || undefined,
+          this.tokenInfo || undefined
+        ) as UnifiedTokenRefreshResponse;
+      } else {
+        console.error('❌ Fyers token refresh failed:', refreshResult.message);
+
+        // If refresh fails, user needs to re-authenticate
+        return UnifiedResponseHelper.createErrorResponse(
+          refreshResult.message || 'Token refresh failed. Please re-authenticate.',
+          'REFRESH_TOKEN_EXPIRED',
+          'PROCEED_TO_OAUTH',
+          'OAUTH_REQUIRED'
+        ) as UnifiedTokenRefreshResponse;
+      }
+
     } catch (error: any) {
       console.error('🚨 Fyers token refresh error:', error);
-      
+
       return UnifiedResponseHelper.createErrorResponse(
         'Token refresh failed. Please re-authenticate.',
         'REFRESH_TOKEN_EXPIRED',
@@ -394,8 +416,22 @@ export class UnifiedFyersService implements IUnifiedBrokerService {
     }
 
     // Transform unified order request to Fyers format
+    // Use symbolMetadata if available
+    let formattedSymbol: string;
+    const symbolMetadata = (orderRequest as any).symbolMetadata;
+
+    if (symbolMetadata) {
+      // Use pre-fetched symbol metadata for formatting
+      formattedSymbol = this.formatSymbolForFyers(symbolMetadata.tradingSymbol, symbolMetadata.exchange);
+      console.log(`🔄 UnifiedFyers using pre-fetched symbol metadata: ${orderRequest.symbol} -> ${formattedSymbol}`);
+    } else {
+      // Use symbol as-is when no metadata provided
+      formattedSymbol = this.formatSymbolForFyers(orderRequest.symbol, orderRequest.exchange);
+      console.log(`🔄 UnifiedFyers using symbol as-is: ${orderRequest.symbol} -> ${formattedSymbol}`);
+    }
+
     const fyersOrderRequest = {
-      symbol: this.formatSymbolForFyers(orderRequest.symbol, orderRequest.exchange),
+      symbol: formattedSymbol,
       qty: Math.abs(orderRequest.quantity), // Ensure positive quantity
       type: this.mapOrderType(orderRequest.orderType),
       side: orderRequest.action as 'BUY' | 'SELL',

@@ -4,7 +4,7 @@
  * Uses comprehensive error handler for consistent error processing
  */
 
-import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
+import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus } from '@copytrade/unified-broker';
 import { ShoonyaService } from './shoonyaService';
 import { ShoonyaCredentials } from './types';
 import { ShoonyaSymbolFormatter } from './symbolFormatter';
@@ -101,42 +101,28 @@ export class ShoonyaServiceAdapter extends IBrokerService {
         };
         const shoonyaProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
-        // Convert symbol using standardized symbol system
+        // Convert symbol using pre-fetched symbolMetadata only
         let formattedData: { tradingSymbol: string; exchange: string };
-        try {
-          // First, try to find the symbol in the standardized database
-          const standardizedSymbol = await this.lookupStandardizedSymbol(orderRequest.symbol, orderRequest.exchange);
-          
-          if (standardizedSymbol) {
-            // TODO: Re-enable when symbol converter is properly exported
-            // const converter = BrokerSymbolConverterFactory.getConverter('shoonya');
-            // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
-            formattedData = {
-              tradingSymbol: standardizedSymbol.tradingSymbol,
-              exchange: standardizedSymbol.exchange || 'NSE'
-            };
-            
-            console.log(`🔄 Shoonya standardized symbol conversion: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
-          } else {
-            // Fallback to legacy symbol formatter
-            formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(
-              orderRequest.symbol,
-              orderRequest.exchange || 'NSE'
-            );
-            
-            console.log(`🔄 Shoonya legacy symbol formatting: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
-          }
-        } catch (error: any) {
-          console.warn(`⚠️ Symbol conversion failed for ${orderRequest.symbol}, using fallback:`, error.message);
-          // Final fallback to original logic
-          let tradingSymbol = orderRequest.symbol;
-          if ((orderRequest.exchange || 'NSE') === 'NSE' && !tradingSymbol.includes('-EQ')) {
-            tradingSymbol = `${tradingSymbol}-EQ`;
-          }
+
+        // Check if symbolMetadata is provided in the order request
+        const symbolMetadata = (orderRequest as any).symbolMetadata;
+
+        if (symbolMetadata) {
+          // Use pre-fetched symbol metadata (no database call needed)
           formattedData = {
-            tradingSymbol: tradingSymbol,
+            tradingSymbol: symbolMetadata.tradingSymbol,
+            exchange: symbolMetadata.exchange || 'NSE'
+          };
+
+          console.log(`🔄 Shoonya using pre-fetched symbol metadata: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        } else {
+          // Use symbol as-is when no metadata provided
+          formattedData = {
+            tradingSymbol: orderRequest.symbol,
             exchange: orderRequest.exchange || 'NSE'
           };
+
+          console.log(`🔄 Shoonya using symbol as-is: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
         }
 
         // Transform to Shoonya-specific order format
@@ -448,97 +434,9 @@ export class ShoonyaServiceAdapter extends IBrokerService {
     throw finalError;
   }
 
-  async getPositions(accountId: string): Promise<Position[]> {
-    const maxRetries = 3;
-    let lastError: any = null;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`📊 Getting positions for account ${accountId} (attempt ${attempt}/${maxRetries})`);
-        
-        const response = await this.shoonyaService.getPositions(accountId);
-        
-        if (!Array.isArray(response)) {
-          console.warn('Shoonya positions response is not an array, returning empty array');
-          return [];
-        }
 
-        const transformedPositions = response.map(position => ({
-          symbol: position.tsym || '',
-          quantity: this.parseNumericValue(position.netqty, 0),
-          averagePrice: this.parseNumericValue(position.netavgprc, 0),
-          currentPrice: this.parseNumericValue(position.lp, 0),
-          pnl: this.parseNumericValue(position.urmtom, 0),
-          exchange: position.exch || '',
-          productType: position.prd || ''
-        }));
-        
-        console.log(`✅ Retrieved ${transformedPositions.length} positions`);
-        return transformedPositions;
-        
-      } catch (error: any) {
-        lastError = error;
-        
-        const enhancedError = new Error(error.message);
-        (enhancedError as any).originalError = error.message;
-        (enhancedError as any).attempt = attempt;
-        throw enhancedError;
-      }
-    }
 
-    // If we get here, all retries failed
-    const finalError = new Error(lastError?.message || 'Failed to get positions after multiple attempts');
-    (finalError as any).originalError = lastError?.message;
-    (finalError as any).maxRetriesExceeded = true;
-    throw finalError;
-  }
-
-  async getQuote(symbol: string, exchange: string): Promise<Quote> {
-    try {
-      // Convert symbol using standardized symbol system
-      let formattedData: { tradingSymbol: string; exchange: string };
-      try {
-        // First, try to find the symbol in the standardized database
-        const standardizedSymbol = await this.lookupStandardizedSymbol(symbol, exchange);
-        
-        if (standardizedSymbol) {
-          // TODO: Re-enable when symbol converter is properly exported
-          // const converter = BrokerSymbolConverterFactory.getConverter('shoonya');
-          // const brokerFormat = converter.convertToBrokerFormat(standardizedSymbol);
-          formattedData = {
-            tradingSymbol: standardizedSymbol.tradingSymbol,
-            exchange: standardizedSymbol.exchange || exchange
-          };
-          
-          console.log(`🔄 Shoonya standardized quote symbol conversion: ${symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
-        } else {
-          // Fallback to legacy symbol formatter
-          formattedData = ShoonyaSymbolFormatter.formatSymbolWithExchange(symbol, exchange);
-          console.log(`🔄 Shoonya legacy quote symbol formatting: ${symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
-        }
-      } catch (error: any) {
-        console.warn(`⚠️ Quote symbol conversion failed for ${symbol}, using fallback:`, error.message);
-        formattedData = {
-          tradingSymbol: symbol,
-          exchange: exchange
-        };
-      }
-
-      const response = await this.shoonyaService.getQuotes(formattedData.exchange, formattedData.tradingSymbol);
-
-      return {
-        symbol: response.tsym || symbol,
-        price: parseFloat(response.lp) || 0,
-        change: parseFloat(response.c) || 0,
-        changePercent: parseFloat(response.pc) || 0,
-        volume: parseInt(response.v) || 0,
-        exchange: response.exch || exchange,
-        timestamp: new Date()
-      };
-    } catch (error: any) {
-      throw new Error(`Failed to get quote: ${error.message}`);
-    }
-  }
 
   async searchSymbols(query: string, exchange: string): Promise<any[]> {
     try {
@@ -547,6 +445,29 @@ export class ShoonyaServiceAdapter extends IBrokerService {
       return [];
     } catch (error: any) {
       throw new Error(`Failed to search symbols: ${error.message}`);
+    }
+  }
+
+  async getPositions(accountId: string): Promise<any[]> {
+    try {
+      const response = await this.shoonyaService.getPositions(accountId);
+      return Array.isArray(response) ? response : [];
+    } catch (error: any) {
+      throw new Error(`Failed to get positions: ${error.message}`);
+    }
+  }
+
+  async getQuote(symbol: string, exchange: string): Promise<any> {
+    try {
+      // For Shoonya, we need to search for the symbol first to get the token
+      const searchResults = await this.shoonyaService.searchScrip(exchange, symbol);
+      if (searchResults && searchResults.length > 0) {
+        const token = searchResults[0].token;
+        return await this.shoonyaService.getQuotes(exchange, token);
+      }
+      return null;
+    } catch (error: any) {
+      throw new Error(`Failed to get quote: ${error.message}`);
     }
   }
 
@@ -652,36 +573,5 @@ export class ShoonyaServiceAdapter extends IBrokerService {
 
   // Legacy error handling methods removed - now using comprehensive error handler
 
-  /**
-   * Look up standardized symbol from database
-   */
-  private async lookupStandardizedSymbol(symbol: string, exchange?: string): Promise<any> {
-    try {
-      // TODO: Re-enable when symbol database service is properly exported
-      // Check if symbol database service is available and initialized
-      // if (!symbolDatabaseService || !symbolDatabaseService.isReady()) {
-      //   console.warn('Symbol database service not available, using legacy formatting');
-      //   return null;
-      // }
 
-      // Try to find by trading symbol first
-      // let standardizedSymbol = await symbolDatabaseService.getSymbolByTradingSymbol(symbol, exchange);
-      
-      // if (!standardizedSymbol) {
-      //   // Try to find by ID if the symbol looks like an ID
-      //   if (symbol.length === 24 && /^[0-9a-fA-F]{24}$/.test(symbol)) {
-      //     standardizedSymbol = await symbolDatabaseService.getSymbolById(symbol);
-      //   }
-      // }
-
-      // return standardizedSymbol;
-      
-      // Temporary fallback - return null to use legacy formatting
-      console.warn('Symbol database service not available, using legacy formatting');
-      return null;
-    } catch (error) {
-      console.warn('Failed to lookup standardized symbol:', error);
-      return null;
-    }
-  }
 }

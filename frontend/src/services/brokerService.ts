@@ -73,19 +73,7 @@ export interface BrokerConnectionResponse {
   }>;
 }
 
-export interface PlaceOrderRequest {
-  brokerName: string;
-  accountId: string; // ID of the specific broker account to use
-  symbol: string;
-  action: 'BUY' | 'SELL';
-  quantity: number;
-  orderType: 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
-  price?: number;
-  triggerPrice?: number;
-  exchange?: string;
-  productType?: string;
-  remarks?: string;
-}
+// REMOVED: Single-account order interface - use PlaceMultiAccountOrderRequest instead
 
 export interface PlaceMultiAccountOrderRequest {
   selectedAccounts: string[]; // Array of account IDs
@@ -171,23 +159,7 @@ export const brokerService = {
     }
   },
 
-  async placeOrder(orderData: PlaceOrderRequest): Promise<OrderResponse> {
-    try {
-      const response = await api.post<OrderResponse>('/broker/place-order', orderData);
-      return response.data;
-    } catch (error: any) {
-      console.error('🚨 Place order error:', error);
-      
-      if (error.response?.data) {
-        return error.response.data;
-      }
-      
-      return {
-        success: false,
-        message: 'Network error. Please check your connection and try again.',
-      };
-    }
-  },
+  // REMOVED: Single-account order placement - use placeMultiAccountOrder instead
 
   async placeMultiAccountOrder(orderData: PlaceMultiAccountOrderRequest): Promise<{
     success: boolean;

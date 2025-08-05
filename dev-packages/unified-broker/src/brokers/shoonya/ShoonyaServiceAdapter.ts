@@ -3,7 +3,7 @@
  * Adapts the existing ShoonyaService to implement IBrokerService interface
  */
 
-import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '../../interfaces/IBrokerService';
+import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus } from '../../interfaces/IBrokerService';
 import { ShoonyaService } from '../../services/shoonyaService';
 import { ShoonyaCredentials } from './types';
 
@@ -171,7 +171,7 @@ export class ShoonyaServiceAdapter extends IBrokerService {
     }
   }
 
-  async getPositions(accountId: string): Promise<Position[]> {
+  async getPositions(accountId: string): Promise<any[]> {
     try {
       const response = await this.shoonyaService.getPositions(accountId);
       
@@ -193,7 +193,7 @@ export class ShoonyaServiceAdapter extends IBrokerService {
     }
   }
 
-  async getQuote(symbol: string, exchange: string): Promise<Quote> {
+  async getQuote(symbol: string, exchange: string): Promise<any> {
     try {
       const response = await this.shoonyaService.getQuotes(exchange, symbol);
 

@@ -9,7 +9,7 @@ import { useConnectionStatus } from './hooks/useConnectionStatus';
 import { memoryMonitorService } from './services/memoryMonitorService';
 import { memoryLeakDetector } from './services/memoryLeakDetector';
 import { resourceManager } from './utils/resourceManager';
-import { appCache, apiCache, marketDataCache } from './services/cacheManager';
+import { appCache, apiCache } from './services/cacheManager';
 import { performanceMonitorService } from './services/performanceMonitorService';
 import { errorCaptureService } from './services/errorCaptureService';
 import { storeRedirectPath } from './utils/sessionUtils';
@@ -448,7 +448,7 @@ const App: React.FC = () => {
     (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager = resourceManager;
     (window as unknown as { appCache?: typeof appCache }).appCache = appCache;
     (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
-    (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
+
     (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
     (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture = errorCaptureService;
 
@@ -476,7 +476,7 @@ const App: React.FC = () => {
       // Shutdown cache managers
       appCache.shutdown();
       apiCache.shutdown();
-      marketDataCache.shutdown();
+
 
       // Clean up global references
       delete (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor;
@@ -484,7 +484,7 @@ const App: React.FC = () => {
       delete (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager;
       delete (window as unknown as { appCache?: typeof appCache }).appCache;
       delete (window as unknown as { apiCache?: typeof apiCache }).apiCache;
-      delete (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache;
+
       delete (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor;
       delete (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture;
     };

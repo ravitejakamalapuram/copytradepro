@@ -626,12 +626,7 @@ export const apiCache = new CacheManager({
   enablePersistence: false
 });
 
-export const marketDataCache = new CacheManager({
-  maxSize: 5 * 1024 * 1024, // 5MB
-  maxEntries: 1000,
-  defaultTTL: 30000, // 30 seconds
-  enablePersistence: false
-});
+
 
 export { CacheManager };
 export default appCache;

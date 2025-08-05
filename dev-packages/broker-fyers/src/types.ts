@@ -55,15 +55,6 @@ export interface FyersQuoteResponse {
   };
 }
 
-export interface FyersPositionResponse {
-  s: string;
-  netPositions?: Array<{
-    symbol: string;
-    qty: number;
-    avgPrice: number;
-    pnl: number;
-    side: number;
-  }>;
-}
+
 
 // Note: Core types are exported from @copytrade/unified-broker

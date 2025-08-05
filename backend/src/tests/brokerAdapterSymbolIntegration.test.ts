@@ -12,8 +12,8 @@ import { StandardizedSymbol } from '../models/symbolModels';
 import mongoose from 'mongoose';
 
 // Mock the broker services to avoid actual API calls
-jest.mock('../../../dev-packages/broker-fyers/src/fyersService');
-jest.mock('../../../dev-packages/broker-shoonya/src/shoonyaService');
+jest.mock('../../../dev-packages/unified-broker/src/services/fyersService');
+jest.mock('../../../dev-packages/unified-broker/src/services/shoonyaService');
 
 describe('Broker Adapter Symbol Integration', () => {
   let fyersAdapter: FyersServiceAdapter;

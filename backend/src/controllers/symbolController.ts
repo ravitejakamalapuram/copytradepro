@@ -76,8 +76,7 @@ export const validateSymbol = async (
         data: {
           symbol,
           exchange,
-          brokerName,
-          isLegacyFormat: validation.isLegacyFormat
+          brokerName
         }
       });
       return;
@@ -93,7 +92,6 @@ export const validateSymbol = async (
         isValid: true,
         symbol: validation.symbol,
         symbolInfo,
-        isLegacyFormat: validation.isLegacyFormat,
         displayInfo: validation.symbol ? symbolValidationService.getSymbolDisplayInfo(validation.symbol) : null
       }
     });

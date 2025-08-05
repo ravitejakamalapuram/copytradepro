@@ -5,7 +5,7 @@ import OrderResultDisplay, { type OrderResultSummary } from '../components/Order
 import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
-import { marketDataService } from '../services/marketDataService';
+import { symbolService } from '../services/symbolService';
 
 import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
@@ -30,19 +30,7 @@ type SymbolSearchResult = {
   relevanceScore?: number;
 };
 
-// API response types for search results
-interface SearchResultItem {
-  tradingSymbol?: string;
-  symbol?: string;
-  name?: string;
-  displayName?: string;
-  exchange: string;
-  token?: string | null;
-  relevanceScore?: number;
-  optionType?: string;
-  strikePrice?: number;
-  expiryDate?: string;
-}
+// Symbol search types are now imported from symbolService
 type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
@@ -187,47 +175,32 @@ const TradeSetup: React.FC = () => {
 
         let results: SymbolSearchResult[] = [];
 
-        // Use unified search API for all instrument types
-        const searchType = activeTab === 'EQUITY' ? 'equity' : 
-                          activeTab === 'OPTION' ? 'options' : 
-                          activeTab === 'FUTURE' ? 'futures' : 'all';
-        
-        const response = await marketDataService.searchUnifiedSymbols(searchTerm, searchType, 8, false, true);
-        
-        if (response.success && response.data) {
-          if (activeTab === 'EQUITY' && response.data.equity) {
-            results = response.data.equity.map((result: SearchResultItem) => ({
+        // Use symbol service for search
+        try {
+          const searchType = activeTab === 'EQUITY' ? 'equity' :
+                            activeTab === 'OPTION' ? 'options' :
+                            activeTab === 'FUTURE' ? 'futures' : 'all';
+
+          const response = await symbolService.searchSymbolsByType(searchTerm, searchType, 8);
+
+          if (response.success && response.data) {
+            results = response.data.map((result) => ({
               symbol: result.tradingSymbol || result.symbol || '',
               name: result.name || result.displayName || '',
               exchange: result.exchange,
-              ltp: (result as any).price || 0,
+              ltp: 0, // No price data
               token: result.token || null,
-              instrumentType: 'EQUITY' as const,
-              relevanceScore: result.relevanceScore || 0
-            }));
-          } else if (activeTab === 'OPTION' && response.data.options) {
-            results = response.data.options.map((result: SearchResultItem) => ({
-              symbol: result.tradingSymbol || result.symbol || '',
-              name: result.name || result.displayName || '',
-              exchange: result.exchange,
-              token: result.token || null,
-              instrumentType: 'OPTION' as const,
-              optionType: result.optionType,
+              instrumentType: activeTab,
+              relevanceScore: result.relevanceScore || 0,
+              // Options specific
               strikePrice: result.strikePrice,
               expiryDate: result.expiryDate,
-              relevanceScore: result.relevanceScore || 0
-            }));
-          } else if (activeTab === 'FUTURE' && response.data.futures) {
-            results = response.data.futures.map((result: SearchResultItem) => ({
-              symbol: result.tradingSymbol || result.symbol || '',
-              name: result.name || result.displayName || '',
-              exchange: result.exchange,
-              token: result.token || null,
-              instrumentType: 'FUTURE' as const,
-              expiryDate: result.expiryDate,
-              relevanceScore: result.relevanceScore || 0
+              optionType: result.optionType
             }));
           }
+        } catch (error) {
+          console.error('Symbol search error:', error);
+          results = [];
         }
 
         console.log(`✅ Frontend: Found ${results.length} results for ${activeTab}:`, results);

@@ -225,7 +225,7 @@ describe('SymbolValidationService', () => {
         const result = await service.validateAndResolveSymbol('UNKNOWN');
 
         expect(result.isValid).toBe(true);
-        expect(result.isLegacyFormat).toBe(true);
+        // Legacy format property removed
         expect(result.error).toContain('not found in standardized database');
         expect(result.error).toContain('Using legacy format');
       });

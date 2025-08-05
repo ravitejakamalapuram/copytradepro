@@ -12,9 +12,9 @@ import { initializeUnifiedBroker } from '@copytrade/unified-broker';
 
 import authRoutes from './routes/auth';
 import brokerRoutes from './routes/broker';
-import portfolioRoutes from './routes/portfolio';
+
 import advancedOrdersRoutes from './routes/advancedOrders';
-import marketDataRoutes from './routes/marketData';
+
 import logsRoutes from './routes/logs';
 import monitoringRoutes from './routes/monitoring';
 import optionsRoutes from './routes/options';
@@ -221,9 +221,9 @@ app.get('/api/startup-status', (_req, res) => {
 // API routes with startup status middleware
 app.use('/api/auth', requireServerReady, authRoutes);
 app.use('/api/broker', requireServerReady, brokerRoutes);
-app.use('/api/portfolio', requireSymbolData, portfolioRoutes);
+
 app.use('/api/advanced-orders', requireSymbolData, advancedOrdersRoutes);
-app.use('/api/market-data', requireSymbolData, marketDataRoutes);
+
 app.use('/api/logs', requireServerReady, logsRoutes);
 app.use('/api/monitoring', requireServerReady, monitoringRoutes);
 app.use('/api/options', requireSymbolData, optionsRoutes);

@@ -142,7 +142,7 @@ describe('Order Placement Symbol Integration', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.isValid).toBe(true);
       expect(response.body.data.symbol.tradingSymbol).toBe('RELIANCE');
-      expect(response.body.data.isLegacyFormat).toBe(false);
+      // Legacy format property removed
     });
 
     it('should validate trading symbol successfully', async () => {
@@ -158,7 +158,7 @@ describe('Order Placement Symbol Integration', () => {
       expect(response.body.success).toBe(true);
       expect(response.body.data.isValid).toBe(true);
       expect(response.body.data.symbol.tradingSymbol).toBe('RELIANCE');
-      expect(response.body.data.isLegacyFormat).toBe(true);
+      // Legacy format property removed
     });
 
     it('should reject inactive symbols', async () => {
@@ -327,7 +327,7 @@ describe('Order Placement Symbol Integration', () => {
       const validation = await symbolValidationService.validateAndResolveSymbol('507f1f77bcf86cd799439011');
       
       expect(validation.isValid).toBe(true);
-      expect(validation.isLegacyFormat).toBe(false);
+      // Legacy format property removed
       expect(validation.symbol?.tradingSymbol).toBe('RELIANCE');
     });
 
@@ -335,7 +335,7 @@ describe('Order Placement Symbol Integration', () => {
       const validation = await symbolValidationService.validateAndResolveSymbol('RELIANCE', 'NSE');
       
       expect(validation.isValid).toBe(true);
-      expect(validation.isLegacyFormat).toBe(true);
+      // Legacy format property removed
       expect(validation.symbol?.tradingSymbol).toBe('RELIANCE');
     });
 
@@ -343,7 +343,7 @@ describe('Order Placement Symbol Integration', () => {
       const validation = await symbolValidationService.validateAndResolveSymbol('UNKNOWN_SYMBOL', 'NSE');
       
       expect(validation.isValid).toBe(true);
-      expect(validation.isLegacyFormat).toBe(true);
+      // Legacy format property removed
       expect(validation.error).toContain('not found in standardized database');
     });
   });

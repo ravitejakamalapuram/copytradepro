@@ -130,7 +130,7 @@ describe('Order Placement Integration', () => {
       expect(validation.isValid).toBe(true);
       expect(validation.symbol).not.toBeNull();
       expect(validation.symbol!.tradingSymbol).toBe('TCS');
-      expect(validation.isLegacyFormat).toBe(true);
+      // Legacy format property removed
     });
 
     it('should validate symbol for specific broker', async () => {
@@ -345,7 +345,7 @@ describe('Order Placement Integration', () => {
         'NFO'
       );
       expect(symbolValidation.isValid).toBe(true);
-      expect(symbolValidation.isLegacyFormat).toBe(true);
+      // Legacy format property removed
       
       // Step 2: Validate order parameters
       const orderParams = {

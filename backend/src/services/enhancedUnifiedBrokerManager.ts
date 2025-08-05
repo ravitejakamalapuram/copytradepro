@@ -17,6 +17,9 @@ import {
 
 import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 import { logger } from '../utils/logger';
+import { brokerErrorLoggingService, BrokerOperationContext } from './brokerErrorLoggingService';
+import { traceIdService } from './traceIdService';
+import TraceContext from '../utils/traceContext';
 
 export interface EnhancedBrokerConnection {
   userId: string;
@@ -68,32 +71,56 @@ export class EnhancedUnifiedBrokerManager {
   }
 
   /**
-   * Connect to a broker using unified interface
+   * Connect to a broker using unified interface with optional detailed logging
    * No broker-specific logic - all handled by broker modules
    */
   async connectToBroker(
-    userId: string, 
-    brokerName: string, 
-    credentials: any
+    userId: string,
+    brokerName: string,
+    credentials: any,
+    enableDetailedLogging: boolean = false
   ): Promise<UnifiedConnectionResponse> {
+    const startTime = performance.now();
+    const traceId = TraceContext.getTraceId() || traceIdService.generateTraceId();
+
+    const context: BrokerOperationContext = {
+      userId,
+      brokerName,
+      accountId: 'pending',
+      operation: 'CONNECT_BROKER',
+      traceId,
+      requestDetails: {
+        method: 'POST',
+        url: `/api/broker/connect`,
+        requestId: traceId
+      }
+    };
+
     try {
+      // Add trace operation if detailed logging is enabled
+      if (enableDetailedLogging) {
+        await traceIdService.addOperation(traceId, 'CONNECT_BROKER', 'BROKER_MANAGER');
+      }
+
       logger.info('Connecting to broker', {
         component: 'ENHANCED_BROKER_MANAGER',
         operation: 'CONNECT',
         brokerName,
-        userId
+        userId,
+        traceId: enableDetailedLogging ? traceId : undefined
       });
 
       // Create broker service instance
       const brokerService = this.brokerFactory.createBroker(brokerName);
-      
+
       // Attempt connection - broker handles all authentication logic
       const result = await brokerService.connect(credentials);
-      
+      const duration = performance.now() - startTime;
+
       if (result.success && result.accountInfo) {
         // Connection successful - create and store connection
         const connectionKey = this.createConnectionKey(userId, brokerName, result.accountInfo.accountId);
-        
+
         const connection: EnhancedBrokerConnection = {
           userId,
           brokerName,
@@ -110,25 +137,32 @@ export class EnhancedUnifiedBrokerManager {
         };
 
         this.connections.set(connectionKey, connection);
-        
+
         logger.info('Successfully connected to broker', {
           component: 'ENHANCED_BROKER_MANAGER',
           operation: 'CONNECT_SUCCESS',
           brokerName,
           userId,
           accountId: result.accountInfo.accountId,
-          totalConnections: this.connections.size
+          totalConnections: this.connections.size,
+          duration: Math.round(duration),
+          traceId: enableDetailedLogging ? traceId : undefined
         });
       }
-      
+
       return result;
     } catch (error: any) {
+      const duration = performance.now() - startTime;
+
       logger.error('Failed to connect to broker', {
         component: 'ENHANCED_BROKER_MANAGER',
         operation: 'CONNECT_FAILED',
         brokerName,
-        userId
+        userId,
+        duration: Math.round(duration),
+        traceId: enableDetailedLogging ? traceId : undefined
       }, error);
+
       throw error;
     }
   }
@@ -141,7 +175,8 @@ export class EnhancedUnifiedBrokerManager {
     userId: string,
     brokerName: string,
     authCode: string,
-    credentials: any
+    credentials: any,
+    enableDetailedLogging: boolean = false
   ): Promise<UnifiedOAuthResponse> {
     try {
       logger.info('Completing OAuth for broker', {
