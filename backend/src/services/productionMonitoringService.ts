@@ -5,7 +5,14 @@
 
 import { EventEmitter } from 'events';
 import { logger, LogContext } from '../utils/logger';
-import { brokerSessionManager } from './brokerSessionManager';
+// Optional brokerSessionManager (may not be present in all builds)
+let brokerSessionManager: { getHealthStatistics: () => any } | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  brokerSessionManager = require('./brokerSessionManager').brokerSessionManager;
+} catch {
+  brokerSessionManager = null;
+}
 
 export interface SystemMetrics {
   timestamp: Date;
@@ -423,7 +430,25 @@ export class ProductionMonitoringService extends EventEmitter {
     try {
       // Import alerting service dynamically to avoid circular dependencies
       const { alertingService } = await import('./alertingService');
-      await alertingService.sendAlert(alert);
+      
+      // Convert Alert to MonitoringAlert
+      const monitoringAlert = {
+        id: alert.id,
+        timestamp: alert.timestamp,
+        type: 'SYSTEM_DEGRADATION' as const,
+        severity: alert.severity.toUpperCase() as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL',
+        title: `System Alert: ${alert.ruleId}`,
+        description: alert.message,
+        affectedComponents: ['SYSTEM'],
+        metrics: {
+          currentValue: 0 // Would need to extract from alert.metrics
+        },
+        acknowledged: false,
+        resolved: alert.resolved,
+        actions: ['Check system metrics', 'Review alert details']
+      };
+      
+      await alertingService.sendAlert(monitoringAlert);
       
       logger.info('📤 Alert sent to external systems', {
         component: 'MONITORING',
@@ -524,7 +549,7 @@ export class ProductionMonitoringService extends EventEmitter {
       systemHealth: this.getHealthStatus(),
       recentMetrics,
       errorSummary,
-      brokerHealth: brokerSessionManager.getHealthStatistics(),
+      brokerHealth: brokerSessionManager ? brokerSessionManager.getHealthStatistics() : { total: 0, active: 0 },
       uptime: process.uptime()
     };
   }

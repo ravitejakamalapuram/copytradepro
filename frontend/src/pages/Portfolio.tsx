@@ -9,6 +9,8 @@ import { portfolioService } from '../services/portfolioService';
 import type { PortfolioItem, SortField, SortOrder } from '../components/PortfolioTable';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, Flex } from '../components/ui/Layout';
 
 // PortfolioItem interface is now imported from PortfolioTable component
 
@@ -228,21 +230,23 @@ const Portfolio: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              Failed to Load Portfolio
-            </div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-              {error}
-            </div>
-            <Button 
-              variant="primary"
-              onClick={fetchPortfolioData}
-            >
-              Retry
-            </Button>
-          </div>
+          <Card style={{ textAlign: 'center', padding: '3rem' }}>
+            <CardContent>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>⚠️</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                Failed to Load Portfolio
+              </div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
+                {error}
+              </div>
+              <Button 
+                variant="primary"
+                onClick={fetchPortfolioData}
+              >
+                Retry
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     );
@@ -252,38 +256,34 @@ const Portfolio: React.FC = () => {
     <div className="app-theme app-layout">
       <AppNavigation />
       <div className="app-main">
-        {/* Header */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '1.5rem'
-        }}>
-          <h1 style={{
-            fontSize: '16px',
-            fontWeight: '600',
-            color: 'var(--text-primary)',
-            margin: 0
-          }}>
-            Portfolio
-          </h1>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={() => navigate('/trade-setup')}
-            >
-              + Buy/Sell
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={fetchPortfolioData}
-            >
-              🔄 Refresh
-            </Button>
-          </div>
-        </div>
+        <Stack gap={6}>
+          {/* Header */}
+          <Flex justify="between" align="center">
+            <h1 style={{
+              fontSize: '16px',
+              fontWeight: '600',
+              color: 'var(--text-primary)',
+              margin: 0
+            }}>
+              Portfolio
+            </h1>
+            <Flex gap={2}>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => navigate('/trade-setup')}
+              >
+                + Buy/Sell
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={fetchPortfolioData}
+              >
+                🔄 Refresh
+              </Button>
+            </Flex>
+          </Flex>
 
         {/* Portfolio Summary */}
         <PortfolioSummary data={portfolioSummary} />
@@ -299,47 +299,48 @@ const Portfolio: React.FC = () => {
           onTabChange={(tabKey) => setViewMode(tabKey as ViewMode)}
         />
 
-        {/* Portfolio Items Table */}
-        <div className="card">
-          <div className="card-header">
-            <h2 className="card-title">
-              {viewMode === 'all' ? 'All Items' :
-               viewMode === 'holdings' ? 'Holdings' : 'Positions'}
-              ({filteredItems.length})
-            </h2>
-            <SortControls
-              sortOptions={[
-                { value: 'currentValue', label: 'Value' },
-                { value: 'pnl', label: 'P&L' },
-                { value: 'pnlPercent', label: 'P&L %' },
-                { value: 'symbol', label: 'Symbol' },
-                { value: 'dayChange', label: 'Day Change' }
-              ]}
-              selectedSort={sortField}
-              sortOrder={sortOrder}
-              onSortChange={(field) => setSortField(field as SortField)}
-              onOrderChange={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+          {/* Portfolio Items Table */}
+          <Card>
+            <CardHeader
+              title={`${viewMode === 'all' ? 'All Items' :
+                     viewMode === 'holdings' ? 'Holdings' : 'Positions'} (${filteredItems.length})`}
+              action={
+                <SortControls
+                  sortOptions={[
+                    { value: 'currentValue', label: 'Value' },
+                    { value: 'pnl', label: 'P&L' },
+                    { value: 'pnlPercent', label: 'P&L %' },
+                    { value: 'symbol', label: 'Symbol' },
+                    { value: 'dayChange', label: 'Day Change' }
+                  ]}
+                  selectedSort={sortField}
+                  sortOrder={sortOrder}
+                  onSortChange={(field) => setSortField(field as SortField)}
+                  onOrderChange={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                />
+              }
             />
-          </div>
-
-          <PortfolioTable
-            items={filteredItems}
-            sortField={sortField}
-            sortOrder={sortOrder}
-            onSort={handleSort}
-            emptyStateConfig={{
-              icon: viewMode === 'holdings' ? '📊' : viewMode === 'positions' ? '⚡' : '📋',
-              title: `No ${viewMode === 'all' ? 'items' : viewMode} found`,
-              description: viewMode === 'holdings'
-                ? 'You don\'t have any holdings yet. Start investing to see your long-term positions here.'
-                : viewMode === 'positions'
-                ? 'You don\'t have any active positions. Place some trades to see your intraday positions here.'
-                : 'Your portfolio is empty. Start trading to see your holdings and positions here.',
-              actionLabel: 'Start Trading',
-              onAction: () => navigate('/trade-setup')
-            }}
-          />
-        </div>
+            <CardContent>
+              <PortfolioTable
+                items={filteredItems}
+                sortField={sortField}
+                sortOrder={sortOrder}
+                onSort={handleSort}
+                emptyStateConfig={{
+                  icon: viewMode === 'holdings' ? '📊' : viewMode === 'positions' ? '⚡' : '📋',
+                  title: `No ${viewMode === 'all' ? 'items' : viewMode} found`,
+                  description: viewMode === 'holdings'
+                    ? 'You don\'t have any holdings yet. Start investing to see your long-term positions here.'
+                    : viewMode === 'positions'
+                    ? 'You don\'t have any active positions. Place some trades to see your intraday positions here.'
+                    : 'Your portfolio is empty. Start trading to see your holdings and positions here.',
+                  actionLabel: 'Start Trading',
+                  onAction: () => navigate('/trade-setup')
+                }}
+              />
+            </CardContent>
+          </Card>
+        </Stack>
       </div>
     </div>
   );

@@ -341,7 +341,7 @@ class MemoryLeakDetector {
           totalSize += (key.length + (value?.length || 0)) * 2;
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore
     }
     
@@ -354,7 +354,7 @@ class MemoryLeakDetector {
           totalSize += (key.length + (value?.length || 0)) * 2;
         }
       }
-    } catch (error) {
+    } catch {
       // Ignore
     }
     

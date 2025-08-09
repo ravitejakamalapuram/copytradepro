@@ -2,9 +2,11 @@
 
 ## 🚀 Quick Deployment
 
-### Step 1: Run the Deployment Script
+### Step 1: Deploy to EC2
 ```bash
-./deploy-ec2.sh
+# Build and deploy manually
+npm run build
+npm start
 ```
 
 ### Step 2: Configure EC2 Security Group

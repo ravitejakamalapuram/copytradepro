@@ -517,8 +517,31 @@ class PerformanceMonitorService {
     // Track clicks
     document.addEventListener('click', (event) => {
       const target = event.target as HTMLElement;
-      const targetDesc = target.tagName + (target.id ? `#${target.id}` : '') + 
-                       (target.className ? `.${target.className.split(' ')[0]}` : '');
+      let targetDesc = target.tagName;
+      
+      if (target.id) {
+        targetDesc += `#${target.id}`;
+      }
+      
+      if (target.className) {
+        try {
+          // Handle both string and DOMTokenList className
+          const classNameStr = typeof target.className === 'string'
+            ? target.className
+            : (target.className as any)?.toString?.() || '';
+
+          if (classNameStr && typeof classNameStr === 'string') {
+            const firstClass = classNameStr.split(' ')[0];
+            if (firstClass) {
+              targetDesc += `.${firstClass}`;
+            }
+          }
+        } catch (error) {
+          // Fallback if className handling fails
+          console.warn('Error processing target className:', error);
+        }
+      }
+      
       this.recordUserInteraction('click', targetDesc);
     }, { passive: true });
 

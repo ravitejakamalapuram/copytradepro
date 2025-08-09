@@ -5,7 +5,8 @@ import OrderResultDisplay, { type OrderResultSummary } from '../components/Order
 import { brokerService, type PlaceMultiAccountOrderRequest } from '../services/brokerService';
 import { accountService, type ConnectedAccount } from '../services/accountService';
 import { fundsService } from '../services/fundsService';
-import { marketDataService } from '../services/marketDataService';
+import { symbolService } from '../services/symbolService';
+
 import { transformBrokerResponseToOrderResult } from '../utils/orderResultTransformer';
 import { Checkbox } from '../components/ui/Checkbox';
 import Button from '../components/ui/Button';
@@ -13,21 +14,30 @@ import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card
 import { Grid, Stack, HStack, Flex } from '../components/ui/Layout';
 import '../styles/app-theme.css';
 import './TradeSetup.css';
+import Popover from '../components/ui/Popover';
 
+import { useToast } from '../components/Toast';
 type OrderType = 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
 type Product = 'CNC' | 'MIS' | 'NRML';
-type SymbolSearchResult = { 
-  symbol: string; 
-  exchange: string; 
+type SymbolSearchResult = {
+  symbol: string;
+  exchange: string;
   name: string;
   token?: string | null;
   ltp?: number;
+  instrumentType?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  optionType?: 'CE' | 'PE';
+  strikePrice?: number;
+  expiryDate?: string;
+  relevanceScore?: number;
 };
+
+// Symbol search types are now imported from symbolService
 type FailedOrderResult = { accountId: string };
 
 interface OrderForm {
   symbol: string;
-  exchange: 'NSE' | 'BSE';
+  exchange: 'NSE' | 'BSE' | 'NFO';
   action: 'BUY' | 'SELL';
   quantity: string;
   price: string;
@@ -46,7 +56,34 @@ interface MarginInfo {
 
 const TradeSetup: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
+
+  // Function to get broker symbol/icon (consistent with Orders page)
+  const getBrokerSymbol = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return '🔥';
+      case 'shoonya': return '🏛️';
+      case 'zerodha': return '⚡';
+      case 'angel': return '👼';
+      case 'upstox': return '📈';
+      case 'dhan': return '💰';
+      default: return '🏢';
+    }
+  };
+
+  // Function to get broker display name
+  const getBrokerDisplayName = (brokerName: string): string => {
+    switch (brokerName?.toLowerCase()) {
+      case 'fyers': return 'Fyers';
+      case 'shoonya': return 'Shoonya';
+      case 'zerodha': return 'Zerodha';
+      case 'angel': return 'Angel';
+      case 'upstox': return 'Upstox';
+      case 'dhan': return 'Dhan';
+      default: return brokerName || 'Unknown';
+    }
+  };
   const [orderForm, setOrderForm] = useState<OrderForm>({
     symbol: '',
     exchange: 'NSE',
@@ -70,6 +107,7 @@ const TradeSetup: React.FC = () => {
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'EQUITY' | 'OPTION' | 'FUTURE'>('EQUITY');
   const [orderResult, setOrderResult] = useState<OrderResultSummary | null>(null);
   const [showOrderResult, setShowOrderResult] = useState(false);
 
@@ -85,9 +123,10 @@ const TradeSetup: React.FC = () => {
 
         // Auto-select all active accounts by default
         if (accounts.length > 0) {
+          const activeIds = accounts.filter(a => a.isActive).map(a => a.id);
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: accounts.map(account => account.id)
+            selectedAccounts: activeIds
           }));
         }
 
@@ -124,7 +163,7 @@ const TradeSetup: React.FC = () => {
     }
   }, [orderForm.symbol, orderForm.quantity, orderForm.price, orderForm.orderType]);
 
-  // Debounced symbol search
+  // Unified symbol search with support for equity, options, and futures
   const handleSymbolSearch = React.useCallback((searchTerm: string) => {
     if (searchTerm.length < 2) {
       setSearchResults([]);
@@ -136,27 +175,44 @@ const TradeSetup: React.FC = () => {
     setSearchLoading(true);
     const timeoutId = setTimeout(async () => {
       try {
-        console.log(`🔍 Frontend: Searching for "${searchTerm}" on ${orderForm.exchange}`);
+        console.log(`🔍 Frontend: Searching for "${searchTerm}" type: ${activeTab}`);
 
-        const response = await marketDataService.searchSymbols(searchTerm, 8, orderForm.exchange);
-        console.log(`📊 Frontend: Received response:`, response);
+        let results: SymbolSearchResult[] = [];
 
-        const results = response.success ? response.data.results : [];
+        // Use symbol service for search
+        try {
+          const searchType = activeTab === 'EQUITY' ? 'equity' :
+                            activeTab === 'OPTION' ? 'options' :
+                            activeTab === 'FUTURE' ? 'futures' : 'all';
 
-        const transformedResults = results.map((result: { symbol: string; name: string; exchange: string; token?: string }) => ({
-          symbol: result.symbol,
-          name: result.name,
-          exchange: result.exchange,
-          ltp: 0,
-          token: result.token || null
-        }));
+          const response = await symbolService.searchSymbolsByType(searchTerm, searchType, 8);
 
-        console.log(`✅ Frontend: Transformed results:`, transformedResults);
+          if (response.success && response.data) {
+            results = response.data.map((result) => ({
+              symbol: result.tradingSymbol || result.symbol || '',
+              name: result.name || result.displayName || '',
+              exchange: result.exchange,
+              ltp: 0, // No price data
+              token: result.token || null,
+              instrumentType: activeTab,
+              relevanceScore: result.relevanceScore || 0,
+              // Options specific
+              strikePrice: result.strikePrice,
+              expiryDate: result.expiryDate,
+              optionType: result.optionType
+            }));
+          }
+        } catch (error) {
+          console.error('Symbol search error:', error);
+          results = [];
+        }
 
-        setSearchResults(transformedResults);
-        setShowSearchResults(transformedResults.length > 0);
+        console.log(`✅ Frontend: Found ${results.length} results for ${activeTab}:`, results);
 
-        if (transformedResults.length === 0) {
+        setSearchResults(results);
+        setShowSearchResults(results.length > 0);
+
+        if (results.length === 0) {
           console.log('❌ Frontend: No results found for:', searchTerm);
         }
       } catch (error: unknown) {
@@ -169,7 +225,7 @@ const TradeSetup: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [orderForm.exchange]);
+  }, [activeTab]);
 
   const handleSymbolSelect = (selectedSymbol: unknown) => {
     if (
@@ -177,17 +233,36 @@ const TradeSetup: React.FC = () => {
       selectedSymbol !== null &&
       'symbol' in selectedSymbol &&
       'exchange' in selectedSymbol &&
-      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string' &&
-      ((selectedSymbol as { exchange: unknown }).exchange === 'NSE' || (selectedSymbol as { exchange: unknown }).exchange === 'BSE')
+      typeof (selectedSymbol as { symbol: unknown }).symbol === 'string'
     ) {
-      const { symbol, exchange } = selectedSymbol as SymbolSearchResult & { exchange: 'NSE' | 'BSE' };
+      const result = selectedSymbol as SymbolSearchResult;
+
+      // Handle different exchanges including F&O (NFO)
+      let exchange: 'NSE' | 'BSE' | 'NFO' = 'NSE'; // Default to NSE
+
+      if (result.exchange === 'BSE') {
+        exchange = 'BSE';
+      } else if (result.exchange === 'NFO' || result.instrumentType === 'OPTION' || result.instrumentType === 'FUTURE') {
+        // F&O instruments should be sent to NFO exchange
+        exchange = 'NFO';
+      } else {
+        exchange = 'NSE';
+      }
+
       setOrderForm(prev => ({
         ...prev,
-        symbol,
+        symbol: result.symbol,
         exchange,
         price: prev.price
       }));
       setShowSearchResults(false);
+
+      console.log(`✅ Selected ${result.instrumentType || 'EQUITY'} instrument:`, {
+        symbol: result.symbol,
+        exchange: result.exchange,
+        orderExchange: exchange,
+        instrumentType: result.instrumentType
+      });
     }
   };
 
@@ -201,10 +276,11 @@ const TradeSetup: React.FC = () => {
   };
 
   const handleSelectAllAccounts = () => {
-    const allSelected = orderForm.selectedAccounts.length === connectedAccounts.length;
+    const activeIds = connectedAccounts.filter(a => a.isActive).map(a => a.id);
+    const allSelected = orderForm.selectedAccounts.length === activeIds.length;
     setOrderForm(prev => ({
       ...prev,
-      selectedAccounts: allSelected ? [] : connectedAccounts.map(account => account.id)
+      selectedAccounts: allSelected ? [] : activeIds
     }));
   };
 
@@ -250,7 +326,7 @@ const TradeSetup: React.FC = () => {
       };
 
       const response = await brokerService.placeMultiAccountOrder(orderRequest);
-      
+
       const orderResultSummary = transformBrokerResponseToOrderResult(response, {
         symbol: orderForm.symbol,
         action: orderForm.action,
@@ -266,6 +342,26 @@ const TradeSetup: React.FC = () => {
 
       setOrderResult(orderResultSummary);
       setShowOrderResult(true);
+
+      // UX: show AUTH_REQUIRED accounts toast with CTA to Accounts page
+      try {
+        const failedAuth = (response?.data?.failedOrders || []).filter((f: any) => f.errorType === 'AUTH_REQUIRED');
+        if (failedAuth.length > 0) {
+          const count = failedAuth.length;
+          showToast({
+            type: 'warning',
+            title: `${count} account${count > 1 ? 's' : ''} require authentication`,
+            message: 'Please activate the accounts before placing orders.',
+            action: {
+              label: 'Go to Accounts',
+              onClick: () => navigate('/account-setup')
+            }
+          });
+        }
+      } catch (e) {
+        // ignore toast rendering errors
+      }
+
 
       if (orderResultSummary.failedAccounts === 0) {
         setOrderForm(prev => ({
@@ -287,12 +383,12 @@ const TradeSetup: React.FC = () => {
 
   const handleRetryFailedOrders = async (failedResults: FailedOrderResult[]) => {
     const failedAccountIds = failedResults.map(result => result.accountId);
-    
+
     setOrderForm(prev => ({
       ...prev,
       selectedAccounts: failedAccountIds
     }));
-    
+
     setShowOrderResult(false);
     setError('Ready to retry failed orders. You can modify the order details if needed, then click Place Order again.');
   };
@@ -300,7 +396,7 @@ const TradeSetup: React.FC = () => {
   const handleCloseOrderResult = () => {
     setShowOrderResult(false);
     setOrderResult(null);
-    
+
     if (orderResult && orderResult.successfulAccounts > 0) {
       navigate('/orders');
     }
@@ -318,10 +414,10 @@ const TradeSetup: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             height: '50vh',
             flexDirection: 'column',
             gap: '1rem'
@@ -359,7 +455,7 @@ const TradeSetup: React.FC = () => {
   return (
     <div className="app-theme app-layout">
       <AppNavigation />
-      
+
       <div className="app-main">
         <Stack gap={6}>
           {/* Main Content Grid */}
@@ -397,13 +493,60 @@ const TradeSetup: React.FC = () => {
 
                   <CardContent>
                     <Stack gap={5}>
-                      {/* Symbol Search */}
+                      {/* Unified Symbol Search with Tabs */}
                       <div style={{ position: 'relative' }}>
                         <label className="form-label">Symbol *</label>
+
+                        {/* Instrument Type Tabs */}
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
+                          marginBottom: '0.75rem',
+                          borderBottom: '1px solid var(--border-secondary)',
+                          paddingBottom: '0.5rem'
+                        }}>
+                          {(['EQUITY', 'OPTION', 'FUTURE'] as const).map((tab) => (
+                            <button
+                              key={tab}
+                              type="button"
+                              onClick={() => {
+                                setActiveTab(tab);
+                                setSearchResults([]);
+                                setShowSearchResults(false);
+                                // Clear the selected symbol when switching tabs
+                                setOrderForm(prev => ({
+                                  ...prev,
+                                  symbol: '',
+                                  price: '',
+                                  triggerPrice: ''
+                                }));
+                                console.log(`🔄 Switched to ${tab} tab, cleared symbol selection`);
+                              }}
+                              style={{
+                                padding: '0.5rem 1rem',
+                                border: 'none',
+                                borderRadius: '0.375rem',
+                                fontSize: '0.875rem',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                backgroundColor: activeTab === tab ? 'var(--color-primary)' : 'var(--bg-secondary)',
+                                color: activeTab === tab ? 'white' : 'var(--text-secondary)',
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              {tab === 'EQUITY' ? 'Stocks' : tab === 'OPTION' ? 'Options' : 'Futures'}
+                            </button>
+                          ))}
+                        </div>
+
                         <div style={{ position: 'relative' }}>
                           <input
                             type="text"
-                            placeholder="Search stocks (e.g., RELIANCE, TCS)"
+                            placeholder={
+                              activeTab === 'EQUITY' ? "Search stocks (e.g., RELIANCE, TCS)" :
+                              activeTab === 'OPTION' ? "Search options (e.g., RELIANCE, NIFTY)" :
+                              "Search futures (e.g., RELIANCE, NIFTY)"
+                            }
                             value={orderForm.symbol}
                             onChange={(e) => {
                               setOrderForm(prev => ({ ...prev, symbol: e.target.value }));
@@ -425,7 +568,7 @@ const TradeSetup: React.FC = () => {
                           )}
                         </div>
 
-                        {/* Search Results Dropdown */}
+                        {/* Enhanced Search Results Dropdown */}
                         {showSearchResults && searchResults.length > 0 && (
                           <div className="search-dropdown">
                             {searchResults.map((result, index) => (
@@ -434,11 +577,77 @@ const TradeSetup: React.FC = () => {
                                 onClick={() => handleSymbolSelect(result)}
                                 className="search-result-item"
                               >
-                                <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
-                                  {result.symbol}
-                                </div>
-                                <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                                  {result.name}
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'flex-start',
+                                  width: '100%'
+                                }}>
+                                  <div style={{ flex: 1 }}>
+                                    <div style={{ fontWeight: '500', color: 'var(--text-primary)' }}>
+                                      {result.symbol}
+                                    </div>
+                                    <div style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                                      {result.name}
+                                    </div>
+                                    {result.instrumentType === 'EQUITY' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        {result.exchange}
+                                      </div>
+                                    )}
+                                    {result.instrumentType === 'OPTION' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        {result.optionType} | Strike: ₹{result.strikePrice} | Exp: {result.expiryDate} | {result.exchange}
+                                      </div>
+                                    )}
+                                    {result.instrumentType === 'FUTURE' && (
+                                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                        Future | Exp: {result.expiryDate} | {result.exchange}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+                                    <div style={{
+                                      fontSize: '0.75rem',
+                                      padding: '0.25rem 0.5rem',
+                                      borderRadius: '0.25rem',
+                                      backgroundColor:
+                                        result.instrumentType === 'EQUITY' ? 'var(--color-info-bg)' :
+                                        result.instrumentType === 'OPTION' ? 'var(--color-warning-bg)' :
+                                        'var(--color-success-bg)',
+                                      color:
+                                        result.instrumentType === 'EQUITY' ? 'var(--color-info)' :
+                                        result.instrumentType === 'OPTION' ? 'var(--color-warning)' :
+                                        'var(--color-success)',
+                                      fontWeight: '500'
+                                    }}>
+                                      {result.instrumentType}
+                                    </div>
+                                    <div style={{
+                                      fontSize: '0.7rem',
+                                      padding: '0.2rem 0.4rem',
+                                      borderRadius: '0.25rem',
+                                      backgroundColor:
+                                        result.exchange === 'NSE' ? 'var(--color-bg-secondary)' :
+                                        result.exchange === 'BSE' ? 'var(--color-bg-tertiary)' :
+                                        result.exchange === 'NFO' ? 'var(--color-bg-card)' :
+                                        'var(--color-bg-secondary)',
+                                      color:
+                                        result.exchange === 'NSE' ? 'var(--color-profit)' :
+                                        result.exchange === 'BSE' ? 'var(--color-secondary-light)' :
+                                        result.exchange === 'NFO' ? 'var(--color-accent)' :
+                                        'var(--color-text-secondary)',
+                                      fontWeight: '500',
+                                      border: '1px solid',
+                                      borderColor:
+                                        result.exchange === 'NSE' ? 'var(--color-profit)' :
+                                        result.exchange === 'BSE' ? 'var(--color-secondary-light)' :
+                                        result.exchange === 'NFO' ? 'var(--color-accent)' :
+                                        'var(--color-border-secondary)'
+                                    }}>
+                                      {result.exchange}
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -567,11 +776,27 @@ const TradeSetup: React.FC = () => {
                           className={`account-card${orderForm.selectedAccounts.includes(account.id) ? ' selected' : ''}`}
                         >
                           <div className="account-info">
-                            <Checkbox
-                              checked={orderForm.selectedAccounts.includes(account.id)}
-                              onChange={(checked) => handleAccountSelection(account.id, checked)}
-                              label={`${account.brokerName || 'Unknown Broker'} (${account.isActive ? 'Active' : 'Inactive'})`}
-                              size="base"
+                            <Popover
+                              placement="right"
+                              content={account.isActive ? undefined : (
+                                <div>
+                                  <strong>Requires Authentication</strong>
+                                  <div style={{ marginTop: 4 }}>
+                                    This account is inactive. Please authenticate in the Accounts page before placing orders.
+                                  </div>
+                                </div>
+                              )}
+                              trigger={
+                                <div>
+                                  <Checkbox
+                                    checked={orderForm.selectedAccounts.includes(account.id)}
+                                    disabled={!account.isActive}
+                                    onChange={(checked) => handleAccountSelection(account.id, checked)}
+                                    label={`${getBrokerSymbol(account.brokerName || '')} ${getBrokerDisplayName(account.brokerName || 'Unknown')} (${account.isActive ? 'Active' : 'Inactive'})`}
+                                    size="base"
+                                  />
+                                </div>
+                              }
                             />
                           </div>
                           <div className="account-meta">

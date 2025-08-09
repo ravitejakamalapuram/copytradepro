@@ -1,476 +1,822 @@
-/**
- * Alerting Service
- * Handles external alerting integrations for production monitoring
- */
-
 import { EventEmitter } from 'events';
 import { logger } from '../utils/logger';
-import { Alert } from './productionMonitoringService';
+import { MonitoringAlert, ErrorSpike, SystemHealthMetrics } from './realTimeErrorMonitoringService';
 
 export interface AlertChannel {
   id: string;
   name: string;
-  type: 'email' | 'slack' | 'webhook' | 'sms';
-  config: any;
+  type: 'email' | 'webhook' | 'slack' | 'console' | 'database';
   enabled: boolean;
-  severityFilter: ('low' | 'medium' | 'high' | 'critical')[];
+  config: {
+    // Email config
+    recipients?: string[];
+    smtpConfig?: {
+      host: string;
+      port: number;
+      secure: boolean;
+      auth: {
+        user: string;
+        pass: string;
+      };
+    };
+    
+    // Webhook config
+    url?: string;
+    headers?: Record<string, string>;
+    method?: 'POST' | 'PUT';
+    
+    // Slack config
+    webhookUrl?: string;
+    channel?: string;
+    username?: string;
+    
+    // Database config
+    collection?: string;
+  };
+  filters?: {
+    severity?: ('LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL')[];
+    alertTypes?: string[];
+    components?: string[];
+  };
 }
 
-export interface AlertNotification {
+export interface AlertRule {
   id: string;
-  alert: Alert;
-  channel: AlertChannel;
-  status: 'pending' | 'sent' | 'failed';
-  sentAt?: Date;
+  name: string;
+  description: string;
+  enabled: boolean;
+  conditions: {
+    severity?: ('LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL')[];
+    alertTypes?: string[];
+    components?: string[];
+    timeWindow?: number; // in milliseconds
+    frequency?: number; // max alerts per time window
+  };
+  channels: string[]; // Channel IDs
+  escalation?: {
+    enabled: boolean;
+    delayMinutes: number;
+    escalationChannels: string[];
+  };
+}
+
+export interface AlertDeliveryResult {
+  channelId: string;
+  channelName: string;
+  success: boolean;
   error?: string;
-  retryCount: number;
+  deliveredAt: Date;
+  responseTime: number;
+}
+
+export interface AlertHistory {
+  id: string;
+  alertId: string;
+  timestamp: Date;
+  action: 'SENT' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ESCALATED';
+  channelId?: string | undefined;
+  userId?: string | undefined;
+  details?: any;
 }
 
 export class AlertingService extends EventEmitter {
+  private static instance: AlertingService;
   private channels: Map<string, AlertChannel> = new Map();
-  private notifications: AlertNotification[] = [];
-  private readonly MAX_RETRY_ATTEMPTS = 3;
-  private readonly RETRY_DELAY = 5000; // 5 seconds
+  private rules: Map<string, AlertRule> = new Map();
+  private alertHistory: Map<string, AlertHistory[]> = new Map();
+  private rateLimitTracker: Map<string, { count: number; windowStart: number }> = new Map();
 
-  constructor() {
+  private constructor() {
     super();
-    this.setupDefaultChannels();
+    this.initializeDefaultChannels();
+    this.initializeDefaultRules();
+  }
+
+  public static getInstance(): AlertingService {
+    if (!AlertingService.instance) {
+      AlertingService.instance = new AlertingService();
+    }
+    return AlertingService.instance;
   }
 
   /**
-   * Setup default alert channels from environment variables
+   * Send alert through configured channels
    */
-  private setupDefaultChannels(): void {
-    // Email alerting
-    if (process.env.ALERT_EMAIL_ENABLED === 'true') {
-      this.addChannel({
-        id: 'email-default',
-        name: 'Email Alerts',
-        type: 'email',
-        config: {
-          smtp: {
-            host: process.env.SMTP_HOST,
-            port: parseInt(process.env.SMTP_PORT || '587'),
-            secure: process.env.SMTP_SECURE === 'true',
-            auth: {
-              user: process.env.SMTP_USER,
-              pass: process.env.SMTP_PASS
-            }
-          },
-          from: process.env.ALERT_EMAIL_FROM,
-          to: process.env.ALERT_EMAIL_TO?.split(',') || []
-        },
-        enabled: true,
-        severityFilter: ['high', 'critical']
-      });
-    }
+  public async sendAlert(alert: MonitoringAlert): Promise<AlertDeliveryResult[]> {
+    const results: AlertDeliveryResult[] = [];
+    
+    try {
+      // Find applicable rules
+      const applicableRules = this.findApplicableRules(alert);
+      
+      if (applicableRules.length === 0) {
+        logger.info('No applicable alert rules found for alert', {
+          component: 'ALERTING_SERVICE',
+          alertId: alert.id,
+          alertType: alert.type,
+          severity: alert.severity
+        });
+        return results;
+      }
 
-    // Slack alerting
-    if (process.env.SLACK_WEBHOOK_URL) {
-      this.addChannel({
-        id: 'slack-default',
-        name: 'Slack Alerts',
-        type: 'slack',
-        config: {
-          webhookUrl: process.env.SLACK_WEBHOOK_URL,
-          channel: process.env.SLACK_CHANNEL || '#alerts',
-          username: process.env.SLACK_USERNAME || 'CopyTrade Monitor'
-        },
-        enabled: true,
-        severityFilter: ['medium', 'high', 'critical']
+      // Get all channels from applicable rules
+      const channelIds = new Set<string>();
+      applicableRules.forEach(rule => {
+        rule.channels.forEach(channelId => channelIds.add(channelId));
       });
-    }
 
-    // Generic webhook
-    if (process.env.ALERT_WEBHOOK_URL) {
-      this.addChannel({
-        id: 'webhook-default',
-        name: 'Webhook Alerts',
-        type: 'webhook',
-        config: {
-          url: process.env.ALERT_WEBHOOK_URL,
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': process.env.ALERT_WEBHOOK_AUTH
-          }
-        },
-        enabled: true,
-        severityFilter: ['high', 'critical']
-      });
+      // Send alert to each channel
+      for (const channelId of channelIds) {
+        const channel = this.channels.get(channelId);
+        if (!channel || !channel.enabled) {
+          continue;
+        }
+
+        // Check rate limiting
+        if (!this.checkRateLimit(channelId, alert)) {
+          logger.warn('Alert rate limit exceeded for channel', {
+            component: 'ALERTING_SERVICE',
+            channelId,
+            alertId: alert.id
+          });
+          continue;
+        }
+
+        // Check channel filters
+        if (!this.passesChannelFilters(channel, alert)) {
+          continue;
+        }
+
+        const startTime = Date.now();
+        try {
+          await this.deliverToChannel(channel, alert);
+          const responseTime = Date.now() - startTime;
+
+          const result: AlertDeliveryResult = {
+            channelId: channel.id,
+            channelName: channel.name,
+            success: true,
+            deliveredAt: new Date(),
+            responseTime
+          };
+
+          results.push(result);
+          this.recordAlertHistory(alert.id, 'SENT', channel.id);
+
+          logger.info('Alert delivered successfully', {
+            component: 'ALERTING_SERVICE',
+            alertId: alert.id,
+            channelId: channel.id,
+            channelType: channel.type,
+            responseTime
+          });
+        } catch (error) {
+          const responseTime = Date.now() - startTime;
+          const result: AlertDeliveryResult = {
+            channelId: channel.id,
+            channelName: channel.name,
+            success: false,
+            error: error instanceof Error ? error.message : 'Unknown error',
+            deliveredAt: new Date(),
+            responseTime
+          };
+
+          results.push(result);
+
+          logger.error('Failed to deliver alert to channel', {
+            component: 'ALERTING_SERVICE',
+            alertId: alert.id,
+            channelId: channel.id,
+            channelType: channel.type,
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      }
+
+      // Schedule escalation if configured
+      this.scheduleEscalation(alert, applicableRules);
+
+      this.emit('alert_sent', { alert, results });
+      return results;
+    } catch (error) {
+      logger.error('Error sending alert:', error);
+      this.emit('alert_send_error', { alert, error });
+      return results;
     }
   }
 
   /**
-   * Add alert channel
+   * Send error spike notification
    */
-  addChannel(channel: AlertChannel): void {
+  public async sendErrorSpikeAlert(spike: ErrorSpike): Promise<AlertDeliveryResult[]> {
+    const alert: MonitoringAlert = {
+      id: `spike_alert_${spike.id}`,
+      timestamp: spike.timestamp,
+      type: 'ERROR_SPIKE',
+      severity: spike.severity,
+      title: `Error Spike Detected`,
+      description: `Error count increased by ${spike.increasePercentage}% (${spike.previousCount} → ${spike.errorCount})`,
+      affectedComponents: spike.affectedComponents,
+      metrics: {
+        currentValue: spike.errorCount,
+        previousValue: spike.previousCount
+      },
+      acknowledged: false,
+      resolved: false,
+      actions: [
+        'Investigate recent changes',
+        'Check system resources',
+        'Review error logs',
+        'Monitor system stability'
+      ]
+    };
+
+    return this.sendAlert(alert);
+  }
+
+  /**
+   * Send system health degradation alert
+   */
+  public async sendSystemHealthAlert(healthMetrics: SystemHealthMetrics): Promise<AlertDeliveryResult[]> {
+    if (healthMetrics.overallHealthScore >= 80) {
+      return []; // No alert needed for healthy systems
+    }
+
+    let severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'LOW';
+    if (healthMetrics.overallHealthScore < 30) severity = 'CRITICAL';
+    else if (healthMetrics.overallHealthScore < 50) severity = 'HIGH';
+    else if (healthMetrics.overallHealthScore < 70) severity = 'MEDIUM';
+
+    const alert: MonitoringAlert = {
+      id: `health_alert_${Date.now()}`,
+      timestamp: healthMetrics.timestamp,
+      type: 'SYSTEM_DEGRADATION',
+      severity,
+      title: `System Health Degradation`,
+      description: `System health score dropped to ${healthMetrics.overallHealthScore}%`,
+      affectedComponents: Object.keys(healthMetrics.componentHealth),
+      metrics: {
+        currentValue: healthMetrics.overallHealthScore
+      },
+      acknowledged: false,
+      resolved: false,
+      actions: [
+        'Check system resources',
+        'Review component health',
+        'Investigate error patterns',
+        'Consider scaling if needed'
+      ]
+    };
+
+    return this.sendAlert(alert);
+  }
+
+  /**
+   * Add or update alert channel
+   */
+  public setChannel(channel: AlertChannel): void {
     this.channels.set(channel.id, channel);
-    logger.info('Alert channel added', {
-      component: 'ALERTING',
-      operation: 'ADD_CHANNEL',
+    logger.info('Alert channel updated', {
+      component: 'ALERTING_SERVICE',
       channelId: channel.id,
       channelType: channel.type
     });
+    this.emit('channel_updated', channel);
   }
 
   /**
    * Remove alert channel
    */
-  removeChannel(channelId: string): boolean {
+  public removeChannel(channelId: string): boolean {
     const removed = this.channels.delete(channelId);
     if (removed) {
       logger.info('Alert channel removed', {
-        component: 'ALERTING',
-        operation: 'REMOVE_CHANNEL',
+        component: 'ALERTING_SERVICE',
         channelId
       });
+      this.emit('channel_removed', { channelId });
     }
     return removed;
   }
 
   /**
-   * Send alert to all configured channels
+   * Add or update alert rule
    */
-  async sendAlert(alert: Alert): Promise<void> {
-    const eligibleChannels = Array.from(this.channels.values()).filter(
-      channel => channel.enabled && channel.severityFilter.includes(alert.severity)
-    );
-
-    if (eligibleChannels.length === 0) {
-      logger.warn('No eligible channels for alert', {
-        component: 'ALERTING',
-        operation: 'SEND_ALERT',
-        alertId: alert.id,
-        severity: alert.severity
-      });
-      return;
-    }
-
-    logger.info('Sending alert to channels', {
-      component: 'ALERTING',
-      operation: 'SEND_ALERT',
-      alertId: alert.id,
-      severity: alert.severity,
-      channelCount: eligibleChannels.length
+  public setRule(rule: AlertRule): void {
+    this.rules.set(rule.id, rule);
+    logger.info('Alert rule updated', {
+      component: 'ALERTING_SERVICE',
+      ruleId: rule.id,
+      ruleName: rule.name
     });
-
-    // Send to all eligible channels
-    const promises = eligibleChannels.map(channel => this.sendToChannel(alert, channel));
-    await Promise.allSettled(promises);
+    this.emit('rule_updated', rule);
   }
 
   /**
-   * Send alert to specific channel
+   * Remove alert rule
    */
-  private async sendToChannel(alert: Alert, channel: AlertChannel): Promise<void> {
-    const notification: AlertNotification = {
-      id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      alert,
-      channel,
-      status: 'pending',
-      retryCount: 0
+  public removeRule(ruleId: string): boolean {
+    const removed = this.rules.delete(ruleId);
+    if (removed) {
+      logger.info('Alert rule removed', {
+        component: 'ALERTING_SERVICE',
+        ruleId
+      });
+      this.emit('rule_removed', { ruleId });
+    }
+    return removed;
+  }
+
+  /**
+   * Get all channels
+   */
+  public getChannels(): AlertChannel[] {
+    return Array.from(this.channels.values());
+  }
+
+  /**
+   * Get all rules
+   */
+  public getRules(): AlertRule[] {
+    return Array.from(this.rules.values());
+  }
+
+  /**
+   * Get alert history for a specific alert
+   */
+  public getAlertHistory(alertId: string): AlertHistory[] {
+    return this.alertHistory.get(alertId) || [];
+  }
+
+  /**
+   * Test alert channel
+   */
+  public async testChannel(channelId: string): Promise<AlertDeliveryResult> {
+    const channel = this.channels.get(channelId);
+    if (!channel) {
+      throw new Error(`Channel ${channelId} not found`);
+    }
+
+    const testAlert: MonitoringAlert = {
+      id: `test_${Date.now()}`,
+      timestamp: new Date(),
+      type: 'THRESHOLD_EXCEEDED',
+      severity: 'LOW',
+      title: 'Test Alert',
+      description: 'This is a test alert to verify channel configuration',
+      affectedComponents: ['TEST_COMPONENT'],
+      metrics: {
+        currentValue: 1
+      },
+      acknowledged: false,
+      resolved: false,
+      actions: ['This is a test - no action required']
     };
 
-    this.notifications.push(notification);
-
+    const startTime = Date.now();
     try {
-      await this.executeChannelSend(notification);
-      notification.status = 'sent';
-      notification.sentAt = new Date();
-      
-      logger.info('Alert sent successfully', {
-        component: 'ALERTING',
-        operation: 'CHANNEL_SEND',
-        notificationId: notification.id,
-        channelId: channel.id,
-        channelType: channel.type
-      });
+      await this.deliverToChannel(channel, testAlert);
+      const responseTime = Date.now() - startTime;
 
-      this.emit('notification:sent', notification);
-    } catch (error: any) {
-      notification.status = 'failed';
-      notification.error = error.message;
-      
-      logger.error('Failed to send alert', {
-        component: 'ALERTING',
-        operation: 'CHANNEL_SEND',
-        notificationId: notification.id,
+      return {
         channelId: channel.id,
-        channelType: channel.type
-      }, error);
-
-      // Retry if under limit
-      if (notification.retryCount < this.MAX_RETRY_ATTEMPTS) {
-        setTimeout(() => this.retryNotification(notification), this.RETRY_DELAY);
-      } else {
-        this.emit('notification:failed', notification);
-      }
+        channelName: channel.name,
+        success: true,
+        deliveredAt: new Date(),
+        responseTime
+      };
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      return {
+        channelId: channel.id,
+        channelName: channel.name,
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        deliveredAt: new Date(),
+        responseTime
+      };
     }
   }
 
-  /**
-   * Execute the actual channel send based on type
-   */
-  private async executeChannelSend(notification: AlertNotification): Promise<void> {
-    const { alert, channel } = notification;
+  // Private methods
 
+  private findApplicableRules(alert: MonitoringAlert): AlertRule[] {
+    return Array.from(this.rules.values()).filter(rule => {
+      if (!rule.enabled) return false;
+
+      const { conditions } = rule;
+
+      // Check severity filter
+      if (conditions.severity && !conditions.severity.includes(alert.severity)) {
+        return false;
+      }
+
+      // Check alert type filter
+      if (conditions.alertTypes && !conditions.alertTypes.includes(alert.type)) {
+        return false;
+      }
+
+      // Check component filter
+      if (conditions.components && conditions.components.length > 0) {
+        const hasMatchingComponent = alert.affectedComponents.some(component =>
+          conditions.components!.includes(component)
+        );
+        if (!hasMatchingComponent) return false;
+      }
+
+      // Check frequency limit
+      if (conditions.frequency && conditions.timeWindow) {
+        const ruleKey = `rule_${rule.id}`;
+        const tracker = this.rateLimitTracker.get(ruleKey);
+        const now = Date.now();
+
+        if (tracker) {
+          if (now - tracker.windowStart < conditions.timeWindow) {
+            if (tracker.count >= conditions.frequency) {
+              return false; // Rate limit exceeded
+            }
+          } else {
+            // Reset window
+            this.rateLimitTracker.set(ruleKey, { count: 1, windowStart: now });
+          }
+        } else {
+          this.rateLimitTracker.set(ruleKey, { count: 1, windowStart: now });
+        }
+      }
+
+      return true;
+    });
+  }
+
+  private passesChannelFilters(channel: AlertChannel, alert: MonitoringAlert): boolean {
+    if (!channel.filters) return true;
+
+    const { filters } = channel;
+
+    // Check severity filter
+    if (filters.severity && !filters.severity.includes(alert.severity)) {
+      return false;
+    }
+
+    // Check alert type filter
+    if (filters.alertTypes && !filters.alertTypes.includes(alert.type)) {
+      return false;
+    }
+
+    // Check component filter
+    if (filters.components && filters.components.length > 0) {
+      const hasMatchingComponent = alert.affectedComponents.some(component =>
+        filters.components!.includes(component)
+      );
+      if (!hasMatchingComponent) return false;
+    }
+
+    return true;
+  }
+
+  private checkRateLimit(channelId: string, alert: MonitoringAlert): boolean {
+    // Simple rate limiting: max 10 alerts per 5 minutes per channel
+    const key = `channel_${channelId}`;
+    const tracker = this.rateLimitTracker.get(key);
+    const now = Date.now();
+    const windowSize = 5 * 60 * 1000; // 5 minutes
+    const maxAlerts = 10;
+
+    if (tracker) {
+      if (now - tracker.windowStart < windowSize) {
+        if (tracker.count >= maxAlerts) {
+          return false; // Rate limit exceeded
+        }
+        tracker.count++;
+      } else {
+        // Reset window
+        this.rateLimitTracker.set(key, { count: 1, windowStart: now });
+      }
+    } else {
+      this.rateLimitTracker.set(key, { count: 1, windowStart: now });
+    }
+
+    return true;
+  }
+
+  private async deliverToChannel(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
     switch (channel.type) {
-      case 'email':
-        await this.sendEmailAlert(alert, channel);
+      case 'console':
+        await this.deliverToConsole(channel, alert);
         break;
-      case 'slack':
-        await this.sendSlackAlert(alert, channel);
+      case 'database':
+        await this.deliverToDatabase(channel, alert);
         break;
       case 'webhook':
-        await this.sendWebhookAlert(alert, channel);
+        await this.deliverToWebhook(channel, alert);
         break;
-      case 'sms':
-        await this.sendSMSAlert(alert, channel);
+      case 'email':
+        await this.deliverToEmail(channel, alert);
+        break;
+      case 'slack':
+        await this.deliverToSlack(channel, alert);
         break;
       default:
         throw new Error(`Unsupported channel type: ${channel.type}`);
     }
   }
 
-  /**
-   * Send email alert
-   */
-  private async sendEmailAlert(alert: Alert, channel: AlertChannel): Promise<void> {
-    // This would integrate with nodemailer or similar
-    // For now, just log the attempt
-    logger.info('Email alert would be sent', {
-      component: 'ALERTING',
-      operation: 'EMAIL_SEND',
-      alertId: alert.id,
-      to: channel.config.to,
-      subject: `[${alert.severity.toUpperCase()}] ${alert.message}`
-    });
-
-    // Simulate email sending
-    if (Math.random() > 0.1) { // 90% success rate simulation
-      return Promise.resolve();
-    } else {
-      throw new Error('Simulated email sending failure');
+  private async deliverToConsole(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
+    const message = this.formatAlertMessage(alert);
+    
+    switch (alert.severity) {
+      case 'CRITICAL':
+        console.error(`🚨 CRITICAL ALERT: ${message}`);
+        break;
+      case 'HIGH':
+        console.error(`⚠️  HIGH ALERT: ${message}`);
+        break;
+      case 'MEDIUM':
+        console.warn(`⚡ MEDIUM ALERT: ${message}`);
+        break;
+      case 'LOW':
+        console.info(`ℹ️  LOW ALERT: ${message}`);
+        break;
     }
   }
 
-  /**
-   * Send Slack alert
-   */
-  private async sendSlackAlert(alert: Alert, channel: AlertChannel): Promise<void> {
-    const payload = {
-      channel: channel.config.channel,
-      username: channel.config.username,
-      text: `🚨 *${alert.severity.toUpperCase()} Alert*`,
-      attachments: [
-        {
-          color: this.getSeverityColor(alert.severity),
-          fields: [
-            {
-              title: 'Message',
-              value: alert.message,
-              short: false
-            },
-            {
-              title: 'Timestamp',
-              value: new Date(alert.timestamp).toLocaleString(),
-              short: true
-            },
-            {
-              title: 'Alert ID',
-              value: alert.id,
-              short: true
-            }
-          ]
-        }
-      ]
-    };
-
-    // This would make actual HTTP request to Slack webhook
-    logger.info('Slack alert would be sent', {
-      component: 'ALERTING',
-      operation: 'SLACK_SEND',
-      alertId: alert.id,
-      channel: channel.config.channel,
-      payload: JSON.stringify(payload)
+  private async deliverToDatabase(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
+    // This would typically save to a database collection
+    // For now, we'll just log it as a structured entry
+    logger.info('Alert stored to database', {
+      component: 'ALERTING_SERVICE',
+      channel: channel.name,
+      alert: {
+        id: alert.id,
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        description: alert.description,
+        timestamp: alert.timestamp,
+        affectedComponents: alert.affectedComponents,
+        metrics: alert.metrics
+      }
     });
-
-    // Simulate Slack sending
-    if (Math.random() > 0.05) { // 95% success rate simulation
-      return Promise.resolve();
-    } else {
-      throw new Error('Simulated Slack sending failure');
-    }
   }
 
-  /**
-   * Send webhook alert
-   */
-  private async sendWebhookAlert(alert: Alert, channel: AlertChannel): Promise<void> {
+  private async deliverToWebhook(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
+    if (!channel.config.url) {
+      throw new Error('Webhook URL not configured');
+    }
+
     const payload = {
       alert: {
         id: alert.id,
-        severity: alert.severity,
-        message: alert.message,
         timestamp: alert.timestamp,
-        metrics: alert.metrics
+        type: alert.type,
+        severity: alert.severity,
+        title: alert.title,
+        description: alert.description,
+        affectedComponents: alert.affectedComponents,
+        metrics: alert.metrics,
+        actions: alert.actions
       },
-      source: 'copytrade-monitoring',
-      timestamp: new Date().toISOString()
+      channel: {
+        id: channel.id,
+        name: channel.name
+      }
     };
 
-    // This would make actual HTTP request
-    logger.info('Webhook alert would be sent', {
-      component: 'ALERTING',
-      operation: 'WEBHOOK_SEND',
-      alertId: alert.id,
-      url: channel.config.url,
-      method: channel.config.method
+    // In a real implementation, this would make an HTTP request
+    logger.info('Alert would be sent to webhook', {
+      component: 'ALERTING_SERVICE',
+      webhookUrl: channel.config.url,
+      payload
     });
-
-    // Simulate webhook sending
-    if (Math.random() > 0.05) { // 95% success rate simulation
-      return Promise.resolve();
-    } else {
-      throw new Error('Simulated webhook sending failure');
-    }
   }
 
-  /**
-   * Send SMS alert
-   */
-  private async sendSMSAlert(alert: Alert, channel: AlertChannel): Promise<void> {
-    const message = `CopyTrade Alert [${alert.severity.toUpperCase()}]: ${alert.message}`;
+  private async deliverToEmail(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
+    if (!channel.config.recipients || channel.config.recipients.length === 0) {
+      throw new Error('Email recipients not configured');
+    }
 
-    // This would integrate with Twilio or similar SMS service
-    logger.info('SMS alert would be sent', {
-      component: 'ALERTING',
-      operation: 'SMS_SEND',
-      alertId: alert.id,
-      message
+    const subject = `[${alert.severity}] ${alert.title}`;
+    const body = this.formatEmailBody(alert);
+
+    // In a real implementation, this would send an email
+    logger.info('Alert would be sent via email', {
+      component: 'ALERTING_SERVICE',
+      recipients: channel.config.recipients,
+      subject,
+      body
     });
-
-    // Simulate SMS sending
-    if (Math.random() > 0.05) { // 95% success rate simulation
-      return Promise.resolve();
-    } else {
-      throw new Error('Simulated SMS sending failure');
-    }
   }
 
-  /**
-   * Retry failed notification
-   */
-  private async retryNotification(notification: AlertNotification): Promise<void> {
-    notification.retryCount++;
-    notification.status = 'pending';
+  private async deliverToSlack(channel: AlertChannel, alert: MonitoringAlert): Promise<void> {
+    if (!channel.config.webhookUrl) {
+      throw new Error('Slack webhook URL not configured');
+    }
 
-    logger.info('Retrying notification', {
-      component: 'ALERTING',
-      operation: 'RETRY_NOTIFICATION',
-      notificationId: notification.id,
-      retryCount: notification.retryCount
+    const slackMessage = this.formatSlackMessage(alert);
+
+    // In a real implementation, this would send to Slack
+    logger.info('Alert would be sent to Slack', {
+      component: 'ALERTING_SERVICE',
+      channel: channel.config.channel,
+      message: slackMessage
     });
-
-    try {
-      await this.executeChannelSend(notification);
-      notification.status = 'sent';
-      notification.sentAt = new Date();
-      this.emit('notification:sent', notification);
-    } catch (error: any) {
-      notification.status = 'failed';
-      notification.error = error.message;
-
-      if (notification.retryCount < this.MAX_RETRY_ATTEMPTS) {
-        setTimeout(() => this.retryNotification(notification), this.RETRY_DELAY * notification.retryCount);
-      } else {
-        this.emit('notification:failed', notification);
-      }
-    }
   }
 
-  /**
-   * Get color for severity level
-   */
-  private getSeverityColor(severity: string): string {
-    switch (severity) {
-      case 'critical': return 'danger';
-      case 'high': return 'warning';
-      case 'medium': return 'warning';
-      case 'low': return 'good';
-      default: return 'good';
-    }
+  private formatAlertMessage(alert: MonitoringAlert): string {
+    return `${alert.title} - ${alert.description} (Components: ${alert.affectedComponents.join(', ')})`;
   }
 
-  /**
-   * Get notification history
-   */
-  getNotificationHistory(limit: number = 100): AlertNotification[] {
-    return this.notifications
-      .sort((a, b) => (b.sentAt || new Date(0)).getTime() - (a.sentAt || new Date(0)).getTime())
-      .slice(0, limit);
+  private formatEmailBody(alert: MonitoringAlert): string {
+    return `
+Alert Details:
+- ID: ${alert.id}
+- Type: ${alert.type}
+- Severity: ${alert.severity}
+- Timestamp: ${alert.timestamp.toISOString()}
+- Description: ${alert.description}
+- Affected Components: ${alert.affectedComponents.join(', ')}
+- Current Value: ${alert.metrics.currentValue}
+${alert.metrics.thresholdValue ? `- Threshold: ${alert.metrics.thresholdValue}` : ''}
+
+Recommended Actions:
+${alert.actions.map(action => `- ${action}`).join('\n')}
+    `.trim();
   }
 
-  /**
-   * Get channel statistics
-   */
-  getChannelStats(): { [channelId: string]: { sent: number; failed: number; successRate: number } } {
-    const stats: { [channelId: string]: { sent: number; failed: number; successRate: number } } = {};
+  private formatSlackMessage(alert: MonitoringAlert): any {
+    const color = {
+      'CRITICAL': 'danger',
+      'HIGH': 'warning',
+      'MEDIUM': 'warning',
+      'LOW': 'good'
+    }[alert.severity];
 
-    for (const notification of this.notifications) {
-      const channelId = notification.channel.id;
-      if (!stats[channelId]) {
-        stats[channelId] = { sent: 0, failed: 0, successRate: 0 };
-      }
-
-      if (notification.status === 'sent') {
-        stats[channelId].sent++;
-      } else if (notification.status === 'failed') {
-        stats[channelId].failed++;
-      }
-    }
-
-    // Calculate success rates
-    for (const channelId in stats) {
-      const channelStats = stats[channelId];
-      if (channelStats) {
-        const { sent, failed } = channelStats;
-        const total = sent + failed;
-        channelStats.successRate = total > 0 ? (sent / total) * 100 : 100;
-      }
-    }
-
-    return stats;
+    return {
+      text: alert.title,
+      attachments: [
+        {
+          color,
+          fields: [
+            {
+              title: 'Severity',
+              value: alert.severity,
+              short: true
+            },
+            {
+              title: 'Type',
+              value: alert.type,
+              short: true
+            },
+            {
+              title: 'Description',
+              value: alert.description,
+              short: false
+            },
+            {
+              title: 'Affected Components',
+              value: alert.affectedComponents.join(', '),
+              short: false
+            }
+          ],
+          ts: Math.floor(alert.timestamp.getTime() / 1000)
+        }
+      ]
+    };
   }
 
-  /**
-   * Test alert channel
-   */
-  async testChannel(channelId: string): Promise<boolean> {
-    const channel = this.channels.get(channelId);
-    if (!channel) {
-      throw new Error(`Channel ${channelId} not found`);
+  private scheduleEscalation(alert: MonitoringAlert, rules: AlertRule[]): void {
+    const escalationRules = rules.filter(rule => rule.escalation?.enabled);
+    
+    escalationRules.forEach(rule => {
+      if (rule.escalation) {
+        setTimeout(async () => {
+          // Check if alert is still unresolved
+          if (!alert.resolved && !alert.acknowledged) {
+            logger.info('Escalating unresolved alert', {
+              component: 'ALERTING_SERVICE',
+              alertId: alert.id,
+              ruleId: rule.id
+            });
+
+            // Send to escalation channels
+            for (const channelId of rule.escalation?.escalationChannels || []) {
+              const channel = this.channels.get(channelId);
+              if (channel && channel.enabled) {
+                try {
+                  await this.deliverToChannel(channel, {
+                    ...alert,
+                    title: `[ESCALATED] ${alert.title}`,
+                    description: `${alert.description} (Escalated after ${rule.escalation?.delayMinutes || 0} minutes)`
+                  });
+                  this.recordAlertHistory(alert.id, 'ESCALATED', channelId);
+                } catch (error) {
+                  logger.error('Failed to escalate alert', {
+                    component: 'ALERTING_SERVICE',
+                    alertId: alert.id,
+                    channelId,
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  });
+                }
+              }
+            }
+          }
+        }, rule.escalation.delayMinutes * 60 * 1000);
+      }
+    });
+  }
+
+  private recordAlertHistory(alertId: string, action: 'SENT' | 'ACKNOWLEDGED' | 'RESOLVED' | 'ESCALATED', channelId?: string, userId?: string): void {
+    if (!this.alertHistory.has(alertId)) {
+      this.alertHistory.set(alertId, []);
     }
 
-    const testAlert: Alert = {
-      id: `test_${Date.now()}`,
-      ruleId: 'test-rule',
-      severity: 'low',
-      message: 'Test alert from CopyTrade monitoring system',
+    const history = this.alertHistory.get(alertId)!;
+    history.push({
+      id: `${alertId}_${Date.now()}`,
+      alertId,
       timestamp: new Date(),
-      metrics: {} as any,
-      resolved: false
-    };
+      action,
+      channelId,
+      userId
+    });
 
-    try {
-      await this.sendToChannel(testAlert, channel);
-      return true;
-    } catch (error) {
-      return false;
+    // Keep only last 100 history entries per alert
+    if (history.length > 100) {
+      history.splice(0, history.length - 100);
     }
+  }
+
+  private initializeDefaultChannels(): void {
+    const defaultChannels: AlertChannel[] = [
+      {
+        id: 'console',
+        name: 'Console Output',
+        type: 'console',
+        enabled: true,
+        config: {}
+      },
+      {
+        id: 'database',
+        name: 'Database Storage',
+        type: 'database',
+        enabled: true,
+        config: {
+          collection: 'alerts'
+        }
+      }
+    ];
+
+    defaultChannels.forEach(channel => {
+      this.channels.set(channel.id, channel);
+    });
+  }
+
+  private initializeDefaultRules(): void {
+    const defaultRules: AlertRule[] = [
+      {
+        id: 'critical_alerts',
+        name: 'Critical Alerts',
+        description: 'Send all critical alerts immediately',
+        enabled: true,
+        conditions: {
+          severity: ['CRITICAL']
+        },
+        channels: ['console', 'database'],
+        escalation: {
+          enabled: true,
+          delayMinutes: 5,
+          escalationChannels: ['console']
+        }
+      },
+      {
+        id: 'high_severity_alerts',
+        name: 'High Severity Alerts',
+        description: 'Send high severity alerts with rate limiting',
+        enabled: true,
+        conditions: {
+          severity: ['HIGH'],
+          frequency: 5,
+          timeWindow: 10 * 60 * 1000 // 10 minutes
+        },
+        channels: ['console', 'database']
+      },
+      {
+        id: 'broker_alerts',
+        name: 'Broker Component Alerts',
+        description: 'Alerts for broker-related issues',
+        enabled: true,
+        conditions: {
+          components: ['BROKER_CONTROLLER', 'BROKER_SERVICE'],
+          severity: ['MEDIUM', 'HIGH', 'CRITICAL']
+        },
+        channels: ['console', 'database']
+      }
+    ];
+
+    defaultRules.forEach(rule => {
+      this.rules.set(rule.id, rule);
+    });
   }
 }
 
-// Export singleton instance
-export const alertingService = new AlertingService();
+export const alertingService = AlertingService.getInstance();

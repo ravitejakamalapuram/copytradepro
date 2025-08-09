@@ -63,7 +63,8 @@ export interface ConnectedAccount {
   products: string; // JSON string of ProductType[]
   encrypted_credentials: string; // Encrypted JSON
   account_status: AccountStatus;
-  token_expiry_time: string | null; // ISO string or null for infinity (Shoonya)
+  token_expiry_time: string | null; // Access token expiry (ISO string or null for infinity like Shoonya)
+  refresh_token_expiry_time: string | null; // Refresh token expiry (ISO string for OAuth brokers like Fyers)
   created_at: string;
   updated_at: string;
 }
@@ -82,7 +83,8 @@ export interface CreateConnectedAccountData {
   products: ProductType[];
   credentials: any; // Will be encrypted before storage
   account_status: AccountStatus;
-  token_expiry_time?: string | null; // ISO string or null for infinity (Shoonya)
+  token_expiry_time?: string | null; // Access token expiry (ISO string or null for infinity like Shoonya)
+  refresh_token_expiry_time?: string | null; // Refresh token expiry (ISO string for OAuth brokers like Fyers)
 }
 
 /**
@@ -117,7 +119,7 @@ export interface ConnectedAccountResponse {
 // ============================================================================
 
 /**
- * Order History - Database representation
+ * Order History - Database representation (supports both equity and F&O)
  */
 export interface OrderHistory {
   id: number | string;
@@ -149,10 +151,18 @@ export interface OrderHistory {
     user_name: string;
     email: string;
   };
+  
+  // NEW: F&O specific fields
+  instrument_type?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  underlying_symbol?: string;
+  strike_price?: number | undefined;
+  expiry_date?: string;
+  option_type?: 'CE' | 'PE';
+  lot_size?: number;
 }
 
 /**
- * Data for creating order history
+ * Data for creating order history (supports both equity and F&O)
  */
 export interface CreateOrderHistoryData {
   user_id: number | string;
@@ -176,6 +186,14 @@ export interface CreateOrderHistoryData {
   executed_at?: string; // Legacy field for backward compatibility
   error_message?: string;
   remarks?: string; // Legacy field for backward compatibility
+  
+  // NEW: F&O specific fields
+  instrument_type?: 'EQUITY' | 'OPTION' | 'FUTURE';
+  underlying_symbol?: string;
+  strike_price?: number | undefined;
+  expiry_date?: string;
+  option_type?: 'CE' | 'PE';
+  lot_size?: number;
 }
 
 /**

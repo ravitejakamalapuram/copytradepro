@@ -26,7 +26,6 @@ This document summarizes the implementation and deployment of comprehensive bug 
 - **Rollback Mechanism**: Automatic rollback on deployment failures
 
 **Key Files:**
-- `scripts/deploy.sh` - Main deployment script with rollback capability
 - `backend/scripts/health-check.js` - Comprehensive health check validation
 - `backend/scripts/validate-deployment.js` - Post-deployment validation
 - `backend/src/services/featureFlagService.ts` - Feature flag management
@@ -87,29 +86,26 @@ This document summarizes the implementation and deployment of comprehensive bug 
 
 ### Manual Rollback
 ```bash
-# Rollback to previous version
-./scripts/deploy.sh rollback
-
 # Check application status
-./scripts/deploy.sh health-check
+cd backend && npm run health-check
+
+# Restart application if needed
+npm run dev
 ```
 
 ## Usage Instructions
 
 ### Deployment Commands
 ```bash
-# Full deployment with validation
-./scripts/deploy.sh deploy
+# Build and start application
+npm run build
+npm start
 
-# Health check only
-./scripts/deploy.sh health-check
+# Health check
+cd backend && npm run health-check
 
-# Manual rollback
-./scripts/deploy.sh rollback
-
-# Start/stop application
-./scripts/deploy.sh start
-./scripts/deploy.sh stop
+# Development mode
+npm run dev
 ```
 
 ### Monitoring Access

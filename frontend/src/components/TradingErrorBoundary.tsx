@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ErrorInfo } from 'react';
 import ErrorBoundary from './ErrorBoundary';
 import Button from './ui/Button';
 import Card from './ui/Card';
@@ -60,10 +60,11 @@ const TradingFallback: React.FC = () => (
 );
 
 const TradingErrorBoundary: React.FC<TradingErrorBoundaryProps> = ({ children }) => {
-  const handleTradingError = (error: Error) => {
+  const handleTradingError = (error: Error, _errorInfo: ErrorInfo) => {
     console.error('Trading Error:', error);
     
-    // Report trading-specific errors with high priority
+    // Trading errors are already captured by the ErrorBoundary component
+    // Additional trading-specific context can be added here
     const errorReport = {
       type: 'trading_error',
       severity: 'high',
@@ -71,18 +72,17 @@ const TradingErrorBoundary: React.FC<TradingErrorBoundaryProps> = ({ children })
       stack: error.stack,
       timestamp: new Date().toISOString(),
       url: window.location.href,
+      section: 'trading'
     };
     
     console.error('Trading Error Report:', errorReport);
-    
-    // In production, send to error tracking service with high priority
-    // Example: Sentry.captureException(error, { level: 'error', tags: { section: 'trading' } });
   };
 
   return (
     <ErrorBoundary
       fallback={<TradingFallback />}
       onError={handleTradingError}
+      componentName="TradingErrorBoundary"
     >
       {children}
     </ErrorBoundary>

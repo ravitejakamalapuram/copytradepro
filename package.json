@@ -72,7 +72,8 @@
     "pm2:status": "pm2 status",
     "pm2:monit": "pm2 monit",
     "pm2:save": "pm2 save",
-    "pm2:resurrect": "pm2 resurrect"
+    "pm2:resurrect": "pm2 resurrect",
+    "test:cors": "node test-cors.js"
   },
   "keywords": [
     "trading",

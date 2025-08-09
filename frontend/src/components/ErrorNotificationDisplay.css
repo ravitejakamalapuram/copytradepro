@@ -1,0 +1,328 @@
+/* Error Notification Display Styles */
+
+.error-notification-container {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  max-width: 400px;
+  width: 100%;
+}
+
+/* Position variants */
+.error-notification-top-right {
+  top: 1rem;
+  right: 1rem;
+}
+
+.error-notification-top-left {
+  top: 1rem;
+  left: 1rem;
+}
+
+.error-notification-bottom-right {
+  bottom: 1rem;
+  right: 1rem;
+}
+
+.error-notification-bottom-left {
+  bottom: 1rem;
+  left: 1rem;
+}
+
+.error-notification-top-center {
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Notification item */
+.error-notification-item {
+  margin-bottom: 0.75rem;
+  pointer-events: auto;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.error-notification-item.error-notification-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.error-notification-item.error-notification-exiting {
+  opacity: 0;
+  transform: translateX(100%);
+}
+
+/* Position-specific transforms */
+.error-notification-top-left .error-notification-item,
+.error-notification-bottom-left .error-notification-item {
+  transform: translateX(-100%);
+}
+
+.error-notification-top-left .error-notification-item.error-notification-visible,
+.error-notification-bottom-left .error-notification-item.error-notification-visible {
+  transform: translateX(0);
+}
+
+.error-notification-top-left .error-notification-item.error-notification-exiting,
+.error-notification-bottom-left .error-notification-item.error-notification-exiting {
+  transform: translateX(-100%);
+}
+
+.error-notification-top-center .error-notification-item {
+  transform: translateY(-100%);
+}
+
+.error-notification-top-center .error-notification-item.error-notification-visible {
+  transform: translateY(0);
+}
+
+.error-notification-top-center .error-notification-item.error-notification-exiting {
+  transform: translateY(-100%);
+}
+
+/* Notification card */
+.error-notification-card {
+  border-left: 4px solid var(--color-border-error, #dc3545);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  background-color: var(--color-background-primary, #ffffff);
+}
+
+.error-notification-error .error-notification-card {
+  border-left-color: var(--color-border-error, #dc3545);
+}
+
+.error-notification-warning .error-notification-card {
+  border-left-color: var(--color-border-warning, #ffc107);
+}
+
+.error-notification-info .error-notification-card {
+  border-left-color: var(--color-border-info, #17a2b8);
+}
+
+/* Notification content */
+.error-notification-content {
+  padding: 1rem;
+}
+
+.error-notification-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.error-notification-icon-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.error-notification-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #212529);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.error-notification-icon {
+  flex-shrink: 0;
+}
+
+.error-notification-icon.error-icon {
+  color: var(--color-text-error, #dc3545);
+}
+
+.error-notification-icon.warning-icon {
+  color: var(--color-text-warning, #856404);
+}
+
+.error-notification-icon.info-icon {
+  color: var(--color-text-info, #0c5460);
+}
+
+.error-notification-close {
+  background: none;
+  border: none;
+  color: var(--color-text-tertiary, #868e96);
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.error-notification-close:hover {
+  color: var(--color-text-secondary, #6c757d);
+  background-color: var(--color-background-subtle, #f8f9fa);
+}
+
+.error-notification-message {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6c757d);
+  line-height: 1.4;
+  margin: 0 0 0.75rem 0;
+}
+
+.error-notification-trace {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.75rem;
+}
+
+.error-notification-trace-label {
+  color: var(--color-text-tertiary, #868e96);
+  font-weight: 500;
+}
+
+.error-notification-trace-id {
+  background-color: var(--color-background-subtle, #f8f9fa);
+  color: var(--color-text-code, #495057);
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 0.6875rem;
+}
+
+.error-notification-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.75rem;
+}
+
+/* Overflow indicator */
+.error-notification-overflow {
+  pointer-events: auto;
+}
+
+.error-notification-overflow-card {
+  background-color: var(--color-background-subtle, #f8f9fa);
+  border: 1px solid var(--color-border-subtle, #dee2e6);
+}
+
+.error-notification-overflow-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6c757d);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .error-notification-container {
+    max-width: calc(100vw - 2rem);
+    left: 1rem !important;
+    right: 1rem !important;
+    transform: none !important;
+  }
+
+  .error-notification-item {
+    transform: translateY(-100%);
+  }
+
+  .error-notification-item.error-notification-visible {
+    transform: translateY(0);
+  }
+
+  .error-notification-item.error-notification-exiting {
+    transform: translateY(-100%);
+  }
+
+  .error-notification-content {
+    padding: 0.875rem;
+  }
+
+  .error-notification-actions {
+    flex-direction: column;
+  }
+
+  .error-notification-actions button {
+    width: 100%;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .error-notification-card {
+    background-color: var(--color-background-primary-dark, #2d2d2d);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .error-notification-title {
+    color: var(--color-text-primary-dark, #ffffff);
+  }
+
+  .error-notification-message {
+    color: var(--color-text-secondary-dark, #b0b0b0);
+  }
+
+  .error-notification-close {
+    color: var(--color-text-tertiary-dark, #808080);
+  }
+
+  .error-notification-close:hover {
+    color: var(--color-text-secondary-dark, #b0b0b0);
+    background-color: var(--color-background-subtle-dark, #1a1a1a);
+  }
+
+  .error-notification-trace-label {
+    color: var(--color-text-tertiary-dark, #808080);
+  }
+
+  .error-notification-trace-id {
+    background-color: var(--color-background-subtle-dark, #1a1a1a);
+    color: var(--color-text-code-dark, #e0e0e0);
+  }
+
+  .error-notification-overflow-card {
+    background-color: var(--color-background-subtle-dark, #1a1a1a);
+    border-color: var(--color-border-subtle-dark, #404040);
+  }
+
+  .error-notification-overflow-content {
+    color: var(--color-text-secondary-dark, #b0b0b0);
+  }
+}
+
+/* Animation for stacked notifications */
+.error-notification-item:nth-child(n+2) {
+  margin-top: -0.25rem;
+  transform: scale(0.98) translateX(100%);
+}
+
+.error-notification-item:nth-child(n+2).error-notification-visible {
+  transform: scale(0.98) translateX(0);
+}
+
+.error-notification-item:nth-child(n+3) {
+  transform: scale(0.96) translateX(100%);
+}
+
+.error-notification-item:nth-child(n+3).error-notification-visible {
+  transform: scale(0.96) translateX(0);
+}
+
+/* Hover effects */
+.error-notification-item:hover {
+  transform: translateX(0) scale(1.02);
+}
+
+.error-notification-item:nth-child(n+2):hover {
+  transform: scale(1) translateX(0);
+  z-index: 1;
+  position: relative;
+}
+
+.error-notification-item:nth-child(n+3):hover {
+  transform: scale(1) translateX(0);
+  z-index: 1;
+  position: relative;
+}

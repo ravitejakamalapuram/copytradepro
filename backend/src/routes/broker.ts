@@ -13,7 +13,6 @@ import {
   disconnectBroker,
   completeOAuthAuth,
   handleOAuthCallback,
-  placeOrder,
   placeMultiAccountOrder,
   refreshAllOrderStatus,
   refreshOrderStatus,
@@ -25,17 +24,11 @@ import {
   checkOrderStatus,
   getOrderSearchSuggestions,
   getOrderBook,
-  getPositions,
-  searchSymbol,
-  getQuotes
+
+  searchSymbol
 } from '../controllers/brokerController';
 
-import {
-  getSessionHealthStats,
-  getAccountSessionHealth,
-  validateAccountSession,
-  refreshAccountToken
-} from '../controllers/sessionHealthController';
+
 
 import { authenticateToken } from '../middleware/auth';
 
@@ -94,33 +87,6 @@ const connectBrokerValidation = [
     .withMessage('Valid Redirect URI is required for Fyers'),
 ];
 
-// Validation rules for placing orders
-const placeOrderValidation = [
-  body('accountId')
-    .trim()
-    .isLength({ min: 1 })
-    .withMessage('Account ID is required'),
-  body('symbol')
-    .trim()
-    .isLength({ min: 1 })
-    .withMessage('Trading symbol is required'),
-  body('action')
-    .isIn(['BUY', 'SELL'])
-    .withMessage('Action must be BUY or SELL'),
-  body('quantity')
-    .isInt({ min: 1 })
-    .withMessage('Quantity must be a positive integer'),
-  body('orderType')
-    .isIn(['MARKET', 'LIMIT', 'SL-LIMIT', 'SL-MARKET'])
-    .withMessage('Invalid order type'),
-  body('exchange')
-    .isIn(['NSE', 'BSE', 'NFO', 'MCX', 'CDS'])
-    .withMessage('Invalid exchange'),
-  body('productType')
-    .isIn(['C', 'M', 'H', 'B', 'CNC', 'MIS', 'NRML', 'BO'])
-    .withMessage('Invalid product type'),
-];
-
 // Validation rules for multi-account order placement
 const placeMultiAccountOrderValidation = [
   body('selectedAccounts')
@@ -171,7 +137,6 @@ router.post('/accounts/:accountId/activate', authenticateToken, activateAccount)
 router.post('/accounts/:accountId/deactivate', authenticateToken, deactivateAccount);
 
 router.post('/disconnect', authenticateToken, disconnectBroker);
-router.post('/place-order', authenticateToken, placeOrderValidation, placeOrder);
 router.post('/place-multi-account-order', authenticateToken, placeMultiAccountOrderValidation, placeMultiAccountOrder);
 router.post('/refresh-all-order-status', authenticateToken, refreshAllOrderStatus);
 router.post('/refresh-order-status/:orderId', authenticateToken, refreshOrderStatus);
@@ -184,14 +149,10 @@ router.get('/order-history', authenticateToken, getOrderHistory);
 router.post('/check-order-status', authenticateToken, checkOrderStatus);
 router.get('/order-search-suggestions', authenticateToken, getOrderSearchSuggestions);
 router.get('/orders/:brokerName', authenticateToken, getOrderBook);
-router.get('/positions/:brokerName', authenticateToken, getPositions);
-router.get('/search/:brokerName/:exchange/:symbol', authenticateToken, searchSymbol);
-router.get('/quotes/:brokerName/:exchange/:token', authenticateToken, getQuotes);
 
-// Session health monitoring routes
-router.get('/session-health', authenticateToken, getSessionHealthStats);
-router.get('/session-health/:brokerName/:accountId', authenticateToken, getAccountSessionHealth);
-router.post('/session-health/:brokerName/:accountId/validate', authenticateToken, validateAccountSession);
-router.post('/session-health/:brokerName/:accountId/refresh', authenticateToken, refreshAccountToken);
+router.get('/search/:brokerName/:exchange/:symbol', authenticateToken, searchSymbol);
+
+
+
 
 export default router;

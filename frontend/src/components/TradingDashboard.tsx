@@ -2,6 +2,7 @@ import React from 'react';
 import StatsCard from './StatsCard';
 import StatusBadge from './StatusBadge';
 import Alert from './Alert';
+import { ORDER_STATUS } from '@copytrade/shared-types';
 
 interface DashboardStats {
   totalOrders: number;
@@ -22,12 +23,12 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
   loading = false,
   className = ''
 }) => {
-  const executionRate = stats.totalOrders > 0 
-    ? (stats.executedOrders / stats.totalOrders) * 100 
+  const executionRate = stats.totalOrders > 0
+    ? (stats.executedOrders / stats.totalOrders) * 100
     : 0;
 
-  const profitLossPercentage = stats.totalValue > 0 
-    ? (stats.profitLoss / stats.totalValue) * 100 
+  const profitLossPercentage = stats.totalValue > 0
+    ? (stats.profitLoss / stats.totalValue) * 100
     : 0;
 
   return (
@@ -45,7 +46,7 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
           icon="📊"
           loading={loading}
         />
-        
+
         <StatsCard
           title="Executed Orders"
           value={stats.executedOrders}
@@ -56,7 +57,7 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
           }}
           loading={loading}
         />
-        
+
         <StatsCard
           title="Portfolio Value"
           value={stats.totalValue}
@@ -64,7 +65,7 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
           icon="💰"
           loading={loading}
         />
-        
+
         <StatsCard
           title="P&L"
           value={stats.profitLoss}
@@ -91,27 +92,27 @@ const TradingDashboard: React.FC<TradingDashboardProps> = ({
                 <p className="text-sm text-secondary">Execution Rate</p>
                 <p className="text-lg font-semibold">{executionRate.toFixed(1)}%</p>
               </div>
-              <StatusBadge 
-                status={executionRate >= 80 ? 'EXECUTED' : executionRate >= 50 ? 'PENDING' : 'REJECTED'} 
+              <StatusBadge
+                status={executionRate >= 80 ? ORDER_STATUS.EXECUTED : executionRate >= 50 ? ORDER_STATUS.PENDING : ORDER_STATUS.REJECTED}
               />
             </div>
-            
+
             <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
               <div>
                 <p className="text-sm text-secondary">Active Accounts</p>
                 <p className="text-lg font-semibold">{stats.activeAccounts}</p>
               </div>
-              <StatusBadge 
-                status={stats.activeAccounts > 0 ? 'EXECUTED' : 'PENDING'} 
+              <StatusBadge
+                status={stats.activeAccounts > 0 ? ORDER_STATUS.EXECUTED : ORDER_STATUS.PENDING}
               />
             </div>
-            
+
             <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
               <div>
                 <p className="text-sm text-secondary">System Status</p>
                 <p className="text-lg font-semibold">Online</p>
               </div>
-              <StatusBadge status="EXECUTED" />
+              <StatusBadge status={ORDER_STATUS.EXECUTED} />
             </div>
           </div>
         </div>

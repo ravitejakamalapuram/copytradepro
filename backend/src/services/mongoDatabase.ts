@@ -1,5 +1,5 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
-import crypto from 'crypto';
+import * as crypto from 'crypto';
 import {
   IDatabaseAdapter,
   User,
@@ -18,6 +18,7 @@ interface UserDocument extends Document {
   email: string;
   name: string;
   password: string;
+  role?: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -33,7 +34,8 @@ interface ConnectedAccountDocument extends Document {
   products: string;
   encrypted_credentials: string;
   account_status: string; // 'ACTIVE' | 'INACTIVE' | 'PROCEED_TO_OAUTH'
-  token_expiry_time: Date | null; // Date or null for infinity (Shoonya)
+  token_expiry_time: Date | null; // Access token expiry (null for infinity like Shoonya)
+  refresh_token_expiry_time: Date | null; // Refresh token expiry (for OAuth brokers like Fyers)
   created_at: Date;
   updated_at: Date;
 }
@@ -75,6 +77,7 @@ const UserSchema = new Schema<UserDocument>({
   email: { type: String, required: true, unique: true, index: true },
   name: { type: String, required: true },
   password: { type: String, required: true },
+  role: { type: String, default: 'user' },
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -90,7 +93,8 @@ const ConnectedAccountSchema = new Schema<ConnectedAccountDocument>({
   products: { type: String, required: true }, // JSON string
   encrypted_credentials: { type: String, required: true },
   account_status: { type: String, required: true, enum: ['ACTIVE', 'INACTIVE', 'PROCEED_TO_OAUTH'], default: 'INACTIVE' },
-  token_expiry_time: { type: Date, default: null }, // null for infinity (Shoonya)
+  token_expiry_time: { type: Date, default: null }, // Access token expiry (null for infinity like Shoonya)
+  refresh_token_expiry_time: { type: Date, default: null }, // Refresh token expiry (for OAuth brokers like Fyers)
   created_at: { type: Date, default: Date.now },
   updated_at: { type: Date, default: Date.now }
 });
@@ -169,7 +173,7 @@ export class MongoDatabase implements IDatabaseAdapter {
 
   async initialize(): Promise<void> {
     try {
-      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/copytrade';
+      const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/copytradepro';
       
       console.log('🔗 Connecting to MongoDB...');
       await mongoose.connect(mongoUri);
@@ -257,6 +261,7 @@ export class MongoDatabase implements IDatabaseAdapter {
       email: doc.email,
       name: doc.name,
       password: doc.password,
+      role: doc.role || 'user',
       created_at: doc.created_at.toISOString(),
       updated_at: doc.updated_at.toISOString()
     };
@@ -276,6 +281,7 @@ export class MongoDatabase implements IDatabaseAdapter {
       encrypted_credentials: doc.encrypted_credentials,
       account_status: doc.account_status as AccountStatus,
       token_expiry_time: doc.token_expiry_time ? doc.token_expiry_time.toISOString() : null,
+      refresh_token_expiry_time: doc.refresh_token_expiry_time ? doc.refresh_token_expiry_time.toISOString() : null,
       created_at: doc.created_at.toISOString(),
       updated_at: doc.updated_at.toISOString()
     };
@@ -299,11 +305,11 @@ export class MongoDatabase implements IDatabaseAdapter {
       broker_name: doc.broker_name || '',
       broker_order_id: doc.broker_order_id || '',
       symbol: doc.symbol || '',
-      action: doc.action || '',
+      action: (doc.action as 'BUY' | 'SELL') || 'BUY',
       quantity: doc.quantity || 0,
       price: doc.price || 0,
-      order_type: doc.order_type || '',
-      status: doc.status || '',
+      order_type: (doc.order_type as 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET') || 'MARKET',
+      status: (doc.status as 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED') || 'PLACED',
       exchange: doc.exchange || '',
       product_type: doc.product_type || '',
       remarks: doc.remarks || '',
@@ -440,7 +446,8 @@ export class MongoDatabase implements IDatabaseAdapter {
         products: JSON.stringify(accountData.products),
         encrypted_credentials: encryptedCredentials,
         account_status: accountData.account_status,
-        token_expiry_time: accountData.token_expiry_time ? new Date(accountData.token_expiry_time) : null
+        token_expiry_time: accountData.token_expiry_time ? new Date(accountData.token_expiry_time) : null,
+        refresh_token_expiry_time: accountData.refresh_token_expiry_time ? new Date(accountData.refresh_token_expiry_time) : null
       });
 
       const savedAccount = await accountDoc.save();

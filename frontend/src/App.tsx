@@ -1,34 +1,54 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { AccountStatusProvider } from './context/AccountStatusContext';
 import { ToastProvider } from './components/Toast';
+import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './hooks/useAuth';
 import { useConnectionStatus } from './hooks/useConnectionStatus';
 import { memoryMonitorService } from './services/memoryMonitorService';
 import { memoryLeakDetector } from './services/memoryLeakDetector';
 import { resourceManager } from './utils/resourceManager';
-import { appCache, apiCache, marketDataCache } from './services/cacheManager';
+import { appCache, apiCache } from './services/cacheManager';
 import { performanceMonitorService } from './services/performanceMonitorService';
-import LandingPage from './pages/LandingPage';
-import CopyTradeLogin from './pages/CopyTradeLogin';
+import { errorCaptureService } from './services/errorCaptureService';
+import { storeRedirectPath } from './utils/sessionUtils';
+// Lazy load components for better performance
+import { lazyWithRetry } from './utils/lazyWithRetry';
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'));
+const CopyTradeLogin = lazyWithRetry(() => import('./pages/CopyTradeLogin'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
+const ComponentDemo = lazyWithRetry(() => import('./pages/ComponentDemo'));
+const PortfolioAnalytics = lazyWithRetry(() => import('./pages/PortfolioAnalytics'));
+const AdvancedOrderManagement = lazyWithRetry(() => import('./pages/AdvancedOrderManagement'));
 
-import Settings from './pages/Settings';
-import ComponentDemo from './pages/ComponentDemo';
-import PortfolioAnalytics from './pages/PortfolioAnalytics';
+// Main application pages - lazy loaded
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const Holdings = lazyWithRetry(() => import('./pages/Holdings'));
+const Orders = lazyWithRetry(() => import('./pages/Orders'));
+const Positions = lazyWithRetry(() => import('./pages/Positions'));
+const TradeSetup = lazyWithRetry(() => import('./pages/TradeSetup'), 2, 600);
+const AccountSetup = lazyWithRetry(() => import('./pages/AccountSetup'));
+const Portfolio = lazyWithRetry(() => import('./pages/Portfolio'));
+const MarketOverview = lazyWithRetry(() => import('./pages/MarketOverview'));
+
+// Advanced features - lazy loaded
+const AlertsManagement = lazyWithRetry(() => import('./pages/AlertsManagement'));
+const RiskManagement = lazyWithRetry(() => import('./pages/RiskManagement'));
+const CopyTradingStrategies = lazyWithRetry(() => import('./pages/CopyTradingStrategies'));
+const UserSettings = lazyWithRetry(() => import('./pages/UserSettings'));
+const AdminPanel = lazyWithRetry(() => import('./pages/AdminPanel'));
+const AdminUserDetails = lazyWithRetry(() => import('./pages/AdminUserDetails'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
+const AdminErrorLogs = lazyWithRetry(() => import('./pages/AdminErrorLogs'));
+const AdminSystemHealth = lazyWithRetry(() => import('./pages/AdminSystemHealth'));
+const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics'));
+
+// Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
-import AdvancedOrderManagement from './pages/AdvancedOrderManagement';
-// Main application pages
-import Dashboard from './pages/Dashboard';
-import Holdings from './pages/Holdings';
-import Orders from './pages/Orders';
-import Positions from './pages/Positions';
-
-import TradeSetup from './pages/TradeSetup';
-import AccountSetup from './pages/AccountSetup';
-import Portfolio from './pages/Portfolio';
-import MarketOverview from './pages/MarketOverview';
+import ErrorNotificationDisplay from './components/ErrorNotificationDisplay';
 import './styles/enterprise-base.css';
+import './styles/dark-theme.css';
 
 // Error Boundaries
 import ErrorBoundary from './components/ErrorBoundary';
@@ -62,20 +82,41 @@ const ConnectionStatus: React.FC = () => {
   );
 };
 
-// Protected Route Component
+// Loading Fallback Component
+const LoadingFallback: React.FC = () => (
+  <div className="loading-container" style={{
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: '60vh',
+    gap: '1rem'
+  }}>
+    <div className="loading-spinner"></div>
+    <p className="loading-text" style={{ color: 'var(--text-secondary)' }}>Loading...</p>
+  </div>
+);
+
+// Protected Route Component with Suspense
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loading-spinner"></div>
-        <p className="loading-text">Loading...</p>
-      </div>
-    );
+    return <LoadingFallback />;
   }
 
-  return isAuthenticated ? <>{children}</> : <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    // Store current path for redirect after login
+    storeRedirectPath(location.pathname + location.search);
+    return <Navigate to="/" replace />;
+  }
+
+  return (
+    <React.Suspense fallback={<LoadingFallback />}>
+      {children}
+    </React.Suspense>
+  );
 };
 
 // Main App Component
@@ -88,10 +129,21 @@ const AppContent: React.FC = () => {
         <Route
           path="/"
           element={
-            isAuthenticated ? <Navigate to="/dashboard" replace /> : <CopyTradeLogin />
+            isAuthenticated ? <Navigate to="/dashboard" replace /> : (
+              <React.Suspense fallback={<LoadingFallback />}>
+                <CopyTradeLogin />
+              </React.Suspense>
+            )
           }
         />
-        <Route path="/landing" element={<LandingPage />} />
+        <Route
+          path="/landing"
+          element={
+            <React.Suspense fallback={<LoadingFallback />}>
+              <LandingPage />
+            </React.Suspense>
+          }
+        />
 
         {/* Main application routes */}
         <Route
@@ -168,6 +220,122 @@ const AppContent: React.FC = () => {
           }
         />
 
+        {/* Advanced Features */}
+        <Route
+          path="/alerts"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AlertsManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/risk-management"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <RiskManagement />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/copy-trading"
+          element={
+            <ProtectedRoute>
+              <TradingErrorBoundary>
+                <CopyTradingStrategies />
+              </TradingErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* User Settings */}
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <UserSettings />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Admin Panel */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminDashboard />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/panel"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminPanel />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminPanel />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/user/:userId"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminUserDetails />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/error-logs"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminErrorLogs />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/system-health"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminSystemHealth />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/analytics"
+          element={
+            <ProtectedRoute>
+              <ErrorBoundary>
+                <AdminAnalytics />
+              </ErrorBoundary>
+            </ProtectedRoute>
+          }
+        />
+
         {/* Legacy routes */}
         <Route
           path="/legacy-account-setup"
@@ -210,7 +378,7 @@ const AppContent: React.FC = () => {
           }
         />
         <Route
-          path="/settings"
+          path="/legacy-settings"
           element={
             <ProtectedRoute>
               <ErrorBoundary>
@@ -222,9 +390,11 @@ const AppContent: React.FC = () => {
         <Route
           path="/demo"
           element={
-            <ErrorBoundary>
-              <ComponentDemo />
-            </ErrorBoundary>
+            <React.Suspense fallback={<LoadingFallback />}>
+              <ErrorBoundary>
+                <ComponentDemo />
+              </ErrorBoundary>
+            </React.Suspense>
           }
         />
         <Route
@@ -260,25 +430,31 @@ const App: React.FC = () => {
   // Initialize memory monitoring and leak detection
   useEffect(() => {
     console.log('🚀 Initializing memory monitoring services');
-    
+
     // Start memory monitoring
     memoryMonitorService.startMonitoring();
-    
+
     // Start leak detection
     memoryLeakDetector.startDetection();
-    
+
     // Start performance monitoring
     performanceMonitorService.startMonitoring();
-    
+
+    // Error capture service is automatically initialized
+    console.log('🛡️ Error capture service initialized');
+
     // Expose services globally for debugging
     (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor = memoryMonitorService;
     (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector = memoryLeakDetector;
     (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager = resourceManager;
     (window as unknown as { appCache?: typeof appCache }).appCache = appCache;
     (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
-    (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache = marketDataCache;
+    // Safe default for legacy/global references used by UI code
+    ;(window as any).marketDataCache = (window as any).marketDataCache || appCache;
+
     (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
-    
+    (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture = errorCaptureService;
+
     // Setup memory alert handling
     const unsubscribeMemoryAlert = memoryMonitorService.onAlert((alert) => {
       if (typeof window.addNotification === 'function') {
@@ -288,48 +464,53 @@ const App: React.FC = () => {
         });
       }
     });
-    
+
     // Cleanup on app unmount
     return () => {
       console.log('🧹 Shutting down memory monitoring services');
-      
+
       unsubscribeMemoryAlert();
       memoryMonitorService.shutdown();
       memoryLeakDetector.shutdown();
       resourceManager.shutdown();
       performanceMonitorService.shutdown();
-      
+      errorCaptureService.destroy();
+
       // Shutdown cache managers
       appCache.shutdown();
       apiCache.shutdown();
-      marketDataCache.shutdown();
-      
+
+
       // Clean up global references
       delete (window as unknown as { memoryMonitor?: typeof memoryMonitorService }).memoryMonitor;
       delete (window as unknown as { leakDetector?: typeof memoryLeakDetector }).leakDetector;
       delete (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager;
       delete (window as unknown as { appCache?: typeof appCache }).appCache;
       delete (window as unknown as { apiCache?: typeof apiCache }).apiCache;
-      delete (window as unknown as { marketDataCache?: typeof marketDataCache }).marketDataCache;
+
       delete (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor;
+      delete (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture;
     };
   }, []);
 
   return (
     <Router>
-      <ToastProvider>
-        <AuthProvider>
-          <ConditionalAccountStatusProvider>
-            <ErrorBoundary>
-              <ConnectionStatus />
-              <NavigationErrorBoundary>
-                <AppContent />
-              </NavigationErrorBoundary>
-              <NotificationDisplay position="top-right" />
-            </ErrorBoundary>
-          </ConditionalAccountStatusProvider>
-        </AuthProvider>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AuthProvider>
+            <ConditionalAccountStatusProvider>
+              <ErrorBoundary>
+                <ConnectionStatus />
+                <NavigationErrorBoundary>
+                  <AppContent />
+                </NavigationErrorBoundary>
+                <NotificationDisplay position="top-right" />
+                <ErrorNotificationDisplay position="top-right" />
+              </ErrorBoundary>
+            </ConditionalAccountStatusProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </ThemeProvider>
     </Router>
   );
 };

@@ -15,6 +15,7 @@ import {
   TableHeaderCell,
   TableCell
 } from './ui';
+
 import { portfolioService, type PortfolioSummary } from '../services/portfolioService';
 
 interface PortfolioDashboardProps {
@@ -263,8 +264,8 @@ const PortfolioDashboard: React.FC<PortfolioDashboardProps> = ({ className = '' 
         {/* Top Positions */}
         {positions.length > 0 && (
           <Card>
-            <CardHeader 
-              title="Top Positions" 
+            <CardHeader
+              title="Top Positions"
               subtitle={`Showing ${positions.length} active positions`}
             />
             <CardContent>

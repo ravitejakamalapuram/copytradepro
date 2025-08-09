@@ -44,8 +44,7 @@ Run the setup script for your operating system:
 ```bash
 git clone <repository-url>
 cd copytradepro
-chmod +x setup.sh
-./setup.sh
+npm run setup
 ```
 
 **Windows (Command Prompt):**
@@ -109,9 +108,10 @@ The setup script will:
 
 #### Quick Start (After Setup)
 
-**Using startup scripts:**
-- Linux/macOS: `./start-dev.sh`
-- Windows: `start-dev.bat` or `.\start-dev.ps1`
+**Using npm scripts:**
+```bash
+npm run dev
+```
 
 **Manual start:**
 
@@ -131,6 +131,38 @@ The setup script will:
 
 3. **Open your browser**
    Navigate to http://localhost:5173
+
+#### CORS Issues in Development
+
+If you encounter CORS (Cross-Origin Resource Sharing) errors:
+
+**Quick Fix:**
+```bash
+# Test CORS functionality
+npm run test:cors
+
+# Manual server restart if needed
+cd backend && npm run dev
+```
+
+**Test CORS Configuration:**
+```bash
+npm run test:cors
+```
+
+**Manual Fix:**
+1. Ensure `NODE_ENV=development` in `backend/.env`
+2. Restart backend server: `cd backend && npm run dev`
+3. Clear browser cache (Ctrl+F5 or Cmd+Shift+R)
+4. Check browser console for specific CORS errors
+
+**Common CORS Solutions:**
+- ✅ Frontend on `http://localhost:5173` (Vite default)
+- ✅ Frontend on `http://localhost:3000` (Create React App)
+- ✅ Both `localhost` and `127.0.0.1` variants supported
+- ✅ Development mode allows all origins for easier development
+
+For detailed CORS troubleshooting, see [CORS_TROUBLESHOOTING.md](CORS_TROUBLESHOOTING.md).
 
 ## Project Structure
 
@@ -183,12 +215,40 @@ copyTradeV2/
 - Input validation and sanitization
 - Secure credential storage
 
+## Admin Setup
+
+After setting up the application, you'll need to create an admin user to access admin features:
+
+### Create Admin User
+
+```bash
+cd backend
+npm run admin:create
+```
+
+This interactive script will prompt you for:
+- Admin name
+- Admin email
+- Admin password
+
+### Admin Features
+
+Once logged in as admin, you'll have access to:
+- **Admin Panel** (`/admin`) - Overview dashboard
+- **User Management** (`/admin/users`) - Manage user accounts
+- **Error Logs** (`/admin/error-logs`) - View system error logs
+- **System Health** (`/admin/system-health`) - Monitor system status
+- **Analytics** (`/admin/analytics`) - View usage analytics
+
+Admin navigation items are visually distinguished with a colored border in the navigation bar.
+
 ## Usage
 
 1. **Register/Login**: Create an account or login with existing credentials
 2. **Account Setup**: Add your broker accounts with API credentials
 3. **Trade Setup**: Configure and execute trades across multiple accounts
 4. **Monitor**: Track trade history and portfolio performance
+5. **Admin Access**: Use admin credentials to access administrative features
 
 ## Environment Variables
 
@@ -197,6 +257,9 @@ copyTradeV2/
 - `PORT`: Server port (default: 3001)
 - `JWT_SECRET`: Secret key for JWT tokens
 - `FRONTEND_URL`: Frontend URL for CORS
+- `MONGODB_URI`: MongoDB connection string (default: `mongodb://localhost:27017/copytradepro`)
+- `ENABLE_FILE_LOGGING`: Enable file-based logging (default: true)
+- `LOG_LEVEL`: Logging level (debug/info/warn/error/critical)
 
 ### Frontend
 - `VITE_API_URL`: Backend API URL
@@ -205,9 +268,11 @@ copyTradeV2/
 
 #### Quick Production Start
 
-**Using startup scripts:**
-- Linux/macOS: `./start-prod.sh`
-- Windows: `start-prod.bat` or `.\start-prod.ps1`
+**Using npm scripts:**
+```bash
+npm run build
+npm start
+```
 
 #### Manual Production Deployment
 

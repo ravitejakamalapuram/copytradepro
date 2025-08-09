@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ErrorInfo } from 'react';
 import ErrorBoundary from './ErrorBoundary';
 import Button from './ui/Button';
 import Card from './ui/Card';
@@ -64,10 +64,11 @@ const AccountFallback: React.FC = () => (
 );
 
 const AccountErrorBoundary: React.FC<AccountErrorBoundaryProps> = ({ children }) => {
-  const handleAccountError = (error: Error) => {
+  const handleAccountError = (error: Error, _errorInfo: ErrorInfo) => {
     console.error('Account Error:', error);
     
-    // Report account-specific errors
+    // Account errors are already captured by the ErrorBoundary component
+    // Additional account-specific context can be added here
     const errorReport = {
       type: 'account_error',
       severity: 'medium',
@@ -75,18 +76,17 @@ const AccountErrorBoundary: React.FC<AccountErrorBoundaryProps> = ({ children })
       stack: error.stack,
       timestamp: new Date().toISOString(),
       url: window.location.href,
+      section: 'accounts'
     };
     
     console.error('Account Error Report:', errorReport);
-    
-    // In production, send to error tracking service
-    // Example: Sentry.captureException(error, { level: 'warning', tags: { section: 'accounts' } });
   };
 
   return (
     <ErrorBoundary
       fallback={<AccountFallback />}
       onError={handleAccountError}
+      componentName="AccountErrorBoundary"
     >
       {children}
     </ErrorBoundary>

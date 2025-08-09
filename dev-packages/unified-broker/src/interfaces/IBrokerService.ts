@@ -49,25 +49,9 @@ export interface OrderStatus {
   timestamp: Date;
 }
 
-export interface Position {
-  symbol: string;
-  quantity: number;
-  averagePrice: number;
-  currentPrice: number;
-  pnl: number;
-  exchange: string;
-  productType: string;
-}
 
-export interface Quote {
-  symbol: string;
-  price: number;
-  change: number;
-  changePercent: number;
-  volume: number;
-  exchange: string;
-  timestamp: Date;
-}
+
+
 
 /**
  * Abstract base class for all broker services
@@ -89,8 +73,8 @@ export abstract class IBrokerService {
   abstract placeOrder(orderRequest: OrderRequest): Promise<OrderResponse>;
   abstract getOrderStatus(accountId: string, orderId: string): Promise<OrderStatus>;
   abstract getOrderHistory(accountId: string): Promise<OrderStatus[]>;
-  abstract getPositions(accountId: string): Promise<Position[]>;
-  abstract getQuote(symbol: string, exchange: string): Promise<Quote>;
+
+
   abstract searchSymbols(query: string, exchange: string): Promise<any[]>;
 
   // Common methods with default implementations

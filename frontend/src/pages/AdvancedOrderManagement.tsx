@@ -22,6 +22,7 @@ import {
 } from '../components/ui';
 import { advancedOrderService, type OrderTemplate, type AdvancedOrder } from '../services/advancedOrderService';
 import { useFormValidation, commonValidationRules } from '../hooks/useFormValidation';
+import { ORDER_STATUS, ACCOUNT_STATUS } from '@copytrade/shared-types';
 
 interface AdvancedOrderFormData {
   symbol: string;
@@ -164,7 +165,7 @@ const AdvancedOrderManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const data = await advancedOrderService.getOrderTemplates();
       setTemplates(data.templates);
     } catch (err: any) {
@@ -179,7 +180,7 @@ const AdvancedOrderManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const data = await advancedOrderService.getAdvancedOrders();
       setAdvancedOrders(data.orders);
     } catch (err: any) {
@@ -221,7 +222,7 @@ const AdvancedOrderManagement: React.FC = () => {
 
         const result = await advancedOrderService.createBracketOrder(orderData);
         setSuccessMessage(`Bracket order created successfully! Order Group ID: ${result.order_group_id}`);
-        
+
         // Reset form
         resetForm();
 
@@ -283,13 +284,13 @@ const AdvancedOrderManagement: React.FC = () => {
   const handleCancelOrder = async (orderId: number) => {
     try {
       setError(null);
-      
+
       await advancedOrderService.cancelAdvancedOrder(orderId);
       setSuccessMessage('Order cancelled successfully!');
-      
+
       // Reload orders
       await loadAdvancedOrders();
-      
+
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       console.error('Failed to cancel order:', err);
@@ -383,8 +384,8 @@ const AdvancedOrderManagement: React.FC = () => {
         return (
           <Stack gap={6}>
             <Card>
-              <CardHeader 
-                title="Advanced Orders" 
+              <CardHeader
+                title="Advanced Orders"
                 subtitle="Monitor your bracket, iceberg, and trailing stop orders"
               />
               <CardContent>
@@ -452,9 +453,9 @@ const AdvancedOrderManagement: React.FC = () => {
                             )}
                           </TableCell>
                           <TableCell>
-                            <StatusBadge 
-                              status={order.status === 'EXECUTED' ? 'active' : 
-                                     order.status === 'CANCELLED' ? 'inactive' : 'pending'}
+                            <StatusBadge
+                              status={order.status === ORDER_STATUS.EXECUTED ? 'active' :
+                                     order.status === ORDER_STATUS.CANCELLED ? 'inactive' : 'pending'}
                             >
                               {advancedOrderService.getStatusDisplayName(order.status)}
                             </StatusBadge>
@@ -467,9 +468,9 @@ const AdvancedOrderManagement: React.FC = () => {
                               <Button variant="outline" size="sm">
                                 View
                               </Button>
-                              {['PENDING', 'ACTIVE'].includes(order.status) && (
-                                <Button 
-                                  variant="outline" 
+                              {[ORDER_STATUS.PENDING, ACCOUNT_STATUS.ACTIVE].includes(order.status as any) && (
+                                <Button
+                                  variant="outline"
                                   size="sm"
                                   onClick={() => order.id && handleCancelOrder(order.id)}
                                 >
@@ -716,8 +717,8 @@ const AdvancedOrderManagement: React.FC = () => {
                     <Button variant="outline" onClick={() => resetForm()}>
                       Reset
                     </Button>
-                    <Button 
-                      variant="primary" 
+                    <Button
+                      variant="primary"
                       onClick={handleCreateAdvancedOrder}
                       disabled={loading}
                     >

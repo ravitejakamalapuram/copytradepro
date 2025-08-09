@@ -265,12 +265,29 @@ export class UnifiedShoonyaService implements IUnifiedBrokerService {
     }
 
     // Transform unified order request to Shoonya format
+    // Use symbolMetadata if available
+    let tradingSymbol: string;
+    let exchange: string;
+    const symbolMetadata = (orderRequest as any).symbolMetadata;
+
+    if (symbolMetadata) {
+      // Use pre-fetched symbol metadata
+      tradingSymbol = symbolMetadata.tradingSymbol;
+      exchange = symbolMetadata.exchange || 'NSE';
+      console.log(`🔄 UnifiedShoonya using pre-fetched symbol metadata: ${orderRequest.symbol} -> ${tradingSymbol} (${exchange})`);
+    } else {
+      // Use symbol as-is when no metadata provided
+      tradingSymbol = orderRequest.symbol;
+      exchange = orderRequest.exchange || 'NSE';
+      console.log(`🔄 UnifiedShoonya using symbol as-is: ${orderRequest.symbol} -> ${tradingSymbol} (${exchange})`);
+    }
+
     const shoonyaOrderRequest = {
       userId: this.accountInfo?.accountId || '',
       buyOrSell: orderRequest.action === 'BUY' ? 'B' as const : 'S' as const,
       productType: this.mapProductType(orderRequest.productType),
-      exchange: orderRequest.exchange || 'NSE',
-      tradingSymbol: orderRequest.symbol, // Map symbol to tradingSymbol
+      exchange: exchange,
+      tradingSymbol: tradingSymbol,
       quantity: orderRequest.quantity,
       discloseQty: 0,
       priceType: this.mapOrderType(orderRequest.orderType),
@@ -328,7 +345,7 @@ export class UnifiedShoonyaService implements IUnifiedBrokerService {
     try {
       console.log('🔄 UnifiedShoonyaService: Cancelling Shoonya order via API...');
 
-      const shoonyaResponse = await this.shoonyaService.cancelOrder(orderId);
+      const shoonyaResponse = await this.shoonyaService.cancelOrder(this.accountInfo?.accountId || '', orderId);
 
       console.log('🔍 UnifiedShoonyaService: Cancel order response:', shoonyaResponse);
 
@@ -379,7 +396,7 @@ export class UnifiedShoonyaService implements IUnifiedBrokerService {
     try {
       console.log('🔄 UnifiedShoonyaService: Modifying Shoonya order via API...');
 
-      const shoonyaResponse = await this.shoonyaService.modifyOrder(orderId, modifications);
+      const shoonyaResponse = await this.shoonyaService.modifyOrder(this.accountInfo?.accountId || '', orderId, modifications);
 
       console.log('🔍 UnifiedShoonyaService: Modify order response:', shoonyaResponse);
 

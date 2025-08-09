@@ -1,0 +1,242 @@
+.error-trend-chart {
+  width: 100%;
+}
+
+/* Trend Indicator */
+.trend-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.trend-icon {
+  font-size: 1rem;
+}
+
+.trend-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Chart Container */
+.chart-container {
+  width: 100%;
+}
+
+/* Chart Statistics */
+.chart-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-secondary);
+}
+
+.chart-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.chart-stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chart-stat-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+/* SVG Chart */
+.chart-svg-container {
+  position: relative;
+  width: 100%;
+  background-color: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-secondary);
+  overflow: hidden;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Chart Grid */
+.chart-grid line {
+  opacity: 0.3;
+}
+
+/* Chart Points */
+.chart-point {
+  transition: all 0.2s ease;
+}
+
+.chart-point:hover {
+  r: 6;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+.chart-point:hover + .chart-tooltip {
+  opacity: 1 !important;
+}
+
+/* Chart Tooltip */
+.chart-tooltip {
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.chart-tooltip rect {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Y-axis Labels */
+.chart-y-labels text {
+  font-family: var(--font-mono);
+}
+
+/* X-axis Labels */
+.chart-x-labels {
+  position: relative;
+  height: 20px;
+  margin-top: 0.5rem;
+}
+
+.chart-x-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* Empty State */
+.chart-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: var(--text-secondary);
+}
+
+.chart-empty-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.chart-empty-text {
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .chart-stats {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .chart-stat {
+    min-width: 80px;
+  }
+  
+  .chart-stat-value {
+    font-size: 0.875rem;
+  }
+  
+  .trend-indicator {
+    flex-direction: column;
+    gap: 0.25rem;
+    text-align: center;
+  }
+  
+  .chart-x-label {
+    font-size: 0.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .chart-stats {
+    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+    gap: 0.75rem;
+  }
+  
+  .chart-stat {
+    min-width: auto;
+  }
+  
+  .chart-empty {
+    padding: 2rem 1rem;
+  }
+  
+  .chart-empty-icon {
+    font-size: 2rem;
+  }
+}
+
+/* Animation */
+.chart-svg {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Interactive States */
+.chart-point[style*="cursor: pointer"]:hover {
+  filter: brightness(1.2) drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
+}
+
+.chart-point[style*="cursor: pointer"]:active {
+  transform: scale(0.9);
+}
+
+/* Color Variations */
+.error-trend-chart.success .chart-point {
+  fill: var(--color-profit);
+}
+
+.error-trend-chart.warning .chart-point {
+  fill: var(--color-neutral);
+}
+
+.error-trend-chart.error .chart-point {
+  fill: var(--color-loss);
+}
+
+/* Dark Mode Adjustments */
+@media (prefers-color-scheme: dark) {
+  .chart-svg-container {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+  
+  .chart-tooltip rect {
+    fill: var(--bg-secondary);
+    stroke: var(--border-secondary);
+  }
+}
