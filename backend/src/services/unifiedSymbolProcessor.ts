@@ -73,7 +73,7 @@ export class UnifiedSymbolProcessor {
   private readonly DATA_DIR = path.join(__dirname, '../../data');
   private readonly JSON_FILE_PATH = path.join(this.DATA_DIR, 'symbols.json');
   private readonly STATS_FILE_PATH = path.join(this.DATA_DIR, 'processing_stats.json');
-  
+
   private isProcessing = false;
   private lastProcessed: Date | null = null;
   private processingStats: SymbolProcessingStats | null = null;
@@ -108,7 +108,7 @@ export class UnifiedSymbolProcessor {
         const parsed = JSON.parse(data);
         this.processingStats = parsed.stats || null;
         this.lastProcessed = parsed.lastProcessed ? new Date(parsed.lastProcessed) : null;
-        
+
         logger.info('Loaded symbol processing stats from cache', {
           component: 'UNIFIED_SYMBOL_PROCESSOR',
           operation: 'LOAD_PROCESSING_STATS',
@@ -202,7 +202,7 @@ export class UnifiedSymbolProcessor {
    */
   private async downloadSymbolData(): Promise<string> {
     const primarySource = this.DATA_SOURCES.find(source => source.enabled && source.priority === 1);
-    
+
     if (!primarySource) {
       throw new Error('No enabled data source found');
     }
@@ -234,7 +234,7 @@ export class UnifiedSymbolProcessor {
 
       // Create file writer
       const writer = fs.createWriteStream(this.JSON_FILE_PATH);
-      
+
       if (primarySource.compressed) {
         // Handle gzipped data
         const zlib = require('zlib');
@@ -568,15 +568,15 @@ export class UnifiedSymbolProcessor {
         await symbolDatabaseService.initialize();
       }
 
-      // Check if we need to process data on startup
-      if (this.needsUpdate()) {
-        logger.info('Symbol data is stale or missing, processing', {
+      // Startup rule: do NOT download/process on server start unless no local data file exists
+      if (!fs.existsSync(this.JSON_FILE_PATH)) {
+        logger.info('Symbol data file missing. Performing initial load once.', {
           component: 'UNIFIED_SYMBOL_PROCESSOR',
-          operation: 'INITIALIZE_PROCESS'
+          operation: 'INITIAL_LOAD_NO_FILE'
         });
         await this.processSymbolData();
       } else {
-        logger.info('Symbol data is up to date', {
+        logger.info('Symbol data present locally. Skipping startup download; daily cron will refresh.', {
           component: 'UNIFIED_SYMBOL_PROCESSOR',
           operation: 'INITIALIZE_UP_TO_DATE'
         });
@@ -629,6 +629,19 @@ export class UnifiedSymbolProcessor {
    */
   isReady(): boolean {
     return !this.isProcessing && this.processingStats !== null;
+  }
+
+  /**
+   * Returns true if a local symbols.json exists and is non-empty
+   */
+  hasLocalData(): boolean {
+    try {
+      if (!fs.existsSync(this.JSON_FILE_PATH)) return false;
+      const stats = fs.statSync(this.JSON_FILE_PATH);
+      return stats.size > 0;
+    } catch {
+      return false;
+    }
   }
 
   /**

@@ -486,21 +486,25 @@ async function startServer() {
       // Mark symbol initialization as started
       startupStatusService.markSymbolInitStarted();
 
-      // Initialize symbol data in background after server starts
-      upstoxDataProcessor.processUpstoxData()
-        .then(() => {
-          console.log(`✅ Symbol data initialization completed successfully`);
-          startupStatusService.markSymbolInitCompleted();
-        })
-        .catch((error: any) => {
-          console.error(`❌ Symbol data initialization failed: ${error.message}`);
-          logger.error('Symbol data initialization failed during startup', {
-            component: 'SERVER_STARTUP',
-            operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
-          }, error);
-          startupStatusService.markStartupFailed(error.message);
-          // Don't exit the server - it can still function with cached data or manual initialization
-        });
+      // Initialize symbol data in background after server starts (only if no local data file)
+      if (!upstoxDataProcessor.hasLocalData()) {
+        upstoxDataProcessor.processUpstoxData()
+          .then(() => {
+            console.log(`✅ Symbol data initialization completed successfully`);
+            startupStatusService.markSymbolInitCompleted();
+          })
+          .catch((error: any) => {
+            console.error(`❌ Symbol data initialization failed: ${error.message}`);
+            logger.error('Symbol data initialization failed during startup', {
+              component: 'SERVER_STARTUP',
+              operation: 'SYMBOL_INIT_BACKGROUND_ERROR'
+            }, error);
+            startupStatusService.markStartupFailed(error.message);
+            // Don't exit the server - it can still function with cached data or manual initialization
+          });
+      } else {
+        console.log('ℹ️ Local symbol data present. Skipping background initialization.');
+      }
     });
 
     // Handle server errors

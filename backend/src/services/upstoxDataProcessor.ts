@@ -75,7 +75,15 @@ export class UpstoxDataProcessor {
   cleanup(): void {
     unifiedSymbolProcessor.cleanup();
   }
+
+  /**
+   * Check if local symbol data file exists
+   */
+  hasLocalData(): boolean {
+    return unifiedSymbolProcessor.hasLocalData();
+  }
 }
 
 // Export singleton instance for backward compatibility
 export const upstoxDataProcessor = new UpstoxDataProcessor();
+
