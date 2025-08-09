@@ -17,7 +17,7 @@ import {
 
 import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 import { logger } from '../utils/logger';
-import { brokerErrorLoggingService, BrokerOperationContext } from './brokerErrorLoggingService';
+// import { BrokerOperationContext } from './brokerErrorLoggingService';
 import { traceIdService } from './traceIdService';
 import TraceContext from '../utils/traceContext';
 
@@ -71,55 +71,177 @@ export class EnhancedUnifiedBrokerManager {
   }
 
   /**
+   * Test broker connection and determine authentication state
+   * Unified method to handle all authentication scenarios
+   */
+  async testBrokerConnection(credentials: any, brokerName: string): Promise<{
+    activated: boolean;
+    authFlowRequired: boolean;
+    authUrl?: string;
+    authToken?: string;
+    refreshToken?: string;
+    [key: string]: any;
+  }> {
+    try {
+      // Check if auth token exists and not expired
+      if (credentials.authToken && !this.isTokenExpired(credentials.authTokenExpiry)) {
+        return {
+          ...credentials,
+          activated: true,
+          authFlowRequired: false
+        };
+      }
+
+      // Check if refresh token exists
+      else if (credentials.refreshToken) {
+        // If refresh token not expired
+        if (!this.isTokenExpired(credentials.refreshTokenExpiry)) {
+          try {
+            const newAuthToken = await this.refreshAuthToken(credentials);
+            return {
+              ...credentials,
+              authToken: newAuthToken.accessToken,
+              authTokenExpiry: newAuthToken.expiryTime,
+              activated: true,
+              authFlowRequired: false
+            };
+          } catch (error) {
+            // Refresh failed, fall through to OAuth flow
+          }
+        }
+
+        // If refresh token expired and auth url exists
+        if (credentials.authUrl) {
+          return {
+            ...credentials,
+            activated: false,
+            authFlowRequired: true
+          };
+        }
+
+        // If refresh token expired and auth url does not exist
+        else {
+          const authUrl = await this.generateAuthUrl(credentials, brokerName);
+          return {
+            ...credentials,
+            activated: false,
+            authFlowRequired: true,
+            authUrl
+          };
+        }
+      }
+
+      // If auth code exists (OAuth callback scenario)
+      else if (credentials.authCode) {
+        const { authCode, ...restCreds } = credentials; // Don't save authCode as it's single-use
+        const tokens = await this.generateTokensFromAuthCode(authCode, restCreds);
+        return {
+          ...restCreds,
+          activated: true,
+          authFlowRequired: false,
+          authToken: tokens.accessToken,
+          refreshToken: tokens.refreshToken,
+          authTokenExpiry: tokens.accessTokenExpiry,
+          refreshTokenExpiry: tokens.refreshTokenExpiry
+        };
+      }
+
+      // Direct authentication (mostly Shoonya way)
+      else {
+        const testResult = await this.testDirectConnection(credentials, brokerName);
+        return {
+          ...testResult,
+          activated: testResult.success,
+          authFlowRequired: !testResult.success && testResult.authUrl ? true : false
+        };
+      }
+    } catch (error: any) {
+      logger.error('Test broker connection failed', {
+        component: 'ENHANCED_BROKER_MANAGER',
+        operation: 'TEST_CONNECTION'
+      }, error);
+
+      // Return credentials with error info, don't throw
+      // This allows UI to handle gracefully and potentially retry
+      return {
+        ...credentials,
+        activated: false,
+        authFlowRequired: false,
+        error: error.message,
+        needsManualIntervention: true
+      };
+    }
+  }
+
+  /**
    * Connect to a broker using unified interface with optional detailed logging
-   * No broker-specific logic - all handled by broker modules
+   * Now uses testBrokerConnection for unified authentication logic
    */
   async connectToBroker(
     userId: string,
     brokerName: string,
     credentials: any,
-    enableDetailedLogging: boolean = false
+    _enableDetailedLogging: boolean = false
   ): Promise<UnifiedConnectionResponse> {
     const startTime = performance.now();
     const traceId = TraceContext.getTraceId() || traceIdService.generateTraceId();
 
-    const context: BrokerOperationContext = {
-      userId,
-      brokerName,
-      accountId: 'pending',
-      operation: 'CONNECT_BROKER',
-      traceId,
-      requestDetails: {
-        method: 'POST',
-        url: `/api/broker/connect`,
-        requestId: traceId
-      }
-    };
+    // Context for potential future logging
+    // const context: BrokerOperationContext = {
+    //   userId,
+    //   brokerName,
+    //   accountId: 'pending',
+    //   operation: 'CONNECT_BROKER',
+    //   traceId,
+    //   requestDetails: {
+    //     method: 'POST',
+    //     url: `/api/broker/connect`,
+    //     requestId: traceId
+    //   }
+    // };
 
     try {
-      // Add trace operation if detailed logging is enabled
-      if (enableDetailedLogging) {
-        await traceIdService.addOperation(traceId, 'CONNECT_BROKER', 'BROKER_MANAGER');
-      }
-
       logger.info('Connecting to broker', {
         component: 'ENHANCED_BROKER_MANAGER',
         operation: 'CONNECT',
         brokerName,
         userId,
-        traceId: enableDetailedLogging ? traceId : undefined
+        traceId: traceId
       });
 
-      // Create broker service instance
-      const brokerService = this.brokerFactory.createBroker(brokerName);
-
-      // Attempt connection - broker handles all authentication logic
-      const result = await brokerService.connect(credentials);
+      // Use unified test connection method to determine authentication state
+      const testResult = await this.testBrokerConnection(credentials, brokerName);
       const duration = performance.now() - startTime;
+
+      // Convert test result to UnifiedConnectionResponse format
+      // Always return success=true for UI compatibility, even when auth flow is required
+      const result = {
+        success: true, // UI expects success=true even for OAuth flows
+        message: testResult.activated
+          ? 'Connection successful'
+          : testResult.authFlowRequired
+            ? 'OAuth authentication required'
+            : 'Authentication required',
+        accountInfo: testResult.accountInfo || null,
+        tokenInfo: testResult.authToken ? {
+          accessToken: testResult.authToken,
+          refreshToken: testResult.refreshToken || '',
+          expiryTime: testResult.authTokenExpiry,
+          isExpired: this.isTokenExpired(testResult.authTokenExpiry),
+          canRefresh: !!testResult.refreshToken
+        } : undefined,
+        accountStatus: (testResult.activated ? 'ACTIVE' : 'PROCEED_TO_OAUTH') as AccountStatus,
+        requiresAuthCode: testResult.authFlowRequired,
+        authUrl: testResult.authUrl,
+        authenticationStep: testResult.authFlowRequired ? 'OAUTH_REQUIRED' : 'DIRECT_AUTH'
+      } as UnifiedConnectionResponse;
 
       if (result.success && result.accountInfo) {
         // Connection successful - create and store connection
         const connectionKey = this.createConnectionKey(userId, brokerName, result.accountInfo.accountId);
+
+        // Create broker service instance for the connection
+        const brokerService = this.brokerFactory.createBroker(brokerName);
 
         const connection: EnhancedBrokerConnection = {
           userId,
@@ -131,7 +253,11 @@ export class EnhancedUnifiedBrokerManager {
           connectedAt: new Date(),
           lastActivity: new Date(),
           accountInfo: result.accountInfo,
-          tokenInfo: result.tokenInfo || null,
+          tokenInfo: result.tokenInfo ? {
+            ...result.tokenInfo,
+            isExpired: this.isTokenExpired(result.tokenInfo?.expiryTime),
+            canRefresh: !!result.tokenInfo.refreshToken
+          } : null,
           connectionAttempts: 1,
           lastError: undefined
         };
@@ -146,7 +272,7 @@ export class EnhancedUnifiedBrokerManager {
           accountId: result.accountInfo.accountId,
           totalConnections: this.connections.size,
           duration: Math.round(duration),
-          traceId: enableDetailedLogging ? traceId : undefined
+          traceId: traceId
         });
       }
 
@@ -160,7 +286,7 @@ export class EnhancedUnifiedBrokerManager {
         brokerName,
         userId,
         duration: Math.round(duration),
-        traceId: enableDetailedLogging ? traceId : undefined
+        traceId: traceId
       }, error);
 
       throw error;
@@ -176,7 +302,7 @@ export class EnhancedUnifiedBrokerManager {
     brokerName: string,
     authCode: string,
     credentials: any,
-    enableDetailedLogging: boolean = false
+    _enableDetailedLogging: boolean = false
   ): Promise<UnifiedOAuthResponse> {
     try {
       logger.info('Completing OAuth for broker', {
@@ -753,8 +879,104 @@ export class EnhancedUnifiedBrokerManager {
     const normalizedUserId = userId.toString().trim();
     const normalizedBrokerName = brokerName.toLowerCase().trim();
     const normalizedAccountId = accountId.toString().trim();
-    
+
     return `${normalizedUserId}::${normalizedBrokerName}::${normalizedAccountId}`;
+  }
+
+  /**
+   * Helper method to check if token is expired
+   */
+  private isTokenExpired(expiryTime?: string | null): boolean {
+    if (!expiryTime) return false; // No expiry means token doesn't expire (like Shoonya)
+    return new Date() > new Date(expiryTime);
+  }
+
+  /**
+   * Helper method to refresh auth token using refresh token
+   */
+  private async refreshAuthToken(credentials: any): Promise<{ accessToken: string; expiryTime: string }> {
+    // This would delegate to the appropriate broker service
+    const brokerService = this.brokerFactory.createBroker(credentials.brokerName);
+    const result = await brokerService.refreshToken(credentials.refreshToken);
+
+    if (!result.success) {
+      throw new Error(result.message || 'Failed to refresh token');
+    }
+
+    return {
+      accessToken: result.tokenInfo?.accessToken || '',
+      expiryTime: result.tokenInfo?.expiryTime || ''
+    };
+  }
+
+  /**
+   * Helper method to generate OAuth URL
+   */
+  private async generateAuthUrl(credentials: any, brokerName?: string): Promise<string> {
+    const name = brokerName || credentials.brokerName || credentials.clientId || credentials.client_id || '';
+    if (!name) {
+      throw new Error('Broker name is missing for OAuth URL generation');
+    }
+    const brokerService = this.brokerFactory.createBroker(String(name));
+    const result = await brokerService.connect(credentials);
+
+    if (!result.authUrl) {
+      throw new Error('Failed to generate OAuth URL');
+    }
+
+    return result.authUrl;
+  }
+
+  /**
+   * Helper method to generate tokens from auth code
+   */
+  private async generateTokensFromAuthCode(authCode: string, credentials: any): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    accessTokenExpiry: string;
+    refreshTokenExpiry: string;
+  }> {
+    const brokerService = this.brokerFactory.createBroker(credentials.brokerName);
+    const result = await brokerService.completeOAuth(authCode, credentials);
+
+    if (!result.success || !result.tokenInfo) {
+      throw new Error(result.message || 'Failed to generate tokens from auth code');
+    }
+
+    return {
+      accessToken: result.tokenInfo.accessToken || '',
+      refreshToken: result.tokenInfo.refreshToken || '',
+      accessTokenExpiry: result.tokenInfo.expiryTime || '',
+      refreshTokenExpiry: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString() // 15 days for refresh token
+    };
+  }
+
+  /**
+   * Helper method to test direct connection (Shoonya style)
+   */
+  private async testDirectConnection(credentials: any, brokerName: string): Promise<{
+    success: boolean;
+    authUrl?: string;
+    [key: string]: any;
+  }> {
+    try {
+      const brokerService = this.brokerFactory.createBroker(brokerName);
+      const result = await brokerService.connect(credentials);
+
+      return {
+        ...credentials,
+        success: result.success,
+        authUrl: result.authUrl,
+        accountInfo: result.accountInfo,
+        tokenInfo: result.tokenInfo
+      };
+    } catch (error: any) {
+      return {
+        ...credentials,
+        success: false,
+        error: error.message
+      };
+    }
   }
 }
 

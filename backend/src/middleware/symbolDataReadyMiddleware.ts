@@ -10,8 +10,12 @@ import { logger } from '../utils/logger';
 /**
  * Middleware to check if symbol data is ready before processing symbol-related requests
  */
-export function requireSymbolData(req: Request, res: Response, next: NextFunction): void {
-  // Check if symbol data is ready
+export async function requireSymbolData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  // Check if symbol data is ready; if not, try to infer readiness from DB to avoid false negatives
+  if (!startupStatusService.isSymbolDataReady()) {
+    await startupStatusService.refreshSymbolReadyFromDb();
+  }
+
   if (!startupStatusService.isSymbolDataReady()) {
     logger.warn('API request blocked - symbol data not ready', {
       component: 'SYMBOL_DATA_MIDDLEWARE',

@@ -4,6 +4,7 @@
  */
 
 import { logger } from './logger';
+import { searchRankingWeights as defaultWeights } from '../config/searchRankingConfig';
 
 export interface SearchQuery {
   text?: string | undefined;
@@ -111,6 +112,11 @@ export function buildSearchPipeline(
       }
     });
   }
+  // Try to fetch overrides from AdminConfig (Mongo). If unavailable, use defaults.
+  // Note: aggregation stage constants must be static values. To keep runtime flexibility,
+  // we retain defaults here; admin overrides are applied at service level tie-breakers
+  // and can be folded into future aggregation stages if needed.
+
 
   // Add sorting
   const sortStage = buildSortStage(sortOptions, !!query.text);
@@ -155,25 +161,51 @@ function buildTextSearchStage(text: string, fuzzy: boolean): any[] {
       }
     });
 
-    // Add relevance scoring
+    // Add relevance scoring (with instrument-type aware boosts)
     stages.push({
       $addFields: {
         relevanceScore: {
           $add: [
-            // Exact matches at start get highest score
-            { $cond: [{ $regexMatch: { input: "$tradingSymbol", regex: `^${escapedText}`, options: "i" } }, 100, 0] },
-            { $cond: [{ $regexMatch: { input: "$displayName", regex: `^${escapedText}`, options: "i" } }, 90, 0] },
-            { $cond: [{ $regexMatch: { input: "$underlying", regex: `^${escapedText}`, options: "i" } }, 80, 0] },
-            
+            // Exact matches first (TS > DN > Underlying)
+            { $cond: [{ $regexMatch: { input: "$tradingSymbol", regex: `^${escapedText}$`, options: "i" } }, defaultWeights.exactTradingSymbol, 0] },
+            { $cond: [{ $regexMatch: { input: "$displayName", regex: `^${escapedText}$`, options: "i" } }, defaultWeights.exactDisplayName, 0] },
+            { $cond: [{ $regexMatch: { input: "$underlying", regex: `^${escapedText}$`, options: "i" } }, defaultWeights.exactUnderlying, 0] },
+
+            // Prefix matches
+            { $cond: [{ $regexMatch: { input: "$tradingSymbol", regex: `^${escapedText}`, options: "i" } }, defaultWeights.prefixTradingSymbol, 0] },
+            { $cond: [{ $regexMatch: { input: "$displayName", regex: `^${escapedText}`, options: "i" } }, defaultWeights.prefixDisplayName, 0] },
+            { $cond: [{ $regexMatch: { input: "$underlying", regex: `^${escapedText}`, options: "i" } }, defaultWeights.prefixUnderlying, 0] },
+
+            // Additional boosts for derivatives when searching by underlying prefix
+            { $cond: [{ $and: [ { $eq: ["$instrumentType", "OPTION"] }, { $regexMatch: { input: "$underlying", regex: `^${escapedText}`, options: "i" } } ] }, defaultWeights.bonusOptionUnderlyingPrefix, 0] },
+            { $cond: [{ $and: [ { $eq: ["$instrumentType", "FUTURE"] }, { $regexMatch: { input: "$underlying", regex: `^${escapedText}`, options: "i" } } ] }, defaultWeights.bonusFutureUnderlyingPrefix, 0] },
+            // Small boost if option tradingSymbol itself starts with query (often includes CE/PE)
+            { $cond: [{ $and: [ { $eq: ["$instrumentType", "OPTION"] }, { $regexMatch: { input: "$tradingSymbol", regex: `^${escapedText}`, options: "i" } } ] }, defaultWeights.bonusOptionTradingSymbolPrefix, 0] },
+
             // Partial matches get medium score
-            { $cond: [{ $regexMatch: { input: "$tradingSymbol", regex: escapedText, options: "i" } }, 70, 0] },
-            { $cond: [{ $regexMatch: { input: "$displayName", regex: escapedText, options: "i" } }, 60, 0] },
-            { $cond: [{ $regexMatch: { input: "$companyName", regex: escapedText, options: "i" } }, 50, 0] },
-            
+            { $cond: [{ $regexMatch: { input: "$tradingSymbol", regex: escapedText, options: "i" } }, defaultWeights.partialTradingSymbol, 0] },
+            { $cond: [{ $regexMatch: { input: "$displayName", regex: escapedText, options: "i" } }, defaultWeights.partialDisplayName, 0] },
+            { $cond: [{ $regexMatch: { input: "$companyName", regex: escapedText, options: "i" } }, defaultWeights.partialCompanyName, 0] },
+
             // Bonus points for active instruments and equity
-            { $cond: ["$isActive", 10, 0] },
-            { $cond: [{ $eq: ["$instrumentType", "EQUITY"] }, 5, 0] }
+            { $cond: ["$isActive", defaultWeights.bonusActive, 0] },
+            { $cond: [{ $eq: ["$instrumentType", "EQUITY"] }, defaultWeights.bonusEquity, 0] }
           ]
+        }
+      }
+    });
+
+    // NSE-first exchange rank for consistent DB-level ordering
+    stages.push({
+      $addFields: {
+        exchangeRank: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$exchange", "NSE"] }, then: 0 },
+              { case: { $eq: ["$exchange", "BSE"] }, then: 1 }
+            ],
+            default: 2
+          }
         }
       }
     });
@@ -199,6 +231,21 @@ function buildTextSearchStage(text: string, fuzzy: boolean): any[] {
         }
       }
     });
+
+    // NSE-first exchange rank for consistent DB-level ordering
+    stages.push({
+      $addFields: {
+        exchangeRank: {
+          $switch: {
+            branches: [
+              { case: { $eq: ["$exchange", "NSE"] }, then: 0 },
+              { case: { $eq: ["$exchange", "BSE"] }, then: 1 }
+            ],
+            default: 2
+          }
+        }
+      }
+    });
   }
 
   return stages;
@@ -216,8 +263,9 @@ function buildSortStage(sortOptions: SortOption[], hasTextSearch: boolean): any 
       sortStage[option.field] = option.direction === 'desc' ? -1 : 1;
     }
   } else if (hasTextSearch) {
-    // Default sort for text search: relevance first
+    // Default sort for text search: relevance first, then NSE-first via exchangeRank
     sortStage.relevanceScore = -1;
+    sortStage.exchangeRank = 1;
     sortStage.isActive = -1;
     sortStage.lastUpdated = -1;
   } else {
@@ -365,7 +413,7 @@ export function validateSearchQuery(query: SearchQuery): {
   if (query.expiryStart && query.expiryEnd) {
     const startDate = new Date(query.expiryStart);
     const endDate = new Date(query.expiryEnd);
-    
+
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       errors.push('Invalid date format in expiry range');
     } else if (startDate > endDate) {
@@ -423,7 +471,7 @@ export function createSearchCacheKey(query: SearchQuery): string {
 export function parseSearchQuery(params: any): SearchQuery {
   const strikeMin = params.strikeMin ? parseFloat(params.strikeMin) : undefined;
   const strikeMax = params.strikeMax ? parseFloat(params.strikeMax) : undefined;
-  
+
   return {
     text: params.query || params.q || undefined,
     instrumentType: params.instrumentType || params.type || undefined,

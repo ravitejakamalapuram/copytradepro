@@ -136,11 +136,10 @@ const AccountSetup: React.FC = () => {
         return;
       }
 
-      // Find broker name for display
+      // For minimal API response, accountId may be a placeholder
       const account = accounts.find(acc => acc.id === accountId);
       const brokerName = account?.brokerDisplayName || 'Broker';
 
-      // Show OAuth dialog
       setOauthDialog({
         isOpen: true,
         authUrl,
@@ -299,14 +298,13 @@ const AccountSetup: React.FC = () => {
       }
 
       if (result.success) {
-        // Check if OAuth authentication is required
-        if (result.data?.requiresAuthCode && result.data?.authUrl && result.data?.accountId) {
+        // Check if OAuth authentication is required (minimal API response)
+        if (result.data?.requiresAuthCode && result.data?.authUrl) {
           console.log('🔄 OAuth authentication required for new connection');
-          console.log('📋 Account ID for OAuth:', result.data.accountId);
 
-          // The account has been saved in inactive state, now complete OAuth
+          // Proceed with OAuth flow (no reliance on accountId from connect response)
           try {
-            await handleOAuthFlow(result.data.accountId, result.data.authUrl);
+            await handleOAuthFlow('<pending>', result.data.authUrl);
 
             // After successful OAuth, refresh accounts using context
             await refreshAccounts();

@@ -14,34 +14,35 @@ import { performanceMonitorService } from './services/performanceMonitorService'
 import { errorCaptureService } from './services/errorCaptureService';
 import { storeRedirectPath } from './utils/sessionUtils';
 // Lazy load components for better performance
-const LandingPage = React.lazy(() => import('./pages/LandingPage'));
-const CopyTradeLogin = React.lazy(() => import('./pages/CopyTradeLogin'));
-const Settings = React.lazy(() => import('./pages/Settings'));
-const ComponentDemo = React.lazy(() => import('./pages/ComponentDemo'));
-const PortfolioAnalytics = React.lazy(() => import('./pages/PortfolioAnalytics'));
-const AdvancedOrderManagement = React.lazy(() => import('./pages/AdvancedOrderManagement'));
+import { lazyWithRetry } from './utils/lazyWithRetry';
+const LandingPage = lazyWithRetry(() => import('./pages/LandingPage'));
+const CopyTradeLogin = lazyWithRetry(() => import('./pages/CopyTradeLogin'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
+const ComponentDemo = lazyWithRetry(() => import('./pages/ComponentDemo'));
+const PortfolioAnalytics = lazyWithRetry(() => import('./pages/PortfolioAnalytics'));
+const AdvancedOrderManagement = lazyWithRetry(() => import('./pages/AdvancedOrderManagement'));
 
 // Main application pages - lazy loaded
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Holdings = React.lazy(() => import('./pages/Holdings'));
-const Orders = React.lazy(() => import('./pages/Orders'));
-const Positions = React.lazy(() => import('./pages/Positions'));
-const TradeSetup = React.lazy(() => import('./pages/TradeSetup'));
-const AccountSetup = React.lazy(() => import('./pages/AccountSetup'));
-const Portfolio = React.lazy(() => import('./pages/Portfolio'));
-const MarketOverview = React.lazy(() => import('./pages/MarketOverview'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const Holdings = lazyWithRetry(() => import('./pages/Holdings'));
+const Orders = lazyWithRetry(() => import('./pages/Orders'));
+const Positions = lazyWithRetry(() => import('./pages/Positions'));
+const TradeSetup = lazyWithRetry(() => import('./pages/TradeSetup'), 2, 600);
+const AccountSetup = lazyWithRetry(() => import('./pages/AccountSetup'));
+const Portfolio = lazyWithRetry(() => import('./pages/Portfolio'));
+const MarketOverview = lazyWithRetry(() => import('./pages/MarketOverview'));
 
 // Advanced features - lazy loaded
-const AlertsManagement = React.lazy(() => import('./pages/AlertsManagement'));
-const RiskManagement = React.lazy(() => import('./pages/RiskManagement'));
-const CopyTradingStrategies = React.lazy(() => import('./pages/CopyTradingStrategies'));
-const UserSettings = React.lazy(() => import('./pages/UserSettings'));
-const AdminPanel = React.lazy(() => import('./pages/AdminPanel'));
-const AdminUserDetails = React.lazy(() => import('./pages/AdminUserDetails'));
-const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
-const AdminErrorLogs = React.lazy(() => import('./pages/AdminErrorLogs'));
-const AdminSystemHealth = React.lazy(() => import('./pages/AdminSystemHealth'));
-const AdminAnalytics = React.lazy(() => import('./pages/AdminAnalytics'));
+const AlertsManagement = lazyWithRetry(() => import('./pages/AlertsManagement'));
+const RiskManagement = lazyWithRetry(() => import('./pages/RiskManagement'));
+const CopyTradingStrategies = lazyWithRetry(() => import('./pages/CopyTradingStrategies'));
+const UserSettings = lazyWithRetry(() => import('./pages/UserSettings'));
+const AdminPanel = lazyWithRetry(() => import('./pages/AdminPanel'));
+const AdminUserDetails = lazyWithRetry(() => import('./pages/AdminUserDetails'));
+const AdminDashboard = lazyWithRetry(() => import('./pages/AdminDashboard'));
+const AdminErrorLogs = lazyWithRetry(() => import('./pages/AdminErrorLogs'));
+const AdminSystemHealth = lazyWithRetry(() => import('./pages/AdminSystemHealth'));
+const AdminAnalytics = lazyWithRetry(() => import('./pages/AdminAnalytics'));
 
 // Keep NotificationDisplay as regular import since it's always needed
 import NotificationDisplay from './components/NotificationDisplay';
@@ -448,6 +449,8 @@ const App: React.FC = () => {
     (window as unknown as { resourceManager?: typeof resourceManager }).resourceManager = resourceManager;
     (window as unknown as { appCache?: typeof appCache }).appCache = appCache;
     (window as unknown as { apiCache?: typeof apiCache }).apiCache = apiCache;
+    // Safe default for legacy/global references used by UI code
+    ;(window as any).marketDataCache = (window as any).marketDataCache || appCache;
 
     (window as unknown as { performanceMonitor?: typeof performanceMonitorService }).performanceMonitor = performanceMonitorService;
     (window as unknown as { errorCapture?: typeof errorCaptureService }).errorCapture = errorCaptureService;

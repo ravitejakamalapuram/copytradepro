@@ -19,11 +19,13 @@ class SymbolSearchController {
     let success = false;
     let resultCount = 0;
     let cacheHit = false;
-    
+
     try {
+      // Support both query and q, and type => instrumentType for compatibility
+      const normalizedQuery = (req.query.query as string) ?? (req.query.q as string);
+      const normalizedInstrument = (req.query.instrumentType as string) ?? (req.query.type as string);
+
       const {
-        query,
-        instrumentType,
         exchange,
         underlying,
         strikeMin,
@@ -39,9 +41,21 @@ class SymbolSearchController {
       } = req.query;
 
       const searchOptions: SearchOptions = {};
-      
-      if (query) searchOptions.query = query as string;
-      if (instrumentType) searchOptions.instrumentType = instrumentType as 'EQUITY' | 'OPTION' | 'FUTURE';
+
+      if (normalizedQuery) searchOptions.query = normalizedQuery as string;
+      if (normalizedInstrument) {
+        const upper = normalizedInstrument.toUpperCase();
+        const map: Record<string, 'EQUITY' | 'OPTION' | 'FUTURE' | 'ALL'> = {
+          EQUITY: 'EQUITY', STOCK: 'EQUITY', STOCKS: 'EQUITY',
+          OPTION: 'OPTION', OPTIONS: 'OPTION', OPT: 'OPTION',
+          FUTURE: 'FUTURE', FUTURES: 'FUTURE', FUT: 'FUTURE',
+          ALL: 'ALL'
+        };
+        const mapped = map[upper];
+        if (mapped && mapped !== 'ALL') {
+          searchOptions.instrumentType = mapped;
+        }
+      }
       if (exchange) searchOptions.exchange = exchange as string;
       if (underlying) searchOptions.underlying = underlying as string;
       if (strikeMin) searchOptions.strikeMin = parseFloat(strikeMin as string);

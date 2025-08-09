@@ -14,7 +14,9 @@ import Card, { CardHeader, CardContent, CardFooter } from '../components/ui/Card
 import { Grid, Stack, HStack, Flex } from '../components/ui/Layout';
 import '../styles/app-theme.css';
 import './TradeSetup.css';
+import Popover from '../components/ui/Popover';
 
+import { useToast } from '../components/Toast';
 type OrderType = 'MARKET' | 'LIMIT' | 'SL-LIMIT' | 'SL-MARKET';
 type Product = 'CNC' | 'MIS' | 'NRML';
 type SymbolSearchResult = {
@@ -54,6 +56,7 @@ interface MarginInfo {
 
 const TradeSetup: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [connectedAccounts, setConnectedAccounts] = useState<ConnectedAccount[]>([]);
 
   // Function to get broker symbol/icon (consistent with Orders page)
@@ -120,9 +123,10 @@ const TradeSetup: React.FC = () => {
 
         // Auto-select all active accounts by default
         if (accounts.length > 0) {
+          const activeIds = accounts.filter(a => a.isActive).map(a => a.id);
           setOrderForm(prev => ({
             ...prev,
-            selectedAccounts: accounts.map(account => account.id)
+            selectedAccounts: activeIds
           }));
         }
 
@@ -232,10 +236,10 @@ const TradeSetup: React.FC = () => {
       typeof (selectedSymbol as { symbol: unknown }).symbol === 'string'
     ) {
       const result = selectedSymbol as SymbolSearchResult;
-      
+
       // Handle different exchanges including F&O (NFO)
       let exchange: 'NSE' | 'BSE' | 'NFO' = 'NSE'; // Default to NSE
-      
+
       if (result.exchange === 'BSE') {
         exchange = 'BSE';
       } else if (result.exchange === 'NFO' || result.instrumentType === 'OPTION' || result.instrumentType === 'FUTURE') {
@@ -244,7 +248,7 @@ const TradeSetup: React.FC = () => {
       } else {
         exchange = 'NSE';
       }
-      
+
       setOrderForm(prev => ({
         ...prev,
         symbol: result.symbol,
@@ -252,7 +256,7 @@ const TradeSetup: React.FC = () => {
         price: prev.price
       }));
       setShowSearchResults(false);
-      
+
       console.log(`✅ Selected ${result.instrumentType || 'EQUITY'} instrument:`, {
         symbol: result.symbol,
         exchange: result.exchange,
@@ -272,10 +276,11 @@ const TradeSetup: React.FC = () => {
   };
 
   const handleSelectAllAccounts = () => {
-    const allSelected = orderForm.selectedAccounts.length === connectedAccounts.length;
+    const activeIds = connectedAccounts.filter(a => a.isActive).map(a => a.id);
+    const allSelected = orderForm.selectedAccounts.length === activeIds.length;
     setOrderForm(prev => ({
       ...prev,
-      selectedAccounts: allSelected ? [] : connectedAccounts.map(account => account.id)
+      selectedAccounts: allSelected ? [] : activeIds
     }));
   };
 
@@ -321,7 +326,7 @@ const TradeSetup: React.FC = () => {
       };
 
       const response = await brokerService.placeMultiAccountOrder(orderRequest);
-      
+
       const orderResultSummary = transformBrokerResponseToOrderResult(response, {
         symbol: orderForm.symbol,
         action: orderForm.action,
@@ -337,6 +342,26 @@ const TradeSetup: React.FC = () => {
 
       setOrderResult(orderResultSummary);
       setShowOrderResult(true);
+
+      // UX: show AUTH_REQUIRED accounts toast with CTA to Accounts page
+      try {
+        const failedAuth = (response?.data?.failedOrders || []).filter((f: any) => f.errorType === 'AUTH_REQUIRED');
+        if (failedAuth.length > 0) {
+          const count = failedAuth.length;
+          showToast({
+            type: 'warning',
+            title: `${count} account${count > 1 ? 's' : ''} require authentication`,
+            message: 'Please activate the accounts before placing orders.',
+            action: {
+              label: 'Go to Accounts',
+              onClick: () => navigate('/account-setup')
+            }
+          });
+        }
+      } catch (e) {
+        // ignore toast rendering errors
+      }
+
 
       if (orderResultSummary.failedAccounts === 0) {
         setOrderForm(prev => ({
@@ -358,12 +383,12 @@ const TradeSetup: React.FC = () => {
 
   const handleRetryFailedOrders = async (failedResults: FailedOrderResult[]) => {
     const failedAccountIds = failedResults.map(result => result.accountId);
-    
+
     setOrderForm(prev => ({
       ...prev,
       selectedAccounts: failedAccountIds
     }));
-    
+
     setShowOrderResult(false);
     setError('Ready to retry failed orders. You can modify the order details if needed, then click Place Order again.');
   };
@@ -371,7 +396,7 @@ const TradeSetup: React.FC = () => {
   const handleCloseOrderResult = () => {
     setShowOrderResult(false);
     setOrderResult(null);
-    
+
     if (orderResult && orderResult.successfulAccounts > 0) {
       navigate('/orders');
     }
@@ -389,10 +414,10 @@ const TradeSetup: React.FC = () => {
       <div className="app-theme app-layout">
         <AppNavigation />
         <div className="app-main">
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
             height: '50vh',
             flexDirection: 'column',
             gap: '1rem'
@@ -430,7 +455,7 @@ const TradeSetup: React.FC = () => {
   return (
     <div className="app-theme app-layout">
       <AppNavigation />
-      
+
       <div className="app-main">
         <Stack gap={6}>
           {/* Main Content Grid */}
@@ -471,11 +496,11 @@ const TradeSetup: React.FC = () => {
                       {/* Unified Symbol Search with Tabs */}
                       <div style={{ position: 'relative' }}>
                         <label className="form-label">Symbol *</label>
-                        
+
                         {/* Instrument Type Tabs */}
-                        <div style={{ 
-                          display: 'flex', 
-                          gap: '0.5rem', 
+                        <div style={{
+                          display: 'flex',
+                          gap: '0.5rem',
                           marginBottom: '0.75rem',
                           borderBottom: '1px solid var(--border-secondary)',
                           paddingBottom: '0.5rem'
@@ -552,9 +577,9 @@ const TradeSetup: React.FC = () => {
                                 onClick={() => handleSymbolSelect(result)}
                                 className="search-result-item"
                               >
-                                <div style={{ 
-                                  display: 'flex', 
-                                  justifyContent: 'space-between', 
+                                <div style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
                                   alignItems: 'flex-start',
                                   width: '100%'
                                 }}>
@@ -586,7 +611,7 @@ const TradeSetup: React.FC = () => {
                                       fontSize: '0.75rem',
                                       padding: '0.25rem 0.5rem',
                                       borderRadius: '0.25rem',
-                                      backgroundColor: 
+                                      backgroundColor:
                                         result.instrumentType === 'EQUITY' ? 'var(--color-info-bg)' :
                                         result.instrumentType === 'OPTION' ? 'var(--color-warning-bg)' :
                                         'var(--color-success-bg)',
@@ -602,7 +627,7 @@ const TradeSetup: React.FC = () => {
                                       fontSize: '0.7rem',
                                       padding: '0.2rem 0.4rem',
                                       borderRadius: '0.25rem',
-                                      backgroundColor: 
+                                      backgroundColor:
                                         result.exchange === 'NSE' ? 'var(--color-bg-secondary)' :
                                         result.exchange === 'BSE' ? 'var(--color-bg-tertiary)' :
                                         result.exchange === 'NFO' ? 'var(--color-bg-card)' :
@@ -751,11 +776,27 @@ const TradeSetup: React.FC = () => {
                           className={`account-card${orderForm.selectedAccounts.includes(account.id) ? ' selected' : ''}`}
                         >
                           <div className="account-info">
-                            <Checkbox
-                              checked={orderForm.selectedAccounts.includes(account.id)}
-                              onChange={(checked) => handleAccountSelection(account.id, checked)}
-                              label={`${getBrokerSymbol(account.brokerName || '')} ${getBrokerDisplayName(account.brokerName || 'Unknown')} (${account.isActive ? 'Active' : 'Inactive'})`}
-                              size="base"
+                            <Popover
+                              placement="right"
+                              content={account.isActive ? undefined : (
+                                <div>
+                                  <strong>Requires Authentication</strong>
+                                  <div style={{ marginTop: 4 }}>
+                                    This account is inactive. Please authenticate in the Accounts page before placing orders.
+                                  </div>
+                                </div>
+                              )}
+                              trigger={
+                                <div>
+                                  <Checkbox
+                                    checked={orderForm.selectedAccounts.includes(account.id)}
+                                    disabled={!account.isActive}
+                                    onChange={(checked) => handleAccountSelection(account.id, checked)}
+                                    label={`${getBrokerSymbol(account.brokerName || '')} ${getBrokerDisplayName(account.brokerName || 'Unknown')} (${account.isActive ? 'Active' : 'Inactive'})`}
+                                    size="base"
+                                  />
+                                </div>
+                              }
                             />
                           </div>
                           <div className="account-meta">

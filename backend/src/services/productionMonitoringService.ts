@@ -5,7 +5,14 @@
 
 import { EventEmitter } from 'events';
 import { logger, LogContext } from '../utils/logger';
-import { brokerSessionManager } from './brokerSessionManager';
+// Optional brokerSessionManager (may not be present in all builds)
+let brokerSessionManager: { getHealthStatistics: () => any } | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  brokerSessionManager = require('./brokerSessionManager').brokerSessionManager;
+} catch {
+  brokerSessionManager = null;
+}
 
 export interface SystemMetrics {
   timestamp: Date;
@@ -542,7 +549,7 @@ export class ProductionMonitoringService extends EventEmitter {
       systemHealth: this.getHealthStatus(),
       recentMetrics,
       errorSummary,
-      brokerHealth: brokerSessionManager.getHealthStatistics(),
+      brokerHealth: brokerSessionManager ? brokerSessionManager.getHealthStatistics() : { total: 0, active: 0 },
       uptime: process.uptime()
     };
   }

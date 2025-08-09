@@ -11,12 +11,13 @@ import type { BrokerStatus as AdminBrokerStatus } from '../services/adminService
 import '../styles/app-theme.css';
 
 
+import SearchRankingConfigPanel from '../components/admin/SearchRankingConfigPanel';
 
 const AdminPanel: React.FC = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'system' | 'brokers' | 'settings'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'system' | 'brokers' | 'settings' | 'search'>('dashboard');
   const [loading, setLoading] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -258,6 +259,7 @@ const AdminPanel: React.FC = () => {
             <div style={{ display: 'flex', gap: '1rem', borderBottom: '1px solid var(--border-primary)' }}>
               {[
                 { key: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { key: 'search', label: 'Search Config', icon: '🔎' },
                 { key: 'users', label: 'User Management', icon: '👥' },
                 { key: 'system', label: 'System Monitor', icon: '🖥️' },
                 { key: 'brokers', label: 'Broker Status', icon: '🔗' },
@@ -442,15 +444,22 @@ const AdminPanel: React.FC = () => {
               </Stack>
             )}
 
+            {/* Search Config Tab */}
+            {activeTab === 'search' && (
+              <Stack gap={4}>
+                <SearchRankingConfigPanel />
+              </Stack>
+            )}
+
             {/* User Management Tab */}
             {activeTab === 'users' && (
               <Card>
                 <CardHeader
                   title="User Management"
                   action={
-                    <div style={{ 
-                      padding: '0.5rem 1rem', 
-                      backgroundColor: 'rgba(245, 158, 11, 0.1)', 
+                    <div style={{
+                      padding: '0.5rem 1rem',
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
                       borderRadius: 'var(--radius-sm)',
                       border: '1px solid rgba(245, 158, 11, 0.3)',
                       fontSize: '0.875rem',
@@ -461,8 +470,8 @@ const AdminPanel: React.FC = () => {
                   }
                 />
                 <CardContent>
-                  <div style={{ 
-                    textAlign: 'center', 
+                  <div style={{
+                    textAlign: 'center',
                     padding: '4rem 2rem',
                     color: 'var(--text-secondary)'
                   }}>
@@ -474,9 +483,9 @@ const AdminPanel: React.FC = () => {
                       The backend endpoints for user management are not implemented yet.
                       This feature will be available once the following endpoints are created:
                     </p>
-                    <div style={{ 
-                      textAlign: 'left', 
-                      maxWidth: '400px', 
+                    <div style={{
+                      textAlign: 'left',
+                      maxWidth: '400px',
                       margin: '0 auto',
                       backgroundColor: 'var(--bg-tertiary)',
                       padding: '1rem',

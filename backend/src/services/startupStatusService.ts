@@ -18,17 +18,38 @@ interface StartupInitializationStatus {
 
 // Simple replacement for deleted startupSymbolInitializationService
 const startupSymbolInitializationService = {
-  getStatus: (): StartupInitializationStatus => ({
-    status: upstoxDataProcessor.isReady() ? 'COMPLETED' : 'PENDING',
-    progress: upstoxDataProcessor.isReady() ? 100 : 0,
-    currentStep: upstoxDataProcessor.isReady() ? 'Completed' : 'Pending'
-  }),
+  getStatus: (): StartupInitializationStatus => {
+    // Prefer DB readiness if it already has symbols; else fall back to processor readiness
+    try {
+      const hasDb = symbolDatabaseService.isReady();
+      // We can’t do async here, so just expose processor status in headers; readiness gate uses async method below
+      const processorReady = upstoxDataProcessor.isReady();
+      return {
+        status: (hasDb && processorReady) ? 'COMPLETED' : (processorReady ? 'COMPLETED' : 'PENDING'),
+        progress: processorReady ? 100 : 0,
+        currentStep: processorReady ? 'Completed' : 'Pending'
+      };
+    } catch {
+      return { status: 'PENDING', progress: 0, currentStep: 'Pending' };
+    }
+  },
   getInitializationStats: () => upstoxDataProcessor.getStats(),
   isInProgress: () => false, // upstoxDataProcessor handles this internally
-  isSymbolDataReady: async () => upstoxDataProcessor.isReady(),
+  // Consider symbol data ready if either processor finished OR DB already has symbols and cache warmed
+  isSymbolDataReady: async () => {
+    try {
+      if (upstoxDataProcessor.isReady()) return true;
+      if (!symbolDatabaseService.isReady()) return false;
+      const stats = await symbolDatabaseService.getStatistics();
+      return stats.totalSymbols > 0;
+    } catch {
+      return false;
+    }
+  },
   forceRestart: async () => upstoxDataProcessor.processUpstoxData()
 };
 import websocketService from './websocketService';
+import { symbolDatabaseService } from './symbolDatabaseService';
 
 export interface ServerStartupStatus {
   serverReady: boolean;
@@ -144,6 +165,20 @@ export class StartupStatusService {
    */
   isSymbolDataReady(): boolean {
     return this.status.symbolDataReady;
+  }
+
+  // Re-evaluate symbol readiness using DB stats (used by middleware)
+  async refreshSymbolReadyFromDb(): Promise<void> {
+    try {
+      if (this.status.symbolDataReady) return;
+      if (!symbolDatabaseService.isReady()) return;
+      const stats = await symbolDatabaseService.getStatistics();
+      if (stats.totalSymbols > 0) {
+        this.markSymbolInitCompleted();
+      }
+    } catch (e) {
+      // no-op
+    }
   }
 
   /**

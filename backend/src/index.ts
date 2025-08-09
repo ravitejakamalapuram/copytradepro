@@ -27,6 +27,7 @@ import startupRoutes from './routes/startup';
 import errorAnalyticsRoutes from './routes/errorAnalytics';
 import errorLoggingHealthRoutes from './routes/errorLoggingHealth';
 import symbolTestRoutes from './routes/symbolTest';
+import adminConfigRoutes from './routes/adminConfig';
 import { errorHandler } from './middleware/errorHandler';
 import { loggingMiddleware, errorLoggingMiddleware } from './middleware/loggingMiddleware';
 import { performanceMonitoring, requestIdMiddleware } from './middleware/performanceMonitoring';
@@ -129,7 +130,7 @@ app.get('/health', (_req, res) => {
   try {
     const startupStatus = startupStatusService.getStatus();
     const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
-    
+
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
@@ -164,7 +165,7 @@ app.get('/api/health', (_req, res) => {
   try {
     const startupStatus = startupStatusService.getStatus();
     const isHealthy = startupStatus.serverReady && startupStatus.startupPhase !== 'FAILED';
-    
+
     res.status(isHealthy ? 200 : 503).json({
       status: isHealthy ? 'OK' : 'STARTING',
       timestamp: new Date().toISOString(),
@@ -201,7 +202,7 @@ app.get('/api/startup-status', (_req, res) => {
   try {
     const status = startupStatusService.getStatus();
     const metrics = startupStatusService.getStartupMetrics();
-    
+
     res.status(200).json({
       success: true,
       status,
@@ -228,6 +229,8 @@ app.use('/api/logs', requireServerReady, logsRoutes);
 app.use('/api/monitoring', requireServerReady, monitoringRoutes);
 app.use('/api/options', requireSymbolData, optionsRoutes);
 app.use('/api/symbols', requireSymbolData, symbolsRoutes);
+app.use('/api/api/symbols', requireSymbolData, symbolsRoutes);
+
 app.use('/api/symbol-lifecycle', requireSymbolData, symbolLifecycleRoutes);
 app.use('/api/symbol-initialization', requireServerReady, symbolInitializationRoutes);
 app.use('/api/symbol-health', requireServerReady, symbolHealthRoutes);
@@ -236,6 +239,7 @@ app.use('/api/startup', requireServerReady, startupRoutes);
 app.use('/api/error-analytics', requireServerReady, errorAnalyticsRoutes);
 app.use('/api/error-logging-health', requireServerReady, errorLoggingHealthRoutes);
 app.use('/api/symbol-test', requireServerReady, symbolTestRoutes);
+app.use('/api/admin', requireServerReady, adminConfigRoutes);
 app.use('/api/symbol-test', requireServerReady, symbolTestRoutes);
 
 
@@ -405,6 +409,10 @@ async function startServer() {
       operation: 'SYMBOL_PROCESSOR_INIT_SUCCESS'
     });
 
+    // Load search ranking weights from DB (if present)
+    const { searchRankingWeightsService } = require('./services/searchRankingWeightsService');
+    await searchRankingWeightsService.refresh();
+
     // Initialize symbol lifecycle manager
     logger.info('Initializing symbol lifecycle manager', {
       component: 'SERVER_STARTUP',
@@ -429,10 +437,10 @@ async function startServer() {
 
       // Start startup monitoring
       startupMonitoringService.startMonitoring();
-      
+
       // Mark server as ready
       startupStatusService.markServerReady();
-      
+
       // Start monitoring startup status
       startupStatusService.startMonitoring();
 
@@ -441,13 +449,13 @@ async function startServer() {
         component: 'SERVER_STARTUP',
         operation: 'MONITORING_INIT'
       });
-      
+
       // Start file logging services
       logger.info('Starting file logging services', {
         component: 'SERVER_STARTUP',
         operation: 'FILE_LOGGING_INIT'
       });
-      
+
       try {
         await logRotationService.start();
         await errorLoggingMonitoringService.start();
@@ -463,13 +471,13 @@ async function startServer() {
         }, error);
         console.log(`⚠️  File logging disabled - using console only`);
       }
-      
+
       productionMonitoringService.start();
       symbolMonitoringService.start();
-      
+
       // Initialize notification service
       await notificationService.initialize();
-      
+
       console.log(`📊 Symbol monitoring active`);
       console.log(`🚨 Alert system active`);
       console.log(`📧 Notification system active`);
@@ -578,7 +586,7 @@ async function gracefulShutdown(signal: string) {
     websocketService.shutdown();
     orderStatusService.stopMonitoring();
     productionMonitoringService.stop();
-    
+
     // Stop file logging services
     try {
       logRotationService.stop();

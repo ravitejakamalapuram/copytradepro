@@ -50,7 +50,13 @@ class SymbolService {
       }
 
       const response = await api.get(`${this.baseUrl}/search?${params.toString()}`);
-      return response.data as SymbolSearchResponse;
+      const payload: any = response.data ?? {};
+      const raw: any[] = Array.isArray(payload.data)
+        ? payload.data
+        : Array.isArray(payload.data?.symbols)
+        ? payload.data.symbols
+        : [];
+      return { success: Boolean(payload.success), data: raw, message: payload.message } as SymbolSearchResponse;
     } catch (error: any) {
       console.error('Symbol search error:', error);
       return {
@@ -82,7 +88,13 @@ class SymbolService {
       }
 
       const response = await api.get(`${this.baseUrl}/search?${params.toString()}`);
-      return response.data as SymbolSearchResponse;
+      const payload: any = response.data ?? {};
+      const raw: any[] = Array.isArray(payload.data)
+        ? payload.data
+        : Array.isArray(payload.data?.symbols)
+        ? payload.data.symbols
+        : [];
+      return { success: Boolean(payload.success), data: raw, message: payload.message } as SymbolSearchResponse;
     } catch (error: any) {
       console.error('Symbol search by type error:', error);
       return {

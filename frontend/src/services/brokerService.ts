@@ -52,20 +52,22 @@ export interface BrokerConnectionResponse {
   success: boolean;
   message: string;
   data?: {
-    brokerName: string;
-    userId?: string;
+    // Minimal OAuth flow fields when required
+    authUrl?: string;
+    requiresAuthCode?: boolean;
+    accountStatus?: 'PROCEED_TO_OAUTH' | 'ACTIVE' | 'INACTIVE';
+    authenticationStep?: 'OAUTH_REQUIRED' | 'DIRECT_AUTH';
+    stateToken?: string;
+
+    // Direct auth (Shoonya) success fields (optional)
+    brokerName?: string;
     accountId?: string;
     userName?: string;
     email?: string;
     brokerDisplayName?: string;
-    lastAccessTime?: string;
     exchanges?: string[];
     products?: string[];
-    // Fyers specific fields
-    authUrl?: string;
     accessToken?: string;
-    requiresAuthCode?: boolean;
-    databaseAccountId?: string; // Database account ID for OAuth completion
   };
   errors?: Array<{
     field: string;

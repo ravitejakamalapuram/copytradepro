@@ -58,3 +58,14 @@ export const authenticateToken = (
     });
   }
 };
+
+
+export const requireAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  const role = req.user?.role?.toLowerCase();
+  if (role === 'admin') return next();
+  res.status(403).json({ success: false, message: 'Admin access required' });
+};

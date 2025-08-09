@@ -18,7 +18,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@copytrade/shared-types": "^1.0.1",
+    "@copytrade/shared-types": "^1.0.3",
     "@types/react-router-dom": "^5.3.3",
     "axios": "^1.10.0",
     "react": "^18.3.1",

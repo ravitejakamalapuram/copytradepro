@@ -54,18 +54,18 @@ export class SymbolSearchService {
     try {
       // Build search query
       const searchQuery = this.buildSearchQuery(options);
-      
+
       // Execute search
       const result = await this.symbolDatabaseService.searchSymbolsWithFilters(searchQuery);
-      
+
       // Apply fuzzy matching and relevance scoring if text query is provided
       let scoredSymbols: SearchResultWithScore[] = result.symbols;
       if (options.query && options.query.trim()) {
         scoredSymbols = this.applyFuzzyMatchingAndScoring(result.symbols, options.query);
       }
 
-      // Apply sorting
-      scoredSymbols = this.applySorting(scoredSymbols, options.sortBy, options.sortOrder);
+      // Apply sorting (with instrument-type specific context)
+      scoredSymbols = this.applySorting(scoredSymbols, options.sortBy, options.sortOrder, { instrumentType: options.instrumentType });
 
       // Get aggregated filters for faceted search
       const filters = await this.getSearchFilters(options);
@@ -110,10 +110,10 @@ export class SymbolSearchService {
       };
 
       const result = await this.symbolDatabaseService.searchSymbolsWithFilters(searchQuery);
-      
+
       // Apply fuzzy matching for better results
       const scoredResults = this.applyFuzzyMatchingAndScoring(result.symbols, query);
-      
+
       // Return top results sorted by relevance
       return scoredResults
         .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
@@ -128,7 +128,7 @@ export class SymbolSearchService {
    * Search symbols by underlying asset (for options/futures chains)
    */
   async searchByUnderlying(
-    underlying: string, 
+    underlying: string,
     instrumentType?: 'OPTION' | 'FUTURE',
     expiry?: string
   ): Promise<StandardizedSymbol[]> {
@@ -143,7 +143,7 @@ export class SymbolSearchService {
       };
 
       const result = await this.symbolDatabaseService.searchSymbolsWithFilters(searchQuery);
-      
+
       // Sort by expiry date and strike price for options
       return result.symbols.sort((a, b) => {
         // First sort by expiry date
@@ -151,17 +151,17 @@ export class SymbolSearchService {
           const expiryCompare = a.expiryDate.localeCompare(b.expiryDate);
           if (expiryCompare !== 0) return expiryCompare;
         }
-        
+
         // Then by strike price for options
         if (a.strikePrice && b.strikePrice) {
           return a.strikePrice - b.strikePrice;
         }
-        
+
         // Finally by option type (CE before PE)
         if (a.optionType && b.optionType) {
           return a.optionType.localeCompare(b.optionType);
         }
-        
+
         return 0;
       });
     } catch (error) {
@@ -181,11 +181,11 @@ export class SymbolSearchService {
     try {
       // Get all options for the underlying
       const options = await this.searchByUnderlying(underlying, 'OPTION', expiry);
-      
+
       // Separate calls and puts
       const calls = options.filter(option => option.optionType === 'CE');
       const puts = options.filter(option => option.optionType === 'PE');
-      
+
       // Get available expiry dates if not specified
       let expiries: string[] = [];
       if (!expiry) {
@@ -212,7 +212,7 @@ export class SymbolSearchService {
   }> {
     try {
       const futures = await this.searchByUnderlying(underlying, 'FUTURE');
-      
+
       const expiries = [...new Set(futures
         .map(future => future.expiryDate)
         .filter((date): date is string => !!date)
@@ -287,67 +287,74 @@ export class SymbolSearchService {
    */
   private applyFuzzyMatchingAndScoring(symbols: StandardizedSymbol[], query: string): SearchResultWithScore[] {
     const normalizedQuery = query.toLowerCase().trim();
-    
+
     return symbols.map(symbol => {
-      let score = 0;
-      
-      // Exact matches get highest score
-      if (symbol.tradingSymbol.toLowerCase() === normalizedQuery) {
-        score += 100;
-      } else if (symbol.displayName.toLowerCase() === normalizedQuery) {
-        score += 95;
-      } else if (symbol.companyName?.toLowerCase() === normalizedQuery) {
-        score += 90;
+      const base = (symbol as any).relevanceScore ?? 0; // Preserve DB aggregation score if present
+      let computed = 0;
+
+      // Exact matches (secondary scoring; DB already handles exact TS/DN with higher weights)
+      const ts = symbol.tradingSymbol.toLowerCase();
+      const dn = symbol.displayName.toLowerCase();
+      const cn = symbol.companyName?.toLowerCase();
+
+      const isExactTS = ts === normalizedQuery;
+      const isExactDN = dn === normalizedQuery;
+
+      if (isExactTS) {
+        computed += 100;
+      } else if (isExactDN) {
+        computed += 95;
+      } else if (cn === normalizedQuery) {
+        computed += 90;
       }
-      
+
       // Prefix matches
-      if (symbol.tradingSymbol.toLowerCase().startsWith(normalizedQuery)) {
-        score += 80;
-      } else if (symbol.displayName.toLowerCase().startsWith(normalizedQuery)) {
-        score += 75;
-      } else if (symbol.companyName?.toLowerCase().startsWith(normalizedQuery)) {
-        score += 70;
+      if (ts.startsWith(normalizedQuery)) {
+        computed += 80;
+      } else if (dn.startsWith(normalizedQuery)) {
+        computed += 75;
+      } else if (cn?.startsWith(normalizedQuery)) {
+        computed += 70;
       }
-      
+
       // Contains matches
-      if (symbol.tradingSymbol.toLowerCase().includes(normalizedQuery)) {
-        score += 60;
-      } else if (symbol.displayName.toLowerCase().includes(normalizedQuery)) {
-        score += 55;
-      } else if (symbol.companyName?.toLowerCase().includes(normalizedQuery)) {
-        score += 50;
+      if (ts.includes(normalizedQuery)) {
+        computed += 60;
+      } else if (dn.includes(normalizedQuery)) {
+        computed += 55;
+      } else if (cn?.includes(normalizedQuery)) {
+        computed += 50;
       }
-      
+
       // Fuzzy matching using Levenshtein distance
-      const tradingSymbolDistance = this.levenshteinDistance(
-        symbol.tradingSymbol.toLowerCase(), 
-        normalizedQuery
-      );
-      const displayNameDistance = this.levenshteinDistance(
-        symbol.displayName.toLowerCase(), 
-        normalizedQuery
-      );
-      
+      const tradingSymbolDistance = this.levenshteinDistance(ts, normalizedQuery);
+      const displayNameDistance = this.levenshteinDistance(dn, normalizedQuery);
+
       // Add fuzzy score (inverse of distance, normalized)
       const maxLength = Math.max(symbol.tradingSymbol.length, symbol.displayName.length, normalizedQuery.length);
       const tradingSymbolFuzzyScore = Math.max(0, (maxLength - tradingSymbolDistance) / maxLength * 40);
       const displayNameFuzzyScore = Math.max(0, (maxLength - displayNameDistance) / maxLength * 35);
-      
-      score += Math.max(tradingSymbolFuzzyScore, displayNameFuzzyScore);
-      
+
+      computed += Math.max(tradingSymbolFuzzyScore, displayNameFuzzyScore);
+
       // Boost score for active symbols
       if (symbol.isActive) {
-        score += 10;
+        computed += 10;
       }
-      
+
       // Boost score for equity instruments (more commonly searched)
       if (symbol.instrumentType === 'EQUITY') {
-        score += 5;
+        computed += 5;
       }
+
+      // Combine with DB score: take the max to avoid overriding stronger DB relevance
+      let combined = Math.max(base, computed);
+      // Tiny nudges to break ties in favor of exact matches
+      if (isExactTS) combined += 1; else if (isExactDN) combined += 0.5;
 
       return {
         ...symbol,
-        relevanceScore: Math.round(score)
+        relevanceScore: Math.round(combined)
       };
     }).filter(symbol => (symbol.relevanceScore || 0) > 0); // Filter out irrelevant results
   }
@@ -384,38 +391,81 @@ export class SymbolSearchService {
    * Apply sorting to search results
    */
   private applySorting(
-    symbols: SearchResultWithScore[], 
-    sortBy: string = 'relevance', 
-    sortOrder: string = 'desc'
+    symbols: SearchResultWithScore[],
+    sortBy: string = 'relevance',
+    sortOrder: string = 'desc',
+    context?: { instrumentType?: 'EQUITY' | 'OPTION' | 'FUTURE' | undefined }
   ): SearchResultWithScore[] {
     const multiplier = sortOrder === 'desc' ? -1 : 1;
 
-    return symbols.sort((a, b) => {
-      switch (sortBy) {
-        case 'relevance':
-          return ((b.relevanceScore || 0) - (a.relevanceScore || 0)) * multiplier;
-        
-        case 'name':
-          return a.displayName.localeCompare(b.displayName) * multiplier;
-        
-        case 'symbol':
-          return a.tradingSymbol.localeCompare(b.tradingSymbol) * multiplier;
-        
-        case 'expiry':
-          if (a.expiryDate && b.expiryDate) {
-            return a.expiryDate.localeCompare(b.expiryDate) * multiplier;
-          }
-          return 0;
-        
-        case 'strike':
-          if (a.strikePrice && b.strikePrice) {
-            return (a.strikePrice - b.strikePrice) * multiplier;
-          }
-          return 0;
-        
-        default:
-          return ((b.relevanceScore || 0) - (a.relevanceScore || 0)) * multiplier;
+    // NSE-first tie-breaker for identical tradingSymbol
+    const exchangeRank = (ex?: string) => (ex === 'NSE' ? 0 : ex === 'BSE' ? 1 : 2);
+
+    // Instrument-type aware tie-breakers (soft ordering while preserving relevance first)
+    const tieBreak = (x: SearchResultWithScore, y: SearchResultWithScore): number => {
+      // NSE-first for identical tradingSymbol
+      if (x.tradingSymbol === y.tradingSymbol) {
+        const rank = (ex?: string) => (ex === 'NSE' ? 0 : ex === 'BSE' ? 1 : 2);
+        const exCmp = rank(x.exchange) - rank(y.exchange);
+        if (exCmp !== 0) return exCmp;
       }
+
+      if (context?.instrumentType === 'OPTION') {
+        // Prefer nearer expiry, then lower strike, then CE before PE
+        const expCmp = (x.expiryDate || '').localeCompare(y.expiryDate || '');
+        if (expCmp !== 0) return expCmp; // always ascending for expiry
+        const strikeCmp = ((x.strikePrice ?? Number.MAX_SAFE_INTEGER) - (y.strikePrice ?? Number.MAX_SAFE_INTEGER));
+        if (strikeCmp !== 0) return strikeCmp; // ascending strike
+        if (x.optionType && y.optionType && x.optionType !== y.optionType) {
+          return x.optionType === 'CE' ? -1 : 1; // CE before PE
+        }
+      } else if (context?.instrumentType === 'FUTURE') {
+        // Prefer nearer expiry
+        const expCmp = (x.expiryDate || '').localeCompare(y.expiryDate || '');
+        if (expCmp !== 0) return expCmp;
+      }
+      return 0;
+    };
+
+    return symbols.sort((a, b) => {
+      let primary = 0;
+      switch (sortBy) {
+        case 'relevance': {
+          const aScore = a.relevanceScore || 0;
+          const bScore = b.relevanceScore || 0;
+          primary = (aScore - bScore) * multiplier; // desc => b - a
+          break;
+        }
+        case 'name':
+          primary = a.displayName.localeCompare(b.displayName) * multiplier;
+          break;
+        case 'symbol':
+          primary = a.tradingSymbol.localeCompare(b.tradingSymbol) * multiplier;
+          break;
+        case 'expiry':
+          if (a.expiryDate && b.expiryDate) primary = a.expiryDate.localeCompare(b.expiryDate) * multiplier;
+          break;
+        case 'strike':
+          if (a.strikePrice && b.strikePrice) primary = (a.strikePrice - b.strikePrice) * multiplier;
+          break;
+        default: {
+          const aScore = a.relevanceScore || 0;
+          const bScore = b.relevanceScore || 0;
+          primary = (aScore - bScore) * multiplier;
+        }
+      }
+
+      if (primary !== 0) return primary;
+      // Apply instrument-type-specific tie-breakers
+      const tb = tieBreak(a, b);
+      if (tb !== 0) return tb;
+
+      // Global fallback: isActive desc, lastUpdated desc for stability
+      const activeCmp = (Number(!!b.isActive) - Number(!!a.isActive));
+      if (activeCmp !== 0) return activeCmp;
+      const dateA = a.lastUpdated ? new Date(a.lastUpdated).getTime() : 0;
+      const dateB = b.lastUpdated ? new Date(b.lastUpdated).getTime() : 0;
+      return (dateB - dateA);
     });
   }
 
@@ -463,10 +513,10 @@ export class SymbolSearchService {
 
     try {
       const results = await this.quickSearch(partialQuery, limit * 2);
-      
+
       // Extract unique suggestions from trading symbols and display names
       const suggestions = new Set<string>();
-      
+
       results.forEach(symbol => {
         if (symbol.tradingSymbol.toLowerCase().includes(partialQuery.toLowerCase())) {
           suggestions.add(symbol.tradingSymbol);
@@ -498,7 +548,7 @@ export class SymbolSearchService {
       };
 
       const result = await this.symbolDatabaseService.searchSymbolsWithFilters(searchQuery);
-      
+
       // For now, just return the first results
       // In a real implementation, this would be based on trading volume, user searches, etc.
       return result.symbols;

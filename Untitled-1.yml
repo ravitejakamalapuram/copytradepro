@@ -1,0 +1,53 @@
+{
+  "selectedAccounts": [
+    "688f470477d1ddcd407094a4",
+    "688f46e40c8dd711a168117b",
+    "688f46c00c8dd711a1681123"
+  ],
+  "symbol": "RELIANCE",
+  "action": "BUY",
+  "quantity": 1,
+  "orderType": "MARKET",
+  "exchange": "NSE",
+  "productType": "CNC",
+  "remarks": "DAY order placed via CopyTrade Pro"
+}
+
+
+
+
+
+
+
+
+
+
+see this curl still all the orders fails.
+
+curl 'http://localhost:3001/api/broker/place-multi-account-order' \
+  -H 'Accept: application/json, text/plain, */*' \
+  -H 'Accept-Language: en-US,en;q=0.9' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY4OGY0MjJmZWUzMDVmYTM5MDNlOTJiYyIsImVtYWlsIjoickBnbWFpbC5jb20iLCJuYW1lIjoicmF2aSIsInJvbGUiOiJhZG1pbiIsImlhdCI6MTc1NDMxNTAzOCwiZXhwIjoxNzU0NDAxNDM4fQ.lQNivGOTt28hFzfCiS-StGD0-6FAogLTxA6dat0U38w' \
+  -H 'Connection: keep-alive' \
+  -H 'Content-Type: application/json' \
+  -H 'DNT: 1' \
+  -H 'Origin: http://localhost:5173' \
+  -H 'Referer: http://localhost:5173/' \
+  -H 'Sec-Fetch-Dest: empty' \
+  -H 'Sec-Fetch-Mode: cors' \
+  -H 'Sec-Fetch-Site: same-site' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36' \
+  -H 'X-Request-ID: 1754330842985-3hmacevwd' \
+  -H 'sec-ch-ua: "Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  --data-raw '{"selectedAccounts":["688f470477d1ddcd407094a4","688f46e40c8dd711a168117b","688f46c00c8dd711a1681123"],"symbol":"RELIANCE","action":"BUY","quantity":1,"orderType":"MARKET","exchange":"NSE","productType":"CNC","remarks":"DAY order placed via CopyTrade Pro"}'
+
+
+it is due to the current changes only. i think instead of simplyfying you made some bugs in the code. can you cross check and fix the process. i dont want you to create multiple scenarios handling in the code. do a simple rewrite of order placement flows for both shoonya and fyers. accounts are activated. so you dont need to worry anout accounts being inc=active. do a though process to unerstand what could have gone worn gand fix it please. in fact make a doc of the complete flow in details and then re thigk to fix it properly. if needed, check the documentation of fyers and shoonya on how the payload is required to be sent for the order to be triggered. 
+
+
+
+
+
+

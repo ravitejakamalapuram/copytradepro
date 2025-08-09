@@ -10,6 +10,9 @@ import { Stack, Flex } from '../components/ui/Layout';
 import { useToast } from '../components/Toast';
 import Popover from '../components/ui/Popover';
 
+import { ORDER_STATUS, type OrderStatus } from '@copytrade/shared-types';
+
+
 interface Order {
   id: string;
   symbol: string;
@@ -18,7 +21,7 @@ interface Order {
   qty: number;
   price?: number;
   triggerPrice?: number;
-  status: 'PLACED' | 'PENDING' | 'EXECUTED' | 'CANCELLED' | 'REJECTED' | 'PARTIALLY_FILLED' | 'FAILED';
+  status: OrderStatus;
   time: string;
   filledQty: number;
   avgPrice?: number;
@@ -51,6 +54,11 @@ const Orders: React.FC = () => {
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [checkingStatus, setCheckingStatus] = useState<Set<string>>(new Set());
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  // Prevent repeated AUTH_REQUIRED toasts on every refresh
+  const [authToastShown, setAuthToastShown] = useState(false);
+  // Status groups for filtering and counts
+  const PENDING_STATUSES: OrderStatus[] = [ORDER_STATUS.PLACED, ORDER_STATUS.PENDING, ORDER_STATUS.PARTIALLY_FILLED];
+  const FAILED_STATUSES: OrderStatus[] = [ORDER_STATUS.FAILED, ORDER_STATUS.REJECTED, ORDER_STATUS.CANCELLED];
 
   const [dateFilter, setDateFilter] = useState<'today' | 'week'>('today');
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -194,6 +202,23 @@ const Orders: React.FC = () => {
 
         setOrders(ordersData);
         setLastRefresh(new Date());
+
+        // Show AUTH_REQUIRED toast if any orders indicate auth issue and we haven't shown it yet
+        if (!authToastShown) {
+          const hasAuthIssue = ordersData.some(o => (o.errorType || '').toUpperCase() === 'AUTH_REQUIRED');
+          if (hasAuthIssue) {
+            setAuthToastShown(true);
+            showToast({
+              type: 'warning',
+              title: 'Some accounts require authentication',
+              message: 'Please activate the accounts before placing or viewing orders.',
+              action: {
+                label: 'Go to Accounts',
+                onClick: () => navigate('/account-setup')
+              }
+            });
+          }
+        }
       } else {
         setError(response.message || 'Failed to load orders');
       }
@@ -299,9 +324,9 @@ const Orders: React.FC = () => {
 
   // Apply both status and account filters
   const filteredOrders = filterOrdersByAccount(orders).filter(order => {
-    if (activeTab === 'pending') return ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(order.status);
-    if (activeTab === 'executed') return order.status === 'EXECUTED';
-    if (activeTab === 'failed') return ['FAILED', 'REJECTED', 'CANCELLED'].includes(order.status);
+    if (activeTab === 'pending') return PENDING_STATUSES.includes(order.status);
+    if (activeTab === 'executed') return order.status === ORDER_STATUS.EXECUTED;
+    if (activeTab === 'failed') return FAILED_STATUSES.includes(order.status);
     return true;
   });
 
@@ -314,13 +339,13 @@ const Orders: React.FC = () => {
 
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case 'PLACED': return 'var(--color-neutral)';
-      case 'PENDING': return 'var(--color-neutral)';
-      case 'EXECUTED': return 'var(--color-profit)';
-      case 'PARTIALLY_FILLED': return 'var(--color-neutral)';
-      case 'CANCELLED': return 'var(--text-secondary)';
-      case 'REJECTED': return 'var(--color-loss)';
-      case 'FAILED': return 'var(--color-loss)';
+      case ORDER_STATUS.PLACED: return 'var(--color-neutral)';
+      case ORDER_STATUS.PENDING: return 'var(--color-neutral)';
+      case ORDER_STATUS.EXECUTED: return 'var(--color-profit)';
+      case ORDER_STATUS.PARTIALLY_FILLED: return 'var(--color-neutral)';
+      case ORDER_STATUS.CANCELLED: return 'var(--text-secondary)';
+      case ORDER_STATUS.REJECTED: return 'var(--color-loss)';
+      case ORDER_STATUS.FAILED: return 'var(--color-loss)';
       default: return 'var(--text-primary)';
     }
   };
@@ -484,11 +509,25 @@ const Orders: React.FC = () => {
         // Refresh orders to show updated status
         await fetchOrders();
       } else {
-        showToast({
-          type: 'error',
-          title: 'Retry Failed',
-          message: response.message || 'Failed to retry order.'
-        });
+        // Handle AUTH_REQUIRED specifically
+        const errorType = (response?.data?.errorType || '').toUpperCase();
+        if (errorType === 'AUTH_REQUIRED') {
+          showToast({
+            type: 'warning',
+            title: 'Authentication Required',
+            message: 'Please activate the account before retrying the order.',
+            action: {
+              label: 'Go to Accounts',
+              onClick: () => navigate('/account-setup')
+            }
+          });
+        } else {
+          showToast({
+            type: 'error',
+            title: 'Retry Failed',
+            message: response.message || 'Failed to retry order.'
+          });
+        }
       }
     } catch (error: unknown) {
       console.error('Failed to retry order:', error);
@@ -532,13 +571,27 @@ const Orders: React.FC = () => {
           message: response.message || 'Failed to delete order.'
         });
       }
-    } catch (error: unknown) {
+    } catch (error: any) {
       console.error('Failed to delete order:', error);
-      showToast({
-        type: 'error',
-        title: 'Delete Error',
-        message: 'An error occurred while deleting the order.'
-      });
+      const backend = error?.response?.data;
+      const errorType = (backend?.data?.errorType || backend?.error?.code || '').toUpperCase();
+      if (errorType === 'AUTH_REQUIRED') {
+        showToast({
+          type: 'warning',
+          title: 'Authentication Required',
+          message: 'Please activate the account before managing failed orders.',
+          action: {
+            label: 'Go to Accounts',
+            onClick: () => navigate('/account-setup')
+          }
+        });
+      } else {
+        showToast({
+          type: 'error',
+          title: 'Delete Error',
+          message: 'An error occurred while deleting the order.'
+        });
+      }
     } finally {
       setCheckingStatus(prev => {
         const newSet = new Set(prev);
@@ -925,9 +978,9 @@ const Orders: React.FC = () => {
               <span className="filter-label">Status:</span>
               {[
                 { key: 'all', label: 'All', count: orders.length },
-                { key: 'pending', label: 'Pending', count: orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length },
-                { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === 'EXECUTED').length },
-                { key: 'failed', label: 'Failed', count: orders.filter(o => ['FAILED', 'REJECTED', 'CANCELLED'].includes(o.status)).length }
+                { key: 'pending', label: 'Pending', count: orders.filter(o => PENDING_STATUSES.includes(o.status)).length },
+                { key: 'executed', label: 'Executed', count: orders.filter(o => o.status === ORDER_STATUS.EXECUTED).length },
+                { key: 'failed', label: 'Failed', count: orders.filter(o => FAILED_STATUSES.includes(o.status)).length }
               ].map(tab => (
                 <Button
                   key={tab.key}
@@ -1310,7 +1363,7 @@ const Orders: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-neutral)' }}>
-                  {orders.filter(o => ['PLACED', 'PENDING', 'PARTIALLY_FILLED'].includes(o.status)).length}
+                  {orders.filter(o => PENDING_STATUSES.includes(o.status)).length}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Pending
@@ -1318,7 +1371,7 @@ const Orders: React.FC = () => {
               </div>
               <div>
                 <div style={{ fontSize: '1.25rem', fontWeight: '700', color: 'var(--color-loss)' }}>
-                  {orders.filter(o => ['CANCELLED', 'REJECTED', 'FAILED'].includes(o.status)).length}
+                  {orders.filter(o => FAILED_STATUSES.includes(o.status)).length}
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Failed
