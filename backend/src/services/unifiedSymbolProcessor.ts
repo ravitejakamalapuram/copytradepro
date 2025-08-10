@@ -4,7 +4,7 @@ import path from 'path';
 import * as cron from 'node-cron';
 import { logger } from '../utils/logger';
 import { CreateStandardizedSymbolData } from '../models/symbolModels';
-import { symbolDatabaseService, ProcessingResult } from './symbolDatabaseService';
+import { symbolDatabaseService } from './symbolDatabaseService';
 
 // Configuration for symbol data sources (extensible for future sources)
 export interface SymbolDataSourceConfig {
@@ -307,8 +307,10 @@ export class UnifiedSymbolProcessor {
       const data = fs.readFileSync(this.JSON_FILE_PATH, 'utf8');
       const jsonData = JSON.parse(data);
 
-      // Handle both array format and object format
-      const symbols = Array.isArray(jsonData) ? jsonData : Object.values(jsonData);
+      // Normalize using adapter (future-source friendly)
+      const { UpstoxAdapter } = await import('./sourceAdapters/upstoxAdapter');
+      const adapter = new UpstoxAdapter();
+      const symbols = adapter.normalize(Array.isArray(jsonData) ? jsonData : Object.values(jsonData));
 
       logger.info('Completed parsing symbol JSON file', {
         component: 'UNIFIED_SYMBOL_PROCESSOR',
@@ -316,7 +318,7 @@ export class UnifiedSymbolProcessor {
         totalSymbols: symbols.length
       });
 
-      return symbols as RawSymbolData[];
+      return symbols as unknown as RawSymbolData[];
     } catch (error: any) {
       logger.error('Error parsing JSON file', {
         component: 'UNIFIED_SYMBOL_PROCESSOR',
@@ -403,9 +405,23 @@ export class UnifiedSymbolProcessor {
           optionType = symbol.instrument_type === 'CE' ? 'CE' : 'PE';
         }
 
+        // Normalize equity trading symbols per exchange
+        let normalizedTradingSymbol = symbol.trading_symbol;
+        if (instrumentType === 'EQUITY') {
+          if (exchange === 'NSE') {
+            // If no series suffix present, default to -EQ; if present, keep as-is
+            if (!/-[A-Z]{1,3}$/.test(normalizedTradingSymbol)) {
+              normalizedTradingSymbol = `${normalizedTradingSymbol}-EQ`;
+            }
+          } else if (exchange === 'BSE') {
+            // Ensure plain symbol for BSE (strip any -SUFFIX)
+            normalizedTradingSymbol = normalizedTradingSymbol.replace(/-[A-Z]{1,3}$/i, '');
+          }
+        }
+
         const standardizedSymbol: CreateStandardizedSymbolData = {
           displayName: symbol.name || symbol.trading_symbol || 'Unknown',
-          tradingSymbol: symbol.trading_symbol,
+          tradingSymbol: normalizedTradingSymbol,
           instrumentType,
           exchange,
           segment: symbol.segment || (instrumentType === 'EQUITY' ? `${exchange}_EQ` : `${exchange}_FO`),
@@ -465,30 +481,26 @@ export class UnifiedSymbolProcessor {
       });
 
       try {
-        // Step 1: Download symbol data
+        // Step 1: Download symbol data (always refresh during cron/manual)
         await this.downloadSymbolData();
 
         // Step 2: Parse JSON file
         const rawSymbols = await this.parseJSONFile();
 
-        // Step 3: Transform to standardized format
-        const standardizedSymbols = this.transformToStandardFormat(rawSymbols);
+        // Step 3: Transform to standardized format and compute content hashes
+        const standardizedSymbols = this.transformToStandardFormat(rawSymbols).map(s => ({
+          ...s,
+          contentHash: computeContentHashLocal(s)
+        }));
 
-        // Step 4: Clear existing symbols and insert fresh data
-        logger.info('Clearing existing symbols for fresh data load', {
+        // Step 4: Incremental sync (upsert changed/new; deactivate missing)
+        logger.info('Running incremental sync for symbols', {
           component: 'UNIFIED_SYMBOL_PROCESSOR',
-          operation: 'CLEAR_EXISTING_SYMBOLS'
-        });
-
-        await symbolDatabaseService.clearAllSymbols();
-
-        logger.info('Inserting fresh symbol data', {
-          component: 'UNIFIED_SYMBOL_PROCESSOR',
-          operation: 'INSERT_FRESH_SYMBOLS',
+          operation: 'INCREMENTAL_SYNC',
           symbolCount: standardizedSymbols.length
         });
 
-        const result: ProcessingResult = await symbolDatabaseService.upsertSymbols(standardizedSymbols);
+        const result = await symbolDatabaseService.incrementalSyncSymbols(standardizedSymbols);
 
         // Calculate processing time
         const processingTime = Date.now() - startTime;
@@ -670,3 +682,26 @@ export class UnifiedSymbolProcessor {
 
 // Export singleton instance
 export const unifiedSymbolProcessor = new UnifiedSymbolProcessor();
+
+
+// Compute a stable content hash for incremental sync
+function computeContentHashLocal(s: CreateStandardizedSymbolData): string {
+  const base = [
+    s.tradingSymbol,
+    s.exchange,
+    s.instrumentType,
+    s.expiryDate || '',
+    s.strikePrice?.toString() || '',
+    s.optionType || '',
+    s.displayName,
+    s.underlying || '',
+    s.lotSize?.toString() || '',
+    s.tickSize?.toString() || ''
+  ].join('|');
+  let h = 2166136261;
+  for (let i = 0; i < base.length; i++) {
+    h ^= base.charCodeAt(i);
+    h += (h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24);
+  }
+  return (h >>> 0).toString(16);
+}

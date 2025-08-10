@@ -17,6 +17,7 @@ export interface StandardizedSymbol {
   isActive: boolean;
   lastUpdated: string;          // ISO timestamp
   source: string;               // "upstox", "manual", etc.
+  contentHash?: string;         // hash of content for incremental sync
   isin?: string | undefined;
   companyName?: string | undefined;         // For equity
   sector?: string | undefined;              // For equity
@@ -87,6 +88,7 @@ export interface StandardizedSymbolDocument extends Document {
   isActive: boolean;
   lastUpdated: Date;
   source: string;
+  contentHash?: string;
   isin?: string;
   companyName?: string;
   sector?: string;
@@ -113,17 +115,17 @@ export interface SymbolProcessingLogDocument extends Document {
 export const StandardizedSymbolSchema = new Schema<StandardizedSymbolDocument>({
   displayName: { type: String, required: true, index: true },
   tradingSymbol: { type: String, required: true, index: true },
-  instrumentType: { 
-    type: String, 
-    enum: ['EQUITY', 'OPTION', 'FUTURE'], 
-    required: true, 
-    index: true 
+  instrumentType: {
+    type: String,
+    enum: ['EQUITY', 'OPTION', 'FUTURE'],
+    required: true,
+    index: true
   },
-  exchange: { 
-    type: String, 
-    enum: ['NSE', 'BSE', 'NFO', 'BFO', 'MCX'], 
-    required: true, 
-    index: true 
+  exchange: {
+    type: String,
+    enum: ['NSE', 'BSE', 'NFO', 'BFO', 'MCX'],
+    required: true,
+    index: true
   },
   segment: { type: String, required: true },
   underlying: { type: String, index: true },
@@ -135,6 +137,7 @@ export const StandardizedSymbolSchema = new Schema<StandardizedSymbolDocument>({
   isActive: { type: Boolean, required: true, default: true, index: true },
   lastUpdated: { type: Date, default: Date.now },
   source: { type: String, required: true },
+  contentHash: { type: String, index: true },
   isin: { type: String },
   companyName: { type: String },
   sector: { type: String },
@@ -143,18 +146,18 @@ export const StandardizedSymbolSchema = new Schema<StandardizedSymbolDocument>({
 
 
 export const SymbolProcessingLogSchema = new Schema<SymbolProcessingLogDocument>({
-  processType: { 
-    type: String, 
-    enum: ['DAILY_UPDATE', 'MANUAL_UPDATE', 'VALIDATION'], 
-    required: true, 
-    index: true 
+  processType: {
+    type: String,
+    enum: ['DAILY_UPDATE', 'MANUAL_UPDATE', 'VALIDATION'],
+    required: true,
+    index: true
   },
   source: { type: String, required: true },
-  status: { 
-    type: String, 
-    enum: ['STARTED', 'COMPLETED', 'FAILED'], 
-    required: true, 
-    index: true 
+  status: {
+    type: String,
+    enum: ['STARTED', 'COMPLETED', 'FAILED'],
+    required: true,
+    index: true
   },
   totalProcessed: { type: Number, default: 0 },
   validSymbols: { type: Number, default: 0 },
@@ -175,7 +178,21 @@ export const SymbolProcessingLogSchema = new Schema<SymbolProcessingLogDocument>
 // Search optimization indexes
 StandardizedSymbolSchema.index({ displayName: 'text', tradingSymbol: 'text', companyName: 'text' });
 
-// Query optimization indexes
+// Minimal partial indexes focused on active records (fast common queries)
+StandardizedSymbolSchema.index(
+  { tradingSymbol: 1 },
+  { partialFilterExpression: { isActive: true }, name: 'idx_active_tradingSymbol' }
+);
+StandardizedSymbolSchema.index(
+  { exchange: 1, instrumentType: 1 },
+  { partialFilterExpression: { isActive: true }, name: 'idx_active_exchange_instrumentType' }
+);
+StandardizedSymbolSchema.index(
+  { underlying: 1, instrumentType: 1, expiryDate: 1 },
+  { partialFilterExpression: { isActive: true }, name: 'idx_active_underlying_instrument_expiry' }
+);
+
+// Existing query optimization indexes
 StandardizedSymbolSchema.index({ underlying: 1, instrumentType: 1, expiryDate: 1, isActive: 1 });
 StandardizedSymbolSchema.index({ instrumentType: 1, exchange: 1, isActive: 1 });
 StandardizedSymbolSchema.index({ underlying: 1, expiryDate: 1, strikePrice: 1, optionType: 1, isActive: 1 });
@@ -202,6 +219,26 @@ export const createStandardizedSymbolModel = (connection: mongoose.Connection): 
 };
 
 
+
+
+// Rejected symbols for debugging normalization/validation failures
+export interface RejectedSymbolDocument extends Document {
+  source: string;
+  reason: string;
+  raw: any;
+  createdAt: Date;
+}
+
+export const RejectedSymbolSchema = new Schema<RejectedSymbolDocument>({
+  source: { type: String, required: true },
+  reason: { type: String, required: true },
+  raw: { type: Schema.Types.Mixed, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+export const createRejectedSymbolModel = (connection: mongoose.Connection): Model<RejectedSymbolDocument> => {
+  return connection.model<RejectedSymbolDocument>('RejectedSymbol', RejectedSymbolSchema);
+};
 
 export const createSymbolProcessingLogModel = (connection: mongoose.Connection): Model<SymbolProcessingLogDocument> => {
   return connection.model<SymbolProcessingLogDocument>('SymbolProcessingLog', SymbolProcessingLogSchema);

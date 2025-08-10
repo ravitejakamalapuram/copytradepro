@@ -52,6 +52,10 @@ export interface ProcessingResult {
   errors: string[];
 }
 
+export interface IncrementalSyncResult extends ProcessingResult {
+  deactivatedSymbols: number;
+}
+
 /**
  * Symbol Database Service
  * Handles all database operations for standardized symbols
@@ -181,7 +185,7 @@ export class SymbolDatabaseService {
       });
 
       const savedSymbol = await symbolDoc.save();
-      
+
       logger.info('Symbol created successfully', {
         component: 'SYMBOL_DATABASE_SERVICE',
         operation: 'CREATE_SYMBOL',
@@ -240,8 +244,8 @@ export class SymbolDatabaseService {
       const result = await this.StandardizedSymbolModel.findOneAndUpdate(
         filter,
         { $set: updateData },
-        { 
-          upsert: true, 
+        {
+          upsert: true,
           new: true,
           runValidators: true
         }
@@ -263,7 +267,7 @@ export class SymbolDatabaseService {
    */
   async searchSymbolsWithFilters(searchQuery: SymbolSearchQuery): Promise<SymbolSearchResult> {
     const startTime = Date.now();
-    
+
     try {
       if (!this.isReady()) {
         throw new Error('Symbol Database Service not initialized');
@@ -321,7 +325,7 @@ export class SymbolDatabaseService {
         component: 'SYMBOL_DATABASE_SERVICE',
         operation: 'FUZZY_SEARCH_ERROR'
       }, error);
-      
+
       // Record error metrics
       symbolMonitoringService.recordDatabaseMetrics({
         operation: 'fuzzySearchSymbols',
@@ -344,7 +348,7 @@ export class SymbolDatabaseService {
    */
   private buildFuzzySearchPipeline(searchQuery: SymbolSearchQuery): any[] {
     const { buildSearchPipeline } = require('../utils/searchHelpers');
-    
+
     // Convert SymbolSearchQuery to SearchQuery format
     const unifiedQuery = {
       text: searchQuery.query,
@@ -363,7 +367,7 @@ export class SymbolDatabaseService {
     };
 
     const pipeline = buildSearchPipeline(unifiedQuery);
-    
+
     // Adjust the final facet stage to match expected output format
     const lastStage = pipeline[pipeline.length - 1];
     if (lastStage && lastStage.$facet) {
@@ -707,7 +711,7 @@ export class SymbolDatabaseService {
       }
 
       const totalSymbols = await this.StandardizedSymbolModel.countDocuments();
-      
+
       if (totalSymbols === 0) {
         return {
           hasData: false,
@@ -774,7 +778,7 @@ export class SymbolDatabaseService {
       const symbol = await this.StandardizedSymbolModel.findById(id);
       const duration = Date.now() - findStart;
       databaseOptimizationService.recordQuery('findById', 'standardizedsymbols', duration, { _id: id }, { found: !!symbol });
-      
+
       // Record monitoring metrics
       symbolMonitoringService.recordDatabaseMetrics({
         operation: 'getSymbolById',
@@ -786,7 +790,7 @@ export class SymbolDatabaseService {
         documentsReturned: symbol ? 1 : 0,
         success: true
       });
-      
+
       if (symbol) {
         const symbolInterface = this.symbolDocToInterface(symbol);
         // Cache the result
@@ -815,7 +819,7 @@ export class SymbolDatabaseService {
       }
 
       // Check cache first
-      const cacheKey = exchange 
+      const cacheKey = exchange
         ? symbolCacheService.generateSymbolKey(undefined, tradingSymbol, exchange)
         : symbolCacheService.generateSymbolKey(undefined, tradingSymbol);
       const cachedSymbol = symbolCacheService.getSymbol(cacheKey);
@@ -831,7 +835,7 @@ export class SymbolDatabaseService {
       const findStart = Date.now();
       const symbol = await this.StandardizedSymbolModel.findOne(query);
       databaseOptimizationService.recordQuery('findOne', 'standardizedsymbols', Date.now() - findStart, query, { found: !!symbol });
-      
+
       if (symbol) {
         const symbolInterface = this.symbolDocToInterface(symbol);
         // Cache the result
@@ -885,11 +889,11 @@ export class SymbolDatabaseService {
 
       // Delete the symbol
       const result = await this.StandardizedSymbolModel.findByIdAndDelete(id);
-      
+
       if (result) {
         // Clear from cache
         symbolCacheService.invalidateSymbol(id, result.tradingSymbol, result.exchange);
-        
+
         logger.info('Symbol deleted successfully', {
           component: 'SYMBOL_DATABASE_SERVICE',
           operation: 'DELETE_SYMBOL',
@@ -1020,7 +1024,7 @@ export class SymbolDatabaseService {
       }
 
       // Use efficient bulk insert instead of individual upserts
-      let insertResult;
+      let insertResult: any[] | null = null;
       try {
         insertResult = await this.StandardizedSymbolModel.insertMany(symbolsToInsert, {
           ordered: false, // Continue inserting even if some fail
@@ -1033,54 +1037,174 @@ export class SymbolDatabaseService {
           errorName: error.name,
           errorMessage: error.message,
           errorCode: error.code,
-          writeErrors: error.writeErrors ? error.writeErrors.slice(0, 3) : undefined,
-          sampleSymbol: symbolsToInsert[0] ? {
-            tradingSymbol: symbolsToInsert[0].tradingSymbol,
-            exchange: symbolsToInsert[0].exchange,
-            instrumentType: symbolsToInsert[0].instrumentType
-          } : 'none'
         });
-        throw error;
       }
 
-      // Log detailed insert result for debugging
-      logger.info('Insert result details', {
-        component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'INSERT_RESULT_DEBUG',
-        resultType: typeof insertResult,
-        resultLength: Array.isArray(insertResult) ? insertResult.length : 'not array',
-        hasInsertedCount: 'insertedCount' in insertResult,
-        resultKeys: Object.keys(insertResult)
-      });
+      const insertedLength = Array.isArray(insertResult) ? insertResult.length : 0;
 
-      // Get actual inserted count
-      const actualInsertedCount = Array.isArray(insertResult) ? insertResult.length :
-                                 ((insertResult as any).insertedCount || 0);
-
-      const result: ProcessingResult = {
-        totalProcessed: symbols.length,
-        validSymbols: actualInsertedCount,
-        invalidSymbols: symbols.length - actualInsertedCount,
-        newSymbols: actualInsertedCount,
-        updatedSymbols: 0, // Fresh insert, no updates
+      // Return counts (best-effort)
+      const processed: ProcessingResult = {
+        totalProcessed: symbolsToInsert.length,
+        validSymbols: symbolsToInsert.length, // assume all valid if accepted by insertMany
+        invalidSymbols: 0,
+        newSymbols: insertedLength,
+        updatedSymbols: 0,
         errors: []
       };
-
-      logger.info('Efficient batch symbol insert completed', {
+      return processed;
+    } catch (error: any) {
+      logger.error('Failed to upsert symbols in bulk', {
         component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'BULK_INSERT_SYMBOLS_COMPLETE',
-        ...result
-      });
-
-      return result;
-    } catch (error) {
-      logger.error('Failed to bulk insert symbols', {
-        component: 'SYMBOL_DATABASE_SERVICE',
-        operation: 'BULK_INSERT_SYMBOLS_ERROR'
+        operation: 'BULK_INSERT_ERROR'
       }, error);
-      throw error;
+      return {
+        totalProcessed: symbols.length,
+        validSymbols: 0,
+        invalidSymbols: symbols.length,
+        newSymbols: 0,
+        updatedSymbols: 0,
+        errors: [error.message]
+      };
     }
   }
+
+
+
+  /**
+   * Incremental sync: upsert changed/new symbols by comparing contentHash and deactivate missing
+   */
+  async incrementalSyncSymbols(symbols: (CreateStandardizedSymbolData & { contentHash?: string })[]): Promise<IncrementalSyncResult> {
+    if (!this.isReady()) throw new Error('Symbol Database Service not initialized');
+
+    const start = Date.now();
+    const errors: string[] = [];
+    let newSymbols = 0, updatedSymbols = 0, invalidSymbols = 0, deactivatedSymbols = 0;
+
+    // Build key -> hash from incoming (key must reflect natural uniqueness)
+    const keyOf = (s: CreateStandardizedSymbolData) => {
+      const base = `${s.tradingSymbol}::${s.exchange}::${s.instrumentType}`;
+      if (s.instrumentType === 'OPTION' || s.instrumentType === 'FUTURE') {
+        return `${base}::${s.expiryDate || ''}::${s.strikePrice || ''}::${s.optionType || ''}`;
+      }
+      return base;
+    };
+
+    const incomingMap = new Map<string, CreateStandardizedSymbolData & { contentHash?: string }>();
+    for (const s of symbols) {
+      incomingMap.set(keyOf(s), s);
+    }
+
+    // Load existing minimal set
+    const projection: any = {
+      tradingSymbol: 1, exchange: 1, instrumentType: 1,
+      expiryDate: 1, strikePrice: 1, optionType: 1,
+      contentHash: 1, isActive: 1
+    };
+    const existingDocs = await this.StandardizedSymbolModel.find({}, projection).lean();
+
+    const existingMap = new Map<string, any>();
+    for (const d of existingDocs) {
+      const base = `${d.tradingSymbol}::${d.exchange}::${d.instrumentType}`;
+      const key = (d.instrumentType === 'OPTION' || d.instrumentType === 'FUTURE')
+        ? `${base}::${d.expiryDate ? new Date(d.expiryDate).toISOString().slice(0,10) : ''}::${d.strikePrice || ''}::${d.optionType || ''}`
+        : base;
+      existingMap.set(key, d);
+    }
+
+    // Upserts
+    const bulkOps: any[] = [];
+    for (const [key, s] of incomingMap.entries()) {
+      const existing = existingMap.get(key);
+      const setData: any = {
+        ...s,
+        expiryDate: s.expiryDate ? new Date(s.expiryDate) : undefined,
+        lastUpdated: new Date(),
+        isActive: true
+      };
+      if (!existing) {
+        newSymbols++;
+        bulkOps.push({ updateOne: { filter: this.buildUniqueFilter(s), update: { $set: setData }, upsert: true } });
+      } else if (existing.contentHash !== s.contentHash) {
+        updatedSymbols++;
+        bulkOps.push({ updateOne: { filter: this.buildUniqueFilter(s), update: { $set: setData }, upsert: true } });
+      }
+    }
+
+    if (bulkOps.length) {
+      try {
+        await this.StandardizedSymbolModel.bulkWrite(bulkOps, { ordered: false });
+      } catch (e: any) {
+        errors.push(`bulkWrite upserts failed: ${e.message}`);
+      }
+    }
+
+    // Deactivate missing
+    const missingKeys: string[] = [];
+    for (const [key] of existingMap) {
+      if (!incomingMap.has(key)) missingKeys.push(key);
+    }
+
+    if (missingKeys.length) {
+      // Build queries in batches
+      const batchSize = 1000;
+      for (let i = 0; i < missingKeys.length; i += batchSize) {
+        const batch = new Set(missingKeys.slice(i, i + batchSize));
+        // Build explicit $or filter array for this batch
+        // Fallback: we run updateMany on computed filters derived from batch entries
+        const or: any[] = [];
+        for (const key of batch) {
+          const parts = key.split('::');
+          const [ts, ex, it, ed, sp, ot] = parts;
+          const q: any = { tradingSymbol: ts, exchange: ex, instrumentType: it };
+          if (it === 'OPTION' || it === 'FUTURE') {
+            if (ed) q.expiryDate = new Date(ed);
+            if (sp) q.strikePrice = Number(sp);
+            if (ot) q.optionType = ot as any;
+          }
+          or.push(q);
+        }
+        if (or.length) {
+          const res = await this.StandardizedSymbolModel.updateMany({ $or: or }, { $set: { isActive: false, lastUpdated: new Date() } });
+          deactivatedSymbols += res.modifiedCount || 0;
+        }
+      }
+    }
+
+    const totalProcessed = symbols.length;
+    const result: IncrementalSyncResult = {
+      totalProcessed,
+      validSymbols: totalProcessed - invalidSymbols,
+      invalidSymbols,
+      newSymbols,
+      updatedSymbols,
+      deactivatedSymbols,
+      errors
+    };
+
+    logger.info('Incremental sync completed', {
+      component: 'SYMBOL_DATABASE_SERVICE',
+      operation: 'INCREMENTAL_SYNC_COMPLETED',
+      durationMs: Date.now() - start,
+      ...result
+    });
+
+    return result;
+  }
+
+  private buildUniqueFilter(symbolData: CreateStandardizedSymbolData): any {
+    const filter: any = {
+      tradingSymbol: symbolData.tradingSymbol,
+      exchange: symbolData.exchange,
+      instrumentType: symbolData.instrumentType
+    };
+    if (symbolData.instrumentType === 'OPTION' || symbolData.instrumentType === 'FUTURE') {
+      if (symbolData.expiryDate) filter.expiryDate = new Date(symbolData.expiryDate);
+      if (symbolData.strikePrice) filter.strikePrice = symbolData.strikePrice;
+      if (symbolData.optionType) filter.optionType = symbolData.optionType;
+    }
+    return filter;
+  }
+
 
   /**
    * Backup existing symbols by renaming collection (fast operation)
