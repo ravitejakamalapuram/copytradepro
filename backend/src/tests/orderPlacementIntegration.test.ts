@@ -18,11 +18,7 @@ const mockBrokerService = {
   isConnected: jest.fn()
 };
 
-jest.mock('../services/enhancedUnifiedBrokerManager', () => ({
-  enhancedUnifiedBrokerManager: {
-    getBrokerService: jest.fn(() => mockBrokerService)
-  }
-}));
+// unified manager removed; no mock needed
 
 describe('Order Placement Integration', () => {
   let mongoServer: MongoMemoryServer;

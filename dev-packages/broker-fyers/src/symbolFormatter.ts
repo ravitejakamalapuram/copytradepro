@@ -53,7 +53,9 @@ export class FyersSymbolFormatter {
    * @returns Formatted symbol (e.g., 'NSE:RELIANCE-EQ')
    */
   static formatEquity(symbol: string, exchange: string = 'NSE'): string {
-    return `${exchange}:${symbol}-EQ`;
+    // NSE uses -EQ suffix, BSE uses plain symbol
+    const normalized = exchange === 'BSE' ? symbol.replace(/-[A-Z]{1,3}$/i, '') : (symbol.endsWith('-EQ') ? symbol : `${symbol}-EQ`);
+    return `${exchange}:${normalized}`;
   }
 
   /**

@@ -74,10 +74,10 @@ export const useAccountStatus = () => {
       prevAccounts.map(account => 
         account.id === accountId 
           ? { 
-              ...account, 
+              ...account,
               isActive,
-              accountStatus: isActive ? 'ACTIVE' : 'INACTIVE',
-              // Add status message if provided
+              // Preserve and display broker-provided status from backend if provided
+              accountStatus: (_status?.toUpperCase?.() as any) || (isActive ? 'ACTIVE' as any : 'INACTIVE' as any),
               ...(message && { statusMessage: message })
             }
           : account
@@ -91,17 +91,17 @@ export const useAccountStatus = () => {
     
     switch (eventType) {
       case 'connected':
-        updateAccountStatus(accountId, true, 'active', message);
+        updateAccountStatus(accountId, true, 'ACTIVE', message);
         break;
       case 'disconnected':
-        updateAccountStatus(accountId, false, 'inactive', message);
+        updateAccountStatus(accountId, false, 'INACTIVE', message);
         break;
       case 'error':
-        updateAccountStatus(accountId, false, 'error', message);
+        updateAccountStatus(accountId, false, 'ERROR', message);
         break;
       case 'token_refresh':
         // Token refreshed successfully, ensure account is active
-        updateAccountStatus(accountId, true, 'active', message);
+        updateAccountStatus(accountId, true, 'ACTIVE', message);
         break;
     }
   }, [updateAccountStatus]);
@@ -247,16 +247,16 @@ export const useAccountStatus = () => {
   const activateAccount = useCallback(async (accountId: string) => {
     try {
       setOperationsInProgress(prev => ({ ...prev, [accountId]: true }));
-      
+
       const result = await accountService.activateAccount(accountId);
-      
+
       if (result.success) {
         // Update local state immediately for better UX
-        updateAccountStatus(accountId, true, 'active', result.message);
-        
+        updateAccountStatus(accountId, true, 'ACTIVE', result.message);
+
         // Refresh accounts to get latest data
         await fetchAccounts(false);
-        
+
         return result;
       } else {
         // Handle OAuth flow or other authentication steps

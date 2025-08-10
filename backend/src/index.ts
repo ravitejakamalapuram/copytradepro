@@ -41,7 +41,7 @@ import { upstoxDataProcessor } from './services/upstoxDataProcessor';
 // Auto-initialize services on import
 import './services/symbolDatabaseService';
 import { getDatabase, DatabaseFactory } from './services/databaseFactory';
-import { initializeBrokerAccountCache } from './controllers/brokerController';
+
 import { productionMonitoringService } from './services/productionMonitoringService';
 import { symbolLifecycleManager } from './services/symbolLifecycleManager';
 
@@ -395,8 +395,7 @@ async function startServer() {
       availableBrokers
     });
 
-    // Initialize broker account cache
-    await initializeBrokerAccountCache();
+    // In-memory broker account cache removed
 
     // Initialize unified symbol processor
     logger.info('Initializing unified symbol processor', {

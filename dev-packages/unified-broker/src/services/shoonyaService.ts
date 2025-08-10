@@ -142,10 +142,12 @@ export class ShoonyaService {
     try {
       // Shoonya API expects data as jData parameter in form-encoded format (raw string)
       const jsonData = JSON.stringify(data);
-      console.log('🔍 Sending jData:', jsonData);
+      if (process.env.ORDER_DEBUG_PAYLOADS === 'true') {
+        console.log('🔍 Sending Shoonya jData (unauth):', jsonData);
+      }
 
       const formBody = `jData=${jsonData}`;
-      console.log('🔍 Form body:', formBody);
+      // Do not log full form body to avoid large noise; jKey not present in unauth calls
 
       const response = await axios.post(`${this.baseUrl}/${endpoint}`, formBody, {
         headers: {
@@ -168,10 +170,12 @@ export class ShoonyaService {
     try {
       // For authenticated requests, pass session token as jKey parameter
       const jsonData = JSON.stringify(data);
-      console.log('🔍 Sending authenticated jData:', jsonData);
+      if (process.env.ORDER_DEBUG_PAYLOADS === 'true') {
+        console.log('🔍 Sending Shoonya jData (auth):', jsonData);
+      }
 
       const formBody = `jData=${jsonData}&jKey=${this.sessionToken}`;
-      console.log('🔍 Authenticated form body:', formBody);
+      // Do not log full form body (contains session token)
 
       const response = await axios.post(`${this.baseUrl}/${endpoint}`, formBody, {
         headers: {
@@ -284,17 +288,18 @@ export class ShoonyaService {
     }
 
     try {
-      // Ensure trading symbol is in correct format for NSE
+      // Ensure trading symbol is in correct format for NSE and URL-encode as required by Shoonya
       let tradingSymbol = orderData.tradingSymbol;
       if (orderData.exchange === 'NSE' && !tradingSymbol.includes('-EQ')) {
         tradingSymbol = `${tradingSymbol}-EQ`;
       }
+      const tsymEncoded = encodeURIComponent(tradingSymbol);
 
       const requestData = {
         uid: orderData.userId,
         actid: orderData.userId,
         exch: orderData.exchange,
-        tsym: tradingSymbol,
+        tsym: tsymEncoded,
         qty: orderData.quantity.toString(),
         dscqty: orderData.discloseQty.toString(),
         prc: orderData.priceType === 'MKT' ? '0' : orderData.price.toString(),

@@ -194,8 +194,14 @@ export class FyersService {
 
       console.log('🔄 Placing Fyers order with payload:', JSON.stringify(payload, null, 2));
 
+      if (process.env.ORDER_DEBUG_PAYLOADS === 'true') {
+        console.log('🔍 Fyers placeOrder payload:', JSON.stringify(payload));
+      }
+
       const response = await this.fyers.place_order(payload);
-      console.log('✅ Fyers order response:', response);
+      if (process.env.ORDER_DEBUG_PAYLOADS === 'true') {
+        console.log('✅ Fyers order response:', JSON.stringify(response));
+      }
       return response;
     } catch (error: any) {
       console.error('🚨 Failed to place Fyers order:', error);

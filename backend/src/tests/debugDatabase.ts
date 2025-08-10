@@ -3,7 +3,6 @@
  */
 
 import { userDatabase } from '../services/databaseCompatibility';
-import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
 
 async function debugDatabase() {
   console.log('🔍 Debugging Database Contents...');
@@ -51,31 +50,8 @@ async function debugDatabase() {
       });
     }
     
-    // Check broker connections in unified manager
-    console.log('\n🔌 Checking unified broker manager connections...');
-    
-    if (allOrders.length > 0) {
-      const userIds = [...new Set(allOrders.map(order => order.user_id.toString()))];
-      
-      for (const userId of userIds) {
-        console.log(`\n👤 User ${userId} broker connections:`);
-        
-        const shoonyaConnections = enhancedUnifiedBrokerManager.getUserConnections(userId)
-          .filter(conn => conn.brokerName === 'shoonya');
-        console.log(`  - Shoonya connections: ${shoonyaConnections.length}`);
-        
-        shoonyaConnections.forEach((conn, index) => {
-          console.log(`    Connection ${index + 1}:`);
-          console.log(`      - Account ID: ${conn.accountId}`);
-          console.log(`      - Active: ${conn.isActive}`);
-          console.log(`      - Service available: ${!!conn.service}`);
-          
-          if (conn.service) {
-            console.log(`      - Service connected: ${conn.service.isConnected()}`);
-          }
-        });
-      }
-    }
+    // No in-memory connection manager in stateless mode
+    console.log('\nℹ️ Stateless mode: no unified broker manager connections to display');
     
   } catch (error: any) {
     console.error('🚨 Debug failed:', error.message);

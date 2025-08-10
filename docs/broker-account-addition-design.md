@@ -19,7 +19,7 @@ This document provides a comprehensive low-level design of the broker account ad
 - **sessionHealthController.ts**: Account session management
 
 ### 3. Business Logic Layer
-- **enhancedUnifiedBrokerManager.ts**: Unified broker management
+- Stateless connection pattern using **UnifiedBrokerFactory** from **@copytrade/unified-broker**
 - **@copytrade/unified-broker**: External package for broker abstraction
 
 ### 4. Data Layer

@@ -73,11 +73,13 @@ const AccountSetup: React.FC = () => {
     authUrl: string;
     accountId: string;
     brokerName: string;
+    stateToken?: string;
   }>({
     isOpen: false,
     authUrl: '',
     accountId: '',
-    brokerName: ''
+    brokerName: '',
+    stateToken: undefined
   });
   const [formData, setFormData] = useState<FormData>({
     brokerName: '',
@@ -119,7 +121,7 @@ const AccountSetup: React.FC = () => {
   };
 
   // Handle OAuth flow - Using Custom Dialog
-  const handleOAuthFlow = async (accountId: string, authUrl: string): Promise<void> => {
+  const handleOAuthFlow = async (accountId: string, authUrl: string, stateToken?: string): Promise<void> => {
     setOauthInProgress(true);
 
     return new Promise((resolve, reject) => {
@@ -144,7 +146,8 @@ const AccountSetup: React.FC = () => {
         isOpen: true,
         authUrl,
         accountId,
-        brokerName
+        brokerName,
+        stateToken
       });
 
       // Store resolve/reject functions for dialog callbacks
@@ -154,12 +157,28 @@ const AccountSetup: React.FC = () => {
   };
 
   // Handle OAuth dialog completion
-  const handleOAuthComplete = async (authCode: string) => {
+  const handleOAuthComplete = async (authCode: string, fullUrl?: string) => {
+    // If a full URL is provided, parse code and (optionally) state
+    let codeToUse = authCode;
+    if (fullUrl && fullUrl.startsWith('http')) {
+      try {
+        const url = new URL(fullUrl);
+        const codeParam = url.searchParams.get('code');
+        if (codeParam) codeToUse = codeParam;
+        const stateParam = url.searchParams.get('state');
+        if (stateParam && !oauthDialog.stateToken) {
+          // Capture state from pasted URL if not already present
+          setOauthDialog(prev => ({ ...prev, stateToken: stateParam }));
+        }
+      } catch (e) {
+        console.warn('Failed to parse pasted URL for code/state');
+      }
+    }
     console.log('✅ Auth code entered:', authCode);
 
     try {
       // Complete OAuth authentication
-      await completeOAuthAuth(oauthDialog.accountId, authCode);
+      await completeOAuthAuth(oauthDialog.accountId, codeToUse, oauthDialog.stateToken);
 
       // Close dialog and reset state
       setOauthDialog({ isOpen: false, authUrl: '', accountId: '', brokerName: '' });
@@ -212,7 +231,7 @@ const AccountSetup: React.FC = () => {
   };
 
   // Complete OAuth authentication with auth code
-  const completeOAuthAuth = async (accountId: string, authCode: string): Promise<void> => {
+  const completeOAuthAuth = async (accountId: string, authCode: string, stateToken?: string): Promise<void> => {
     try {
       console.log('🔄 Completing OAuth authentication...');
 
@@ -225,7 +244,8 @@ const AccountSetup: React.FC = () => {
         },
         body: JSON.stringify({
           accountId,
-          authCode
+          authCode,
+          ...(stateToken ? { stateToken } : {})
         })
       });
 
@@ -304,7 +324,7 @@ const AccountSetup: React.FC = () => {
 
           // Proceed with OAuth flow (no reliance on accountId from connect response)
           try {
-            await handleOAuthFlow('<pending>', result.data.authUrl);
+            await handleOAuthFlow('<pending>', result.data.authUrl, result.data.stateToken);
 
             // After successful OAuth, refresh accounts using context
             await refreshAccounts();
@@ -369,33 +389,18 @@ const AccountSetup: React.FC = () => {
       const result = await activateAccount(accountId);
 
       if (result.success) {
-        console.log('✅ Account activated successfully');
-        showToast({
-          type: 'success',
-          title: 'Account Activated!',
-          message: 'Your broker account has been successfully activated.'
-        });
+        showToast({ type: 'success', title: 'Account Activated!', message: 'Your broker account has been successfully activated.' });
+        await refreshAccounts();
+      } else if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
+        // Show modal with OAuth URL and input for auth code (earlier flow)
+        await handleOAuthFlow(accountId, result.authUrl, result.stateToken);
       } else {
-        // Handle OAuth flow
-        if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
-          console.log('🔄 OAuth authentication required');
-          await handleOAuthFlow(accountId, result.authUrl);
-        } else {
-          console.error('❌ Account activation failed:', result.message);
-          showToast({
-            type: 'error',
-            title: 'Activation Failed',
-            message: result.message || 'Unknown error occurred during activation.'
-          });
-        }
+        console.error('❌ Account activation failed:', result.message);
+        showToast({ type: 'error', title: 'Activation Failed', message: result.message || 'Please try again.' });
       }
     } catch (error: any) {
       console.error('Failed to activate account:', error);
-      showToast({
-        type: 'error',
-        title: 'Activation Error',
-        message: error.message || 'Failed to activate account.'
-      });
+      showToast({ type: 'error', title: 'Activation Error', message: error.message || 'Failed to activate account.' });
     }
   };
 
@@ -610,8 +615,7 @@ const AccountSetup: React.FC = () => {
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={isOperationInProgress(account.id) || oauthInProgress}
                             >
-                              {oauthInProgress ? 'Authenticating...' :
-                               isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
+                              {oauthInProgress ? 'Authenticating...' : isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
                             </Button>
                           )}
                           <Button

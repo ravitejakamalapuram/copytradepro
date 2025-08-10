@@ -9,7 +9,7 @@ import { authErrorLoggingService } from '../services/authErrorLoggingService';
 import { traceIdService } from '../services/traceIdService';
 import TraceContext from '../utils/traceContext';
 import { User } from '../interfaces/IDatabaseAdapter';
-import { populateCacheForUser } from './brokerController';
+
 
 // Helper function to generate JWT token
 const generateToken = (user: Pick<User, 'id' | 'email' | 'name' | 'role'>): string => {
@@ -338,8 +338,7 @@ export const login = async (
       role: user.role || 'user',
     });
 
-    // Populate broker account cache for this user
-    await populateCacheForUser(user.id.toString());
+    // In-memory broker account cache removed
 
     const duration = performance.now() - startTime;
 

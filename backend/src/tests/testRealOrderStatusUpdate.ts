@@ -4,7 +4,7 @@
 
 import { userDatabase } from '../services/databaseCompatibility';
 import orderStatusService from '../services/orderStatusService';
-import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
+import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 
 async function testRealOrderStatusUpdate() {
   console.log('🧪 Testing Real Order Status Update...');
@@ -58,22 +58,7 @@ async function testRealOrderStatusUpdate() {
     // Step 3: Check broker connections
     console.log(`\n🔗 Step 3: Checking broker connections for user ${testOrder.user_id}...`);
     
-    const shoonyaConnections = enhancedUnifiedBrokerManager.getUserConnections(
-      testOrder.user_id.toString()
-    ).filter(conn => conn.brokerName === 'shoonya');
-    
-    console.log(`Found ${shoonyaConnections.length} Shoonya connections`);
-    
-    shoonyaConnections.forEach((conn, index) => {
-      console.log(`  Connection ${index + 1}:`);
-      console.log(`    Account ID: ${conn.accountId}`);
-      console.log(`    Active: ${conn.isActive}`);
-      console.log(`    Service Available: ${!!conn.service}`);
-      
-      if (conn.service) {
-        console.log(`    Service Connected: ${conn.service.isConnected()}`);
-      }
-    });
+    console.log('Stateless mode: connections are created on demand via UnifiedBrokerFactory');
     
     // Step 4: Test the actual order status refresh
     console.log(`\n🔄 Step 4: Testing order status refresh...`);
@@ -120,19 +105,19 @@ async function testRealOrderStatusUpdate() {
     const knownOrderId = '25071900001627';
     console.log(`Testing direct Shoonya API call for order: ${knownOrderId}`);
     
-    // Try to get a Shoonya connection and test the API directly
-    if (shoonyaConnections.length > 0 && shoonyaConnections[0]?.service) {
-      const shoonyaService = shoonyaConnections[0].service;
-      const accountId = shoonyaConnections[0].accountId;
-      
-      if (!shoonyaService || !accountId) {
-        console.log('❌ Missing service or account ID');
-        return;
-      }
-      
-      console.log(`Using account: ${accountId}`);
-      
-      try {
+    // Stateless mode: create service on demand and call API directly
+    const factory = UnifiedBrokerFactory.getInstance();
+    const shoonyaService = factory.createBroker('shoonya');
+    const accountId = testOrder.account_id?.toString();
+
+    if (!accountId) {
+      console.log('❌ Missing account ID on order');
+      return;
+    }
+
+    console.log(`Using account: ${accountId}`);
+
+    try {
         console.log('🔄 Making direct Shoonya API call...');
         const directResult = await shoonyaService.getOrderStatus(accountId, knownOrderId);
         
@@ -147,9 +132,7 @@ async function testRealOrderStatusUpdate() {
         console.error('  - Network connectivity issues');
         console.error('  - Shoonya API issues');
       }
-    } else {
-      console.log('❌ No active Shoonya connection available for direct API test');
-    }
+
     
   } catch (error: any) {
     console.error('🚨 Test failed:', error.message);

@@ -42,10 +42,14 @@ export class FyersSymbolConverter implements IBrokerSymbolConverter {
   }
 
   private convertEquitySymbol(symbol: StandardizedSymbol): string {
-    // Fyers equity format: EXCHANGE:SYMBOL-EQ
-    // Example: NSE:RELIANCE-EQ, BSE:RELIANCE-EQ
+    // Fyers equity format:
+    // - NSE: EXCHANGE:SYMBOL-EQ (ensure -EQ once)
+    // - BSE: EXCHANGE:SYMBOL (plain scrip symbol)
     this.validateEquitySymbol(symbol);
-    return `${symbol.exchange}:${symbol.tradingSymbol}-EQ`;
+    const exch = symbol.exchange;
+    const base = symbol.tradingSymbol || '';
+    const normalized = exch === 'BSE' ? base.replace(/-[A-Z]{1,3}$/i, '') : (base.endsWith('-EQ') ? base : `${base}-EQ`);
+    return `${exch}:${normalized}`;
   }
 
   private convertOptionSymbol(symbol: StandardizedSymbol): string {

@@ -80,6 +80,7 @@ export const accountService = {
     success: boolean;
     authStep?: AuthenticationStep;
     authUrl?: string;
+    stateToken?: string;
     message?: string;
     error?: string;
   }> {
@@ -99,6 +100,7 @@ export const accountService = {
             success: false,
             authStep: AuthenticationStep.OAUTH_REQUIRED,
             authUrl: data.authUrl,
+            stateToken: data.stateToken,
             message: data.message
           };
         }

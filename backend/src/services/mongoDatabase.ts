@@ -219,13 +219,15 @@ export class MongoDatabase implements IDatabaseAdapter {
   }
 
   // Encryption helpers
-  private encrypt(text: string): string {
+  private encrypt(text: any): string {
     const algorithm = 'aes-256-cbc';
     const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv(algorithm, key, iv);
 
-    let encrypted = cipher.update(text, 'utf8', 'hex');
+    const plain: string = typeof text === 'string' ? text : JSON.stringify(text ?? {});
+
+    let encrypted = cipher.update(plain, 'utf8', 'hex');
     encrypted += cipher.final('hex');
 
     return iv.toString('hex') + ':' + encrypted;
@@ -433,7 +435,9 @@ export class MongoDatabase implements IDatabaseAdapter {
   // Connected Accounts Management
   async createConnectedAccount(accountData: CreateConnectedAccountData): Promise<ConnectedAccount> {
     try {
-      const encryptedCredentials = this.encrypt(JSON.stringify(accountData.credentials));
+      const encryptedCredentials = this.encrypt(
+        typeof accountData.credentials === 'undefined' ? {} : JSON.stringify(accountData.credentials)
+      );
 
       const accountDoc = new this.ConnectedAccountModel({
         user_id: new mongoose.Types.ObjectId(accountData.user_id.toString()),
@@ -489,8 +493,10 @@ export class MongoDatabase implements IDatabaseAdapter {
     try {
       const updateData: any = { ...accountData, updated_at: new Date() };
 
-      if (accountData.credentials) {
-        updateData.encrypted_credentials = this.encrypt(JSON.stringify(accountData.credentials));
+      if (Object.prototype.hasOwnProperty.call(accountData, 'credentials')) {
+        updateData.encrypted_credentials = this.encrypt(
+          typeof accountData.credentials === 'undefined' ? {} : JSON.stringify(accountData.credentials)
+        );
         delete updateData.credentials;
       }
 
