@@ -1,10 +1,7 @@
 import { EventEmitter } from 'events';
 import { userDatabase } from './databaseCompatibility';
-import { BrokerRegistry, IBrokerService, IUnifiedBrokerService } from '@copytrade/unified-broker';
-import { notificationService, OrderNotificationData } from './notificationService';
-
-// Import enhanced unified broker manager
-import { enhancedUnifiedBrokerManager } from './enhancedUnifiedBrokerManager';
+import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
+import { notificationService } from './notificationService';
 
 // Import WebSocket service for real-time updates
 import websocketService from './websocketService';
@@ -12,39 +9,14 @@ import websocketService from './websocketService';
 // Import enhanced logging for order status operations
 import { orderStatusLogger, OrderStatusLogContext } from './orderStatusLogger';
 
-// Broker connection manager interface
-interface BrokerConnectionManager {
-  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null;
+// Stateless helper to get a broker service connected with DB credentials
+async function getStatelessBrokerService(userId: string, brokerName: string, accountId: string) {
+  const credentials = await userDatabase.getAccountCredentials(accountId);
+  if (!credentials) return null;
+  const service = UnifiedBrokerFactory.getInstance().createBroker(brokerName);
+  await service.connect(credentials).catch(() => {});
+  return service;
 }
-
-// Create broker connection manager implementation using enhanced manager
-const brokerConnectionManager: BrokerConnectionManager = {
-  getBrokerConnection(userId: string, brokerName: string): IUnifiedBrokerService | null {
-    console.log(`🔍 Looking for broker connection: userId=${userId}, brokerName=${brokerName}`);
-
-    // Get all connections for this user and broker from enhanced manager
-    const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
-      .filter(conn => conn.brokerName === brokerName);
-    
-    if (connections.length === 0) {
-      console.log(`❌ No ${brokerName} connections found for user ${userId}`);
-      return null;
-    }
-
-    // Return the first active connection
-    const activeConnection = connections.find(conn => conn.isActive);
-    if (activeConnection) {
-      console.log(`✅ Found active ${brokerName} connection for user ${userId} (account: ${activeConnection.accountId})`);
-      return activeConnection.service;
-    }
-
-    // If no active connection, try the first one
-    console.log(`⚠️ No active ${brokerName} connection found for user ${userId}, trying first available`);
-    return connections[0]?.service || null;
-  }
-};
-
-
 
 // Enhanced logger with structured logging
 const logger = {
@@ -298,17 +270,16 @@ class OrderStatusService extends EventEmitter {
 
       let newStatus = order.status;
 
-      // Try to get real status from broker API first
-      if (brokerConnectionManager) {
-        try {
-          // Get the broker connection for the user
-          const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
+      // Try to get real status from broker API first (stateless)
+      try {
+        // Get stateless broker service using DB credentials
+        const brokerService = await getStatelessBrokerService(order.user_id.toString(), order.broker_name, brokerAccountId);
 
-          if (brokerService) {
-            logger.debug('Broker connection found, calling API', logContext, {
-              operationId,
-              brokerService: !!brokerService
-            });
+        if (brokerService) {
+          logger.debug('Stateless broker service ready, calling API', logContext, {
+            operationId,
+            brokerService: !!brokerService
+          });
 
             // Log the API request
             orderStatusLogger.logOrderStatusRequest(logContext);
@@ -447,11 +418,7 @@ class OrderStatusService extends EventEmitter {
 
           // Don't throw here - we want to continue with status update logic
         }
-      } else {
-        logger.warn('Broker connection manager not available', logContext, {
-          operationId
-        });
-      }
+
 
       // Update status if changed
       if (newStatus !== order.status) {
@@ -572,39 +539,7 @@ class OrderStatusService extends EventEmitter {
         }
       }
 
-      // Final fallback: Try to get broker account ID from active broker connections
-      logger.debug(`Final fallback: Checking active broker connections for user ${order.user_id}`);
-      const brokerService = brokerConnectionManager.getBrokerConnection(order.user_id.toString(), order.broker_name);
-
-      if (brokerService && brokerService.isConnected()) {
-        // Try to get broker account ID from the service
-        const brokerServiceTyped = brokerService as any; // Type assertion for broker service capabilities
-
-        // Try different methods to get the account ID based on broker capabilities
-        let accountId = null;
-
-        // Method 1: getUserId (Shoonya-style)
-        if (brokerServiceTyped.getUserId && typeof brokerServiceTyped.getUserId === 'function') {
-          accountId = brokerServiceTyped.getUserId();
-        }
-
-        // Method 2: getAccountInfo (Unified interface)
-        if (!accountId && brokerServiceTyped.getAccountInfo && typeof brokerServiceTyped.getAccountInfo === 'function') {
-          const accountInfo = brokerServiceTyped.getAccountInfo();
-          accountId = accountInfo?.accountId;
-        }
-
-        // Method 3: Direct accountId property
-        if (!accountId && brokerServiceTyped.accountId) {
-          accountId = brokerServiceTyped.accountId;
-        }
-
-        if (accountId) {
-          logger.debug(`Found broker account ID from active connection: ${accountId}`);
-          return accountId;
-        }
-      }
-
+      // Final fallback: No stateless connection available without account ID
       logger.warn(`Could not find broker account ID for order ${order.id}`);
       return null;
     } catch (error) {
@@ -837,19 +772,25 @@ class OrderStatusService extends EventEmitter {
       try {
         const notificationStartTime = performance.now();
         
-        const orderNotificationData: OrderNotificationData = {
-          orderId: order.id,
-          symbol: order.symbol,
-          action: order.action as 'BUY' | 'SELL',
-          quantity: order.quantity,
-          price: order.price,
-          oldStatus,
-          newStatus,
-          brokerName: order.broker_name,
-          timestamp: now
-        };
-
-        await notificationService.sendOrderStatusNotification(order.user_id.toString(), orderNotificationData);
+        // Send order status notification
+        await notificationService.sendNotification({
+          id: `order_status_${order.id}_${Date.now()}`,
+          type: 'alert',
+          title: 'Order Status Update',
+          message: `Order ${order.id} status changed from ${oldStatus} to ${newStatus}`,
+          severity: newStatus === 'REJECTED' ? 'high' : 'medium',
+          timestamp: new Date(now),
+          data: {
+            orderId: order.id,
+            symbol: order.symbol,
+            action: order.action,
+            quantity: order.quantity,
+            price: order.price,
+            oldStatus,
+            newStatus,
+            brokerName: order.broker_name
+          }
+        });
         
         const notificationDuration = performance.now() - notificationStartTime;
         notificationSuccess = true;

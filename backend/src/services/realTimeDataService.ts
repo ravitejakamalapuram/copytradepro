@@ -4,7 +4,6 @@
  */
 
 import { Server as SocketIOServer } from 'socket.io';
-import { nseService } from './nseService';
 
 interface PriceSubscription {
   symbol: string;
@@ -40,8 +39,9 @@ class RealTimeDataService {
   initialize(io: SocketIOServer): void {
     this.io = io;
     this.setupSocketHandlers();
-    this.startPriceUpdates();
-    console.log('✅ Real-time data service connected to Socket.IO');
+    // Price updates disabled per user request
+    // this.startPriceUpdates();
+    console.log('✅ Real-time data service connected to Socket.IO (price updates disabled)');
   }
 
   /**
@@ -170,34 +170,9 @@ class RealTimeDataService {
         const [symbol, exchange] = key.split(':');
         if (!symbol || !exchange) continue;
 
-        const quote = await nseService.getQuoteInfo(symbol);
-
-        if (quote) {
-          const livePrice: LivePrice = {
-            symbol,
-            price: quote.lastPrice || 0,
-            change: quote.change || 0,
-            changePercent: quote.pChange || 0,
-            volume: 0, // NSE API doesn't provide volume in this format
-            timestamp: new Date(),
-            exchange
-          };
-
-          // Cache the price
-          this.priceCache.set(key, livePrice);
-
-          // Emit to all subscribers with enhanced event data
-          const subscriptions = this.subscriptions.get(key);
-          if (subscriptions) {
-            for (const subscription of subscriptions) {
-              this.io.to(subscription.socketId).emit('price_update', {
-                ...livePrice,
-                eventId: `price_${symbol}_${Date.now()}`,
-                source: 'realtime_service'
-              });
-            }
-          }
-        }
+        // Real-time price updates disabled - NSE service removed
+        // This functionality will be replaced with standardized symbol management system
+        console.log(`⚠️ Real-time price updates temporarily disabled for ${symbol} - awaiting standardized symbol system integration`);
       } catch (error) {
         console.warn(`⚠️ Failed to update price for ${key}:`, error);
         

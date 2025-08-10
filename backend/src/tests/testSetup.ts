@@ -13,13 +13,7 @@ jest.mock('../services/brokerSessionManager', () => ({
   }
 }));
 
-jest.mock('../services/enhancedUnifiedBrokerManager', () => ({
-  enhancedUnifiedBrokerManager: {
-    initialize: jest.fn(),
-    cleanup: jest.fn(),
-    getBrokerService: jest.fn()
-  }
-}));
+// unified manager removed; no mock needed
 
 jest.mock('../services/websocketService', () => ({
   default: {

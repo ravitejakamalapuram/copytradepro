@@ -46,8 +46,7 @@ class WebSocketService {
 
     this.io = new Server(server, {
       cors: {
-        origin: process.env.FRONTEND_URL || ["http://localhost:5173", "http://localhost:5174"],
-        methods: ["GET", "POST"],
+        origin: true,
         credentials: true
       },
       path: '/socket.io/',
@@ -619,6 +618,50 @@ class WebSocketService {
         total: (connectionHealthSize * 200) + (totalTrackedSockets * 50)
       }
     };
+  }
+
+  /**
+   * Broadcast startup status updates to all connected clients
+   */
+  broadcastStartupStatus(status: any): void {
+    if (!this.io) {
+      logger.warn('Cannot broadcast startup status - Socket.IO not initialized');
+      return;
+    }
+
+    this.io.emit('startup_status_update', {
+      type: 'startup_status',
+      data: status,
+      timestamp: new Date().toISOString()
+    });
+
+    logger.debug('Broadcasted startup status update to all clients', {
+      component: 'WEBSOCKET_SERVICE',
+      operation: 'BROADCAST_STARTUP_STATUS',
+      connectedClients: this.io.engine.clientsCount
+    });
+  }
+
+  /**
+   * Broadcast symbol initialization progress to all connected clients
+   */
+  broadcastSymbolInitProgress(progress: any): void {
+    if (!this.io) {
+      logger.warn('Cannot broadcast symbol init progress - Socket.IO not initialized');
+      return;
+    }
+
+    this.io.emit('symbol_init_progress', {
+      type: 'symbol_init_progress',
+      data: progress,
+      timestamp: new Date().toISOString()
+    });
+
+    logger.debug('Broadcasted symbol initialization progress to all clients', {
+      component: 'WEBSOCKET_SERVICE',
+      operation: 'BROADCAST_SYMBOL_INIT_PROGRESS',
+      progress: progress.progress || 0
+    });
   }
 
   /**

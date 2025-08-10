@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type ErrorInfo } from 'react';
 import ErrorBoundary from './ErrorBoundary';
 import Button from './ui/Button';
 
@@ -22,15 +22,17 @@ const NavigationFallback: React.FC = () => (
 );
 
 const NavigationErrorBoundary: React.FC<NavigationErrorBoundaryProps> = ({ children }) => {
-  const handleNavigationError = (error: Error) => {
+  const handleNavigationError = (error: Error, _errorInfo: ErrorInfo) => {
     console.error('Navigation Error:', error);
-    // Report navigation-specific errors
+    // Navigation errors are already captured by the ErrorBoundary component
+    // Additional navigation-specific logging can be added here if needed
   };
 
   return (
     <ErrorBoundary
       fallback={<NavigationFallback />}
       onError={handleNavigationError}
+      componentName="NavigationErrorBoundary"
     >
       {children}
     </ErrorBoundary>

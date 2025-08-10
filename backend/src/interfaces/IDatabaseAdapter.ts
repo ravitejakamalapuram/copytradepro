@@ -5,6 +5,7 @@ export interface User {
   email: string;
   name: string;
   password: string;
+  role?: string;
   created_at: string;
   updated_at: string;
 }
@@ -13,12 +14,14 @@ export interface CreateUserData {
   email: string;
   name: string;
   password: string;
+  role?: string;
 }
 
 export interface UpdateUserData {
   email?: string;
   name?: string;
   password?: string;
+  role?: string;
 }
 
 // Account status enum for authentication flow
@@ -36,7 +39,8 @@ export interface ConnectedAccount {
   products: string; // JSON string
   encrypted_credentials: string; // Encrypted JSON
   account_status: AccountStatus; // Authentication status
-  token_expiry_time: string | null; // ISO string or null for infinity (Shoonya)
+  token_expiry_time: string | null; // Access token expiry (ISO string or null for infinity like Shoonya)
+  refresh_token_expiry_time: string | null; // Refresh token expiry (ISO string for OAuth brokers like Fyers)
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +56,8 @@ export interface CreateConnectedAccountData {
   products: any[];
   credentials: any; // Will be encrypted before storage
   account_status: AccountStatus; // Authentication status
-  token_expiry_time?: string | null; // ISO string or null for infinity (Shoonya)
+  token_expiry_time?: string | null; // Access token expiry (ISO string or null for infinity like Shoonya)
+  refresh_token_expiry_time?: string | null; // Refresh token expiry (ISO string for OAuth brokers like Fyers)
 }
 
 export interface OrderHistory {

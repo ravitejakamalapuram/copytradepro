@@ -13,7 +13,7 @@ export const useConnectionStatus = () => {
         await api.get('/health', { timeout: 3000 });
         setIsOnline(true);
         setLastChecked(new Date());
-      } catch (error) {
+      } catch {
         console.warn('🔌 Server connection check failed');
         setIsOnline(false);
         setLastChecked(new Date());

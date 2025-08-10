@@ -1,5 +1,11 @@
 // Database models and interfaces
 
+// Export symbol models
+export * from './symbolModels';
+
+// Export error log models
+export * from './errorLogModels';
+
 export interface User {
   id: number;
   email: string;

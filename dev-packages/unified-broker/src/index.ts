@@ -9,6 +9,10 @@ export * from './interfaces/IBrokerService';
 // New unified interfaces for standardized broker responses
 export * from './interfaces/UnifiedBrokerResponse';
 
+// Core broker services (for adapter compatibility)
+export { FyersService } from './services/fyersService';
+export { ShoonyaService } from './services/shoonyaService';
+
 // Unified broker factory
 export * from './factories/UnifiedBrokerFactory';
 

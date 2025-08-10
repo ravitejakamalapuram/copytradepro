@@ -1,0 +1,377 @@
+.error-dashboard {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.error-dashboard__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.error-dashboard__subtitle {
+  color: var(--text-secondary);
+  margin: 0.5rem 0 0 0;
+  font-size: 0.875rem;
+}
+
+.error-dashboard__status {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.status-indicator {
+  margin-left: 0.25rem;
+}
+
+.status-indicator.active {
+  color: var(--color-profit);
+}
+
+.status-indicator.inactive {
+  color: var(--color-neutral);
+}
+
+.auto-refresh-active {
+  color: var(--color-profit);
+  border-color: var(--color-profit);
+}
+
+.auto-refresh-inactive {
+  color: var(--text-secondary);
+  border-color: var(--border-primary);
+}
+
+/* Tab Navigation */
+.error-dashboard__tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--border-primary);
+  margin-bottom: 1rem;
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: none;
+  color: var(--text-secondary);
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.tab-button:hover {
+  color: var(--text-primary);
+}
+
+.tab-button.active {
+  color: var(--interactive-primary);
+  border-bottom-color: var(--interactive-primary);
+}
+
+.tab-icon {
+  font-size: 1rem;
+}
+
+/* Metric Cards */
+.metric-card {
+  border: 1px solid var(--border-secondary);
+  transition: all 0.2s ease;
+}
+
+.metric-card:hover {
+  border-color: var(--border-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.metric-content {
+  text-align: center;
+  padding: 1.5rem;
+}
+
+.metric-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+  color: var(--text-primary);
+}
+
+.metric-value.critical {
+  color: var(--color-loss);
+}
+
+.metric-value.success {
+  color: var(--color-profit);
+}
+
+.metric-value.warning {
+  color: var(--color-neutral);
+}
+
+.metric-label {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.metric-change {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.metric-change.critical {
+  color: var(--color-loss);
+}
+
+.metric-change.success {
+  color: var(--color-profit);
+}
+
+.metric-change.warning {
+  color: var(--color-neutral);
+}
+
+/* Distribution Chart */
+.distribution-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.distribution-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.distribution-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.source-badge {
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.source-badge[data-source="ui"] {
+  background-color: rgba(59, 130, 246, 0.1);
+  color: rgb(59, 130, 246);
+}
+
+.source-badge[data-source="be"] {
+  background-color: rgba(16, 185, 129, 0.1);
+  color: rgb(16, 185, 129);
+}
+
+.source-badge[data-source="db"] {
+  background-color: rgba(245, 158, 11, 0.1);
+  color: rgb(245, 158, 11);
+}
+
+.source-badge[data-source="api"] {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: rgb(239, 68, 68);
+}
+
+.distribution-count {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.distribution-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.distribution-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+/* Top Components */
+.top-components {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.component-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.component-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.component-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.component-count {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+}
+
+.component-bar {
+  width: 100%;
+  height: 6px;
+  background-color: var(--bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.component-fill {
+  height: 100%;
+  background-color: var(--interactive-primary);
+  transition: width 0.3s ease;
+}
+
+/* Recent Errors */
+.recent-errors {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recent-error-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.recent-error-item:hover {
+  border-color: var(--border-primary);
+  background-color: var(--bg-secondary);
+}
+
+.error-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.error-indicator.critical {
+  background-color: var(--color-loss);
+}
+
+.error-indicator.warning {
+  background-color: var(--color-neutral);
+}
+
+.error-indicator.info {
+  background-color: var(--color-profit);
+}
+
+.error-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.error-message {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-meta {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.error-actions {
+  flex-shrink: 0;
+}
+
+.no-errors {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+}
+
+.no-errors-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.no-errors-text {
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .error-dashboard__tabs {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .tab-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .metric-content {
+    padding: 1rem;
+  }
+  
+  .metric-value {
+    font-size: 1.25rem;
+  }
+  
+  .metric-icon {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .error-dashboard__title {
+    font-size: 1.25rem;
+  }
+  
+  .recent-error-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .error-actions {
+    align-self: flex-end;
+  }
+}

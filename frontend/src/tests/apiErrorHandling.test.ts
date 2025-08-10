@@ -337,39 +337,44 @@ describe('API Error Handling', () => {
       expect(shouldLogout(error)).toBe(false);
     });
 
-    test('should handle 401 errors appropriately in production', () => {
-      const authError = new Error('Unauthorized') as AxiosError;
-      authError.config = { url: '/api/auth/profile' } as any;
-      authError.response = {
+    test('should handle 401 errors based on session expiry, not URL', () => {
+      const sessionExpiredError = new Error('Token expired') as AxiosError;
+      sessionExpiredError.config = { url: '/api/broker/accounts' } as any;
+      sessionExpiredError.response = {
         status: 401,
-        data: { message: 'Unauthorized' },
+        data: { message: 'Token expired' },
         statusText: 'Unauthorized',
         headers: {},
-        config: { url: '/api/auth/profile' } as any
+        config: { url: '/api/broker/accounts' } as any
       };
 
-      const brokerError = new Error('Unauthorized') as AxiosError;
-      brokerError.config = { url: '/api/broker/accounts' } as any;
-      brokerError.response = {
+      const brokerConnectionError = new Error('Broker connection failed') as AxiosError;
+      brokerConnectionError.config = { url: '/api/broker/accounts' } as any;
+      brokerConnectionError.response = {
         status: 401,
-        data: { message: 'Unauthorized' },
+        data: { message: 'Broker connection failed' },
         statusText: 'Unauthorized',
         headers: {},
         config: { url: '/api/broker/accounts' } as any
       };
 
       const shouldLogout = (error: AxiosError, isDevelopment: boolean = false): boolean => {
-        const url = error.config?.url || '';
-        
         if (isDevelopment) {
           return false;
         }
         
-        return url.includes('/auth/') || url.includes('/profile');
+        // Check if error indicates session expiry
+        const errorMessage = (error.response?.data as any)?.message || '';
+        const isSessionExpired = errorMessage === 'Token expired' || 
+                                errorMessage === 'Invalid token' ||
+                                errorMessage === 'Invalid or expired token';
+        
+        return isSessionExpired && (error.response?.status === 401 || error.response?.status === 403);
       };
 
-      expect(shouldLogout(authError, false)).toBe(true);  // Should logout for auth endpoints in production
-      expect(shouldLogout(brokerError, false)).toBe(false); // Should not logout for broker endpoints in production
+      expect(shouldLogout(sessionExpiredError, false)).toBe(true);  // Should logout for session expired
+      expect(shouldLogout(brokerConnectionError, false)).toBe(false); // Should not logout for broker errors
+      expect(shouldLogout(sessionExpiredError, true)).toBe(false); // Should not logout in development
     });
   });
 

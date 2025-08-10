@@ -4,9 +4,15 @@
  * Uses comprehensive error handler for consistent error processing
  */
 
-import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '@copytrade/unified-broker';
+import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus } from '@copytrade/unified-broker';
 import { ShoonyaService } from './shoonyaService';
 import { ShoonyaCredentials } from './types';
+import { ShoonyaSymbolFormatter } from './symbolFormatter';
+
+// Import standardized symbol services
+// TODO: These should be properly exported from shared packages
+// import { BrokerSymbolConverterFactory } from '../../../backend/src/services/brokerSymbolConverters/BrokerSymbolConverterFactory';
+// import { symbolDatabaseService } from '../../../backend/src/services/symbolDatabaseService';
 
 export class ShoonyaServiceAdapter extends IBrokerService {
   private shoonyaService: ShoonyaService;
@@ -95,13 +101,37 @@ export class ShoonyaServiceAdapter extends IBrokerService {
         };
         const shoonyaProductType = productTypeMap[orderRequest.productType] || orderRequest.productType;
 
+        // Convert symbol using pre-fetched symbolMetadata only
+        let formattedData: { tradingSymbol: string; exchange: string };
+
+        // Check if symbolMetadata is provided in the order request
+        const symbolMetadata = (orderRequest as any).symbolMetadata;
+
+        if (symbolMetadata) {
+          // Use pre-fetched symbol metadata (no database call needed)
+          formattedData = {
+            tradingSymbol: symbolMetadata.tradingSymbol,
+            exchange: symbolMetadata.exchange || 'NSE'
+          };
+
+          console.log(`🔄 Shoonya using pre-fetched symbol metadata: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        } else {
+          // Use symbol as-is when no metadata provided
+          formattedData = {
+            tradingSymbol: orderRequest.symbol,
+            exchange: orderRequest.exchange || 'NSE'
+          };
+
+          console.log(`🔄 Shoonya using symbol as-is: ${orderRequest.symbol} -> ${formattedData.tradingSymbol} (${formattedData.exchange})`);
+        }
+
         // Transform to Shoonya-specific order format
         const shoonyaOrderRequest = {
           userId: orderRequest.accountId || this.accountId || '',
           buyOrSell: orderRequest.action === 'BUY' ? 'B' as const : 'S' as const,
           productType: shoonyaProductType,
-          exchange: orderRequest.exchange || 'NSE',
-          tradingSymbol: orderRequest.symbol,
+          exchange: formattedData.exchange,
+          tradingSymbol: formattedData.tradingSymbol,
           quantity: orderRequest.quantity,
           discloseQty: 0,
           priceType: shoonyaPriceType,
@@ -404,68 +434,9 @@ export class ShoonyaServiceAdapter extends IBrokerService {
     throw finalError;
   }
 
-  async getPositions(accountId: string): Promise<Position[]> {
-    const maxRetries = 3;
-    let lastError: any = null;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`📊 Getting positions for account ${accountId} (attempt ${attempt}/${maxRetries})`);
-        
-        const response = await this.shoonyaService.getPositions(accountId);
-        
-        if (!Array.isArray(response)) {
-          console.warn('Shoonya positions response is not an array, returning empty array');
-          return [];
-        }
 
-        const transformedPositions = response.map(position => ({
-          symbol: position.tsym || '',
-          quantity: this.parseNumericValue(position.netqty, 0),
-          averagePrice: this.parseNumericValue(position.netavgprc, 0),
-          currentPrice: this.parseNumericValue(position.lp, 0),
-          pnl: this.parseNumericValue(position.urmtom, 0),
-          exchange: position.exch || '',
-          productType: position.prd || ''
-        }));
-        
-        console.log(`✅ Retrieved ${transformedPositions.length} positions`);
-        return transformedPositions;
-        
-      } catch (error: any) {
-        lastError = error;
-        
-        const enhancedError = new Error(error.message);
-        (enhancedError as any).originalError = error.message;
-        (enhancedError as any).attempt = attempt;
-        throw enhancedError;
-      }
-    }
 
-    // If we get here, all retries failed
-    const finalError = new Error(lastError?.message || 'Failed to get positions after multiple attempts');
-    (finalError as any).originalError = lastError?.message;
-    (finalError as any).maxRetriesExceeded = true;
-    throw finalError;
-  }
-
-  async getQuote(symbol: string, exchange: string): Promise<Quote> {
-    try {
-      const response = await this.shoonyaService.getQuotes(exchange, symbol);
-
-      return {
-        symbol: response.tsym || symbol,
-        price: parseFloat(response.lp) || 0,
-        change: parseFloat(response.c) || 0,
-        changePercent: parseFloat(response.pc) || 0,
-        volume: parseInt(response.v) || 0,
-        exchange: response.exch || exchange,
-        timestamp: new Date()
-      };
-    } catch (error: any) {
-      throw new Error(`Failed to get quote: ${error.message}`);
-    }
-  }
 
   async searchSymbols(query: string, exchange: string): Promise<any[]> {
     try {
@@ -474,6 +445,29 @@ export class ShoonyaServiceAdapter extends IBrokerService {
       return [];
     } catch (error: any) {
       throw new Error(`Failed to search symbols: ${error.message}`);
+    }
+  }
+
+  async getPositions(accountId: string): Promise<any[]> {
+    try {
+      const response = await this.shoonyaService.getPositions(accountId);
+      return Array.isArray(response) ? response : [];
+    } catch (error: any) {
+      throw new Error(`Failed to get positions: ${error.message}`);
+    }
+  }
+
+  async getQuote(symbol: string, exchange: string): Promise<any> {
+    try {
+      // For Shoonya, we need to search for the symbol first to get the token
+      const searchResults = await this.shoonyaService.searchScrip(exchange, symbol);
+      if (searchResults && searchResults.length > 0) {
+        const token = searchResults[0].token;
+        return await this.shoonyaService.getQuotes(exchange, token);
+      }
+      return null;
+    } catch (error: any) {
+      throw new Error(`Failed to get quote: ${error.message}`);
     }
   }
 
@@ -578,4 +572,6 @@ export class ShoonyaServiceAdapter extends IBrokerService {
   }
 
   // Legacy error handling methods removed - now using comprehensive error handler
+
+
 }

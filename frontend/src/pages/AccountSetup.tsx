@@ -8,6 +8,8 @@ import AccountStatusIndicator from '../components/AccountStatusIndicator';
 import { AuthenticationStep } from '@copytrade/shared-types';
 import '../styles/app-theme.css';
 import Button from '../components/ui/Button';
+import Card, { CardHeader, CardContent } from '../components/ui/Card';
+import { Stack, HStack } from '../components/ui/Layout';
 import { OAuthDialog } from '../components/OAuthDialog';
 import { useToast } from '../components/Toast';
 
@@ -16,17 +18,19 @@ const ALL_BROKERS = [
     id: 'shoonya',
     name: 'Shoonya',
     description: 'Reliable trading & investment platform by Finvasia',
-    logo: '🏦',
+    logo: '🏛️',
     features: ['Zero brokerage on equity delivery', 'Advanced charting tools', 'API trading support']
   },
   {
     id: 'fyers',
     name: 'Fyers',
     description: 'Advanced trading platform with powerful APIs',
-    logo: '🚀',
+    logo: '🔥',
     features: ['Professional trading tools', 'Real-time market data', 'Advanced order types']
   },
 ];
+
+// Broker symbols are already defined in ALL_BROKERS array above
 
 interface FormData {
   brokerName: string;
@@ -69,11 +73,13 @@ const AccountSetup: React.FC = () => {
     authUrl: string;
     accountId: string;
     brokerName: string;
+    stateToken?: string;
   }>({
     isOpen: false,
     authUrl: '',
     accountId: '',
-    brokerName: ''
+    brokerName: '',
+    stateToken: undefined
   });
   const [formData, setFormData] = useState<FormData>({
     brokerName: '',
@@ -115,7 +121,7 @@ const AccountSetup: React.FC = () => {
   };
 
   // Handle OAuth flow - Using Custom Dialog
-  const handleOAuthFlow = async (accountId: string, authUrl: string): Promise<void> => {
+  const handleOAuthFlow = async (accountId: string, authUrl: string, stateToken?: string): Promise<void> => {
     setOauthInProgress(true);
 
     return new Promise((resolve, reject) => {
@@ -132,16 +138,16 @@ const AccountSetup: React.FC = () => {
         return;
       }
 
-      // Find broker name for display
+      // For minimal API response, accountId may be a placeholder
       const account = accounts.find(acc => acc.id === accountId);
       const brokerName = account?.brokerDisplayName || 'Broker';
 
-      // Show OAuth dialog
       setOauthDialog({
         isOpen: true,
         authUrl,
         accountId,
-        brokerName
+        brokerName,
+        stateToken
       });
 
       // Store resolve/reject functions for dialog callbacks
@@ -151,12 +157,28 @@ const AccountSetup: React.FC = () => {
   };
 
   // Handle OAuth dialog completion
-  const handleOAuthComplete = async (authCode: string) => {
+  const handleOAuthComplete = async (authCode: string, fullUrl?: string) => {
+    // If a full URL is provided, parse code and (optionally) state
+    let codeToUse = authCode;
+    if (fullUrl && fullUrl.startsWith('http')) {
+      try {
+        const url = new URL(fullUrl);
+        const codeParam = url.searchParams.get('code');
+        if (codeParam) codeToUse = codeParam;
+        const stateParam = url.searchParams.get('state');
+        if (stateParam && !oauthDialog.stateToken) {
+          // Capture state from pasted URL if not already present
+          setOauthDialog(prev => ({ ...prev, stateToken: stateParam }));
+        }
+      } catch (e) {
+        console.warn('Failed to parse pasted URL for code/state');
+      }
+    }
     console.log('✅ Auth code entered:', authCode);
 
     try {
       // Complete OAuth authentication
-      await completeOAuthAuth(oauthDialog.accountId, authCode);
+      await completeOAuthAuth(oauthDialog.accountId, codeToUse, oauthDialog.stateToken);
 
       // Close dialog and reset state
       setOauthDialog({ isOpen: false, authUrl: '', accountId: '', brokerName: '' });
@@ -209,7 +231,7 @@ const AccountSetup: React.FC = () => {
   };
 
   // Complete OAuth authentication with auth code
-  const completeOAuthAuth = async (accountId: string, authCode: string): Promise<void> => {
+  const completeOAuthAuth = async (accountId: string, authCode: string, stateToken?: string): Promise<void> => {
     try {
       console.log('🔄 Completing OAuth authentication...');
 
@@ -222,7 +244,8 @@ const AccountSetup: React.FC = () => {
         },
         body: JSON.stringify({
           accountId,
-          authCode
+          authCode,
+          ...(stateToken ? { stateToken } : {})
         })
       });
 
@@ -295,14 +318,13 @@ const AccountSetup: React.FC = () => {
       }
 
       if (result.success) {
-        // Check if OAuth authentication is required
-        if (result.data?.requiresAuthCode && result.data?.authUrl && result.data?.accountId) {
+        // Check if OAuth authentication is required (minimal API response)
+        if (result.data?.requiresAuthCode && result.data?.authUrl) {
           console.log('🔄 OAuth authentication required for new connection');
-          console.log('📋 Account ID for OAuth:', result.data.accountId);
 
-          // The account has been saved in inactive state, now complete OAuth
+          // Proceed with OAuth flow (no reliance on accountId from connect response)
           try {
-            await handleOAuthFlow(result.data.accountId, result.data.authUrl);
+            await handleOAuthFlow('<pending>', result.data.authUrl, result.data.stateToken);
 
             // After successful OAuth, refresh accounts using context
             await refreshAccounts();
@@ -367,33 +389,18 @@ const AccountSetup: React.FC = () => {
       const result = await activateAccount(accountId);
 
       if (result.success) {
-        console.log('✅ Account activated successfully');
-        showToast({
-          type: 'success',
-          title: 'Account Activated!',
-          message: 'Your broker account has been successfully activated.'
-        });
+        showToast({ type: 'success', title: 'Account Activated!', message: 'Your broker account has been successfully activated.' });
+        await refreshAccounts();
+      } else if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
+        // Show modal with OAuth URL and input for auth code (earlier flow)
+        await handleOAuthFlow(accountId, result.authUrl, result.stateToken);
       } else {
-        // Handle OAuth flow
-        if (result.authStep === AuthenticationStep.OAUTH_REQUIRED && result.authUrl) {
-          console.log('🔄 OAuth authentication required');
-          await handleOAuthFlow(accountId, result.authUrl);
-        } else {
-          console.error('❌ Account activation failed:', result.message);
-          showToast({
-            type: 'error',
-            title: 'Activation Failed',
-            message: result.message || 'Unknown error occurred during activation.'
-          });
-        }
+        console.error('❌ Account activation failed:', result.message);
+        showToast({ type: 'error', title: 'Activation Failed', message: result.message || 'Please try again.' });
       }
     } catch (error: any) {
       console.error('Failed to activate account:', error);
-      showToast({
-        type: 'error',
-        title: 'Activation Error',
-        message: error.message || 'Failed to activate account.'
-      });
+      showToast({ type: 'error', title: 'Activation Error', message: error.message || 'Failed to activate account.' });
     }
   };
 
@@ -443,12 +450,12 @@ const AccountSetup: React.FC = () => {
           message: 'Failed to remove the account. Please try again.'
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to remove account:', error);
       showToast({
         type: 'error',
         title: 'Removal Error',
-        message: error.message || 'Failed to remove account.'
+        message: (error as any).message || 'Failed to remove account.'
       });
     }
   };
@@ -481,35 +488,37 @@ const AccountSetup: React.FC = () => {
       <AppNavigation />
       
       <div className="app-main">
-        {/* Page Header */}
-        <div className="card">
-          <div className="card-header">
-            <h1 className="card-title">Broker Accounts</h1>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <Button 
-                variant="primary"
-                onClick={() => navigate('/trade-setup')}
-              >
-                📈 Start Trading
-              </Button>
-              <Button 
-                variant="primary"
-                onClick={() => setShowAddForm(true)}
-              >
-                + Add Broker
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Stack gap={6}>
+          {/* Page Header */}
+          <Card>
+            <CardHeader
+              title="Broker Accounts"
+              action={
+                <HStack gap={2}>
+                  <Button 
+                    variant="primary"
+                    onClick={() => navigate('/trade-setup')}
+                  >
+                    📈 Start Trading
+                  </Button>
+                  <Button 
+                    variant="primary"
+                    onClick={() => setShowAddForm(true)}
+                  >
+                    + Add Broker
+                  </Button>
+                </HStack>
+              }
+            />
+          </Card>
 
-        {/* Connected Accounts */}
-        {accounts.length > 0 && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">Connected Accounts ({accounts.length})</h2>
-            </div>
-            <div style={{ overflowX: 'auto' }}>
-              <table className="table table-trading">
+          {/* Connected Accounts */}
+          {accounts.length > 0 && (
+            <Card>
+              <CardHeader title={`Connected Accounts (${accounts.length})`} />
+              <CardContent>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="table table-trading">
                 <thead>
                   <tr>
                     <th>Broker</th>
@@ -606,8 +615,7 @@ const AccountSetup: React.FC = () => {
                               onClick={() => handleActivateAccount(account.id)}
                               disabled={isOperationInProgress(account.id) || oauthInProgress}
                             >
-                              {oauthInProgress ? 'Authenticating...' :
-                               isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
+                              {oauthInProgress ? 'Authenticating...' : isOperationInProgress(account.id) ? 'Activating...' : 'Activate'}
                             </Button>
                           )}
                           <Button
@@ -622,31 +630,31 @@ const AccountSetup: React.FC = () => {
                     </tr>
                   ))}
                 </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Add Broker Form */}
-        {showAddForm && (
-          <div className="card">
-            <div className="card-header">
-              <h2 className="card-title">
-                {selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
-              </h2>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowAddForm(false);
-                  setSelectedBroker('');
-                  setError(null);
-                }}
-              >
-                ✕ Cancel
-              </Button>
-            </div>
-
-            <div style={{ padding: '1.5rem' }}>
+          {/* Add Broker Form */}
+          {showAddForm && (
+            <Card>
+              <CardHeader
+                title={selectedBroker ? `Connect ${ALL_BROKERS.find(b => b.id === selectedBroker)?.name}` : 'Select Broker'}
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setSelectedBroker('');
+                      setError(null);
+                    }}
+                  >
+                    ✕ Cancel
+                  </Button>
+                }
+              />
+              <CardContent>
               {!selectedBroker ? (
                 /* Broker Selection */
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
@@ -932,29 +940,30 @@ const AccountSetup: React.FC = () => {
                   </Button>
                 </div>
               )}
-            </div>
-          </div>
-        )}
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Empty State */}
-        {accounts.length === 0 && !showAddForm && (
-          <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-            <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
-              No Broker Accounts Connected
-            </div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
-              Connect your broker account to start trading. We support multiple brokers with secure API integration.
-            </div>
-            <Button
-              variant="primary"
-              onClick={() => setShowAddForm(true)}
-              style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
-            >
-              Connect Your First Broker
-            </Button>
-          </div>
-        )}
+          {/* Empty State */}
+          {accounts.length === 0 && !showAddForm && (
+            <Card padding="lg" style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>🔗</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: '600', marginBottom: '1rem', color: 'var(--text-primary)' }}>
+                No Broker Accounts Connected
+              </div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: '2rem', maxWidth: '400px', margin: '0 auto 2rem' }}>
+                Connect your broker account to start trading. We support multiple brokers with secure API integration.
+              </div>
+              <Button
+                variant="primary"
+                onClick={() => setShowAddForm(true)}
+                style={{ fontSize: '1rem', padding: '0.75rem 2rem' }}
+              >
+                Connect Your First Broker
+              </Button>
+            </Card>
+          )}
+        </Stack>
       </div>
 
       {/* OAuth Dialog */}

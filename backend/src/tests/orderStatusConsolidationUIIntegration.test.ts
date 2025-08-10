@@ -132,14 +132,7 @@ const mockBrokerService = {
   isConnected: jest.fn().mockReturnValue(true)
 };
 
-// Mock the enhanced unified broker manager
-jest.mock('../services/enhancedUnifiedBrokerManager', () => ({
-  enhancedUnifiedBrokerManager: {
-    getBrokerService: jest.fn(),
-    getUserConnections: jest.fn(),
-    getConnection: jest.fn()
-  }
-}));
+// unified manager removed; no mock needed
 
 // Mock the database
 jest.mock('../services/databaseCompatibility', () => ({

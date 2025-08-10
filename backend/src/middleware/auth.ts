@@ -6,6 +6,7 @@ export interface AuthenticatedRequest extends Request {
     id: string;
     email: string;
     name: string;
+    role?: string;
   };
   body: any;
   params: any;
@@ -39,6 +40,7 @@ export const authenticateToken = (
       id: string;
       email: string;
       name: string;
+      role?: string;
     };
 
     req.user = decoded;
@@ -55,4 +57,15 @@ export const authenticateToken = (
       message: 'Invalid or expired token',
     });
   }
+};
+
+
+export const requireAdmin = (
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  const role = req.user?.role?.toLowerCase();
+  if (role === 'admin') return next();
+  res.status(403).json({ success: false, message: 'Admin access required' });
 };

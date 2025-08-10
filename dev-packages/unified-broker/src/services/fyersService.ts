@@ -56,9 +56,9 @@ export class FyersService {
   private fyers: any;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
-  private appId: string = '';
+  public appId: string = '';
   private clientId: string = '';
-  private secretKey: string = '';
+  public secretKey: string = '';
 
   constructor() {
     // Initialize the official Fyers API client
@@ -68,14 +68,16 @@ export class FyersService {
     });
   }
 
-  // Generate auth URL for user to visit
+  // Generate auth URL for user to visit - Fixed to use actual login page
   generateAuthUrl(credentials: FyersCredentials): string {
     this.appId = credentials.clientId;
     this.fyers.setAppId(credentials.clientId);
     this.fyers.setRedirectUrl(credentials.redirectUri);
-    
-    const authUrl = this.fyers.generateAuthCode();
-    console.log('🔗 Auth URL generated:', authUrl);
+
+    // Use the correct Fyers login URL instead of API endpoint
+    const authUrl = `https://api-t1.fyers.in/api/v3/generate-authcode?client_id=${credentials.clientId}&redirect_uri=${encodeURIComponent(credentials.redirectUri)}&response_type=code&state=sample_state`;
+
+    console.log('🔗 Fixed Auth URL generated:', authUrl);
     return authUrl;
   }
 
@@ -174,20 +176,20 @@ export class FyersService {
     }
 
     try {
-      // Fyers API v3 expects specific payload structure
+      // Fyers API v3 expects specific payload structure with mixed case field names
       const payload = {
         symbol: orderData.symbol,
         qty: Math.abs(orderData.qty), // Ensure quantity is positive
         type: this.getOrderTypeCode(orderData.type),
         side: orderData.side === 'BUY' ? 1 : -1, // 1=BUY, -1=SELL
-        productType: this.getProductTypeCode(orderData.productType),
-        limitPrice: orderData.limitPrice || 0,
-        stopPrice: orderData.stopPrice || 0,
-        disclosedQty: orderData.disclosedQty || 0,
+        productType: this.getProductTypeCode(orderData.productType), // Keep camelCase
+        limitPrice: orderData.limitPrice || 0, // Keep camelCase
+        stopPrice: orderData.stopPrice || 0, // Keep camelCase
+        disclosedQty: orderData.disclosedQty || 0, // Keep camelCase
         validity: orderData.validity === 'DAY' ? 'DAY' : 'IOC',
-        offlineOrder: orderData.offlineOrder || false,
-        stopLoss: orderData.stopLoss || 0,
-        takeProfit: orderData.takeProfit || 0,
+        offlineOrder: orderData.offlineOrder || false, // Keep camelCase
+        stopLoss: orderData.stopLoss || 0, // Keep camelCase
+        takeProfit: orderData.takeProfit || 0, // Keep camelCase
       };
 
       console.log('🔄 Placing Fyers order with payload:', JSON.stringify(payload, null, 2));
@@ -257,20 +259,7 @@ export class FyersService {
     }
   }
 
-  // Get positions using official API
-  async getPositions(): Promise<FyersPosition[]> {
-    if (!this.accessToken) {
-      throw new Error('Not authenticated. Please login first.');
-    }
 
-    try {
-      const response = await this.fyers.get_positions();
-      return response.netPositions || [];
-    } catch (error: any) {
-      console.error('🚨 Failed to get positions:', error);
-      throw new Error(error.message || 'Failed to get positions');
-    }
-  }
 
   // Search symbols using official API
   async searchScrip(exchange: string, symbol: string): Promise<any[]> {
@@ -329,11 +318,13 @@ export class FyersService {
   // Helper method to convert product type to code
   private getProductTypeCode(productType: string): string {
     const productMap: { [key: string]: string } = {
-      'CNC': 'CNC',
-      'INTRADAY': 'INTRADAY',
-      'MARGIN': 'MARGIN',
-      'CO': 'CO',
-      'BO': 'BO',
+      'CNC': 'CNC',        // Cash and Carry
+      'INTRADAY': 'INTRADAY', // Intraday/MIS
+      'MIS': 'INTRADAY',   // Map MIS to INTRADAY
+      'MARGIN': 'MARGIN',  // Margin/NRML
+      'NRML': 'MARGIN',    // Map NRML to MARGIN
+      'CO': 'CO',          // Cover Order
+      'BO': 'BO',          // Bracket Order
     };
     return productMap[productType] || 'CNC';
   }
@@ -352,6 +343,71 @@ export class FyersService {
   setAccessToken(token: string): void {
     this.accessToken = token;
     this.fyers.setAccessToken(token);
+  }
+
+  // Refresh access token using refresh token (overloaded for compatibility)
+  async refreshAccessToken(): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; message: string; expiryTime?: string }>;
+  async refreshAccessToken(refreshToken: string): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; message: string; expiryTime?: string }>;
+  async refreshAccessToken(refreshToken?: string): Promise<{ success: boolean; accessToken?: string; refreshToken?: string; message: string; expiryTime?: string }> {
+    const tokenToUse = refreshToken || this.refreshToken;
+    if (!tokenToUse) {
+      return {
+        success: false,
+        message: 'No refresh token available'
+      };
+    }
+
+    try {
+      console.log('🔄 Refreshing Fyers access token using refresh token...');
+
+      // Create appIdHash (SHA-256 of appId + secretKey)
+      const crypto = require('crypto');
+      const appIdHash = crypto.createHash('sha256').update(this.clientId + this.secretKey).digest('hex');
+
+      const response = await fetch('https://api-t1.fyers.in/api/v3/validate-refresh-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          refresh_token: tokenToUse,
+          appIdHash: appIdHash
+        })
+      });
+
+      const data = await response.json() as any;
+
+      if (data.s === 'ok') {
+        this.accessToken = data.access_token;
+        this.refreshToken = tokenToUse; // Keep the same refresh token
+        this.fyers.setAccessToken(data.access_token);
+
+        console.log('✅ Fyers access token refreshed successfully');
+
+        // Calculate new expiry time (24 hours from now)
+        const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+        return {
+          success: true,
+          accessToken: data.access_token,
+          refreshToken: tokenToUse, // Same refresh token
+          message: 'Access token refreshed successfully',
+          expiryTime: expiryTime
+        };
+      } else {
+        console.error('❌ Fyers token refresh failed:', data.message);
+        return {
+          success: false,
+          message: data.message || 'Token refresh failed'
+        };
+      }
+    } catch (error: any) {
+      console.error('🚨 Fyers token refresh error:', error);
+      return {
+        success: false,
+        message: error.message || 'Token refresh failed'
+      };
+    }
   }
 
   // Validate if the current session is still active
@@ -380,7 +436,7 @@ export class FyersService {
     try {
       this.accessToken = null;
       this.appId = '';
-      
+
       console.log('✅ Fyers logout successful');
       return {
         success: true,
@@ -392,6 +448,26 @@ export class FyersService {
         success: false,
         message: error.message || 'Logout failed',
       };
+    }
+  }
+
+  // Compatibility methods for broker adapters
+  setRefreshToken(token: string | undefined): void {
+    this.refreshToken = token || null;
+  }
+
+  // Get positions using official API
+  async getPositions(): Promise<any[]> {
+    if (!this.accessToken) {
+      throw new Error('Not authenticated. Please login first.');
+    }
+
+    try {
+      const response = await this.fyers.positions();
+      return response.netPositions || [];
+    } catch (error: any) {
+      console.error('🚨 Failed to get positions:', error);
+      throw new Error(error.message || 'Failed to get positions');
     }
   }
 }

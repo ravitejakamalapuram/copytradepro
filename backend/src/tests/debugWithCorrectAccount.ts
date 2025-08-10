@@ -2,7 +2,7 @@
  * Debug order status using the correct account for each order
  */
 
-import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
+import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 import { userDatabase } from '../services/databaseCompatibility';
 
 async function debugWithCorrectAccount(orderId: string) {
@@ -35,40 +35,22 @@ async function debugWithCorrectAccount(orderId: string) {
     console.log(`- Status: ${order.status}`);
     console.log(`- Symbol: ${order.symbol}`);
     
-    // Get the specific connection for this account
-    console.log('\n🔍 Looking for specific account connection...');
-    const connection = enhancedUnifiedBrokerManager.getConnection(
-      order.user_id.toString(),
-      order.broker_name,
-      order.account_id.toString()
-    );
-    
-    if (!connection) {
-      console.log(`❌ No connection found for account ${order.account_id}`);
-      
-      // Show all available connections
-      const allConnections = enhancedUnifiedBrokerManager.getUserConnections(order.user_id.toString());
-      console.log(`\n📊 Available connections for user ${order.user_id}:`);
-      allConnections.forEach((conn, index) => {
-        console.log(`${index + 1}. ${conn.brokerName} - ${conn.accountId} (Active: ${conn.isActive})`);
-      });
-      return;
-    }
-    
-    console.log(`✅ Found connection for account: ${connection.accountId}`);
-    console.log(`- Is Active: ${connection.isActive}`);
-    console.log(`- Is Connected: ${connection.service.isConnected()}`);
-    console.log(`- Last Activity: ${connection.lastActivity}`);
-    
+    // Create service statelessly using broker name
+    const factory = UnifiedBrokerFactory.getInstance();
+    const service = factory.createBroker(order.broker_name);
+
+    console.log(`✅ Prepared stateless service for broker: ${order.broker_name}`);
+    console.log(`- Account ID: ${order.account_id}`);
+
     // Make direct API call with correct account
     console.log('\n🚀 Making Shoonya API call with correct account...');
-    console.log(`- Account ID: ${connection.accountId}`);
+    console.log(`- Account ID: ${order.account_id}`);
     console.log(`- Broker Order ID: ${order.broker_order_id}`);
-    
+
     try {
       const startTime = Date.now();
-      const apiResponse = await connection.service.getOrderStatus(
-        connection.accountId,
+      const apiResponse = await service.getOrderStatus(
+        order.account_id.toString(),
         order.broker_order_id
       );
       const endTime = Date.now();

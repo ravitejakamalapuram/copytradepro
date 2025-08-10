@@ -556,24 +556,7 @@ export class ShoonyaService {
     return 'UNKNOWN_ERROR';
   }
 
-  async getPositions(userId: string): Promise<any> {
-    if (!this.sessionToken) {
-      throw new Error('Not logged in to Shoonya. Please login first.');
-    }
 
-    try {
-      const response = await this.makeRequest('PositionBook', {
-        uid: userId,
-        actid: userId,
-        token: this.sessionToken,
-      });
-
-      return response;
-    } catch (error: any) {
-      console.error('🚨 Shoonya get positions error:', error.message);
-      throw error;
-    }
-  }
 
   async searchScrip(exchange: string, searchText: string): Promise<any> {
     if (!this.sessionToken) {
@@ -608,25 +591,7 @@ export class ShoonyaService {
     }
   }
 
-  async getQuotes(exchange: string, token: string): Promise<any> {
-    if (!this.sessionToken) {
-      throw new Error('Not logged in to Shoonya. Please login first.');
-    }
 
-    try {
-      const response = await this.makeRequest('GetQuotes', {
-        uid: '',
-        exch: exchange,
-        token: token,
-        sessionToken: this.sessionToken,
-      });
-
-      return response;
-    } catch (error: any) {
-      console.error('🚨 Shoonya get quotes error:', error.message);
-      throw error;
-    }
-  }
 
   isLoggedIn(): boolean {
     return this.sessionToken !== null;
@@ -729,6 +694,50 @@ export class ShoonyaService {
       }
     } catch (error: any) {
       console.error('🚨 Shoonya modify order error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get positions for a user
+   */
+  async getPositions(userId: string): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      const response = await this.makeAuthenticatedRequest('PositionBook', {
+        uid: userId,
+        actid: userId,
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('🚨 Shoonya get positions error:', error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get quotes for a symbol
+   */
+  async getQuotes(exchange: string, token: string): Promise<any> {
+    if (!this.sessionToken) {
+      throw new Error('Not logged in to Shoonya. Please login first.');
+    }
+
+    try {
+      const response = await this.makeRequest('GetQuotes', {
+        uid: '',
+        exch: exchange,
+        token: token,
+        sessionToken: this.sessionToken,
+      });
+
+      return response;
+    } catch (error: any) {
+      console.error('🚨 Shoonya get quotes error:', error.message);
       throw error;
     }
   }

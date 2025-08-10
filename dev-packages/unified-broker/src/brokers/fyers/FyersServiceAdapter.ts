@@ -3,7 +3,7 @@
  * Adapts the existing FyersService to implement IBrokerService interface
  */
 
-import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus, Position, Quote } from '../../interfaces/IBrokerService';
+import { IBrokerService, BrokerCredentials, LoginResponse, OrderRequest, OrderResponse, OrderStatus } from '../../interfaces/IBrokerService';
 import { FyersService } from '../../services/fyersService';
 import { FyersCredentials } from './types';
 
@@ -222,7 +222,7 @@ export class FyersServiceAdapter extends IBrokerService {
     }
   }
 
-  async getPositions(accountId: string): Promise<Position[]> {
+  async getPositions(accountId: string): Promise<any[]> {
     try {
       const response = await this.fyersService.getPositions();
 
@@ -245,7 +245,7 @@ export class FyersServiceAdapter extends IBrokerService {
     }
   }
 
-  async getQuote(symbol: string, exchange: string): Promise<Quote> {
+  async getQuote(symbol: string, exchange: string): Promise<any> {
     try {
       const response = await this.fyersService.getQuotes([`${exchange}:${symbol}`]);
 

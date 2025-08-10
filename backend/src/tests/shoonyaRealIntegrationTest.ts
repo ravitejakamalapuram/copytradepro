@@ -5,7 +5,7 @@
 
 import { userDatabase } from '../services/databaseCompatibility';
 import orderStatusService from '../services/orderStatusService';
-import { enhancedUnifiedBrokerManager } from '../services/enhancedUnifiedBrokerManager';
+import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 
 async function testShoonyaOrderStatusIntegration() {
   console.log('🧪 Starting Shoonya Order Status Real Integration Test...');
@@ -47,13 +47,8 @@ async function testShoonyaOrderStatusIntegration() {
     
     for (const userId of userIds) {
       console.log(`\n👤 Checking connections for user ${userId}:`);
-      const connections = enhancedUnifiedBrokerManager.getUserConnections(userId)
-        .filter(conn => conn.brokerName === 'shoonya');
-      console.log(`  - Found ${connections.length} Shoonya connections`);
-      
-      connections.forEach((conn, index) => {
-        console.log(`  - Connection ${index + 1}: Account ${conn.accountId}, Active: ${conn.isActive}`);
-      });
+      // Stateless mode: just log that we would create service on demand
+      console.log('  - Stateless mode: connections are created on demand via UnifiedBrokerFactory');
     }
     
     // Step 3: Test order status refresh for a specific order

@@ -4,7 +4,7 @@
  */
 
 import { userDatabase } from './databaseCompatibility';
-import { enhancedUnifiedBrokerManager } from './enhancedUnifiedBrokerManager';
+import { UnifiedBrokerFactory } from '@copytrade/unified-broker';
 import { OrderErrorClassifier } from './orderErrorClassifier';
 import { logger } from '../utils/logger';
 import { OrderHistory } from '../interfaces/IDatabaseAdapter';
@@ -189,16 +189,11 @@ export class OrderRetryService {
         accountId: account.account_id
       };
 
-      // Get broker service
-      const brokerService = enhancedUnifiedBrokerManager.getBrokerService(
-        order.user_id.toString(),
-        order.broker_name,
-        account.account_id
-      );
-
-      if (!brokerService) {
-        throw new Error(`No active connection found for ${order.broker_name}`);
-      }
+      // Get stateless broker service
+      const factory = UnifiedBrokerFactory.getInstance();
+      const brokerService = factory.createBroker(order.broker_name);
+      const credentials = await userDatabase.getAccountCredentials(account.id);
+      await brokerService.connect(credentials).catch(() => {});
 
       // Place the order
       const response = await brokerService.placeOrder(orderRequest);

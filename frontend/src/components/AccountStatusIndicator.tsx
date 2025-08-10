@@ -43,21 +43,13 @@ const AccountStatusIndicator: React.FC<AccountStatusIndicatorProps> = ({
   }
 
   const getStatusInfo = () => {
-    if (account.isActive) {
-      return {
-        status: 'active',
-        text: 'Active',
-        color: '#22c55e', // green
-        bgColor: '#dcfce7'
-      };
-    } else {
-      return {
-        status: 'inactive',
-        text: 'Inactive',
-        color: '#ef4444', // red
-        bgColor: '#fee2e2'
-      };
+    if (account.accountStatus === 'PROCEED_TO_OAUTH') {
+      return { status: 'inactive', text: 'Auth Required', color: '#f59e0b', bgColor: '#fef3c7' };
     }
+    if (account.isActive) {
+      return { status: 'active', text: 'Active', color: '#22c55e', bgColor: '#dcfce7' };
+    }
+    return { status: 'inactive', text: 'Inactive', color: '#ef4444', bgColor: '#fee2e2' };
   };
 
   const statusInfo = getStatusInfo();

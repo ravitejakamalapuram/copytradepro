@@ -4,11 +4,15 @@ import jwt from 'jsonwebtoken';
 import { validationResult } from 'express-validator';
 import { AuthenticatedRequest } from '../middleware/auth';
 import { getDatabase } from '../services/databaseFactory';
+import { trackedUserDatabase } from '../services/trackedDatabaseCompatibility';
+import { authErrorLoggingService } from '../services/authErrorLoggingService';
+import { traceIdService } from '../services/traceIdService';
+import TraceContext from '../utils/traceContext';
 import { User } from '../interfaces/IDatabaseAdapter';
-import { populateCacheForUser } from './brokerController';
+
 
 // Helper function to generate JWT token
-const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
+const generateToken = (user: Pick<User, 'id' | 'email' | 'name' | 'role'>): string => {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('JWT_SECRET not configured');
@@ -19,6 +23,7 @@ const generateToken = (user: Pick<User, 'id' | 'email' | 'name'>): string => {
       id: user.id.toString(),
       email: user.email,
       name: user.name,
+      role: user.role || 'user',
     },
     jwtSecret,
     { expiresIn: '24h' }
@@ -30,10 +35,57 @@ export const register = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const startTime = performance.now();
+  const traceId = TraceContext.getTraceId() || traceIdService.generateTraceId();
+  
+  const authContext = authErrorLoggingService.createAuthContext(
+    'REGISTER_USER',
+    {
+      email: req.body.email,
+      sessionInfo: {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip || req.connection.remoteAddress
+      },
+      requestDetails: {
+        url: req.originalUrl,
+        method: req.method,
+        requestId: traceId
+      },
+      traceId
+    }
+  );
+
   try {
+    await traceIdService.addOperation(traceId, 'REGISTER_USER', 'AUTH_CONTROLLER');
+
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const duration = performance.now() - startTime;
+      const validationError = new Error('Validation failed');
+      
+      await authErrorLoggingService.logAuthError(
+        'User registration failed: Validation errors',
+        validationError,
+        {
+          ...authContext,
+          requestDetails: {
+            ...authContext.requestDetails!,
+            duration
+          }
+        }
+      );
+
+      await traceIdService.completeOperation(
+        traceId,
+        'REGISTER_USER',
+        'ERROR',
+        { 
+          error: 'Validation failed',
+          duration 
+        }
+      );
+
       res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -48,9 +100,8 @@ export const register = async (
     const saltRounds = 12;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Create new user using database adapter
-    const database = await getDatabase();
-    const newUser = await database.createUser({
+    // Create new user using tracked database service
+    const newUser = await trackedUserDatabase.createUser({
       email,
       name,
       password: hashedPassword,
@@ -61,7 +112,34 @@ export const register = async (
       id: newUser.id,
       email: newUser.email,
       name: newUser.name,
+      role: newUser.role || 'user',
     });
+
+    const duration = performance.now() - startTime;
+
+    // Log successful registration
+    await authErrorLoggingService.logAuthSuccess(
+      'User registered successfully',
+      {
+        ...authContext,
+        userId: newUser.id.toString(),
+        requestDetails: {
+          ...authContext.requestDetails!,
+          duration
+        }
+      }
+    );
+
+    await traceIdService.completeOperation(
+      traceId,
+      'REGISTER_USER',
+      'SUCCESS',
+      { 
+        userId: newUser.id.toString(),
+        email: newUser.email,
+        duration 
+      }
+    );
 
     res.status(201).json({
       success: true,
@@ -76,7 +154,31 @@ export const register = async (
         token,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    const duration = performance.now() - startTime;
+
+    await authErrorLoggingService.logAuthError(
+      `User registration failed: ${error.message}`,
+      error,
+      {
+        ...authContext,
+        requestDetails: {
+          ...authContext.requestDetails!,
+          duration
+        }
+      }
+    );
+
+    await traceIdService.completeOperation(
+      traceId,
+      'REGISTER_USER',
+      'ERROR',
+      { 
+        error: error.message,
+        duration 
+      }
+    );
+
     next(error);
   }
 };
@@ -86,10 +188,57 @@ export const login = async (
   res: Response,
   next: NextFunction
 ): Promise<void> => {
+  const startTime = performance.now();
+  const traceId = TraceContext.getTraceId() || traceIdService.generateTraceId();
+  
+  const authContext = authErrorLoggingService.createAuthContext(
+    'LOGIN_USER',
+    {
+      email: req.body.email,
+      sessionInfo: {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip || req.connection.remoteAddress
+      },
+      requestDetails: {
+        url: req.originalUrl,
+        method: req.method,
+        requestId: traceId
+      },
+      traceId
+    }
+  );
+
   try {
+    await traceIdService.addOperation(traceId, 'LOGIN_USER', 'AUTH_CONTROLLER');
+
     // Check validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      const duration = performance.now() - startTime;
+      const validationError = new Error('Validation failed');
+      
+      await authErrorLoggingService.logAuthError(
+        'User login failed: Validation errors',
+        validationError,
+        {
+          ...authContext,
+          requestDetails: {
+            ...authContext.requestDetails!,
+            duration
+          }
+        }
+      );
+
+      await traceIdService.completeOperation(
+        traceId,
+        'LOGIN_USER',
+        'ERROR',
+        { 
+          error: 'Validation failed',
+          duration 
+        }
+      );
+
       res.status(400).json({
         success: false,
         message: 'Validation failed',
@@ -100,10 +249,38 @@ export const login = async (
 
     const { email, password } = req.body;
 
-    // Find user using database adapter
-    const database = await getDatabase();
-    const user = await database.findUserByEmail(email);
+    // Find user using tracked database service
+    const user = await trackedUserDatabase.findUserByEmail(email);
     if (!user) {
+      const duration = performance.now() - startTime;
+      const authError = new Error('Invalid email or password');
+      
+      await authErrorLoggingService.logAuthError(
+        'Login failed: User not found',
+        authError,
+        {
+          ...authContext,
+          requestDetails: {
+            ...authContext.requestDetails!,
+            duration
+          },
+          securityContext: {
+            suspiciousActivity: false // Not necessarily suspicious, could be typo
+          }
+        }
+      );
+
+      await traceIdService.completeOperation(
+        traceId,
+        'LOGIN_USER',
+        'ERROR',
+        { 
+          error: 'User not found',
+          email,
+          duration 
+        }
+      );
+
       res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -114,6 +291,38 @@ export const login = async (
     // Verify password
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      const duration = performance.now() - startTime;
+      const authError = new Error('Invalid email or password');
+      
+      await authErrorLoggingService.logAuthError(
+        'Login failed: Invalid password',
+        authError,
+        {
+          ...authContext,
+          userId: user.id.toString(),
+          requestDetails: {
+            ...authContext.requestDetails!,
+            duration
+          },
+          securityContext: {
+            suspiciousActivity: true, // Wrong password is more suspicious
+            loginAttempts: 1 // In real app, track this
+          }
+        }
+      );
+
+      await traceIdService.completeOperation(
+        traceId,
+        'LOGIN_USER',
+        'ERROR',
+        { 
+          error: 'Invalid password',
+          userId: user.id.toString(),
+          email,
+          duration 
+        }
+      );
+
       res.status(401).json({
         success: false,
         message: 'Invalid email or password',
@@ -126,10 +335,40 @@ export const login = async (
       id: user.id,
       email: user.email,
       name: user.name,
+      role: user.role || 'user',
     });
 
-    // Populate broker account cache for this user
-    await populateCacheForUser(user.id.toString());
+    // In-memory broker account cache removed
+
+    const duration = performance.now() - startTime;
+
+    // Log successful login
+    await authErrorLoggingService.logAuthSuccess(
+      'User login successful',
+      {
+        ...authContext,
+        userId: user.id.toString(),
+        sessionInfo: {
+          ...authContext.sessionInfo!,
+          tokenExpiry: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+        },
+        requestDetails: {
+          ...authContext.requestDetails!,
+          duration
+        }
+      }
+    );
+
+    await traceIdService.completeOperation(
+      traceId,
+      'LOGIN_USER',
+      'SUCCESS',
+      { 
+        userId: user.id.toString(),
+        email: user.email,
+        duration 
+      }
+    );
 
     res.status(200).json({
       success: true,
@@ -139,12 +378,37 @@ export const login = async (
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role || 'user', // Include role field
           createdAt: user.created_at,
         },
         token,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
+    const duration = performance.now() - startTime;
+
+    await authErrorLoggingService.logAuthError(
+      `User login failed: ${error.message}`,
+      error,
+      {
+        ...authContext,
+        requestDetails: {
+          ...authContext.requestDetails!,
+          duration
+        }
+      }
+    );
+
+    await traceIdService.completeOperation(
+      traceId,
+      'LOGIN_USER',
+      'ERROR',
+      { 
+        error: error.message,
+        duration 
+      }
+    );
+
     next(error);
   }
 };

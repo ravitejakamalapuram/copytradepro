@@ -1,0 +1,141 @@
+/* ==========================================================================
+   DARK THEME VARIABLES
+   ========================================================================== */
+
+.dark-theme {
+  /* Background colors */
+  --bg-primary: #0f0f0f;
+  --bg-secondary: #1a1a1a;
+  --bg-tertiary: #262626;
+  --bg-surface: #1f1f1f;
+  --bg-elevated: #2a2a2a;
+
+  /* Text colors */
+  --text-primary: #ffffff;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+  --text-inverse: #000000;
+
+  /* Border colors */
+  --border-primary: #404040;
+  --border-secondary: #525252;
+  --border-tertiary: #737373;
+
+  /* Interactive colors */
+  --interactive-primary: #3b82f6;
+  --interactive-primary-hover: #2563eb;
+  --interactive-secondary: #374151;
+  --interactive-secondary-hover: #4b5563;
+
+  /* Status colors */
+  --color-profit: #10b981;
+  --color-loss: #ef4444;
+  --color-warning: #f59e0b;
+  --color-neutral: #6b7280;
+
+  /* Shadows for dark theme */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+
+  /* Trading specific colors for dark theme */
+  --trading-buy: #10b981;
+  --trading-sell: #ef4444;
+  --trading-pending: #f59e0b;
+  --trading-executed: #10b981;
+  --trading-cancelled: #6b7280;
+}
+
+/* Color scheme variations for dark theme */
+.dark-theme[data-color-scheme="green"] {
+  --interactive-primary: #10b981;
+  --interactive-primary-hover: #059669;
+}
+
+.dark-theme[data-color-scheme="purple"] {
+  --interactive-primary: #8b5cf6;
+  --interactive-primary-hover: #7c3aed;
+}
+
+.dark-theme[data-color-scheme="orange"] {
+  --interactive-primary: #f59e0b;
+  --interactive-primary-hover: #d97706;
+}
+
+/* Dark theme specific adjustments */
+.dark-theme .loading-spinner {
+  border-color: var(--border-secondary);
+  border-top-color: var(--interactive-primary);
+}
+
+.dark-theme .table-trading {
+  background-color: var(--bg-surface);
+}
+
+.dark-theme .table-trading th {
+  background-color: var(--bg-tertiary);
+  border-bottom-color: var(--border-primary);
+}
+
+.dark-theme .table-trading td {
+  border-bottom-color: var(--border-primary);
+}
+
+.dark-theme .table-trading tbody tr:hover {
+  background-color: var(--bg-tertiary);
+}
+
+/* Dark theme navigation */
+.dark-theme .app-nav {
+  background-color: var(--bg-surface);
+  border-bottom-color: var(--border-primary);
+}
+
+/* Dark theme cards */
+.dark-theme .card {
+  background-color: var(--bg-surface);
+  border-color: var(--border-primary);
+}
+
+.dark-theme .card-header {
+  border-bottom-color: var(--border-primary);
+}
+
+/* Dark theme forms */
+.dark-theme input,
+.dark-theme select,
+.dark-theme textarea {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.dark-theme input:focus,
+.dark-theme select:focus,
+.dark-theme textarea:focus {
+  border-color: var(--interactive-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Dark theme buttons */
+.dark-theme .btn-secondary {
+  background-color: var(--bg-tertiary);
+  border-color: var(--border-secondary);
+  color: var(--text-primary);
+}
+
+.dark-theme .btn-secondary:hover {
+  background-color: var(--bg-elevated);
+  border-color: var(--border-primary);
+}
+
+.dark-theme .btn-outline {
+  border-color: var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.dark-theme .btn-outline:hover {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+}

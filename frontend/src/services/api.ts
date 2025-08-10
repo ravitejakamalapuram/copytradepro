@@ -1,8 +1,10 @@
 import axios from 'axios';
 import type { AxiosInstance, AxiosError, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
 import { frontendLogger } from './loggingService';
+import { errorCaptureService } from './errorCaptureService';
 import { apiCache } from './cacheManager';
 import { performanceMonitorService } from './performanceMonitorService';
+import { shouldLogoutOnError, handleSessionExpiry } from '../utils/sessionUtils';
 
 // Enhanced request configuration with retry metadata
 interface EnhancedAxiosRequestConfig extends InternalAxiosRequestConfig {
@@ -154,6 +156,16 @@ api.interceptors.response.use(
       data: axiosError.response?.data,
     };
 
+    // Capture API error using error capture service
+    const duration = config?._startTime ? Date.now() - config._startTime : undefined;
+    errorCaptureService.captureApiError(axiosError, {
+      method: config?.method?.toUpperCase(),
+      url: config?.url,
+      requestId: config?._requestId,
+      status: axiosError.response?.status,
+      duration
+    });
+
     // Log error using frontend logger
     frontendLogger.error('API request failed', {
       requestId: config?._requestId,
@@ -189,23 +201,22 @@ api.interceptors.response.use(
       }
     }
 
-    // Handle authentication errors
+    // Handle authentication errors - only logout for actual session expiry
     if (axiosError.response?.status === 401 || axiosError.response?.status === 403) {
       const url = config?.url || '';
       const isDevelopment = import.meta.env.DEV;
 
-      if (isDevelopment) {
-        console.log('🔍 Auth error in development, keeping user logged in:', url);
+      if (shouldLogoutOnError(axiosError, url, isDevelopment)) {
+        console.log('🚨 Session expired detected, logging out user');
+        handleSessionExpiry(`API call to ${url} failed with session expiry`);
       } else {
-        // Production: Only logout for authentication-related endpoints
-        if (url.includes('/auth/') || url.includes('/profile')) {
-          console.log('🚨 User authentication failed, logging out');
-          localStorage.removeItem('token');
-          localStorage.removeItem('user');
-          window.location.href = '/';
-        } else {
-          console.log('🔍 Broker operation failed, keeping user logged in');
-        }
+        const errorMessage = (axiosError.response?.data as any)?.message || '';
+        console.log('🔍 API error (not session expiry), keeping user logged in:', {
+          url,
+          errorMessage,
+          status: axiosError.response?.status,
+          isDevelopment
+        });
       }
     }
 
@@ -472,7 +483,7 @@ const createEnhancedRequest = (originalApi: AxiosInstance) => {
 
 // Cache invalidation helper
 const invalidateCacheForUrl = (url: string) => {
-  let tagsToInvalidate: string[] = [];
+  const tagsToInvalidate: string[] = [];
   
   if (url.includes('/accounts')) {
     tagsToInvalidate.push('account-data');
